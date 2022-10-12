@@ -11,6 +11,7 @@
     <FileVersion>0.10.0.73</FileVersion>
     <AssemblyName>dbatools</AssemblyName>
     <SkipFunctionsDepsCopy>false</SkipFunctionsDepsCopy>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugType>full</DebugType>
@@ -40,17 +41,17 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.0.1" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.0.0" />
     <PackageReference Include="Microsoft.Management.Infrastructure" Version="2.0.0" />
-    <PackageReference Include="Microsoft.SqlServer.DacFx" Version="161.6304.0-preview" />
     <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="170.7.0-preview" />
-    <PackageReference Include="Microsoft.SqlServer.Types" Version="160.900.6-rc0" />
     <PackageReference Include="Microsoft.SqlServer.XEvent.XELite" Version="2021.12.12.2" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
     <PackageReference Include="System.Management.Automation" Version="7.2.6" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>C:\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
       <Private>False</Private>
