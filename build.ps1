@@ -7,8 +7,8 @@ Get-ChildItem -Recurse bin | Remove-Item -Recurse -ErrorAction Ignore
 Get-ChildItem -Recurse temp | Remove-Item -Recurse -ErrorAction Ignore
 Push-Location ".\project"
 dotnet clean
-dotnet publish --configuration release --framework net6.0 | Out-String -OutVariable build
-dotnet publish --configuration release --framework net462 | Out-String -OutVariable build
+dotnet publish --configuration release --framework net6.0 --self-contained | Out-String -OutVariable build
+dotnet publish --configuration release --framework net462 --self-contained | Out-String -OutVariable build
 #dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
 #dotnet test --framework net6.0 --verbosity normal | Out-String -OutVariable test
 
@@ -28,9 +28,7 @@ Copy-Item -Recurse ./third-party-licenses ./bin/third-party-licenses
 
 $null = mkdir ./temp/dacfull -Force
 $null = mkdir bin/sqlpackage/windows -Force
-$null = mkdir bin/sqlpackage/windows-core
 $null = mkdir bin/sqlpackage/mac
-$null = mkdir bin/sqlpackage/linux
 $null = mkdir ./temp/xe
 $null = mkdir ./bin/third-party
 $null = mkdir ./bin/third-party/XESmartTarget
@@ -72,7 +70,16 @@ msiexec /a $(Resolve-Path .\temp\XESmartTarget_x64.msi) /qb TARGETDIR=$(Resolve-
 Start-Sleep 3
 
 $mac = 'Azure.Core.dll', 'Azure.Identity.dll', 'sqlpackage', 'System.Memory.Data.dll', 'System.Security.SecureString.dll'
-$other = 'Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Build.dll', 'Microsoft.Build.Framework.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'System.Memory.Data.dll', 'System.Resources.Extensions.dll', 'System.Security.SecureString.dll', 'sqlpackage.exe', 'sqlpackage'
+
+$win = 'clrjit.dll', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.exe', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.Contracts.dll', 'System.Diagnostics.Debug.dll', 'System.Diagnostics.DiagnosticSource.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.Process.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.Tools.dll', 'System.Diagnostics.TraceSource.dll', 'System.Diagnostics.Tracing.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Runtime.dll', 'System.Runtime.InteropServices.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Text.Encoding.Extensions.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll'
+
+$linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.IdentityModel.JsonWebTokens.dll', 'Microsoft.Win32.Primitives.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.runtimeconfig.json', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Net.Http.Json.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Runtime.Serialization.Json.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Text.Json.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll'
+
+$linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Net.Http.Json.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll','System.Runtime.Serialization.Json.dll','System.Security.Cryptography.Algorithms.dll', 'System.Text.Json.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll', 'sqlpackage', 'sqlpackage.dll', 'sqlpackage.deps.json', 'sqlpackage.runtimeconfig.json'
+
+$other = 'Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Build.dll', 'Microsoft.Build.Framework.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'System.Memory.Data.dll', 'System.Resources.Extensions.dll', 'System.Security.SecureString.dll', 'sqlpackage.exe', 'sqlpackage', 'sqlpackage.dll', 'libhostfxr.so', 'libhostpolicy.so', 'sqlpackage.runtimeconfig.json', 'sqlpackage.deps.json', 'hostpolicy.dll', 'hostfxr.dll', 'sqlpackage', 'sqlpackage.dll'
+
+
 $xe = 'CommandLine.dll', 'CsvHelper.dll', 'DouglasCrockford.JsMin.dll', 'NLog.dll', 'NLog.dll.nlog', 'SmartFormat.dll', 'XESmartTarget.Core.dll'
 
 # 'Microsoft.Data.SqlClient.dll', 'Microsoft.Data.SqlClient.SNI.dll',
@@ -89,8 +96,8 @@ Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination
 Get-ChildItem bin/net462/dbatools.dll | Remove-Item -Force
 Get-ChildItem bin/net6.0/dbatools.dll | Remove-Item -Force
 
-Get-ChildItem ./temp/linux | Where-Object Name -in $other | Copy-Item -Destination bin/sqlpackage/linux/
-Get-ChildItem ./temp/windows | Where-Object Name -in $other | Copy-Item -Destination bin/sqlpackage/windows-core/
+Get-ChildItem ./temp/linux | Where-Object Name -in $linux | Copy-Item -Destination bin/net6.0
+
 Get-ChildItem ./temp/macos | Where-Object Name -in $other | Copy-Item -Destination bin/sqlpackage/mac/
 #Get-ChildItem ./temp/windows/*Microsoft.Data.SqlClient*.dll | Copy-Item -Destination bin/net6.0/publish/win -Verbose
 #Get-ChildItem ./temp/macos | Where-Object Name -in $mac | Copy-Item -Destination bin/net6.0/publish/mac
@@ -146,9 +153,16 @@ Move-Item -Path bin/net462/publish/* -Destination bin/net462/
 Remove-Item -Path bin/net6.0/publish -Recurse -ErrorAction Ignore
 Remove-Item -Path bin/net462/publish -Recurse -ErrorAction Ignore
 
+Remove-Item -Path bin/*.xml -Recurse -ErrorAction Ignore
+Remove-Item -Path bin/*.pdb -Recurse -ErrorAction Ignore
+
 Import-Module C:\github\dbatools-library -Force; Import-Module C:\github\dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs
 
 $Error | Select-Object *
+
+
+### LINUX #####
+Import-Module ./dbatools-library -Force; Import-Module ./dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
 
 
 
@@ -167,10 +181,23 @@ $publishprofile = New-DbaDacProfile -SqlInstance $script:instance1 -Database dba
 $extractOptions = New-DbaDacOption -Action Export
 $extractOptions.ExtractAllTableData = $true
 $dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
+$dacpac
 $Error | select *
 
 
 ipmo ./dbatools-library -Force; ipmo ./dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
+
+$script:instance1 =  $script:instance2 = "sqlcs"
+Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true
+$db = Get-DbaDatabase -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac
+$publishprofile = New-DbaDacProfile -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -Path /tmp
+$extractOptions = New-DbaDacOption -Action Export
+$extractOptions.ExtractAllTableData = $true
+$dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
+$dacpac
+$Error | select *
+
+
 
 <#
 # Remove all the SMO directories that the build created -- they are elsewhere in the project
