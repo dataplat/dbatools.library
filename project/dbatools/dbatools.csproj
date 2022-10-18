@@ -12,6 +12,7 @@
     <AssemblyName>dbatools</AssemblyName>
     <SkipFunctionsDepsCopy>false</SkipFunctionsDepsCopy>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugType>full</DebugType>
@@ -41,6 +42,7 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="System.Resources.Extensions" Version="6.0.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.0.1" />
     <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="170.7.0-preview" />
     <PackageReference Include="Microsoft.SqlServer.XEvent.XELite" Version="2021.12.12.2" />
