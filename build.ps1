@@ -215,9 +215,4 @@ Get-ChildItem dbatools.dll -Recurse | Set-AuthenticodeSignature -Certificate $ce
 
 #.OnRemove 
 
-
-
-
-Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Data.SqlClient.dll', 'Microsoft.Data.SqlClient.SNI.x64.dll', 'Microsoft.Data.SqlClient.SNI.x86.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.Identity.Client.dll', 'Microsoft.Identity.Client.Extensions.Msal.dll', 'Microsoft.IdentityModel.JsonWebTokens.dll', 'Microsoft.IdentityModel.Logging.dll', 'Microsoft.IdentityModel.Protocols.dll', 'Microsoft.IdentityModel.Protocols.OpenIdConnect.dll', 'Microsoft.IdentityModel.Tokens.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'netstandard.dll', 'SqlPackage.exe', 'SqlPackage.exe.config', 'System.Data.Common.dll', 'System.Memory.Data.dll', 'System.Memory.dll', 'System.Net.Http.dll', 'System.Resources.Extensions.dll', 'System.Runtime.InteropServices.RuntimeInformation.dll', 'System.Security.SecureString.dll', 'System.Threading.Tasks.Dataflow.dll', 'System.Threading.Tasks.Extensions.dll
-
 #>
