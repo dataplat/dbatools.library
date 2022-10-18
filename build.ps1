@@ -6,11 +6,11 @@ Remove-Item .\project\dbatools.Tests\obj -Recurse -ErrorAction Ignore
 Get-ChildItem -Recurse bin | Remove-Item -Recurse -ErrorAction Ignore
 Get-ChildItem -Recurse temp | Remove-Item -Recurse -ErrorAction Ignore
 Push-Location ".\project"
+dotnet clean
 dotnet publish --configuration release --framework net6.0 | Out-String -OutVariable build
 dotnet publish --configuration release --framework net462 | Out-String -OutVariable build
-dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
-dotnet test --framework net6.0 --verbosity normal | Out-String -OutVariable test
-
+#dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
+#dotnet test --framework net6.0 --verbosity normal | Out-String -OutVariable test
 
 Get-ChildItem ..\bin -Recurse -Include *.pdb | Remove-Item -Force
 Get-ChildItem ..\bin -Recurse -Include *.xml | Remove-Item -Force
@@ -20,6 +20,7 @@ Get-ChildItem ..\bin\*\dbatools.deps.json -Recurse | Remove-Item -Force
 
 #https://github.com/dotnet/SqlClient/issues/292
 #[System.AppContext]::SetSwitch("Switch.Microsoft.Data.SqlClient.UseManagedNetworkingOnWindows", $false)
+# [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($onAssemblyResolveEventHandler)
 
 Pop-Location
 
@@ -73,7 +74,9 @@ $xe = 'CommandLine.dll', 'CsvHelper.dll', 'DouglasCrockford.JsMin.dll', 'NLog.dl
 # 'Microsoft.Data.SqlClient.dll', 'Microsoft.Data.SqlClient.SNI.dll',
 # 'Microsoft.Identity.Client.dll', 'Microsoft.Identity.Client.Extensions.Msal.dll',
 
-Get-ChildItem "./temp/dacfull/*.dll" -Recurse | Where-Object Name -in $other | Copy-Item -Destination bin/net462/publish
+#Get-ChildItem "./temp/dacfull/*.dll" -Recurse | Where-Object Name -in $other | Copy-Item -Destination bin/net462/publish
+
+#Get-ChildItem "./temp/dacfull/*" -File -Recurse | Copy-Item -Destination bin/net462/publish
 Get-ChildItem "./temp/xe/*.dll" -Recurse | Where-Object Name -in $xe | Copy-Item -Destination bin/third-party/XESmartTarget
 Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination bin/third-party/bogus/net31/bogus.dll
 Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination bin/third-party/bogus/net40/bogus.dll
@@ -83,10 +86,10 @@ Get-ChildItem bin/net6.0/publish/dbatools.dll | Remove-Item -Force
 
 Get-ChildItem ./temp/linux | Where-Object Name -in $other | Copy-Item -Destination bin/net6.0/publish
 Get-ChildItem ./temp/windows | Where-Object Name -in $other | Copy-Item -Destination bin/net6.0/publish/win
-#Get-ChildItem ./temp/windows/*Microsoft.Data.SqlClient*.dll | Copy-Item -Destination bin/net6.0/publish/win
+Get-ChildItem ./temp/windows/*Microsoft.Data.SqlClient*.dll | Copy-Item -Destination bin/net6.0/publish/win -Verbose
 Get-ChildItem ./temp/macos | Where-Object Name -in $mac | Copy-Item -Destination bin/net6.0/publish/mac
 
-Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction SilentlyContinue
+Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 
 $parms = @{
     Provider         = "Nuget"
@@ -96,6 +99,10 @@ $parms = @{
     Force            = $true
     SkipDependencies = $true
 }
+
+$parms.Name = "Microsoft.SqlServer.SqlManagementObjects"
+$parms.RequiredVersion = "170.7.0-preview"
+#Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient"
 $parms.RequiredVersion = "5.0.1"
@@ -116,17 +123,36 @@ $parms.RequiredVersion = "1.6.0"
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\unix\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination bin/net6.0/publish
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination bin/net6.0/publish/win
 Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination bin/net6.0/publish/win
+Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\net461\Microsoft.Identity.Client.dll" -Destination bin/net462/publish/
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination bin/net6.0/publish/win
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination bin/net462/publish/
+
+Import-Module C:\github\dbatools-library -Force; Import-Module C:\github\dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs
+
+$Error | select *
 
 
 
 
-Import-Module C:\github\dbatools-library -Force
-Import-Module C:\github\dbatools -Force
-
+Import-Module C:\github\dbatools-library -Force; Import-Module C:\github\dbatools -Force
+$script:instance1 =  $script:instance2 = "sqlcs"
 Connect-DbaInstance -SqlInstance sqlcs
 
 
+
+
+#.OnRemove 
+
+
+$db = Get-DbaDatabase -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac
+$publishprofile = New-DbaDacProfile -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -Path C:\temp
+$extractOptions = New-DbaDacOption -Action Export
+$extractOptions.ExtractAllTableData = $true
+$dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
+$Error | select *
+
+
+ipmo ./dbatools-library -Force; ipmo ./dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
 
 <#
 # Remove all the SMO directories that the build created -- they are elsewhere in the project
