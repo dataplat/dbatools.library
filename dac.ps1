@@ -25,3 +25,21 @@ foreach ($file in (Get-ChildItem /mnt/c/github/dbatools-library/bin/sqlpackage/l
     }
 }
 
+
+
+### MacOS
+
+foreach ($file in (Get-ChildItem $home/Desktop/dbatools-library/bin/sqlpackage/mac)) {
+    if ($file.Name -match "sqlpackage" -or $file.Name -match "System.Collections.Concurrent" -or $file -match "trace" -or $file.Name -match "json") {
+        continue
+    }
+
+    #$file | Write-Warning
+    Remove-Item $file -ErrorAction Ignore
+    $output = ./sqlpackage | Out-String
+    if ($output -notmatch "Specifies a name value pair for an") {
+        $output
+        Copy-Item "$home/Desktop/dbatools-library/temp/macos/$($file.Name)" -Destination $home/Desktop/dbatools-library/bin/sqlpackage/mac -Verbose -ErrorAction Stop
+    }
+}
+

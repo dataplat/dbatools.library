@@ -69,15 +69,13 @@ Start-Sleep 3
 msiexec /a $(Resolve-Path .\temp\XESmartTarget_x64.msi) /qb TARGETDIR=$(Resolve-Path .\temp\xe)
 Start-Sleep 3
 
-$mac = 'Azure.Core.dll', 'Azure.Identity.dll', 'sqlpackage', 'System.Memory.Data.dll', 'System.Security.SecureString.dll'
+$mac = 'libclrjit.dylib', 'libcoreclr.dylib', 'libhostfxr.dylib', 'libhostpolicy.dylib', 'libSystem.Native.dylib', 'libSystem.Security.Cryptography.Native.Apple.dylib', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.IdentityModel.JsonWebTokens.dll', 'Microsoft.Win32.Primitives.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Net.Http.Json.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Runtime.Serialization.Json.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Text.Json.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll'
 
 $win = 'clrjit.dll', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.exe', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.Contracts.dll', 'System.Diagnostics.Debug.dll', 'System.Diagnostics.DiagnosticSource.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.Process.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.Tools.dll', 'System.Diagnostics.TraceSource.dll', 'System.Diagnostics.Tracing.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Runtime.dll', 'System.Runtime.InteropServices.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Text.Encoding.Extensions.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll'
 
-$linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.IdentityModel.JsonWebTokens.dll', 'Microsoft.Win32.Primitives.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.runtimeconfig.json', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Net.Http.Json.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Runtime.Serialization.Json.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Text.Json.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll'
+$linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Net.Http.Json.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Runtime.Serialization.Json.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Text.Json.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll', 'sqlpackage', 'sqlpackage.dll', 'sqlpackage.deps.json', 'sqlpackage.runtimeconfig.json'
 
-$linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Net.Http.Json.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll','System.Runtime.Serialization.Json.dll','System.Security.Cryptography.Algorithms.dll', 'System.Text.Json.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll', 'sqlpackage', 'sqlpackage.dll', 'sqlpackage.deps.json', 'sqlpackage.runtimeconfig.json'
-
-$other = 'Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Build.dll', 'Microsoft.Build.Framework.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'System.Memory.Data.dll', 'System.Resources.Extensions.dll', 'System.Security.SecureString.dll', 'sqlpackage.exe', 'sqlpackage', 'sqlpackage.dll', 'libhostfxr.so', 'libhostpolicy.so', 'sqlpackage.runtimeconfig.json', 'sqlpackage.deps.json', 'hostpolicy.dll', 'hostfxr.dll', 'sqlpackage', 'sqlpackage.dll'
+$winfull = 'Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Build.dll', 'Microsoft.Build.Framework.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'System.Memory.Data.dll', 'System.Resources.Extensions.dll', 'System.Security.SecureString.dll', 'sqlpackage.exe', 'sqlpackage', 'sqlpackage.dll', 'libhostfxr.so', 'libhostpolicy.so', 'sqlpackage.runtimeconfig.json', 'sqlpackage.deps.json', 'hostpolicy.dll', 'hostfxr.dll', 'sqlpackage', 'sqlpackage.dll'
 
 
 $xe = 'CommandLine.dll', 'CsvHelper.dll', 'DouglasCrockford.JsMin.dll', 'NLog.dll', 'NLog.dll.nlog', 'SmartFormat.dll', 'XESmartTarget.Core.dll'
@@ -86,7 +84,7 @@ $xe = 'CommandLine.dll', 'CsvHelper.dll', 'DouglasCrockford.JsMin.dll', 'NLog.dl
 # 'Microsoft.Identity.Client.dll', 'Microsoft.Identity.Client.Extensions.Msal.dll',
 #Get-ChildItem "./temp/dacfull/*.exe*" -File -Recurse | Copy-Item -Destination bin/net462/publish
 
-Get-ChildItem "./temp/dacfull/" -Recurse | Where-Object Name -in $other | Copy-Item -Destination bin/sqlpackage/windows
+Get-ChildItem "./temp/dacfull/" -Recurse | Where-Object Name -in $winfull | Copy-Item -Destination bin/sqlpackage/windows
 
 
 Get-ChildItem "./temp/xe/*.dll" -Recurse | Where-Object Name -in $xe | Copy-Item -Destination bin/third-party/XESmartTarget
@@ -97,10 +95,7 @@ Get-ChildItem bin/net462/dbatools.dll | Remove-Item -Force
 Get-ChildItem bin/net6.0/dbatools.dll | Remove-Item -Force
 
 Get-ChildItem ./temp/linux | Where-Object Name -in $linux | Copy-Item -Destination bin/net6.0
-
-Get-ChildItem ./temp/macos | Where-Object Name -in $other | Copy-Item -Destination bin/sqlpackage/mac/
-#Get-ChildItem ./temp/windows/*Microsoft.Data.SqlClient*.dll | Copy-Item -Destination bin/net6.0/publish/win -Verbose
-#Get-ChildItem ./temp/macos | Where-Object Name -in $mac | Copy-Item -Destination bin/net6.0/publish/mac
+Get-ChildItem ./temp/macos | Where-Object Name -in $mac | Copy-Item -Destination bin/sqlpackage/mac/
 
 Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 
@@ -156,9 +151,24 @@ Remove-Item -Path bin/net462/publish -Recurse -ErrorAction Ignore
 Remove-Item -Path bin/*.xml -Recurse -ErrorAction Ignore
 Remove-Item -Path bin/*.pdb -Recurse -ErrorAction Ignore
 
+Get-ChildItem -Directory -Path .\bin\net462 | Where-Object Name -notin 'x64', 'x86' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path .\bin\net6.0 | Where-Object Name -notin 'x64', 'x86' | Remove-Item -Recurse
+
+
 Import-Module C:\github\dbatools-library -Force; Import-Module C:\github\dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs
 
 $Error | Select-Object *
+
+
+$script:instance1 = $script:instance2 = "sqlcs"
+Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true
+$db = Get-DbaDatabase -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac
+$publishprofile = New-DbaDacProfile -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -Path C:\temp
+$extractOptions = New-DbaDacOption -Action Export
+$extractOptions.ExtractAllTableData = $true
+$dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
+$dacpac
+$Error | select *
 
 
 ### LINUX #####
