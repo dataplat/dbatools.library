@@ -152,8 +152,8 @@ Remove-Item -Path bin/net462/publish -Recurse -ErrorAction Ignore
 Remove-Item -Path bin/*.xml -Recurse -ErrorAction Ignore
 Remove-Item -Path bin/*.pdb -Recurse -ErrorAction Ignore
 
-Get-ChildItem -Directory -Path .\bin\net462 | Where-Object Name -notin 'x64', 'x86' | Remove-Item -Recurse
-Get-ChildItem -Directory -Path .\bin\net6.0 | Where-Object Name -notin 'x64', 'x86' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path .\bin\net462 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path .\bin\net6.0 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 
 Import-Module C:\github\dbatools-library -Force; Import-Module C:\github\dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs
@@ -169,7 +169,7 @@ $extractOptions = New-DbaDacOption -Action Export
 $extractOptions.ExtractAllTableData = $true
 $dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
 $dacpac
-$results = $dacpac | Publish-DbaDacPackage -PublishXml $publishprofile.FileName -Database butt -SqlInstance $script:instance2 -Confirm:$false
+$dacpac | Publish-DbaDacPackage -PublishXml $publishprofile.FileName -Database butt -SqlInstance $script:instance2 -Confirm:$false
 $Error | Select-Object *
 
 
@@ -179,20 +179,6 @@ $Error | Select-Object *
 
 ### LINUX #####
 Import-Module ./dbatools-library -Force; Import-Module ./dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
-
-
-Import-Module C:\github\dbatools-library -Force; Import-Module C:\github\dbatools -Force
-$script:instance1 =  $script:instance2 = "sqlcs"
-Connect-DbaInstance -SqlInstance sqlcs
-
-
-$db = Get-DbaDatabase -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac
-$publishprofile = New-DbaDacProfile -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -Path C:\temp
-$extractOptions = New-DbaDacOption -Action Export
-$extractOptions.ExtractAllTableData = $true
-$dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
-$dacpac
-$Error | select *
 
 
 ipmo ./dbatools-library -Force; ipmo ./dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
@@ -205,7 +191,9 @@ $extractOptions = New-DbaDacOption -Action Export
 $extractOptions.ExtractAllTableData = $true
 $dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
 $dacpac
-$Error | select *
+
+($dacpac | Publish-DbaDacPackage -PublishXml $publishprofile.FileName -Database butt -SqlInstance $script:instance2 -Confirm:$false).Result
+$Error | Select-Object *
 
 
 
