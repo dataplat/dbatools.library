@@ -37,3 +37,4 @@ debug.log
 bin/
 temp/
 runtimes/
+lib/
