@@ -25,7 +25,7 @@ Get-ChildItem .\bin\net462\ -Exclude *dbatools*, publish | Remove-Item -Force -R
 Get-ChildItem .\bin\ -Include runtimes -Recurse | Remove-Item -Force -Recurse
 Get-ChildItem .\bin\*\dbatools.deps.json -Recurse | Remove-Item -Force
 
-Copy-Item -Recurse ./third-party-licenses ./bin/third-party-licenses
+#Copy-Item -Recurse ./third-party-licenses ./bin/third-party-licenses
 
 $null = mkdir ./temp/dacfull -Force
 $null = mkdir ./bin/sqlpackage/windows -Force
@@ -142,6 +142,10 @@ Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Micr
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination bin/net6.0/publish/win
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination bin/net462/publish/
 
+Copy-Item "replication/Microsoft.SqlServer.Rmo.dll" -Destination bin/net462/publish/
+Copy-Item "replication/Microsoft.SqlServer.Replication.dll" -Destination bin/net462/publish/
+Copy-Item "replication/Microsoft.SqlServer.Rmo.dll" -Destination bin/net6.0/publish/
+Copy-Item "replication/Microsoft.SqlServer.Replication.dll" -Destination bin/net6.0/publish/
 
 Move-Item -Path bin/net6.0/publish/* -Destination bin/net6.0/
 Move-Item -Path bin/net462/publish/* -Destination bin/net462/
@@ -198,21 +202,11 @@ $Error | Select-Object *
 
 
 <#
-# Remove all the SMO directories that the build created -- they are elsewhere in the project
-Get-ChildItem -Directory ".\bin\net462" | Remove-Item -Recurse -Confirm:$false
-Get-ChildItem -Directory ".\bin\net6.0" | Remove-Item -Recurse -Confirm:$false
-
-# Remove all the SMO files that the build created -- they are elsewhere in the project
-Get-ChildItem ".\bin\net6.0" -Recurse -Exclude dbatools.* | Move-Item -Destination ".\bin\smo\coreclr" -Confirm:$false -Force
-Get-ChildItem ".\bin\net462" -Recurse -Exclude dbatools.* | Move-Item -Destination ".\bin\smo\" -Confirm:$false -Force
-Get-ChildItem ".\bin" -Recurse -Include dbatools.deps.json | Remove-Item -Confirm:$false
 
 # Sign the DLLs, how cool -- Set-AuthenticodeSignature works on DLLs (and presumably Exes) too
 $buffer = [IO.File]::ReadAllBytes("C:\github\dbatools-code-signing-cert.pfx")
 $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::New($buffer, $pw.Password)
 Get-ChildItem dbatools.dll -Recurse | Set-AuthenticodeSignature -Certificate $certificate -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
 
-
-#.OnRemove 
 
 #>
