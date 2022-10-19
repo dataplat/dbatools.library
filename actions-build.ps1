@@ -1,5 +1,5 @@
 # Go compile the DLLs
-Set-Location C:\github\dbatools-library
+Set-Location ./dbatools-library
 Remove-Item .\project\dbatools\obj -Recurse -ErrorAction Ignore
 Remove-Item .\project\dbatools.Tests\lib -Recurse -ErrorAction Ignore
 Remove-Item .\project\dbatools.Tests\obj -Recurse -ErrorAction Ignore
@@ -142,4 +142,4 @@ Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 Get-ChildItem -Directory -Path .\lib\net462 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 Get-ChildItem -Directory -Path .\lib\net6.0 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
-Import-Module C:\github\dbatools-library -Force
+Import-Module ./dbatools-library/dbatools-library.psd1 -Force
