@@ -12,10 +12,6 @@ dotnet publish --configuration release --framework net462 --self-contained | Out
 #dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
 #dotnet test --framework net6.0 --verbosity normal | Out-String -OutVariable test
 
-#https://github.com/dotnet/SqlClient/issues/292
-#[System.AppContext]::SetSwitch("Switch.Microsoft.Data.SqlClient.UseManagedNetworkingOnWindows", $false)
-# [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($onAssemblyResolveEventHandler)
-
 Pop-Location
 
 Get-ChildItem .\lib -Recurse -Include *.pdb | Remove-Item -Force
@@ -40,18 +36,8 @@ $null = mkdir ./lib/third-party/bogus/netstandard2.0
 $null = mkdir ./lib/third-party/bogus/net40
 $null = mkdir ./temp/bogus
 $null = mkdir ./lib/net6.0/publish/win
-#$null = mkdir lib/net6.0/publish/mac
 
 $ProgressPreference = "SilentlyContinue"
-
-<#
-Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile .\temp\sqlpackage-linux.zip
-Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile .\temp\sqlpackage-macos.zip
-Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile .\temp\DacFramework.msi
-Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile .\temp\bogus.zip
-Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile .\temp\LumenWorksCsvReader.zip
-Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.4.9/XESmartTarget_x64.msi -OutFile .\temp\XESmartTarget_x64.msi
-#>
 
 Copy-Item C:\temp\sqlpackage-linux.zip .\temp\sqlpackage-linux.zip
 Copy-Item C:\temp\sqlpackage-macos.zip .\temp\sqlpackage-macos.zip
@@ -60,13 +46,12 @@ Copy-Item C:\temp\bogus.zip .\temp\bogus.zip
 Copy-Item C:\temp\LumenWorksCsvReader.zip .\temp\LumenWorksCsvReader.zip
 Copy-Item C:\temp\XESmartTarget_x64.msi .\temp\XESmartTarget_x64.msi
 
-$ProgressPreference = "Continue"
-
 Expand-Archive -Path .\temp\sqlpackage-linux.zip -DestinationPath .\temp\linux
-#Expand-Archive -Path .\temp\sqlpackage-win.zip -DestinationPath .\temp\windows
 Expand-Archive -Path .\temp\sqlpackage-macos.zip -DestinationPath .\temp\macos
 Expand-Archive -Path .\temp\LumenWorksCsvReader.zip -DestinationPath .\temp\LumenWorksCsvReader
 Expand-Archive -Path .\temp\bogus.zip -DestinationPath .\temp\bogus
+$ProgressPreference = "Continue"
+
 
 msiexec /a $(Resolve-Path .\temp\DacFramework.msi) /qb TARGETDIR=$(Resolve-Path .\temp\dacfull)
 Start-Sleep 3
@@ -78,20 +63,11 @@ $linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libho
 $winfull = 'Microsoft.Data.SqlClient.dll', 'Microsoft.Data.SqlClient.SNI.x64.dll', 'Microsoft.Data.SqlClient.SNI.x86.dll', 'System.Threading.Tasks.Dataflow.dll', 'Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Build.dll', 'Microsoft.Build.Framework.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'System.Memory.Data.dll', 'System.Resources.Extensions.dll', 'System.Security.SecureString.dll', 'sqlpackage.exe', 'sqlpackage.dll', 'libhostfxr.so', 'libhostpolicy.so', 'sqlpackage.runtimeconfig.json', 'sqlpackage.deps.json', 'hostpolicy.dll', 'hostfxr.dll', 'sqlpackage.dll'
 $xe = 'CommandLine.dll', 'CsvHelper.dll', 'DouglasCrockford.JsMin.dll', 'NLog.dll', 'NLog.dll.nlog', 'SmartFormat.dll', 'XESmartTarget.Core.dll'
 
-# 'Microsoft.Data.SqlClient.dll', 'Microsoft.Data.SqlClient.SNI.dll',
-# 'Microsoft.Identity.Client.dll', 'Microsoft.Identity.Client.Extensions.Msal.dll',
-#Get-ChildItem "./temp/dacfull/*.exe*" -File -Recurse | Copy-Item -Destination lib/net462/publish
-
 Get-ChildItem "./temp/dacfull/" -Recurse | Where-Object Name -in $winfull | Copy-Item -Destination lib/sqlpackage/windows
-
-
 Get-ChildItem "./temp/xe/*.dll" -Recurse | Where-Object Name -in $xe | Copy-Item -Destination lib/third-party/XESmartTarget
 Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/netstandard2.0/bogus.dll
 Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/net40/bogus.dll
-
-
 Copy-Item .\temp\LumenWorksCsvReader\lib\net461\LumenWorks.Framework.IO.dll -Destination ./lib/third-party/LumenWorks/net461/LumenWorks.Framework.IO.dll
-
 Copy-Item .\temp\LumenWorksCsvReader\lib\netstandard2.0\LumenWorks.Framework.IO.dll -Destination ./lib/third-party/LumenWorks/netstandard2.0/LumenWorks.Framework.IO.dll
 
 Get-ChildItem lib/net462/dbatools.dll | Remove-Item -Force
@@ -137,16 +113,18 @@ $parms.Name = "Microsoft.Identity.Client"
 $parms.RequiredVersion = "4.45.0"
 #Install-Package @parms
 
+$parms.Name = "Microsoft.SqlServer.Server"
+$parms.RequiredVersion = "1.0.0"
+#Install-Package @parms
+
 $parms.Name = "Azure.Identity"
 $parms.RequiredVersion = "1.6.0"
 #Install-Package @parms
 
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\unix\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish
 Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/net462/publish/
-
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win
 Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win
-
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
 
