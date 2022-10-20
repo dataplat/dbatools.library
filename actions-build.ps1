@@ -19,7 +19,13 @@ Get-ChildItem .\lib\net462\ -Exclude *dbatools*, publish | Remove-Item -Force -R
 Get-ChildItem .\lib\ -Include runtimes -Recurse | Remove-Item -Force -Recurse
 Get-ChildItem .\lib\*\dbatools.deps.json -Recurse | Remove-Item -Force
 
-$null = mkdir C:\temp -Force -ErrorAction Ignore
+if ($IsLinux -or $IsMacOs) {
+    $tempdir = "/tmp"
+} else {
+    $tempdir = "C:\temp"
+}
+
+$null = mkdir $tempdir -Force -ErrorAction Ignore
 $null = mkdir ./temp/dacfull -Force -ErrorAction Ignore
 $null = mkdir ./lib/sqlpackage/windows -Force -ErrorAction Ignore
 $null = mkdir ./lib/sqlpackage/mac -ErrorAction Ignore
@@ -83,7 +89,7 @@ Register-PackageSource -provider NuGet -name nugetRepository -Location https://w
 
 $parms = @{
     Provider         = "Nuget"
-    Destination      = "C:\temp\nuget"
+    Destination      = "$tempdir\nuget"
     Source           = "nugetRepository"
     Scope            = "CurrentUser"
     Force            = $true
@@ -92,7 +98,7 @@ $parms = @{
 
 $parms.Name = "System.Resources.Extensions"
 $parms.RequiredVersion = "6.0.0.0"
-#Install-Package @parms
+Install-Package @parms
 
 $parms.Name = "Microsoft.SqlServer.DacFx"
 $parms.RequiredVersion = "161.6319.0-preview"
@@ -118,12 +124,12 @@ $parms.Name = "Azure.Identity"
 $parms.RequiredVersion = "1.6.0"
 Install-Package @parms
 
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\unix\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish
-Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/net462/publish/
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win
-Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
+Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\unix\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish
+Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.45.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/net462/publish/
+Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win
+Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win
+Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win
+Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
 
 Copy-Item "replication/Microsoft.SqlServer.Rmo.dll" -Destination lib/net462/publish/
 Copy-Item "replication/Microsoft.SqlServer.Replication.dll" -Destination lib/net462/publish/
