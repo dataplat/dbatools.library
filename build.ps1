@@ -1,6 +1,6 @@
 Push-Location ".\project"
 Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
-Install-Package Microsoft.PowerShell.SDK -RequiredVersion 7.2.7 -SkipDependencies -Force
+Install-Package Microsoft.PowerShell.SDK -RequiredVersion 7.2.7 -SkipDependencies -Force -Scope CurrentUser
 
 dotnet publish --configuration release --framework net6.0 --self-contained | Out-String -OutVariable build
 dotnet publish --configuration release --framework net462 --self-contained | Out-String -OutVariable build
