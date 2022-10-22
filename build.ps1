@@ -127,10 +127,8 @@ Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Micr
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
 
-Copy-Item "replication/Microsoft.SqlServer.Rmo.dll" -Destination lib/net462/publish/
-Copy-Item "replication/Microsoft.SqlServer.Replication.dll" -Destination lib/net462/publish/
-Copy-Item "replication/Microsoft.SqlServer.Rmo.dll" -Destination lib/net6.0/publish/
-Copy-Item "replication/Microsoft.SqlServer.Replication.dll" -Destination lib/net6.0/publish/
+Copy-Item "replication/*.dll" -Destination lib/net462/publish/
+Copy-Item "replication/*.dll" -Destination lib/net6.0/publish/
 
 Move-Item -Path lib/net6.0/publish/* -Destination lib/net6.0/
 Move-Item -Path lib/net462/publish/* -Destination lib/net462/
