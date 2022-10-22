@@ -1,10 +1,3 @@
-# Go compile the DLLs
-Set-Location ./dbatools-library
-Remove-Item .\project\dbatools\obj -Recurse -ErrorAction Ignore
-Remove-Item .\project\dbatools.Tests\lib -Recurse -ErrorAction Ignore
-Remove-Item .\project\dbatools.Tests\obj -Recurse -ErrorAction Ignore
-Get-ChildItem -Recurse lib | Remove-Item -Recurse -ErrorAction Ignore
-Get-ChildItem -Recurse temp | Remove-Item -Recurse -ErrorAction Ignore
 Push-Location ".\project"
 dotnet clean
 dotnet publish --configuration release --framework net6.0 --self-contained | Out-String -OutVariable build
