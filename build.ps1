@@ -83,8 +83,8 @@ Get-ChildItem lib/net6.0/dbatools.dll | Remove-Item -Force
 Get-ChildItem lib/net462/dbatools.dll.config | Remove-Item -Force
 Get-ChildItem lib/net6.0/dbatools.dll.config | Remove-Item -Force
 
-Get-ChildItem ./temp/linux | Where-Object Name -in $linux | Copy-Item -Destination lib/net6.0
-Get-ChildItem ./temp/macos | Where-Object Name -in $mac | Copy-Item -Destination lib/sqlpackage/mac/
+Copy-Item (Join-Path ./temp/linux "*") lib/net6.0 -Exclude (Get-ChildItem lib/net6.0)
+Get-ChildItem ./temp/macos | Copy-Item -Destination lib/sqlpackage/mac/
 
 Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 
