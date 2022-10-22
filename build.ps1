@@ -147,4 +147,4 @@ Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 Get-ChildItem -Directory -Path .\lib\net462 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 Get-ChildItem -Directory -Path .\lib\net6.0 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
-Import-Module ./dbatools-library/dbatools-library.psd1 -Force
+Import-Module ./dbatools-library.psd1 -Force
