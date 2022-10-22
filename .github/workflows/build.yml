@@ -13,6 +13,7 @@ jobs:
     - name: Build the library
       shell: pwsh
       run: |
+        sudo apt install msitools -y
         ./build
 
     - name: Execute sqlpackage
