@@ -1,6 +1,7 @@
 Push-Location ".\project"
-dotnet clean
+Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 Install-Package Microsoft.PowerShell.SDK -RequiredVersion 7.2.7 -SkipDependencies -Force
+
 dotnet publish --configuration release --framework net6.0 --self-contained | Out-String -OutVariable build
 dotnet publish --configuration release --framework net462 --self-contained | Out-String -OutVariable build
 dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
@@ -81,8 +82,6 @@ Get-ChildItem lib/net6.0/dbatools.dll.config | Remove-Item -Force
 
 Get-ChildItem ./temp/linux | Where-Object Name -in $linux | Copy-Item -Destination lib/net6.0
 Get-ChildItem ./temp/macos | Where-Object Name -in $mac | Copy-Item -Destination lib/sqlpackage/mac/
-
-Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 
 $parms = @{
     Provider         = "Nuget"
