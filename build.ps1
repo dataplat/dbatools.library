@@ -62,7 +62,7 @@ $mac = 'libclrjit.dylib', 'libcoreclr.dylib', 'libhostfxr.dylib', 'libhostpolicy
 $linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.StackTrace.dll', 'System.Diagnostics.TextWriterTraceListener.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Net.Http.Json.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Runtime.Serialization.Json.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Text.Json.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll', 'sqlpackage', 'sqlpackage.dll', 'sqlpackage.deps.json', 'sqlpackage.runtimeconfig.json'
 $winfull = 'Microsoft.Data.SqlClient.dll', 'Microsoft.Data.SqlClient.SNI.x64.dll', 'Microsoft.Data.SqlClient.SNI.x86.dll', 'System.Threading.Tasks.Dataflow.dll', 'Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Build.dll', 'Microsoft.Build.Framework.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'System.Memory.Data.dll', 'System.Resources.Extensions.dll', 'System.Security.SecureString.dll', 'sqlpackage.exe', 'sqlpackage.dll', 'libhostfxr.so', 'libhostpolicy.so', 'sqlpackage.runtimeconfig.json', 'sqlpackage.deps.json', 'hostpolicy.dll', 'hostfxr.dll', 'sqlpackage.dll'
 
-Get-ChildItem "./temp/dacfull/" -Recurse | Where-Object Name -in $winfull | Copy-Item -Destination lib/sqlpackage/windows
+Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe -Recurse | Copy-Item -Destination lib/sqlpackage/windows
 Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination lib/third-party/XESmartTarget
 Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/netstandard2.0/bogus.dll
 Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/net40/bogus.dll
@@ -127,10 +127,8 @@ Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Micr
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
 
-Copy-Item "replication/Microsoft.SqlServer.Rmo.dll" -Destination lib/net462/publish/
-Copy-Item "replication/Microsoft.SqlServer.Replication.dll" -Destination lib/net462/publish/
-Copy-Item "replication/Microsoft.SqlServer.Rmo.dll" -Destination lib/net6.0/publish/
-Copy-Item "replication/Microsoft.SqlServer.Replication.dll" -Destination lib/net6.0/publish/
+Copy-Item "replication/*.dll" -Destination lib/net462/publish/
+Copy-Item "replication/*.dll" -Destination lib/net6.0/publish/
 
 Move-Item -Path lib/net6.0/publish/* -Destination lib/net6.0/
 Move-Item -Path lib/net462/publish/* -Destination lib/net462/
