@@ -83,9 +83,6 @@ Get-ChildItem lib/net6.0/dbatools.dll | Remove-Item -Force
 Get-ChildItem lib/net462/dbatools.dll.config | Remove-Item -Force
 Get-ChildItem lib/net6.0/dbatools.dll.config | Remove-Item -Force
 
-Copy-Item (Join-Path ./temp/linux "*") lib/net6.0 -Exclude (Get-ChildItem lib/net6.0)
-Get-ChildItem ./temp/macos | Copy-Item -Destination lib/sqlpackage/mac/
-
 Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 
 $parms = @{
@@ -137,6 +134,9 @@ Copy-Item "replication/*.dll" -Destination lib/net6.0/publish/
 
 Move-Item -Path lib/net6.0/publish/* -Destination lib/net6.0/
 Move-Item -Path lib/net462/publish/* -Destination lib/net462/
+
+Copy-Item (Join-Path ./temp/linux "*") lib/net6.0 -Exclude (Get-ChildItem lib/net6.0)
+Get-ChildItem ./temp/macos | Copy-Item -Destination lib/sqlpackage/mac/
 
 Remove-Item -Path lib/net6.0/publish -Recurse -ErrorAction Ignore
 Remove-Item -Path lib/net462/publish -Recurse -ErrorAction Ignore
