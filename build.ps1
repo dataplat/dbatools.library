@@ -1,5 +1,6 @@
 Push-Location ".\project"
 dotnet clean
+Install-Package Microsoft.PowerShell.SDK -RequiredVersion 7.2.7 -SkipDependencies -Force
 dotnet publish --configuration release --framework net6.0 --self-contained | Out-String -OutVariable build
 dotnet publish --configuration release --framework net462 --self-contained | Out-String -OutVariable build
 dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
@@ -18,21 +19,21 @@ if ($IsLinux -or $IsMacOs) {
     $tempdir = "C:\temp"
 }
 
-$null = mkdir $tempdir -Force -ErrorAction Ignore
-$null = mkdir ./temp/dacfull -Force -ErrorAction Ignore
-$null = mkdir ./lib/sqlpackage/windows -Force -ErrorAction Ignore
-$null = mkdir ./lib/sqlpackage/mac -ErrorAction Ignore
-$null = mkdir ./temp/xe -ErrorAction Ignore
-$null = mkdir ./lib/third-party
-$null = mkdir ./lib/third-party/XESmartTarget
-$null = mkdir ./lib/third-party/bogus
-$null = mkdir ./lib/third-party/LumenWorks
-$null = mkdir ./lib/third-party/LumenWorks/netstandard2.0
-$null = mkdir ./lib/third-party/LumenWorks/net461
-$null = mkdir ./lib/third-party/bogus/netstandard2.0
-$null = mkdir ./lib/third-party/bogus/net40
-$null = mkdir ./temp/bogus
-$null = mkdir ./lib/net6.0/publish/win
+$null = New-Item -ItemType Directory $tempdir -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory ./temp/dacfull -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory ./lib/sqlpackage/windows -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory ./lib/sqlpackage/mac -ErrorAction Ignore
+$null = New-Item -ItemType Directory ./temp/xe -ErrorAction Ignore
+$null = New-Item -ItemType Directory ./lib/third-party
+$null = New-Item -ItemType Directory ./lib/third-party/XESmartTarget
+$null = New-Item -ItemType Directory ./lib/third-party/bogus
+$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks
+$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/netstandard2.0
+$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/net461
+$null = New-Item -ItemType Directory ./lib/third-party/bogus/netstandard2.0
+$null = New-Item -ItemType Directory ./lib/third-party/bogus/net40
+$null = New-Item -ItemType Directory ./temp/bogus
+$null = New-Item -ItemType Directory ./lib/net6.0/publish/win
 
 $ProgressPreference = "SilentlyContinue"
 
