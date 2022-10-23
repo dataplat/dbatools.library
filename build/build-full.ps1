@@ -37,7 +37,7 @@ $ProgressPreference = "SilentlyContinue"
 
 
 Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile .\temp\sqlpackage-linux.zip
-Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile .\temp\sqlpackage-macos.zip
+#Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile .\temp\sqlpackage-macos.zip
 Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile .\temp\DacFramework.msi
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile .\temp\bogus.zip
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile .\temp\LumenWorksCsvReader.zip
@@ -46,13 +46,13 @@ Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/do
 $ProgressPreference = "Continue"
 
 Expand-Archive -Path .\temp\sqlpackage-linux.zip -DestinationPath .\temp\linux
-Expand-Archive -Path .\temp\sqlpackage-macos.zip -DestinationPath .\temp\macos
+#Expand-Archive -Path .\temp\sqlpackage-macos.zip -DestinationPath .\temp\macos
 Expand-Archive -Path .\temp\LumenWorksCsvReader.zip -DestinationPath .\temp\LumenWorksCsvReader
 Expand-Archive -Path .\temp\bogus.zip -DestinationPath .\temp\bogus
 
 if ($isLinux -or $IsMacOs) {
     chmod +x ./temp/linux/sqlpackage
-    chmod +x ./temp/macos/sqlpackage
+    #chmod +x ./temp/macos/sqlpackage
 }
 
 if ($IsLinux) {
