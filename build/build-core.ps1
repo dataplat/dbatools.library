@@ -1,11 +1,21 @@
 $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
+
+if (Test-Path ./lib) {
+    write-warning removing
+    Remove-Item -Path lib -Recurse -ErrorAction Ignore
+    Remove-Item -Path temp -Recurse -ErrorAction Ignore
+    Remove-Item -Path third-party -Recurse -ErrorAction Ignore
+    Remove-Item -Path third-party-licenses -Recurse -ErrorAction Ignore
+}
 Push-Location "./project"
-dotnet publish --configuration release --framework net6.0 --self-contained | Out-String -OutVariable build
+dotnet publish --configuration release --framework net6.0 | Out-String -OutVariable build
 dotnet test --framework net6.0 --verbosity normal | Out-String -OutVariable test
 Pop-Location
 
-Move-Item -Path lib/net6.0/* -Destination lib/ -ErrorAction Ignore
+Remove-Item -Path lib/dbatools.xml
+Get-ChildItem -Path lib/net6.0 -File | Remove-Item
+Move-Item -Path lib/net6.0/publish/* -Destination lib/ -ErrorAction Ignore
 Remove-Item -Path lib/net6.0 -Recurse -ErrorAction Ignore
 
 Get-ChildItem ./lib -Recurse -Include *.pdb | Remove-Item
@@ -15,19 +25,32 @@ Get-ChildItem ./lib/*/dbatools.deps.json -Recurse | Remove-Item
 
 if ($IsLinux -or $IsMacOs) {
     $tempdir = "/tmp"
+    $null = mkdir ./temp
+    $null = mkdir ./temp/dacfull
+    $null = mkdir ./temp/xe
+    $null = mkdir ./third-party
+    $null = mkdir ./third-party/XESmartTarget
+    $null = mkdir ./third-party/bogus
+    $null = mkdir ./third-party/LumenWorks
+    $null = mkdir ./temp/bogus
+    $null = mkdir ./temp/linux
+    $null = mkdir ./lib/win
+    $null = mkdir ./lib/win-sqlclient
 } else {
     $tempdir = "C:/temp"
+    $null = New-Item -ItemType Directory $tempdir -ErrorAction Ignore
+    $null = New-Item -ItemType Directory ./temp/dacfull -ErrorAction Ignore
+    $null = New-Item -ItemType Directory ./temp/xe -ErrorAction Ignore
+    $null = New-Item -ItemType Directory ./third-party/XESmartTarget
+    $null = New-Item -ItemType Directory ./third-party/bogus
+    $null = New-Item -ItemType Directory ./third-party/LumenWorks
+    $null = New-Item -ItemType Directory ./temp/bogus
+    $null = New-Item -ItemType Directory ./temp/linux
+    $null = New-Item -ItemType Directory ./lib/win
+    $null = New-Item -ItemType Directory ./lib/win-sqlclient
 }
 
-$null = New-Item -ItemType Directory $tempdir -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./temp/dacfull -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./temp/xe -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./third-party/XESmartTarget
-$null = New-Item -ItemType Directory ./third-party/bogus
-$null = New-Item -ItemType Directory ./third-party/LumenWorks
-$null = New-Item -ItemType Directory ./temp/bogus
-$null = New-Item -ItemType Directory ./temp/linux
-$null = New-Item -ItemType Directory ./lib/win
+
 
 $ProgressPreference = "SilentlyContinue"
 
@@ -91,24 +114,29 @@ $parms.RequiredVersion = "4.45.0"
 $null = Install-Package @parms
 
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.0.1/runtimes/unix/lib/netcoreapp3.1/Microsoft.Data.SqlClient.dll" -Destination lib
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.0.1/runtimes/win/lib/netcoreapp3.1/Microsoft.Data.SqlClient.dll" -Destination lib/win
-Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.45.0/lib/netcoreapp2.1/Microsoft.Identity.Client.dll" -Destination lib/win
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.0.1/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.0.1/runtimes/win/lib/netcoreapp3.1/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
+Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.45.0/lib/netcoreapp2.1/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient/
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.0.1/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient/
 
-Copy-Item (Join-Path ./temp/linux "*") lib -Exclude (Get-ChildItem lib -Recurse) -Recurse
+Copy-Item ./temp/linux/* -Destination lib -Exclude (Get-ChildItem lib -Recurse) -Recurse -Include *.exe, *.config -Verbose
 
 Copy-Item "./var/replication/*.dll" -Destination ./lib/
 Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse
 
+Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
+Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
+
+
+$linux = 'libclrjit.so', 'libcoreclr.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml'
+
+$sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
+Copy-Item -Path $sqlp.FullName -Destination ./lib/
 
 if ($isLinux -or $IsMacOs) {
     chmod +x ./lib/sqlpackage
 }
 
-Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
-Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
-
-Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 Import-Module ./dbatools-core-library.psd1
 

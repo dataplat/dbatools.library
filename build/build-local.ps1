@@ -23,8 +23,6 @@ Get-ChildItem .\lib\*\dbatools.deps.json -Recurse | Remove-Item -Force
 #Copy-Item -Recurse ./third-party-licenses ./third-party-licenses
 
 $null = mkdir ./temp/dacfull -Force
-$null = mkdir ./lib/sqlpackage/windows -Force
-$null = mkdir ./lib/sqlpackage/mac
 $null = mkdir ./temp/xe
 $null = mkdir ./third-party
 $null = mkdir ./third-party/XESmartTarget
@@ -122,9 +120,9 @@ $parms.RequiredVersion = "1.6.0"
 
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\unix\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish
 Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/net462/publish/
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win
-Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win-sqlclient
+Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win-sqlclient
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win-sqlclient
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
 
 Copy-Item "replication/*.dll" -Destination lib/net462/publish/
@@ -139,12 +137,13 @@ Remove-Item -Path lib/net462/publish -Recurse -ErrorAction Ignore
 Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
 Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 
-Get-ChildItem -Directory -Path .\lib\net462 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
-Get-ChildItem -Directory -Path .\lib\net6.0 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path .\lib\net462 | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path .\lib\net6.0 | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
+
+Import-Module C:\github\dbatools-library\dbatools-core-library.psd1 -Force; Import-Module C:\github\dbatools -Force
 
 Import-Module C:\github\dbatools -Force
-
 
 $script:instance1 = $script:instance2 = "sqlcs"
 Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true
@@ -158,7 +157,7 @@ $dacpac | Publish-DbaDacPackage -PublishXml $publishprofile.FileName -Database b
 $Error | Select-Object *
 
 
-
+#Data Source=sqlcs;Integrated Security=True;Encrypt=True;Trust Server Certificate=True;
 
 <#
 New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs
@@ -169,7 +168,7 @@ $Error | Select-Object *
 Import-Module ./dbatools-library -Force; Import-Module ./dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
 
 
-ipmo ./dbatools-library -Force; ipmo ./dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
+Import-Module /mnt/c/github/dbatools-library/dbatools-core-library.psd1 -Force; ipmo /mnt/c/github/dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
 
 $script:instance1 =  $script:instance2 = "sqlcs"
 Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true

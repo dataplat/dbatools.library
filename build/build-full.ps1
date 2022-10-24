@@ -1,7 +1,7 @@
 $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
 Push-Location ".\project"
-dotnet publish --configuration release --framework net462 --self-contained | Out-String -OutVariable build
+dotnet publish --configuration release --framework net462 | Out-String -OutVariable build
 dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
 Pop-Location
 
@@ -98,3 +98,12 @@ if ((Get-ChildItem -Path C:\gallery\dbatools-library -ErrorAction Ignore)) {
 
     Get-ChildItem -Recurse -Path C:\gallery\dbatools-library\*.ps*, C:\gallery\dbatools-library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
 }
+
+<#
+already there
+-rwxrwxrwx ctrlb            ctrlb              10/08/2022 03:08       12132752 Microsoft.Data.Tools.Schema.Sql.dll
+-rwxrwxrwx ctrlb            ctrlb              10/08/2022 03:08         346040 Microsoft.Data.Tools.Utilities.dll
+#>
+
+#(Get-Item C:\github\dbatools-library\lib\Microsoft.Data.Tools.Schema.Sql.dll).VersionInfo.FileVersion
+#(Get-Item C:\github\dbatools-library\lib\Microsoft.Data.Tools.Utilities.dll).VersionInfo.FileVersion

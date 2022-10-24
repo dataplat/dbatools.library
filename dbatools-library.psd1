@@ -7,7 +7,7 @@
 #
 @{
     # Version number of this module.
-    ModuleVersion          = '2022.10.24'
+    ModuleVersion          = '2022.10.25'
 
     # ID used to uniquely identify this module
     GUID                   = '00b61a37-6c36-40d8-8865-ac0180288c84'
@@ -34,7 +34,18 @@
     RequiredModules        = @()
 
     # Assemblies that must be loaded prior to importing this module
-    RequiredAssemblies     = @('./third-party/LumenWorks/LumenWorks.Framework.IO.dll')
+    RequiredAssemblies     = @(
+        './lib/Microsoft.SqlServer.Dac.dll',
+        './lib/Microsoft.SqlServer.Smo.dll',
+        './lib/Microsoft.SqlServer.SmoExtended.dll',
+        './lib/Microsoft.SqlServer.SqlWmiManagement.dll',
+        './lib/Microsoft.SqlServer.Management.RegisteredServers.dll',
+        './lib/Microsoft.SqlServer.Management.Collector.dll',
+        './lib/Microsoft.SqlServer.Management.XEvent.dll',
+        './lib/Microsoft.SqlServer.Management.XEventDbScoped.dll',
+        './lib/Microsoft.SqlServer.XEvent.XELite.dll',
+        './third-party/LumenWorks/LumenWorks.Framework.IO.dll'
+    )
 
     # Script module or binary module file associated with this manifest.
     RootModule             = ''

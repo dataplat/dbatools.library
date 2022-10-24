@@ -21,7 +21,7 @@ jobs:
       run: |
         Import-Module ./dbatools-library.psd1 -Force
         
-        $libpath = Split-Path -Path (Get-Module dbatools-library).Path
+        $libpath = Split-Path -Path (Get-Module dbatools*library).Path
 
         if ($IsWindows) {
           $sqlpackage = "./lib/sqlpackage/windows/sqlpackage.exe"
