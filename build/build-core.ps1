@@ -22,10 +22,9 @@ if ($IsLinux -or $IsMacOs) {
 $null = New-Item -ItemType Directory $tempdir -ErrorAction Ignore
 $null = New-Item -ItemType Directory ./temp/dacfull -ErrorAction Ignore
 $null = New-Item -ItemType Directory ./temp/xe -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./lib/third-party
-$null = New-Item -ItemType Directory ./lib/third-party/XESmartTarget
-$null = New-Item -ItemType Directory ./lib/third-party/bogus
-$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks
+$null = New-Item -ItemType Directory ./third-party/XESmartTarget
+$null = New-Item -ItemType Directory ./third-party/bogus
+$null = New-Item -ItemType Directory ./third-party/LumenWorks
 $null = New-Item -ItemType Directory ./temp/bogus
 $null = New-Item -ItemType Directory ./temp/linux
 $null = New-Item -ItemType Directory ./lib/win
@@ -63,13 +62,10 @@ if ($IsLinux) {
 }
 
 
-Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination lib/third-party/XESmartTarget
-Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe -Recurse | Copy-Item -Destination ./lib/win
-Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/bogus.dll
-Copy-Item ./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll -Destination ./lib/third-party/LumenWorks/LumenWorks.Framework.IO.dll
-
-Get-ChildItem lib/dbatools.dll | Remove-Item
-Get-ChildItem lib/dbatools.dll.config | Remove-Item
+Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination third-party/XESmartTarget
+Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe, *.config -Recurse | Copy-Item -Destination ./lib/win
+Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination ./third-party/bogus/bogus.dll
+Copy-Item ./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll -Destination ./third-party/LumenWorks/LumenWorks.Framework.IO.dll
 
 Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 
@@ -99,15 +95,15 @@ Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.0.1/runtimes/win/lib/netcor
 Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.45.0/lib/netcoreapp2.1/Microsoft.Identity.Client.dll" -Destination lib/win
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.0.1/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win
 
-Copy-Item "./var/replication/*.dll" -Destination ./lib/
 Copy-Item (Join-Path ./temp/linux "*") lib -Exclude (Get-ChildItem lib -Recurse) -Recurse
+
+Copy-Item "./var/replication/*.dll" -Destination ./lib/
+Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse
+
 
 if ($isLinux -or $IsMacOs) {
     chmod +x ./lib/sqlpackage
 }
-
-#Move-Item -Path lib/* -Destination lib/
-#Remove-Item -Path lib -Recurse -ErrorAction Ignore
 
 Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
 Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
@@ -115,3 +111,16 @@ Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 Import-Module ./dbatools-core-library.psd1
+
+<#
+    if ((Get-ChildItem -Path C:\gallery\dbatools-core-library -ErrorAction Ignore)) {
+        $null = Remove-Item C:\gallery\dbatools-core-library -Recurse
+        $null = mkdir C:\gallery\dbatools-core-library
+        $null = robocopy c:\github\dbatools-library C:\gallery\dbatools-core-library /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 *build*.ps1 /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
+        Remove-Item c:\gallery\dbatools-core-library\dac.ps1 -ErrorAction Ignore
+        Remove-Item c:\gallery\dbatools-core-library\dbatools-library.psd1 -ErrorAction Ignore
+        Copy-Item C:\github\dbatools-library\dbatools-core-library.psd1 C:\github\dbatools-core-library
+
+        Get-ChildItem -Recurse -Path C:\gallery\dbatools-core-library\*.ps*, C:\gallery\dbatools-core-library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
+    }
+#>

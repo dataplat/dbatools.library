@@ -20,20 +20,20 @@ Get-ChildItem .\lib\net462\ -Exclude *dbatools*, publish | Remove-Item -Force -R
 Get-ChildItem .\lib\ -Include runtimes -Recurse | Remove-Item -Force -Recurse
 Get-ChildItem .\lib\*\dbatools.deps.json -Recurse | Remove-Item -Force
 
-#Copy-Item -Recurse ./third-party-licenses ./lib/third-party-licenses
+#Copy-Item -Recurse ./third-party-licenses ./third-party-licenses
 
 $null = mkdir ./temp/dacfull -Force
 $null = mkdir ./lib/sqlpackage/windows -Force
 $null = mkdir ./lib/sqlpackage/mac
 $null = mkdir ./temp/xe
-$null = mkdir ./lib/third-party
-$null = mkdir ./lib/third-party/XESmartTarget
-$null = mkdir ./lib/third-party/bogus
-$null = mkdir ./lib/third-party/LumenWorks
-$null = mkdir ./lib/third-party/LumenWorks/netstandard2.0
-$null = mkdir ./lib/third-party/LumenWorks/net461
-$null = mkdir ./lib/third-party/bogus/netstandard2.0
-$null = mkdir ./lib/third-party/bogus/net40
+$null = mkdir ./third-party
+$null = mkdir ./third-party/XESmartTarget
+$null = mkdir ./third-party/bogus
+$null = mkdir ./third-party/LumenWorks
+$null = mkdir ./third-party/LumenWorks/netstandard2.0
+$null = mkdir ./third-party/LumenWorks/net461
+$null = mkdir ./third-party/bogus/netstandard2.0
+$null = mkdir ./third-party/bogus/net40
 $null = mkdir ./temp/bogus
 $null = mkdir ./lib/net6.0/publish/win
 
@@ -63,11 +63,11 @@ $linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libho
 $winfull = 'Microsoft.Data.SqlClient.dll', 'Microsoft.Data.SqlClient.SNI.x64.dll', 'Microsoft.Data.SqlClient.SNI.x86.dll', 'System.Threading.Tasks.Dataflow.dll', 'Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Build.dll', 'Microsoft.Build.Framework.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'System.Memory.Data.dll', 'System.Resources.Extensions.dll', 'System.Security.SecureString.dll', 'sqlpackage.exe', 'sqlpackage.dll', 'libhostfxr.so', 'libhostpolicy.so', 'sqlpackage.runtimeconfig.json', 'sqlpackage.deps.json', 'hostpolicy.dll', 'hostfxr.dll', 'sqlpackage.dll'
 
 Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe -Recurse | Copy-Item -Destination lib/sqlpackage/windows
-Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination lib/third-party/XESmartTarget
-Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/netstandard2.0/bogus.dll
-Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/net40/bogus.dll
-Copy-Item .\temp\LumenWorksCsvReader\lib\net461\LumenWorks.Framework.IO.dll -Destination ./lib/third-party/LumenWorks/net461/LumenWorks.Framework.IO.dll
-Copy-Item .\temp\LumenWorksCsvReader\lib\netstandard2.0\LumenWorks.Framework.IO.dll -Destination ./lib/third-party/LumenWorks/netstandard2.0/LumenWorks.Framework.IO.dll
+Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination third-party/XESmartTarget
+Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination third-party/bogus/netstandard2.0/bogus.dll
+Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination third-party/bogus/net40/bogus.dll
+Copy-Item .\temp\LumenWorksCsvReader\lib\net461\LumenWorks.Framework.IO.dll -Destination ./third-party/LumenWorks/net461/LumenWorks.Framework.IO.dll
+Copy-Item .\temp\LumenWorksCsvReader\lib\netstandard2.0\LumenWorks.Framework.IO.dll -Destination ./third-party/LumenWorks/netstandard2.0/LumenWorks.Framework.IO.dll
 
 Get-ChildItem lib/net462/dbatools.dll | Remove-Item -Force
 Get-ChildItem lib/net6.0/dbatools.dll | Remove-Item -Force
