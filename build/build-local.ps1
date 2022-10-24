@@ -143,7 +143,7 @@ Get-ChildItem -Directory -Path .\lib\net462 | Where-Object Name -notin 'x64', 'x
 Get-ChildItem -Directory -Path .\lib\net6.0 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 
-Import-Module C:\github\dbatools-library -Force; Import-Module C:\github\dbatools -Force;
+Import-Module C:\github\dbatools -Force
 
 
 $script:instance1 = $script:instance2 = "sqlcs"

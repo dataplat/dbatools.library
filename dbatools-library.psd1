@@ -7,7 +7,7 @@
 #
 @{
     # Version number of this module.
-    ModuleVersion          = '2022.10.22'
+    ModuleVersion          = '2022.10.24'
 
     # ID used to uniquely identify this module
     GUID                   = '00b61a37-6c36-40d8-8865-ac0180288c84'
@@ -32,6 +32,9 @@
 
     # Modules that must be imported into the global environment prior to importing this module
     RequiredModules        = @()
+
+    # Assemblies that must be loaded prior to importing this module
+    RequiredAssemblies     = @('./third-party/LumenWorks/LumenWorks.Framework.IO.dll')
 
     # Script module or binary module file associated with this manifest.
     RootModule             = ''
