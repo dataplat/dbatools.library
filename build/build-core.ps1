@@ -132,6 +132,12 @@ $linux = 'libclrjit.so', 'libcoreclr.so', 'libhostfxr.so', 'libhostpolicy.so', '
 $sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
 Copy-Item -Path $sqlp.FullName -Destination ./lib/
 
+
+Get-ChildItem ./lib, ./lib/win | Where-Object Name -in (Get-ChildItem /opt/microsoft/powershell/7).Name -OutVariable files
+Remove-Item $files
+Get-ChildItem ./lib/win | Where-Object Name -in (Get-ChildItem /opt/microsoft/powershell/7).Name -OutVariable files
+Remove-Item $files
+
 if ($isLinux -or $IsMacOs) {
     chmod +x ./lib/sqlpackage
 }
