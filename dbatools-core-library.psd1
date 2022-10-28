@@ -7,7 +7,7 @@
 #
 @{
     # Version number of this module.
-    ModuleVersion          = '2022.10.25'
+    ModuleVersion          = '2022.10.27'
 
     # ID used to uniquely identify this module
     GUID                   = '024b94cc-65a3-484f-bc5f-12cd8717ffd1'
@@ -29,6 +29,9 @@
 
     # Minimum version of the .NET Framework required by this module
     DotNetFrameworkVersion = '6.0'
+
+    # Supported PSEditions
+    CompatiblePSEditions   = @('Core')
 
     # Modules that must be imported into the global environment prior to importing this module
     RequiredModules        = @()

@@ -35,6 +35,7 @@ if ($IsLinux -or $IsMacOs) {
     $null = mkdir ./temp/bogus
     $null = mkdir ./temp/linux
     $null = mkdir ./lib/win
+    $null = mkdir ./lib/mac
     $null = mkdir ./lib/win-sqlclient
 } else {
     $tempdir = "C:/temp"
@@ -47,6 +48,7 @@ if ($IsLinux -or $IsMacOs) {
     $null = New-Item -ItemType Directory ./temp/bogus
     $null = New-Item -ItemType Directory ./temp/linux
     $null = New-Item -ItemType Directory ./lib/win
+    $null = New-Item -ItemType Directory ./lib/mac
     $null = New-Item -ItemType Directory ./lib/win-sqlclient
 }
 
@@ -56,6 +58,7 @@ $ProgressPreference = "SilentlyContinue"
 
 
 Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile ./temp/sqlpackage-linux.zip
+Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile ./temp/sqlpackage-macos.zip
 Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile .\temp\DacFramework.msi
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile ./temp/bogus.zip
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile ./temp/LumenWorksCsvReader.zip
@@ -63,26 +66,15 @@ Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/do
 
 $ProgressPreference = "Continue"
 
-if ($IsLinux -or $IsMacOs) {
-    # Expand-Archive is not fun on linux cuz it's prompts galore
-    unzip ./temp/sqlpackage-linux.zip -d ./temp/linux
-    unzip ./temp/LumenWorksCsvReader.zip -d ./temp/LumenWorksCsvReader
-    unzip ./temp/bogus.zip -d ./temp/bogus
-} else {
-    Expand-Archive -Path ./temp/sqlpackage-linux.zip -DestinationPath ./temp/linux
-    Expand-Archive -Path ./temp/LumenWorksCsvReader.zip -DestinationPath ./temp/LumenWorksCsvReader
-    Expand-Archive -Path ./temp/bogus.zip -DestinationPath ./temp/bogus
-}
 
-if ($IsLinux) {
-    msiextract --directory $(Resolve-Path .\temp\dacfull) $(Resolve-Path .\temp\DacFramework.msi)
-    msiextract --directory $(Resolve-Path .\temp\xe) $(Resolve-Path .\temp\XESmartTarget_x64.msi)
-} else {
-    msiexec /a $(Resolve-Path .\temp\DacFramework.msi) /qb TARGETDIR=$(Resolve-Path .\temp\dacfull)
-    Start-Sleep 3
-    msiexec /a $(Resolve-Path .\temp\XESmartTarget_x64.msi) /qb TARGETDIR=$(Resolve-Path .\temp\xe)
-    Start-Sleep 3
-}
+# Expand-Archive is not fun on linux cuz it's prompts galore
+unzip ./temp/sqlpackage-linux.zip -d ./temp/linux
+unzip ./temp/sqlpackage-macos.zip -d ./lib/mac
+unzip ./temp/LumenWorksCsvReader.zip -d ./temp/LumenWorksCsvReader
+unzip ./temp/bogus.zip -d ./temp/bogus
+
+msiextract --directory $(Resolve-Path .\temp\dacfull) $(Resolve-Path .\temp\DacFramework.msi)
+msiextract --directory $(Resolve-Path .\temp\xe) $(Resolve-Path .\temp\XESmartTarget_x64.msi)
 
 
 Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination third-party/XESmartTarget
@@ -123,26 +115,23 @@ Copy-Item ./temp/linux/* -Destination lib -Exclude (Get-ChildItem lib -Recurse) 
 Copy-Item "./var/replication/*.dll" -Destination ./lib/
 Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse
 
-Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
-Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
-
-
 $linux = 'libclrjit.so', 'libcoreclr.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml'
 
 $sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
 Copy-Item -Path $sqlp.FullName -Destination ./lib/
 
+Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
-Get-ChildItem ./lib, ./lib/win | Where-Object Name -in (Get-ChildItem /opt/microsoft/powershell/7).Name -OutVariable files
-Remove-Item $files
-Get-ChildItem ./lib/win | Where-Object Name -in (Get-ChildItem /opt/microsoft/powershell/7).Name -OutVariable files
-Remove-Item $files
+Get-ChildItem ./lib, ./lib/win, ./lib/mac | Where-Object BaseName -in (Get-ChildItem /opt/microsoft/powershell/7).BaseName -OutVariable files
+Remove-Item $files -Recurse
 
 if ($isLinux -or $IsMacOs) {
     chmod +x ./lib/sqlpackage
+    chmod +x ./lib/mac/sqlpackage
 }
 
-Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+Get-ChildItem ./lib/*.xml, ./lib/*.pdb -Recurse -OutVariable xmlpdb
+Remove-Item -Path $xmlpdb -Recurse -ErrorAction Ignore
 
 Import-Module ./dbatools-core-library.psd1
 

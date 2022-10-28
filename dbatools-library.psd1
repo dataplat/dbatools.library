@@ -7,7 +7,7 @@
 #
 @{
     # Version number of this module.
-    ModuleVersion          = '2022.10.25'
+    ModuleVersion          = '2022.10.28'
 
     # ID used to uniquely identify this module
     GUID                   = '00b61a37-6c36-40d8-8865-ac0180288c84'
@@ -25,25 +25,23 @@
     Description            = "The library that powers dbatools, the community module for SQL Server Pros"
 
     # Minimum version of the Windows PowerShell engine required by this module
-    PowerShellVersion      = '3.0'
+    PowerShellVersion      = '5.1'
 
     # Minimum version of the .NET Framework required by this module
     DotNetFrameworkVersion = '4.6.2'
+
+    # Supported PSEditions
+    CompatiblePSEditions   = @('Desktop')
 
     # Modules that must be imported into the global environment prior to importing this module
     RequiredModules        = @()
 
     # Assemblies that must be loaded prior to importing this module
+    # DO NOT BE TEMPTED to load SQL Server assemblies here
+    # because SQL Server has so many diff componenets
+    # (SMO/DacFX/SqlClient), we need to first load bindingRedirects
+    # but only in Full .NET because Core does something different
     RequiredAssemblies     = @(
-        './lib/Microsoft.SqlServer.Dac.dll',
-        './lib/Microsoft.SqlServer.Smo.dll',
-        './lib/Microsoft.SqlServer.SmoExtended.dll',
-        './lib/Microsoft.SqlServer.SqlWmiManagement.dll',
-        './lib/Microsoft.SqlServer.Management.RegisteredServers.dll',
-        './lib/Microsoft.SqlServer.Management.Collector.dll',
-        './lib/Microsoft.SqlServer.Management.XEvent.dll',
-        './lib/Microsoft.SqlServer.Management.XEventDbScoped.dll',
-        './lib/Microsoft.SqlServer.XEvent.XELite.dll',
         './third-party/LumenWorks/LumenWorks.Framework.IO.dll'
     )
 
@@ -80,7 +78,8 @@
             # RequireLicenseAcceptance = ""
 
             # Indicates this is a pre-release/testing version of the module.
-            IsPrerelease = 'False'
+            IsPrerelease = 'true'
+            Prerelease   = 'preview'
         }
     }
 }

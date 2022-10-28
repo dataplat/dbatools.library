@@ -85,8 +85,6 @@ Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 
 Get-ChildItem -Directory -Path .\lib\ | Where-Object Name -notin 'x64', 'x86' | Remove-Item -Recurse
 
-Import-Module ./dbatools-library.psd1 -Force
-
 if ((Get-ChildItem -Path C:\gallery\dbatools-library -ErrorAction Ignore)) {
     $null = Remove-Item C:\gallery\dbatools-library -Recurse
     $null = mkdir C:\gallery\dbatools-library
@@ -98,6 +96,8 @@ if ((Get-ChildItem -Path C:\gallery\dbatools-library -ErrorAction Ignore)) {
 
     Get-ChildItem -Recurse -Path C:\gallery\dbatools-library\*.ps*, C:\gallery\dbatools-library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
 }
+
+Import-Module C:\gallery\dbatools-library\dbatools-library.psd1 -Force
 
 <#
 already there
