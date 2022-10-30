@@ -4,10 +4,10 @@ using System.IO;
 namespace Sqlcollaborative.Dbatools.Commands
 {
     /// <summary>
-    /// Implements the <c>Import-LocalModule</c> internal command
+    /// Implements the <c>Import-Command</c> internal command
     /// </summary>
-    [Cmdlet("Import", "LocalModule", DefaultParameterSetName = "DefaultParameter", RemotingCapability = RemotingCapability.None)]
-    public class ImportLocalModule : PSCmdlet
+    [Cmdlet("Import", "Command", DefaultParameterSetName = "DefaultParameter", RemotingCapability = RemotingCapability.None)]
+    public class ImportCommand : PSCmdlet
     {
         #region Parameters
         /// <summary>
@@ -31,7 +31,15 @@ namespace Sqlcollaborative.Dbatools.Commands
         /// </summary>
         protected override void ProcessRecord()
         {
-
+            /*
+             *  SessionState.InvokeCommand.InvokeScript(thecode.Resource.dbatools,
+                SessionState.InvokeCommand.InvokeScript(File.ReadAllText(Path),
+            */
+            SessionState.InvokeCommand.InvokeScript(File.ReadAllText(Path),
+            false,
+                System.Management.Automation.Runspaces.PipelineResultTypes.None,
+                null,
+                null);
         }
 
         /// <summary>
@@ -39,12 +47,6 @@ namespace Sqlcollaborative.Dbatools.Commands
         /// </summary>
         protected override void EndProcessing()
         {
-            //string txt = File.ReadAllText(Path);
-            SessionState.InvokeCommand.InvokeScript(File.ReadAllText(Path),
-                false,
-                System.Management.Automation.Runspaces.PipelineResultTypes.None,
-                null,
-                null);
         }
         #endregion Command Implementation
     }
