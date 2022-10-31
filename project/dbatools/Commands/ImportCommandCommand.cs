@@ -1,6 +1,5 @@
 ﻿using System.Management.Automation;
 using System.IO;
-using System.Text;
 
 namespace Sqlcollaborative.Dbatools.Commands
 {
@@ -36,18 +35,11 @@ namespace Sqlcollaborative.Dbatools.Commands
              *  SessionState.InvokeCommand.InvokeScript(thecode.Resource.dbatools,
                 SessionState.InvokeCommand.InvokeScript(File.ReadAllText(Path),
             */
-            var fs = File.OpenRead(Path);
-            var sr = new StreamReader(fs, Encoding.UTF8);
-
-            SessionState.InvokeCommand.InvokeScript(sr.ReadToEnd(),
-                false,
+            SessionState.InvokeCommand.InvokeScript(File.ReadAllText(Path),
+            false,
                 System.Management.Automation.Runspaces.PipelineResultTypes.None,
                 null,
                 null);
-            sr.Close();
-            sr.Dispose();
-            fs.Close();
-            fs.Dispose();
         }
 
         /// <summary>
