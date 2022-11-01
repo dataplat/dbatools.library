@@ -60,4 +60,7 @@
       <SpecificVersion>False</SpecificVersion>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\dbatoolscode\dbatoolscode.csproj" />
+  </ItemGroup>
 </Project>
