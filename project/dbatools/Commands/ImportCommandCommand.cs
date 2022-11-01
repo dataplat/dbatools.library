@@ -36,10 +36,7 @@ namespace Sqlcollaborative.Dbatools.Commands
                 SessionState.InvokeCommand.InvokeScript(File.ReadAllText(Path),
             */
             SessionState.InvokeCommand.InvokeScript(File.ReadAllText(Path),
-            false,
-                System.Management.Automation.Runspaces.PipelineResultTypes.None,
-                null,
-                null);
+            false, System.Management.Automation.Runspaces.PipelineResultTypes.None, null, null);
         }
 
         /// <summary>
