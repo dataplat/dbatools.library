@@ -1,15 +1,6 @@
 $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
 Push-Location ".\project"
-
-if (Test-Path "C:\github\dbatools-library\lib") {
-    write-warning removing
-    Remove-Item -Path lib -Recurse -ErrorAction Ignore
-    Remove-Item -Path temp -Recurse -ErrorAction Ignore
-    Remove-Item -Path third-party -Recurse -ErrorAction Ignore
-    Remove-Item -Path third-party-licenses -Recurse -ErrorAction Ignore
-}
-
 dotnet publish --configuration release --framework net462 | Out-String -OutVariable build
 dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
 Pop-Location

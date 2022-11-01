@@ -7,8 +7,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "dbatools", "dbatools\dbatoo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "dbatools.Tests", "dbatools.Tests\dbatools.Tests.csproj", "{AFD56AD2-F9F0-4C9D-901B-69CA1455C32A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dbatoolscode", "dbatoolscode\dbatoolscode.csproj", "{1C7729E2-7476-4377-88B1-C4020B576156}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,14 +30,6 @@ Global
 		{AFD56AD2-F9F0-4C9D-901B-69CA1455C32A}.ps4|Any CPU.ActiveCfg = Release|Any CPU
 		{AFD56AD2-F9F0-4C9D-901B-69CA1455C32A}.ps4|Any CPU.Build.0 = Release|Any CPU
 		{AFD56AD2-F9F0-4C9D-901B-69CA1455C32A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1C7729E2-7476-4377-88B1-C4020B576156}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1C7729E2-7476-4377-88B1-C4020B576156}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1C7729E2-7476-4377-88B1-C4020B576156}.ps3|Any CPU.ActiveCfg = Debug|Any CPU
-		{1C7729E2-7476-4377-88B1-C4020B576156}.ps3|Any CPU.Build.0 = Debug|Any CPU
-		{1C7729E2-7476-4377-88B1-C4020B576156}.ps4|Any CPU.ActiveCfg = Debug|Any CPU
-		{1C7729E2-7476-4377-88B1-C4020B576156}.ps4|Any CPU.Build.0 = Debug|Any CPU
-		{1C7729E2-7476-4377-88B1-C4020B576156}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1C7729E2-7476-4377-88B1-C4020B576156}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
