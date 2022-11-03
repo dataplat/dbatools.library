@@ -1,9 +1,5 @@
 ﻿using System.Management.Automation;
-using System.IO;
-using System.Collections.Concurrent;
-using System.Threading.Tasks;
-using System.Management.Automation.Language;
-using System;
+using File = System.IO.File;
 
 namespace Sqlcollaborative.Dbatools.Commands
 {
@@ -35,24 +31,7 @@ namespace Sqlcollaborative.Dbatools.Commands
         /// </summary>
         protected override void ProcessRecord()
         {
-            /*
-             *  SessionState.InvokeCommand.InvokeScript(thecode.Resource.dbatools,
-                SessionState.InvokeCommand.InvokeScript(File.ReadAllText(Path),
-            */
-
-            //Token[] token = null;
-            //ParseError[] errors = null;
-
-            //Path = "C:\\gallery\\dbatools\\segments";
-            //Path = "C:\\gallery\\dbatools\\single";
-            //Console.WriteLine(Path);
-            Parallel.ForEach(Directory.GetFiles(Path), file =>
-            {
-                //Console.WriteLine(file);
-                //ast = (ScriptBlockAst)Parser.ParseFile(file, out token, out errors);
-                //ScriptBlock sb = ScriptBlock.Create(File.ReadAllText(file));
-                SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create(File.ReadAllText(file)), null, null);
-            });
+            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create(File.ReadAllText(Path)), null, null);
         }
 
         /// <summary>
