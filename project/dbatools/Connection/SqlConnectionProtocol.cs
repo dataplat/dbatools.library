@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Connection
+﻿namespace Dataplat.Dbatools.Connection
 {
     /// <summary>
     /// The protocol to connect over via SMO

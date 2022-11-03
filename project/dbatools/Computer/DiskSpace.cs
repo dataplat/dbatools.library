@@ -1,11 +1,11 @@
-﻿using Sqlcollaborative.Dbatools.Utility;
+﻿using Dataplat.Dbatools.Utility;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Computer
+namespace Dataplat.Dbatools.Computer
 {
     /// <summary>
     /// Data Container for the output of Get-DbaDiskSpace

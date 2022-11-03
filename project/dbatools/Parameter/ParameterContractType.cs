@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Parameter
+﻿namespace Dataplat.Dbatools.Parameter
 {
     /// <summary>
     /// Defines what kind of element is granted the contract

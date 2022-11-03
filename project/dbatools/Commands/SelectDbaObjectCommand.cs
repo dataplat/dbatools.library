@@ -2,9 +2,9 @@
 using System.Collections;
 using System.Linq;
 using System.Management.Automation;
-using Sqlcollaborative.Dbatools.Parameter;
+using Dataplat.Dbatools.Parameter;
 
-namespace Sqlcollaborative.Dbatools.Commands
+namespace Dataplat.Dbatools.Commands
 {
     /// <summary>
     /// Implements the <c>Select-DbaObject</c> command

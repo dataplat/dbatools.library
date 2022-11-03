@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.dbaSystem
+namespace Dataplat.Dbatools.dbaSystem
 {
     /// <summary>
     /// An error record written by dbatools

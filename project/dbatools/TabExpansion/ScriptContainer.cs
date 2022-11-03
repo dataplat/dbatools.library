@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.TabExpansion
+namespace Dataplat.Dbatools.TabExpansion
 {
     /// <summary>
     /// Regular container to store scripts in, that are used in TEPP

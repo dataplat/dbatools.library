@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Connection
+﻿namespace Dataplat.Dbatools.Connection
 {
     /// <summary>
     /// The various types of state a connection-protocol may have

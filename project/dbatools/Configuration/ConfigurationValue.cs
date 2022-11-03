@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Configuration
+namespace Dataplat.Dbatools.Configuration
 {
     /// <summary>
     /// Contains all information about a configuration item's value

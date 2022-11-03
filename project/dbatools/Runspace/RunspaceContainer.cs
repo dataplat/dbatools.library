@@ -3,7 +3,7 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Threading;
 
-namespace Sqlcollaborative.Dbatools.Runspace
+namespace Dataplat.Dbatools.Runspace
 {
     /// <summary>
     /// Class that contains the logic necessary to manage a unique runspace

@@ -1,7 +1,7 @@
-﻿using Sqlcollaborative.Dbatools.Utility;
+﻿using Dataplat.Dbatools.Utility;
 using System.Collections.Generic;
 
-namespace Sqlcollaborative.Dbatools.Message
+namespace Dataplat.Dbatools.Message
 {
     /// <summary>
     /// List engine, managing the lists for a message transformation type

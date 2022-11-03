@@ -7,7 +7,7 @@ using System.Security;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Parameter
+namespace Dataplat.Dbatools.Parameter
 {
     /// <summary>
     /// Parameter class that handles the various kinds of credential input

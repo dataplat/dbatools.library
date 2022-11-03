@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Maintenance
+namespace Dataplat.Dbatools.Maintenance
 {
     /// <summary>
     /// Host class providing access to resources need to perform dbatools maintenance

@@ -1,7 +1,7 @@
 ﻿using System.Management.Automation;
 using File = System.IO.File;
 
-namespace Sqlcollaborative.Dbatools.Commands
+namespace Dataplat.Dbatools.Commands
 {
     /// <summary>
     /// Implements the <c>Import-Command</c> internal command

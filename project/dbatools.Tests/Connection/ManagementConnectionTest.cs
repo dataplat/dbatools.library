@@ -1,6 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Sqlcollaborative.Dbatools.Connection
+namespace Dataplat.Dbatools.Connection
 {
     //TODO: Add a reference to System.Management.Automation to the project so I can test PsCredential
 

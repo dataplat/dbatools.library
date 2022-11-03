@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Runspace
+namespace Dataplat.Dbatools.Runspace
 {
     /// <summary>
     /// Provides hosting for all registered runspaces

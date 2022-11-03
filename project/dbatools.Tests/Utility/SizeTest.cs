@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Sqlcollaborative.Dbatools.Utility
+namespace Dataplat.Dbatools.Utility
 {
     [TestClass]
     public class SizeTest
@@ -96,7 +96,7 @@ namespace Sqlcollaborative.Dbatools.Utility
             }
             catch (ArgumentException ex)
             {
-                Assert.AreEqual("Cannot compare a Sqlcollaborative.Dbatools.Utility.Size to a System.Guid", ex.Message);
+                Assert.AreEqual("Cannot compare a Dataplat.Dbatools.Utility.Size to a System.Guid", ex.Message);
                 throw;
             }
         }

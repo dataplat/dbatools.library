@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Discovery
+namespace Dataplat.Dbatools.Discovery
 {
     /// <summary>
     /// We tried to connect to a port, how did it go?

@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Message
+﻿namespace Dataplat.Dbatools.Message
 {
     /// <summary>
     /// The messaging system provides these kinds of transformations for input.

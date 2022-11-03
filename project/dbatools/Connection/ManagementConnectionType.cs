@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Connection
+namespace Dataplat.Dbatools.Connection
 {
     /// <summary>
     /// The various ways to connect to a windows server fopr management purposes.

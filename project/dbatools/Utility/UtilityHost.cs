@@ -6,7 +6,7 @@ using System.Management.Automation;
 using System.Reflection;
 using System.Text;
 
-namespace Sqlcollaborative.Dbatools.Utility
+namespace Dataplat.Dbatools.Utility
 {
     /// <summary>
     /// Provides static resources to utility-namespaced stuff

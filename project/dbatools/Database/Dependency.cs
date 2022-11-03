@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Database
+namespace Dataplat.Dbatools.Database
 {
     /// <summary>
     /// Class containing all dependency information over a database object

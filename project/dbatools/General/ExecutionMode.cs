@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.General
+﻿namespace Dataplat.Dbatools.General
 {
     /// <summary>
     /// What kind of mode do you want to run a command in?

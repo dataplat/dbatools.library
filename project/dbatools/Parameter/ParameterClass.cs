@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Sqlcollaborative.Dbatools.Parameter
+namespace Dataplat.Dbatools.Parameter
 {
     /// <summary>
     /// Base class of all parameter classes

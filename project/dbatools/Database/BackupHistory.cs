@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Numerics;
-using Sqlcollaborative.Dbatools.Utility;
+using Dataplat.Dbatools.Utility;
 
-namespace Sqlcollaborative.Dbatools.Database
+namespace Dataplat.Dbatools.Database
 {
     /// <summary>
     /// Object containing the information about the history of mankind ... or a database backup. WHo knows.

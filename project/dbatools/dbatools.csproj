@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>Sqlcollaborative.Dbatools</RootNamespace>
+    <RootNamespace>Dataplat.Dbatools</RootNamespace>
     <TargetFrameworks>net462;net6.0</TargetFrameworks>
     <AssemblyTitle>dbatools</AssemblyTitle>
-    <Company>sqlcollaborative</Company>
+    <Company>Dataplat</Company>
     <Product>dbatools</Product>
     <Description>The dbatools PowerShell Module library</Description>
     <Copyright>Copyright ©  2021</Copyright>

@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Utility
+﻿namespace Dataplat.Dbatools.Utility
 {
     /// <summary>
     /// Static class that holds useful regex patterns, ready for use

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.dbaSystem
+namespace Dataplat.Dbatools.dbaSystem
 {
     /// <summary>
     /// Provides system-wide static resources regarding the dbatools system runtime in general

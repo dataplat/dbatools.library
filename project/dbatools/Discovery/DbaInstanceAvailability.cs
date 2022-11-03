@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Discovery
+﻿namespace Dataplat.Dbatools.Discovery
 {
     /// <summary>
     /// Indiciator for whether an instance is known to be available or not

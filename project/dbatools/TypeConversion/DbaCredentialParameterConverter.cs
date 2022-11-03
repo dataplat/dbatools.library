@@ -4,9 +4,9 @@ using System.Linq;
 using System.Management.Automation;
 using System.Text;
 using System.Threading.Tasks;
-using Sqlcollaborative.Dbatools.Parameter;
+using Dataplat.Dbatools.Parameter;
 
-namespace Sqlcollaborative.Dbatools.TypeConversion
+namespace Dataplat.Dbatools.TypeConversion
 {
     /// <summary>
     /// Converts to and from DbaCredentialparameter
@@ -60,7 +60,7 @@ namespace Sqlcollaborative.Dbatools.TypeConversion
         /// <returns>Whether it's possible, duh!</returns>
         public override bool CanConvertFrom(object SourceValue, Type DestinationType)
         {
-            if (DestinationType.FullName != "Sqlcollaborative.Dbatools.Parameter.DbaCredentialParameter")
+            if (DestinationType.FullName != "Dataplat.Dbatools.Parameter.DbaCredentialParameter")
                 return false;
             if (SourceValue == null)
                 return false;
@@ -93,7 +93,7 @@ namespace Sqlcollaborative.Dbatools.TypeConversion
         {
             switch (type.FullName)
             {
-                case "Sqlcollaborative.Dbatools.Parameter.DbaCredentialParameter":
+                case "Dataplat.Dbatools.Parameter.DbaCredentialParameter":
                     return true;
                 case "System.Net.NetworkCredential":
                     return true;

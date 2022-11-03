@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Net;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Sqlcollaborative.Dbatools.Connection;
-using Sqlcollaborative.Dbatools.Exceptions;
+using Dataplat.Dbatools.Connection;
+using Dataplat.Dbatools.Exceptions;
 
-namespace Sqlcollaborative.Dbatools.Parameter
+namespace Dataplat.Dbatools.Parameter
 {
     [TestClass]
     public class DbaInstanceParamaterTest

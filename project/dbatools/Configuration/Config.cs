@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.Configuration
+namespace Dataplat.Dbatools.Configuration
 {
     /// <summary>
     /// Configuration Manager as well as individual configuration object.

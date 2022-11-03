@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Discovery
+namespace Dataplat.Dbatools.Discovery
 {
     /// <summary>
     /// The reply the browser service gave

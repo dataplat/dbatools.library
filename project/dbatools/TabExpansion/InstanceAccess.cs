@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.TabExpansion
+namespace Dataplat.Dbatools.TabExpansion
 {
     /// <summary>
     /// Contains information on access to an instance

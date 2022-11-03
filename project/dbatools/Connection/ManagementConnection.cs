@@ -4,7 +4,7 @@ using System.Management.Automation;
 using Microsoft.Management.Infrastructure;
 using Microsoft.Management.Infrastructure.Options;
 
-namespace Sqlcollaborative.Dbatools.Connection
+namespace Dataplat.Dbatools.Connection
 {
     /// <summary>
     /// Contains management connection information for a windows server

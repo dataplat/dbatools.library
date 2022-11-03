@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace Sqlcollaborative.Dbatools.IO
+namespace Dataplat.Dbatools.IO
 {
     /// <summary>
     /// Provides progress callbacks for a stream being read.

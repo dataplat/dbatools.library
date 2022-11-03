@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Computer
+namespace Dataplat.Dbatools.Computer
 {
     /// <summary>
     /// What kind of drive are you?

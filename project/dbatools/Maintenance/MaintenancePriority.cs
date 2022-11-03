@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Maintenance
+namespace Dataplat.Dbatools.Maintenance
 {
     /// <summary>
     /// How high the priority of the task. Higher priority tasks take precedence over low priority tasks.

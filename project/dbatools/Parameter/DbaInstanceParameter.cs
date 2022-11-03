@@ -3,11 +3,11 @@ using System.Management.Automation;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Text.RegularExpressions;
-using Sqlcollaborative.Dbatools.Connection;
-using Sqlcollaborative.Dbatools.Exceptions;
-using Sqlcollaborative.Dbatools.Utility;
+using Dataplat.Dbatools.Connection;
+using Dataplat.Dbatools.Exceptions;
+using Dataplat.Dbatools.Utility;
 
-namespace Sqlcollaborative.Dbatools.Parameter
+namespace Dataplat.Dbatools.Parameter
 {
     /// <summary>
     /// Input converter for instance information

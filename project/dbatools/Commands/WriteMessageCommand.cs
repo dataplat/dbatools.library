@@ -1,11 +1,11 @@
-using Sqlcollaborative.Dbatools.Message;
+using Dataplat.Dbatools.Message;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
 
-namespace Sqlcollaborative.Dbatools.Commands
+namespace Dataplat.Dbatools.Commands
 {
     /// <summary>
     /// Implements the <c>Write-Message</c> command, performing message handling and logging.
@@ -183,8 +183,8 @@ namespace Sqlcollaborative.Dbatools.Commands
         private static string _writeHostScript = @"
 param ( $string )
 
-if ([Sqlcollaborative.Dbatools.Message.MessageHost]::DeveloperMode) { Write-HostColor -String $string -DefaultColor ([Sqlcollaborative.Dbatools.Message.MessageHost]::DeveloperColor) -ErrorAction Ignore }
-else { Write-HostColor -String $string -DefaultColor ([Sqlcollaborative.Dbatools.Message.MessageHost]::InfoColor) -ErrorAction Ignore }
+if ([Dataplat.Dbatools.Message.MessageHost]::DeveloperMode) { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message.MessageHost]::DeveloperColor) -ErrorAction Ignore }
+else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message.MessageHost]::InfoColor) -ErrorAction Ignore }
 ";
 
         /// <summary>

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Configuration
+namespace Dataplat.Dbatools.Configuration
 {
     /// <summary>
     /// The location where a setting was applied

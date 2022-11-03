@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Exceptions
+namespace Dataplat.Dbatools.Exceptions
 {
     /// <summary>
     /// An exception that is thrown by parameter classes when given empty input

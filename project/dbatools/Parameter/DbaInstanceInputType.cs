@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Parameter
+﻿namespace Dataplat.Dbatools.Parameter
 {
     /// <summary>
     /// What kind of object was bound to the parameter class?

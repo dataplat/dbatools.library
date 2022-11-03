@@ -5,7 +5,7 @@ using System.Management.Automation;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Maintenance
+namespace Dataplat.Dbatools.Maintenance
 {
     /// <summary>
     /// An individual task assigned to the maintenance engine

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Discovery
+namespace Dataplat.Dbatools.Discovery
 {
     /// <summary>
     /// The mechanisms we use to determine, whether a given host contains a legit instance
