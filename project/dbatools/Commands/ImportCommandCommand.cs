@@ -1,4 +1,5 @@
 ﻿using System.Management.Automation;
+using System.Runtime.InteropServices;
 using File = System.IO.File;
 
 namespace Dataplat.Dbatools.Commands
@@ -23,7 +24,6 @@ namespace Dataplat.Dbatools.Commands
         /// </summary>
         protected override void BeginProcessing()
         {
-
         }
 
         /// <summary>

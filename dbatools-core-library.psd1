@@ -7,7 +7,7 @@
 #
 @{
     # Version number of this module.
-    ModuleVersion          = '2022.10.27'
+    ModuleVersion          = '2022.11.4'
 
     # ID used to uniquely identify this module
     GUID                   = '024b94cc-65a3-484f-bc5f-12cd8717ffd1'
@@ -52,9 +52,9 @@
         )
 
     # Script module or binary module file associated with this manifest.
-    RootModule             = ''
+    RootModule             = 'dbatools-library.psm1'
 
-    FunctionsToExport      = @()
+    FunctionsToExport      = @('Get-DbatoolsLibraryPath')
 
     PrivateData            = @{
         # PSData is module packaging and gallery metadata embedded in PrivateData

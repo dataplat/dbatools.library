@@ -41,14 +41,12 @@
     # because SQL Server has so many diff componenets
     # (SMO/DacFX/SqlClient), we need to first load bindingRedirects
     # but only in Full .NET because Core does something different
-    RequiredAssemblies     = @(
-        './third-party/LumenWorks/LumenWorks.Framework.IO.dll'
-    )
+    RequiredAssemblies     = @()
 
     # Script module or binary module file associated with this manifest.
-    RootModule             = ''
+    RootModule             = 'dbatools-library.psm1'
 
-    FunctionsToExport      = @()
+    FunctionsToExport      = @('Get-DbatoolsLibraryPath')
 
     PrivateData            = @{
         # PSData is module packaging and gallery metadata embedded in PrivateData

@@ -3,10 +3,10 @@ $PSDefaultParameterValues["*:Confirm"] = $false
 
 if (Test-Path ./lib) {
     write-warning removing
-    Remove-Item -Path lib -Recurse -ErrorAction Ignore
-    Remove-Item -Path temp -Recurse -ErrorAction Ignore
-    Remove-Item -Path third-party -Recurse -ErrorAction Ignore
-    Remove-Item -Path third-party-licenses -Recurse -ErrorAction Ignore
+    rm -rf lib
+    rm -rf temp
+    rm -rf third-party
+    rm -rf third-party-licenses
 }
 Push-Location "./project"
 dotnet publish --configuration release --framework net6.0 | Out-String -OutVariable build
