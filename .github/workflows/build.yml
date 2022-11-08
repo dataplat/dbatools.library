@@ -19,7 +19,7 @@ jobs:
     - name: Execute sqlpackage
       shell: pwsh
       run: |
-        Import-Module ./dbatools-library.psd1 -Force
+        Import-Module ./dbatools.library.psd1 -Force
         
         $libpath = Split-Path -Path (Get-Module dbatools*library).Path
 

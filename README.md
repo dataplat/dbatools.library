@@ -1,1 +1,1 @@
-# dbatools-library
+# dbatools.library

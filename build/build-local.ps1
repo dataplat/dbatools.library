@@ -1,5 +1,5 @@
 # Go compile the DLLs
-Set-Location C:\github\dbatools-library
+Set-Location C:\github\dbatools.library
 Remove-Item .\project\dbatools\obj -Recurse -ErrorAction Ignore
 Remove-Item .\project\dbatools.Tests\lib -Recurse -ErrorAction Ignore
 Remove-Item .\project\dbatools.Tests\obj -Recurse -ErrorAction Ignore
@@ -141,7 +141,7 @@ Get-ChildItem -Directory -Path .\lib\net462 | Where-Object Name -notin 'win-sqlc
 Get-ChildItem -Directory -Path .\lib\net6.0 | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 
-Import-Module C:\github\dbatools-library\dbatools-core-library.psd1 -Force; Import-Module C:\github\dbatools -Force
+Import-Module C:\github\dbatools.library\dbatools.core.library.psd1 -Force; Import-Module C:\github\dbatools -Force
 
 Import-Module C:\github\dbatools -Force
 
@@ -165,10 +165,10 @@ New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Sou
 $Error | Select-Object *
 
 ### LINUX #####
-Import-Module ./dbatools-library -Force; Import-Module ./dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
+Import-Module ./dbatools.library -Force; Import-Module ./dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
 
 
-Import-Module /mnt/c/github/dbatools-library/dbatools-core-library.psd1 -Force; ipmo /mnt/c/github/dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
+Import-Module /mnt/c/github/dbatools.library/dbatools.core.library.psd1 -Force; ipmo /mnt/c/github/dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
 
 $script:instance1 =  $script:instance2 = "sqlcs"
 Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true

@@ -133,17 +133,17 @@ if ($isLinux -or $IsMacOs) {
 Get-ChildItem ./lib/*.xml, ./lib/*.pdb -Recurse -OutVariable xmlpdb
 Remove-Item -Path $xmlpdb -Recurse -ErrorAction Ignore
 
-Import-Module ./dbatools-core-library.psd1
+Import-Module ./dbatools.core.library.psd1
 
 <#
-    if ((Get-ChildItem -Path C:\gallery\dbatools-core-library -ErrorAction Ignore)) {
-        $null = Remove-Item C:\gallery\dbatools-core-library -Recurse
-        $null = mkdir C:\gallery\dbatools-core-library
-        $null = robocopy c:\github\dbatools-library C:\gallery\dbatools-core-library /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 *build*.ps1 /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
-        Remove-Item c:\gallery\dbatools-core-library\dac.ps1 -ErrorAction Ignore
-        Remove-Item c:\gallery\dbatools-core-library\dbatools-library.psd1 -ErrorAction Ignore
-        Copy-Item C:\github\dbatools-library\dbatools-core-library.psd1 C:\github\dbatools-core-library
+    if ((Get-ChildItem -Path C:\gallery\dbatools.core.library -ErrorAction Ignore)) {
+        $null = Remove-Item C:\gallery\dbatools.core.library -Recurse
+        $null = mkdir C:\gallery\dbatools.core.library
+        $null = robocopy c:\github\dbatools.library C:\gallery\dbatools.core.library /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 *build*.ps1 /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
+        Remove-Item c:\gallery\dbatools.core.library\dac.ps1 -ErrorAction Ignore
+        Remove-Item c:\gallery\dbatools.core.library\dbatools.library.psd1 -ErrorAction Ignore
+        Copy-Item C:\github\dbatools.library\dbatools.core.library.psd1 C:\github\dbatools.core.library
 
-        Get-ChildItem -Recurse -Path C:\gallery\dbatools-core-library\*.ps*, C:\gallery\dbatools-core-library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
+        Get-ChildItem -Recurse -Path C:\gallery\dbatools.core.library\*.ps*, C:\gallery\dbatools.core.library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
     }
 #>
