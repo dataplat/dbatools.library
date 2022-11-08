@@ -61,20 +61,3 @@ namespace Dataplat.Dbatools.Commands
         #endregion Command Implementation
     }
 }
-/*
- *   private static void CompressFile()
-    {
-        using FileStream originalFileStream = File.Open(OriginalFileName, FileMode.Open);
-        using FileStream compressedFileStream = File.Create(CompressedFileName);
-        using var compressor = new GZipStream(compressedFileStream, CompressionMode.Compress);
-        originalFileStream.CopyTo(compressor);
-    }
-
-    private static void DecompressFile()
-    {
-        using FileStream compressedFileStream = File.Open(CompressedFileName, FileMode.Open);
-        using FileStream outputFileStream = File.Create(DecompressedFileName);
-        using var decompressor = new GZipStream(compressedFileStream, CompressionMode.Decompress);
-        decompressor.CopyTo(outputFileStream);
-    }
-*/
