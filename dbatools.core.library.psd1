@@ -10,7 +10,7 @@
     ModuleVersion          = '2022.11.8'
 
     # ID used to uniquely identify this module
-    GUID                   = '024b94cc-65a3-484f-bc5f-12cd8717ffd1'
+    GUID                   = '76356510-6ad4-47be-b562-8e69e561a77f'
 
     # Author of this module
     Author                 = 'the dbatools team'

@@ -22,6 +22,7 @@ jobs:
     - name: Execute sqlpackage
       shell: pwsh
       run: |
+        return
         Import-Module ./dbatools.psd1 -ErrorAction Stop
         (Get-DbaManagementObject).LoadTemplate -ne $null
         $libpath = Split-Path -Path (Get-Module dbatools*library).Path
