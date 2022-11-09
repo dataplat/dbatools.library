@@ -33,17 +33,18 @@ namespace Dataplat.Dbatools.Commands
         /// </summary>
         protected override void ProcessRecord()
         {
-            if (Path.EndsWith("dat")) {
-                FileStream fs = File.Open(Path, FileMode.Open);
-                var stream = new DeflateStream(fs, CompressionMode.Decompress);
-                var sr = new StreamReader(stream, Encoding.UTF8);
-                SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create(sr.ReadToEnd()), null, null);
-                sr.Close();
-                stream.Close();
-                fs.Close();
-                sr.Dispose();
-                stream.Dispose();
-                fs.Dispose();
+            if (Path.EndsWith("dat"))
+            {
+                using (FileStream fs = File.Open(Path, FileMode.Open, FileAccess.Read))
+                {
+                    using (var stream = new DeflateStream(fs, CompressionMode.Decompress))
+                    {
+                        using (var sr = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create(sr.ReadToEnd()), null, null);
+                        }
+                    }
+                }
             }
             else
             {
