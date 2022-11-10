@@ -2,7 +2,7 @@
 using System.Management.Automation;
 using System.Text.RegularExpressions;
 
-namespace Sqlcollaborative.Dbatools.Utility
+namespace Dataplat.Dbatools.Utility
 {
     /// <summary>
     /// Validates that each parameter argument matches the RegexPattern

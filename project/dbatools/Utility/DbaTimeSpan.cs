@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace Sqlcollaborative.Dbatools.Utility
+namespace Dataplat.Dbatools.Utility
 {
     /// <summary>
     /// A wrapper class, encapsuling a regular TimeSpan object. Used to provide custom timespan display.

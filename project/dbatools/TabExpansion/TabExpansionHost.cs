@@ -6,7 +6,7 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Threading;
 
-namespace Sqlcollaborative.Dbatools.TabExpansion
+namespace Dataplat.Dbatools.TabExpansion
 {
     /// <summary>
     /// Class that handles the static fields supporting the dbatools TabExpansion implementation

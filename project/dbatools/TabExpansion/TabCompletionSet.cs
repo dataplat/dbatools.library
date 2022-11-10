@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Sqlcollaborative.Dbatools.Utility;
+using Dataplat.Dbatools.Utility;
 
-namespace Sqlcollaborative.Dbatools.TabExpansion
+namespace Dataplat.Dbatools.TabExpansion
 {
     /// <summary>
     /// Contains information used to transmit Tepp Assignment

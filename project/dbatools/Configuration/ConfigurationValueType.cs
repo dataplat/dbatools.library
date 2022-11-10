@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Configuration
+﻿namespace Dataplat.Dbatools.Configuration
 {
     /// <summary>
     /// The data types supported by the configuration system.

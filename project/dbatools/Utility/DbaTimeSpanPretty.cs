@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Utility
+namespace Dataplat.Dbatools.Utility
 {
     /// <summary>
     /// Makes timespan great again

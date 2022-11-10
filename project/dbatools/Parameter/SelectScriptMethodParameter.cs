@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
 
-namespace Sqlcollaborative.Dbatools.Parameter
+namespace Dataplat.Dbatools.Parameter
 {
     /// <summary>
     /// Parameter class parsing various inputs for scriptmethod properties

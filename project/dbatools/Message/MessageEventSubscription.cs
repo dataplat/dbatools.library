@@ -1,9 +1,9 @@
-﻿using Sqlcollaborative.Dbatools.Utility;
+﻿using Dataplat.Dbatools.Utility;
 using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.Message
+namespace Dataplat.Dbatools.Message
 {
     /// <summary>
     /// Condition and logic to be executed on message events

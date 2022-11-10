@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Utility
+namespace Dataplat.Dbatools.Utility
 {
     /// <summary>
     /// A dbatools-internal datetime wrapper for neater display

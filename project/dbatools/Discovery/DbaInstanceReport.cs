@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Discovery
+namespace Dataplat.Dbatools.Discovery
 {
     /// <summary>
     /// The report on a discovered instance

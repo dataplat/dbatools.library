@@ -1,6 +1,6 @@
 ﻿using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.Message
+namespace Dataplat.Dbatools.Message
 {
     /// <summary>
     /// A condition, under which the object shall be transaformed

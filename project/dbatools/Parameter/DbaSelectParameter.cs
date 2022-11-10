@@ -5,7 +5,7 @@ using System.Management.Automation;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Parameter
+namespace Dataplat.Dbatools.Parameter
 {
     /// <summary>
     /// Class that automatically parses input chosen for the -Property parameter of Select-PSUObject

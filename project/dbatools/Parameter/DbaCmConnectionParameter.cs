@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Management.Automation;
-using Sqlcollaborative.Dbatools.Connection;
+using Dataplat.Dbatools.Connection;
 
-namespace Sqlcollaborative.Dbatools.Parameter
+namespace Dataplat.Dbatools.Parameter
 {
         
     /// <summary>
@@ -105,7 +105,7 @@ namespace Sqlcollaborative.Dbatools.Parameter
 
             switch (typeName)
             {
-                case "Sqlcollaborative.Dbatools.connection.managementconnection":
+                case "Dataplat.Dbatools.connection.managementconnection":
                     try
                     {
                         ManagementConnection con = new ManagementConnection();

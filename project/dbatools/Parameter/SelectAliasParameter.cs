@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
 
-namespace Sqlcollaborative.Dbatools.Parameter
+namespace Dataplat.Dbatools.Parameter
 {
     /// <summary>
     /// A parameter class for binding specific alias property mappings

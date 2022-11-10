@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Utility
+namespace Dataplat.Dbatools.Utility
 {
     using System.Net;
     using System.Net.NetworkInformation;

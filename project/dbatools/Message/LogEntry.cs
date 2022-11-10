@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.Message
+namespace Dataplat.Dbatools.Message
 {
     /// <summary>
     /// An individual entry for the message log

@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.Message
+namespace Dataplat.Dbatools.Message
 {
     /// <summary>
     /// Wrapper class that can emulate any exception for purpose of serialization without blowing up the storage space consumed

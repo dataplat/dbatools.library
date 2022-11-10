@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.dbaSystem
+namespace Dataplat.Dbatools.dbaSystem
 {
     /// <summary>
     /// Hosts static debugging values and methods

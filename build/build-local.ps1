@@ -1,5 +1,5 @@
 # Go compile the DLLs
-Set-Location C:\github\dbatools-library
+Set-Location C:\github\dbatools.library
 Remove-Item .\project\dbatools\obj -Recurse -ErrorAction Ignore
 Remove-Item .\project\dbatools.Tests\lib -Recurse -ErrorAction Ignore
 Remove-Item .\project\dbatools.Tests\obj -Recurse -ErrorAction Ignore
@@ -20,20 +20,18 @@ Get-ChildItem .\lib\net462\ -Exclude *dbatools*, publish | Remove-Item -Force -R
 Get-ChildItem .\lib\ -Include runtimes -Recurse | Remove-Item -Force -Recurse
 Get-ChildItem .\lib\*\dbatools.deps.json -Recurse | Remove-Item -Force
 
-#Copy-Item -Recurse ./third-party-licenses ./lib/third-party-licenses
+#Copy-Item -Recurse ./third-party-licenses ./third-party-licenses
 
 $null = mkdir ./temp/dacfull -Force
-$null = mkdir ./lib/sqlpackage/windows -Force
-$null = mkdir ./lib/sqlpackage/mac
 $null = mkdir ./temp/xe
-$null = mkdir ./lib/third-party
-$null = mkdir ./lib/third-party/XESmartTarget
-$null = mkdir ./lib/third-party/bogus
-$null = mkdir ./lib/third-party/LumenWorks
-$null = mkdir ./lib/third-party/LumenWorks/netstandard2.0
-$null = mkdir ./lib/third-party/LumenWorks/net461
-$null = mkdir ./lib/third-party/bogus/netstandard2.0
-$null = mkdir ./lib/third-party/bogus/net40
+$null = mkdir ./third-party
+$null = mkdir ./third-party/XESmartTarget
+$null = mkdir ./third-party/bogus
+$null = mkdir ./third-party/LumenWorks
+$null = mkdir ./third-party/LumenWorks/netstandard2.0
+$null = mkdir ./third-party/LumenWorks/net461
+$null = mkdir ./third-party/bogus/netstandard2.0
+$null = mkdir ./third-party/bogus/net40
 $null = mkdir ./temp/bogus
 $null = mkdir ./lib/net6.0/publish/win
 
@@ -63,11 +61,11 @@ $linux = 'libclrjit.so', 'libcoreclr.so', 'libcoreclrtraceptprovider.so', 'libho
 $winfull = 'Microsoft.Data.SqlClient.dll', 'Microsoft.Data.SqlClient.SNI.x64.dll', 'Microsoft.Data.SqlClient.SNI.x86.dll', 'System.Threading.Tasks.Dataflow.dll', 'Azure.Core.dll', 'Azure.Identity.dll', 'Microsoft.Build.dll', 'Microsoft.Build.Framework.dll', 'Microsoft.Data.Tools.Schema.Sql.dll', 'Microsoft.Data.Tools.Utilities.dll', 'Microsoft.SqlServer.Dac.dll', 'Microsoft.SqlServer.Dac.Extensions.dll', 'Microsoft.SqlServer.TransactSql.ScriptDom.dll', 'Microsoft.SqlServer.Types.dll', 'System.Memory.Data.dll', 'System.Resources.Extensions.dll', 'System.Security.SecureString.dll', 'sqlpackage.exe', 'sqlpackage.dll', 'libhostfxr.so', 'libhostpolicy.so', 'sqlpackage.runtimeconfig.json', 'sqlpackage.deps.json', 'hostpolicy.dll', 'hostfxr.dll', 'sqlpackage.dll'
 
 Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe -Recurse | Copy-Item -Destination lib/sqlpackage/windows
-Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination lib/third-party/XESmartTarget
-Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/netstandard2.0/bogus.dll
-Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination lib/third-party/bogus/net40/bogus.dll
-Copy-Item .\temp\LumenWorksCsvReader\lib\net461\LumenWorks.Framework.IO.dll -Destination ./lib/third-party/LumenWorks/net461/LumenWorks.Framework.IO.dll
-Copy-Item .\temp\LumenWorksCsvReader\lib\netstandard2.0\LumenWorks.Framework.IO.dll -Destination ./lib/third-party/LumenWorks/netstandard2.0/LumenWorks.Framework.IO.dll
+Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination third-party/XESmartTarget
+Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination third-party/bogus/netstandard2.0/bogus.dll
+Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination third-party/bogus/net40/bogus.dll
+Copy-Item .\temp\LumenWorksCsvReader\lib\net461\LumenWorks.Framework.IO.dll -Destination ./third-party/LumenWorks/net461/LumenWorks.Framework.IO.dll
+Copy-Item .\temp\LumenWorksCsvReader\lib\netstandard2.0\LumenWorks.Framework.IO.dll -Destination ./third-party/LumenWorks/netstandard2.0/LumenWorks.Framework.IO.dll
 
 Get-ChildItem lib/net462/dbatools.dll | Remove-Item -Force
 Get-ChildItem lib/net6.0/dbatools.dll | Remove-Item -Force
@@ -122,9 +120,9 @@ $parms.RequiredVersion = "1.6.0"
 
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\unix\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish
 Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/net462/publish/
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win
-Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win-sqlclient
+Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win-sqlclient
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win-sqlclient
 Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
 
 Copy-Item "replication/*.dll" -Destination lib/net462/publish/
@@ -139,12 +137,13 @@ Remove-Item -Path lib/net462/publish -Recurse -ErrorAction Ignore
 Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
 Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 
-Get-ChildItem -Directory -Path .\lib\net462 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
-Get-ChildItem -Directory -Path .\lib\net6.0 | Where-Object Name -notin 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path .\lib\net462 | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path .\lib\net6.0 | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 
-Import-Module C:\github\dbatools-library -Force; Import-Module C:\github\dbatools -Force;
+Import-Module C:\github\dbatools.library\dbatools.core.library.psd1 -Force; Import-Module C:\github\dbatools -Force
 
+Import-Module C:\github\dbatools -Force
 
 $script:instance1 = $script:instance2 = "sqlcs"
 Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true
@@ -158,7 +157,7 @@ $dacpac | Publish-DbaDacPackage -PublishXml $publishprofile.FileName -Database b
 $Error | Select-Object *
 
 
-
+#Data Source=sqlcs;Integrated Security=True;Encrypt=True;Trust Server Certificate=True;
 
 <#
 New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs
@@ -166,10 +165,10 @@ New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Sou
 $Error | Select-Object *
 
 ### LINUX #####
-Import-Module ./dbatools-library -Force; Import-Module ./dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
+Import-Module ./dbatools.library -Force; Import-Module ./dbatools -Force; New-Object -TypeName Microsoft.SqlServer.Dac.DacServices -ArgumentList 'Data Source=sqlcs;Integrated Security=True;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=true;Packet Size=4096;Application Name="dbatools PowerShell module - dbatools.io";Database=dbatoolsci_publishdacpac';Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
 
 
-ipmo ./dbatools-library -Force; ipmo ./dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
+Import-Module /mnt/c/github/dbatools.library/dbatools.core.library.psd1 -Force; ipmo /mnt/c/github/dbatools -Force; Connect-DbaInstance -SqlInstance sqlcs -TrustServerCertificate
 
 $script:instance1 =  $script:instance2 = "sqlcs"
 Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true

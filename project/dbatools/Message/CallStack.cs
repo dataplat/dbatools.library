@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.Message
+namespace Dataplat.Dbatools.Message
 {
     /// <summary>
     /// Container for a callstack, to create a non-volatile copy of the relevant information

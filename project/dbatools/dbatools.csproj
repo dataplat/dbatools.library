@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>Sqlcollaborative.Dbatools</RootNamespace>
+    <RootNamespace>Dataplat.Dbatools</RootNamespace>
     <TargetFrameworks>net462;net6.0</TargetFrameworks>
     <AssemblyTitle>dbatools</AssemblyTitle>
-    <Company>sqlcollaborative</Company>
+    <Company>Dataplat</Company>
     <Product>dbatools</Product>
     <Description>The dbatools PowerShell Module library</Description>
     <Copyright>Copyright ©  2021</Copyright>
@@ -54,8 +54,6 @@
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <PackageReference Include="Microsoft.Management.Infrastructure" Version="2.0.0" />
-  </ItemGroup>
-  <ItemGroup>
     <Reference Include="System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>C:\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
       <Private>False</Private>

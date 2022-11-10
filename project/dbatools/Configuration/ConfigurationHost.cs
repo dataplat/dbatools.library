@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.Configuration
+namespace Dataplat.Dbatools.Configuration
 {
     /// <summary>
     /// Host class providing static configuration settings that are constant across all runspaces within the process.

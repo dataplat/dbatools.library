@@ -1,10 +1,10 @@
-﻿using Sqlcollaborative.Dbatools.Configuration;
+﻿using Dataplat.Dbatools.Configuration;
 using System;
 using System.Collections;
 using System.Linq;
 using System.Management.Automation;
 
-namespace Sqlcollaborative.Dbatools.Commands
+namespace Dataplat.Dbatools.Commands
 {
     /// <summary>
     /// Implements the <c>Set-PSFConfig</c> command.

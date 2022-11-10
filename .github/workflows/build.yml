@@ -1,0 +1,42 @@
+name: Build and test library
+on: [push]
+defaults:
+  run:
+    shell: pwsh
+jobs:
+  linux-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build the library
+      shell: pwsh
+      run: |
+        sudo apt-get install msitools -y
+        ./build/build-core.ps1
+
+    - name: Execute sqlpackage
+      shell: pwsh
+      run: |
+        return
+        Import-Module ./dbatools.library.psd1 -Force
+        
+        $libpath = Split-Path -Path (Get-Module dbatools*library).Path
+
+        if ($IsWindows) {
+          $sqlpackage = "./lib/sqlpackage/windows/sqlpackage.exe"
+        }
+        if ($IsMacOS) {
+          $sqlpackage = "./lib/sqlpackage/mac/sqlpackage"
+        }
+        if ($IsLinux) {
+          $sqlpackage = "./lib/net6.0/sqlpackage"
+        }
+
+        . $sqlpackage | Select-String "Specifies a name value pair" | Should -Not -BeNullorEmpty
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: library
+        path: lib

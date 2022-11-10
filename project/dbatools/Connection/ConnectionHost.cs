@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Management.Automation.Runspaces;
 
-namespace Sqlcollaborative.Dbatools.Connection
+namespace Dataplat.Dbatools.Connection
 {
     /// <summary>
     /// Provides static tools for managing connections

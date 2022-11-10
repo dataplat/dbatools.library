@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Discovery
+﻿namespace Dataplat.Dbatools.Discovery
 {
     /// <summary>
     /// How high is our confidence that this is a valid instance?

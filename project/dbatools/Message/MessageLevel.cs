@@ -1,4 +1,4 @@
-﻿namespace Sqlcollaborative.Dbatools.Message
+﻿namespace Dataplat.Dbatools.Message
 {
     /// <summary>
     /// The various levels of verbosity available.

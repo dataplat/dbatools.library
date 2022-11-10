@@ -5,7 +5,7 @@ using System.Management.Automation.Runspaces;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Sqlcollaborative.Dbatools.Connection
+namespace Dataplat.Dbatools.Connection
 {
     /// <summary>
     /// The container that lists all sessions for a given runspace

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sqlcollaborative.Dbatools.Validation
+namespace Dataplat.Dbatools.Validation
 {
     /// <summary>
     /// The results of testing linked server connectivity as seen from the server that was linked to.

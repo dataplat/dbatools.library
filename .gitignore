@@ -38,3 +38,5 @@ bin/
 temp/
 runtimes/
 lib/
+/third-party
+/third-party-licenses
