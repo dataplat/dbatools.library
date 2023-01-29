@@ -2,14 +2,16 @@ $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
 
 if (Test-Path "C:\github\dbatools.library\lib") {
-    write-warning removing
+    write-warning "removing C:\github\dbatools.library\lib"
     Remove-Item -Path lib -Recurse -ErrorAction Ignore
     Remove-Item -Path temp -Recurse -ErrorAction Ignore
     Remove-Item -Path third-party -Recurse -ErrorAction Ignore
     Remove-Item -Path third-party-licenses -Recurse -ErrorAction Ignore
 }
 
-Push-Location ".\project"
+$root = Split-Path -Path $PSScriptRoot
+Push-Location "$root\project"
+
 dotnet publish --configuration release --framework net462 | Out-String -OutVariable build
 dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
 Pop-Location

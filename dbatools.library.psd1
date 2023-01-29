@@ -7,7 +7,7 @@
 #
 @{
     # Version number of this module.
-    ModuleVersion          = '2022.11.8'
+    ModuleVersion          = '2023.1.29'
 
     # ID used to uniquely identify this module
     GUID                   = '00b61a37-6c36-40d8-8865-ac0180288c84'
@@ -19,19 +19,10 @@
     CompanyName            = 'dbatools.io'
 
     # Copyright statement for this module
-    Copyright              = 'Copyright (c) 2022 by dbatools, licensed under MIT'
+    Copyright              = 'Copyright (c) 2023 by dbatools, licensed under MIT'
 
     # Description of the functionality provided by this module
     Description            = "The library that powers dbatools, the community module for SQL Server Pros"
-
-    # Minimum version of the Windows PowerShell engine required by this module
-    PowerShellVersion      = '5.1'
-
-    # Minimum version of the .NET Framework required by this module
-    DotNetFrameworkVersion = '4.6.2'
-
-    # Supported PSEditions
-    CompatiblePSEditions   = @('Desktop')
 
     # Modules that must be imported into the global environment prior to importing this module
     RequiredModules        = @()
@@ -76,8 +67,7 @@
             # RequireLicenseAcceptance = ""
 
             # Indicates this is a pre-release/testing version of the module.
-            IsPrerelease = 'true'
-            Prerelease   = 'preview'
+            IsPrerelease = 'false'
         }
     }
 }
