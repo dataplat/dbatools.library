@@ -1,5 +1,6 @@
 $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
+Push-Location C:\github\dbatools.library\
 
 if (Test-Path "C:\github\dbatools.library\lib") {
     write-warning "removing C:\github\dbatools.library\lib"
@@ -9,7 +10,11 @@ if (Test-Path "C:\github\dbatools.library\lib") {
     Remove-Item -Path third-party-licenses -Recurse -ErrorAction Ignore
 }
 
-$root = Split-Path -Path $PSScriptRoot
+$scriptroot = $PSScriptRoot
+if (-not $scriptroot) {
+    $scriptroot = "C:\github\dbatools.library\build"
+}
+$root = Split-Path -Path $scriptroot
 Push-Location "$root\project"
 
 dotnet publish --configuration release --framework net462 | Out-String -OutVariable build
@@ -74,21 +79,23 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.0.1"
+$parms.RequiredVersion = "5.1.1"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
-$parms.RequiredVersion = "5.0.1"
+$parms.RequiredVersion = "5.1.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
-$parms.RequiredVersion = "4.45.0"
+$parms.RequiredVersion = "4.53.0"
 $null = Install-Package @parms
 
-Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.45.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.53.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.1.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
 
-Copy-Item "./var/replication/*.dll" -Destination lib/
+
+Copy-Item "./var/misc/core/*.dll" -Destination ./lib/
+Copy-Item "./var/misc/both/*.dll" -Destination ./lib/
 Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse
 
 Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
@@ -105,11 +112,11 @@ if ((Get-ChildItem -Path C:\gallery\dbatools.library -ErrorAction Ignore)) {
     Remove-Item c:\gallery\dbatools.library\dbatools.core.library.psd1 -ErrorAction Ignore
     Copy-Item C:\github\dbatools.library\dbatools.library.psd1 C:\gallery\dbatools.library
 
-    Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
+    $null = Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
 }
 
 Import-Module C:\gallery\dbatools.library\dbatools.library.psd1 -Force
-
+Pop-Location
 <#
 already there
 -rwxrwxrwx ctrlb            ctrlb              10/08/2022 03:08       12132752 Microsoft.Data.Tools.Schema.Sql.dll

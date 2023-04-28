@@ -1,5 +1,6 @@
 $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
+Push-Location /mnt/c/github/dbatools.library
 
 if (Test-Path ./lib) {
     write-warning "removing ./lib"
@@ -9,15 +10,22 @@ if (Test-Path ./lib) {
     rm -rf third-party-licenses
 }
 
-$root = Split-Path -Path $PSScriptRoot
+$scriptroot = $PSScriptRoot
+if (-not $scriptroot) {
+    $scriptroot = "/mnt/c/github/dbatools.library/build"
+}
+
+$root = Split-Path -Path $scriptroot
 Push-Location "$root/project"
+
+
 dotnet publish --configuration release --framework net6.0 | Out-String -OutVariable build
 dotnet test --framework net6.0 --verbosity normal | Out-String -OutVariable test
 Pop-Location
 
 Remove-Item -Path lib/dbatools.xml
 Get-ChildItem -Path lib/net6.0 -File | Remove-Item
-Move-Item -Path lib/net6.0/publish/* -Destination lib/ -ErrorAction Ignore
+Move-Item -Path lib/net6.0/publish/* -Destination lib/ #-ErrorAction Ignore
 Remove-Item -Path lib/net6.0 -Recurse -ErrorAction Ignore
 
 Get-ChildItem ./lib -Recurse -Include *.pdb | Remove-Item
@@ -81,7 +89,7 @@ msiextract --directory $(Resolve-Path .\temp\xe) $(Resolve-Path .\temp\XESmartTa
 
 Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination third-party/XESmartTarget
 Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe, *.config -Recurse | Copy-Item -Destination ./lib/win
-Get-ChildItem "./temp/bogus/*/netstandard2.0/bogus.dll" -Recurse | Copy-Item -Destination ./third-party/bogus/bogus.dll
+Get-ChildItem "./temp/bogus/*/net6.0/bogus.dll" -Recurse | Copy-Item -Destination ./third-party/bogus/bogus.dll
 Copy-Item ./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll -Destination ./third-party/LumenWorks/LumenWorks.Framework.IO.dll
 
 Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
@@ -96,25 +104,26 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.0.1"
+$parms.RequiredVersion = "5.1.1"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
-$parms.RequiredVersion = "5.0.1"
+$parms.RequiredVersion = "5.1.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
-$parms.RequiredVersion = "4.45.0"
+$parms.RequiredVersion = "4.53.0"
 $null = Install-Package @parms
 
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.0.1/runtimes/unix/lib/netcoreapp3.1/Microsoft.Data.SqlClient.dll" -Destination lib
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.0.1/runtimes/win/lib/netcoreapp3.1/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
-Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.45.0/lib/netcoreapp2.1/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient/
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.0.1/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient/
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.1/runtimes/unix/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.1/runtimes/win/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
+Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.53.0/lib/net6.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient/ #Maybe this will be a problem, i dont know
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.1.0/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient/
 
 Copy-Item ./temp/linux/* -Destination lib -Exclude (Get-ChildItem lib -Recurse) -Recurse -Include *.exe, *.config -Verbose
 
-Copy-Item "./var/replication/*.dll" -Destination ./lib/
+Copy-Item "./var/misc/core/*.dll" -Destination ./lib/
+Copy-Item "./var/misc/both/*.dll" -Destination ./lib/
 Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse
 
 $linux = 'libclrjit.so', 'libcoreclr.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml'
@@ -125,7 +134,11 @@ Copy-Item -Path $sqlp.FullName -Destination ./lib/
 Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 Get-ChildItem ./lib, ./lib/win, ./lib/mac | Where-Object BaseName -in (Get-ChildItem /opt/microsoft/powershell/7).BaseName -OutVariable files
-Remove-Item $files -Recurse
+
+if ($files) {
+    Remove-Item $files -Recurse
+}
+
 
 if ($isLinux -or $IsMacOs) {
     chmod +x ./lib/sqlpackage
@@ -133,9 +146,11 @@ if ($isLinux -or $IsMacOs) {
 }
 
 Get-ChildItem ./lib/*.xml, ./lib/*.pdb -Recurse -OutVariable xmlpdb
-Remove-Item -Path $xmlpdb -Recurse -ErrorAction Ignore
+if ($xmlpdb) {
+    Remove-Item -Path $xmlpdb -Recurse -ErrorAction Ignore
+}
 
-Import-Module ./dbatools.core.library.psd1
+#Import-Module ./dbatools.core.library.psd1
 
 <#
     if ((Get-ChildItem -Path C:\gallery\dbatools.library\core -ErrorAction Ignore)) {

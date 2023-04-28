@@ -88,11 +88,11 @@ $parms = @{
 
 $parms.Name = "System.Resources.Extensions"
 $parms.RequiredVersion = "6.0.0.0"
-#Install-Package @parms
+Install-Package @parms
 
 $parms.Name = "Microsoft.SqlServer.DacFx"
 $parms.RequiredVersion = "161.6319.0-preview"
-#Install-Package @parms
+Install-Package @parms
 
 $parms.Name = "Microsoft.SqlServer.SqlManagementObjects"
 $parms.RequiredVersion = "170.7.0-preview"
