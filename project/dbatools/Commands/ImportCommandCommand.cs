@@ -35,7 +35,7 @@ namespace Dataplat.Dbatools.Commands
         {
             if (Path.EndsWith("dat"))
             {
-                using (FileStream fs = File.Open(Path, FileMode.Open, FileAccess.Read))
+                using (FileStream fs = File.Open(Path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     using (var stream = new DeflateStream(fs, CompressionMode.Decompress))
                     {
