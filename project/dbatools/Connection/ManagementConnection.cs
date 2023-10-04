@@ -1113,6 +1113,35 @@ namespace Dataplat.Dbatools.Connection
 
         #endregion DCOM
 
+        #region Shared
+        /// <summary>
+        /// Generates a CIM session to the target computer.
+        /// For use with other commands that expect a CIM session.
+        /// </summary>
+        /// <param name="Credential">Credential to use (if present)</param>
+        /// <returns>A CIM Session to the target computer represented by this connection.</returns>
+        /// <exception cref="Exception">When no CIM Session is available.</exception>
+        public CimSession GetCimSession(PSCredential Credential = null)
+        {
+            Exception tempError = null;
+            if ((DisabledConnectionTypes & ManagementConnectionType.CimRM) != ManagementConnectionType.CimRM)
+            {
+                try { return GetCimWinRMSession(Credential); }
+                catch (Exception e) { tempError = e; }
+            }
+
+            if ((DisabledConnectionTypes & ManagementConnectionType.CimDCOM) != ManagementConnectionType.CimDCOM)
+            {
+                try { return GetCimDComSession(Credential); }
+                catch (Exception e) { tempError = e; }
+            }
+
+            if (tempError != null)
+                throw tempError;
+            throw new Exception("No supporting connection type is enabled!");
+        }
+        #endregion Shared
+
         #endregion CIM Execution
 
         /// <summary>
