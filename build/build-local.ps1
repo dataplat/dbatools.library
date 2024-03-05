@@ -99,15 +99,15 @@ $parms.RequiredVersion = "170.7.0-preview"
 #Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.0.1"
+$parms.RequiredVersion = "5.1.4"
 #Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
-$parms.RequiredVersion = "5.0.1"
+$parms.RequiredVersion = "5.2.0"
 #Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
-$parms.RequiredVersion = "4.45.0"
+$parms.RequiredVersion = "4.53.0"
 #Install-Package @parms
 
 $parms.Name = "Microsoft.SqlServer.Server"
@@ -115,15 +115,15 @@ $parms.RequiredVersion = "1.0.0"
 #Install-Package @parms
 
 $parms.Name = "Azure.Identity"
-$parms.RequiredVersion = "1.6.0"
+$parms.RequiredVersion = "1.10.3"
 #Install-Package @parms
 
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\unix\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish
-Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/net462/publish/
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.0.1\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win-sqlclient
-Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.45.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win-sqlclient
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win-sqlclient
-Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.0.1\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.1.4\runtimes\unix\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish
+Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.53.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/net462/publish/
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.5.1.4\runtimes\win\lib\netcoreapp3.1\Microsoft.Data.SqlClient.dll" -Destination lib/net6.0/publish/win-sqlclient
+Copy-Item "C:\temp\nuget\Microsoft.Identity.Client.4.53.0\lib\netcoreapp2.1\Microsoft.Identity.Client.dll" -Destination lib/net6.0/publish/win-sqlclient
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net6.0/publish/win-sqlclient
+Copy-Item "C:\temp\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/net462/publish/
 
 Copy-Item "replication/*.dll" -Destination lib/net462/publish/
 Copy-Item "replication/*.dll" -Destination lib/net6.0/publish/

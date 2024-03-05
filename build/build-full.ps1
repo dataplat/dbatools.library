@@ -79,11 +79,11 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.1.1"
+$parms.RequiredVersion = "5.1.4"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
-$parms.RequiredVersion = "5.1.0"
+$parms.RequiredVersion = "5.2.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
@@ -91,7 +91,7 @@ $parms.RequiredVersion = "4.53.0"
 $null = Install-Package @parms
 
 Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.53.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.1.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
 
 
 Copy-Item "./var/misc/core/*.dll" -Destination ./lib/

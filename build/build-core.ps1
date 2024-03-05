@@ -104,21 +104,21 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.1.1"
+$parms.RequiredVersion = "5.1.4"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
-$parms.RequiredVersion = "5.1.0"
+$parms.RequiredVersion = "5.2.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
 $parms.RequiredVersion = "4.53.0"
 $null = Install-Package @parms
 
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.1/runtimes/unix/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.1/runtimes/win/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.4/runtimes/unix/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.4/runtimes/win/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
 Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.53.0/lib/net6.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient/ #Maybe this will be a problem, i dont know
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.1.0/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient/
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.2.0/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient/
 
 Copy-Item ./temp/linux/* -Destination lib -Exclude (Get-ChildItem lib -Recurse) -Recurse -Include *.exe, *.config -Verbose
 
