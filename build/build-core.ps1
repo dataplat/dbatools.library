@@ -161,6 +161,6 @@ if ($xmlpdb) {
         Remove-Item c:\gallery\dbatools.library\core\dbatools.library.psd1 -ErrorAction Ignore
         #Copy-Item C:\github\dbatools.library\dbatools.core.library.psd1 C:\github\dbatools.core.library
 
-        Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\*\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
+        Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\*\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\1c735258e8b34ce113ad86a501235c1f2e263106) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
     }
 #>
