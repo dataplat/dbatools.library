@@ -79,11 +79,11 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.1.1"
+$parms.RequiredVersion = "5.1.4"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
-$parms.RequiredVersion = "5.1.0"
+$parms.RequiredVersion = "5.2.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
@@ -91,7 +91,7 @@ $parms.RequiredVersion = "4.53.0"
 $null = Install-Package @parms
 
 Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.53.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.1.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
 
 
 Copy-Item "./var/misc/core/*.dll" -Destination ./lib/
@@ -106,17 +106,27 @@ Get-ChildItem -Directory -Path .\lib\ | Where-Object Name -notin 'x64', 'x86' | 
 if ((Get-ChildItem -Path C:\gallery\dbatools.library -ErrorAction Ignore)) {
     $null = Remove-Item C:\gallery\dbatools.library -Recurse
     $null = mkdir C:\gallery\dbatools.library
+    $null = mkdir C:\gallery\dbatools.library\desktop
+    $null = mkdir C:\gallery\dbatools.library\desktop\lib
+    #$null = mkdir C:\gallery\dbatools.library\desktop\x86
+    #$null = mkdir C:\gallery\dbatools.library\desktop\x64
     $null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 build*.ps1 dbatools-core*.* /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
     
     Remove-Item c:\gallery\dbatools.library\dac.ps1 -ErrorAction Ignore
     Remove-Item c:\gallery\dbatools.library\dbatools.core.library.psd1 -ErrorAction Ignore
     Copy-Item C:\github\dbatools.library\dbatools.library.psd1 C:\gallery\dbatools.library
+    Move-Item C:\github\dbatools.library\lib\x86 C:\gallery\dbatools.library\desktop\lib
+    Move-Item C:\github\dbatools.library\lib\x64 C:\gallery\dbatools.library\desktop\lib
+    Move-Item C:\github\dbatools.library\lib\* C:\gallery\dbatools.library\desktop\*
+    Remove-Item C:\gallery\dbatools.library\lib -Recurse
 
-    $null = Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\fd0dde81152c4d4868afd88d727e78a9b6881cf4) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
+
+    #$null = Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\1c735258e8b34ce113ad86a501235c1f2e263106) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
 }
 
 Import-Module C:\gallery\dbatools.library\dbatools.library.psd1 -Force
 Pop-Location
+# gotta copy the integration dlls
 <#
 already there
 -rwxrwxrwx ctrlb            ctrlb              10/08/2022 03:08       12132752 Microsoft.Data.Tools.Schema.Sql.dll
