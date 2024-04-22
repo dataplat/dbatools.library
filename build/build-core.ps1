@@ -47,6 +47,7 @@ if ($IsLinux -or $IsMacOs) {
     $null = mkdir ./lib/win
     $null = mkdir ./lib/mac
     $null = mkdir ./lib/win-sqlclient
+    $null = mkdir ./lib/win-sqlclient-x86
 } else {
     $tempdir = "C:/temp"
     $null = New-Item -ItemType Directory $tempdir -ErrorAction Ignore
@@ -60,6 +61,7 @@ if ($IsLinux -or $IsMacOs) {
     $null = New-Item -ItemType Directory ./lib/win
     $null = New-Item -ItemType Directory ./lib/mac
     $null = New-Item -ItemType Directory ./lib/win-sqlclient
+    $null = New-Item -ItemType Directory ./lib/win-sqlclient-x86
 }
 
 
@@ -116,9 +118,16 @@ $parms.RequiredVersion = "4.53.0"
 $null = Install-Package @parms
 
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.4/runtimes/unix/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib
+
+# Copy to the 'x64' directory
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.4/runtimes/win/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
 Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.53.0/lib/net6.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient/ #Maybe this will be a problem, i dont know
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.2.0/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient/
+
+# Copy to the 'x86' directory, but with a different SNI DLL file. Remember,the SNI file is not managed code, it's _native_.
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.1.4/runtimes/win/lib/net6.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient-x86/
+Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.53.0/lib/net6.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient-x86/ #Maybe this will be a problem, i dont know
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.2.0/runtimes/win-x86/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient-x86/
 
 Copy-Item ./temp/linux/* -Destination lib -Exclude (Get-ChildItem lib -Recurse) -Recurse -Include *.exe, *.config -Verbose
 
@@ -131,7 +140,7 @@ $linux = 'libclrjit.so', 'libcoreclr.so', 'libhostfxr.so', 'libhostpolicy.so', '
 $sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
 Copy-Item -Path $sqlp.FullName -Destination ./lib/
 
-Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'win-sqlclient-x86', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 Get-ChildItem ./lib, ./lib/win, ./lib/mac | Where-Object BaseName -in (Get-ChildItem /opt/microsoft/powershell/7).BaseName -OutVariable files
 
