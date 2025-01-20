@@ -49,7 +49,7 @@ $ProgressPreference = "SilentlyContinue"
 Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile .\temp\DacFramework.msi
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile .\temp\bogus.zip
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile .\temp\LumenWorksCsvReader.zip
-Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.4.9/XESmartTarget_x64.msi -OutFile .\temp\XESmartTarget_x64.msi
+Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.5.7/XESmartTarget_x64.msi -OutFile .\temp\XESmartTarget_x64.msi
 
 $ProgressPreference = "Continue"
 7z x .\temp\LumenWorksCsvReader.zip "-o.\temp\LumenWorksCsvReader"
@@ -79,7 +79,7 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.1.4"
+$parms.RequiredVersion = "5.2.2"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
@@ -87,10 +87,10 @@ $parms.RequiredVersion = "5.2.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
-$parms.RequiredVersion = "4.53.0"
+$parms.RequiredVersion = "4.67.1"
 $null = Install-Package @parms
 
-Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.53.0\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.67.1\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/
 Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
 
 
