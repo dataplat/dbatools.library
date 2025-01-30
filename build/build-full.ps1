@@ -103,6 +103,9 @@ $null = Install-Package @parms
 Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.67.1\lib\net462\Microsoft.Identity.Client.dll" -Destination lib/
 Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
 Copy-Item "$tempdir\nuget\Azure.Core.1.38.0\lib\net461\Azure.Core.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.IdentityModel.Abstractions.8.3.1\lib\net462\Microsoft.IdentityModel.Abstractions.dll" -Destination lib/
+
+
 
 Copy-Item "./var/misc/core/*.dll" -Destination ./lib/
 Copy-Item "./var/misc/both/*.dll" -Destination ./lib/
