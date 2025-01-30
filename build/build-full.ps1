@@ -90,9 +90,19 @@ $parms.Name = "Microsoft.Identity.Client"
 $parms.RequiredVersion = "4.67.1"
 $null = Install-Package @parms
 
-Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.67.1\lib\net461\Microsoft.Identity.Client.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
+$parms.Name = "Microsoft.IdentityModel.Abstractions"
+$parms.RequiredVersion = "8.3.1"
+$null = Install-Package @parms
 
+$parms.Name = "Azure.Core"
+$parms.RequiredVersion = "1.38.0"
+$null = Install-Package @parms
+
+
+
+Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.67.1\lib\net462\Microsoft.Identity.Client.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Azure.Core.1.38.0\lib\net461\Azure.Core.dll" -Destination lib/
 
 Copy-Item "./var/misc/core/*.dll" -Destination ./lib/
 Copy-Item "./var/misc/both/*.dll" -Destination ./lib/
@@ -111,7 +121,7 @@ if ((Get-ChildItem -Path C:\gallery\dbatools.library -ErrorAction Ignore)) {
     #$null = mkdir C:\gallery\dbatools.library\desktop\x86
     #$null = mkdir C:\gallery\dbatools.library\desktop\x64
     $null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 build*.ps1 dbatools-core*.* /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
-    
+
     Remove-Item c:\gallery\dbatools.library\dac.ps1 -ErrorAction Ignore
     Remove-Item c:\gallery\dbatools.library\dbatools.core.library.psd1 -ErrorAction Ignore
     Copy-Item C:\github\dbatools.library\dbatools.library.psd1 C:\gallery\dbatools.library
@@ -135,3 +145,18 @@ already there
 
 #(Get-Item C:\github\dbatools.library\lib\Microsoft.Data.Tools.Schema.Sql.dll).VersionInfo.FileVersion
 #(Get-Item C:\github\dbatools.library\lib\Microsoft.Data.Tools.Utilities.dll).VersionInfo.FileVersion
+
+<#
+
+$script:instance1 = $script:instance2 = "localhost"
+Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true
+$db = Get-DbaDatabase -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac
+$publishprofile = New-DbaDacProfile -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -Path C:\temp
+$extractOptions = New-DbaDacOption -Action Export
+$extractOptions.ExtractAllTableData = $true
+$dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
+$dacpac
+$dacpac | Publish-DbaDacPackage -PublishXml $publishprofile.FileName -Database butt -SqlInstance $script:instance2 -Confirm:$false -Verbose
+$Error | Select-Object *
+
+#>
