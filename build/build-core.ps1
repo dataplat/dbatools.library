@@ -18,15 +18,19 @@ if (-not $scriptroot) {
 $root = Split-Path -Path $scriptroot
 Push-Location "$root/project"
 
+dotnet clean
+dotnet publish --configuration release --verbosity diag --framework net8.0 | Out-String -OutVariable build
+dotnet test --configuration release --verbosity diag --framework net8.0 | Out-String -OutVariable test
 
-dotnet publish --configuration release --framework net8.0 | Out-String -OutVariable build
-dotnet test --framework net8.0 --verbosity normal | Out-String -OutVariable test
+## the build is now in dbatools.library/lib
 Pop-Location
 
 Remove-Item -Path lib/dbatools.xml
 Get-ChildItem -Path lib/net8.0 -File | Remove-Item
 Move-Item -Path lib/net8.0/publish/* -Destination lib/ #-ErrorAction Ignore
 Remove-Item -Path lib/net8.0 -Recurse -ErrorAction Ignore
+#publish got moved to lib
+
 
 Get-ChildItem ./lib -Recurse -Include *.pdb | Remove-Item
 Get-ChildItem ./lib -Recurse -Include *.xml | Remove-Item
@@ -38,12 +42,14 @@ if ($IsLinux -or $IsMacOs) {
     $null = mkdir ./temp
     $null = mkdir ./temp/dacfull
     $null = mkdir ./temp/xe
+    $null = mkdir ./temp/bogus
+    $null = mkdir ./temp/linux
+
     $null = mkdir ./third-party
     $null = mkdir ./third-party/XESmartTarget
     $null = mkdir ./third-party/bogus
     $null = mkdir ./third-party/LumenWorks
-    $null = mkdir ./temp/bogus
-    $null = mkdir ./temp/linux
+
     $null = mkdir ./lib/win
     $null = mkdir ./lib/mac
     $null = mkdir ./lib/win-sqlclient
@@ -71,7 +77,7 @@ $ProgressPreference = "SilentlyContinue"
 
 Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile ./temp/sqlpackage-linux.zip
 Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile ./temp/sqlpackage-macos.zip
-Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile .\temp\DacFramework.msi
+Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile ./temp/DacFramework.msi
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile ./temp/bogus.zip
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile ./temp/LumenWorksCsvReader.zip
 Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.5.7/XESmartTarget_x64.msi -OutFile ./temp/XESmartTarget_x64.msi
@@ -126,7 +132,7 @@ $parms.RequiredVersion = "1.38.0"
 $null = Install-Package @parms
 
 
-
+# README cl: this dll is already there, as we're building dbatools csproj whose dependencies are already included !?
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.2.2/runtimes/unix/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib
 # Copy to the 'x64' directory
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.2.2/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
@@ -175,7 +181,7 @@ if ($xmlpdb) {
     Remove-Item -Path $xmlpdb -Recurse -ErrorAction Ignore
 }
 
-#Import-Module ./dbatools.core.library.psd1
+#Import-Module ./dbatools.library.psd1
 
 <#
     if ((Get-ChildItem -Path C:\gallery\dbatools.library\core -ErrorAction Ignore)) {
