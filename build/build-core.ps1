@@ -2,6 +2,19 @@ $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
 Push-Location /mnt/c/github/dbatools.library
 
+if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+    sudo apt-get install -y dotnet-sdk-8.0
+}
+
+if (-not (Get-Command msiexec -ErrorAction SilentlyContinue)) {
+    sudo apt-get install -y msitools
+}
+
+if (-not (Get-Command unzip -ErrorAction SilentlyContinue)) {
+    sudo apt-get install -y unzip
+}
+
+
 if (Test-Path ./lib) {
     write-warning "removing ./lib"
     rm -rf lib
@@ -19,7 +32,7 @@ $root = Split-Path -Path $scriptroot
 Push-Location "$root/project"
 
 dotnet clean
-dotnet publish --configuration release --verbosity diag --framework net8.0 | Out-String -OutVariable build
+dotnet publish --force --configuration release --verbosity diag --framework net8.0 | Out-String -OutVariable build
 dotnet test --configuration release --verbosity diag --framework net8.0 | Out-String -OutVariable test
 
 ## the build is now in dbatools.library/lib
@@ -164,7 +177,9 @@ Copy-Item -Path $sqlp.FullName -Destination ./lib/
 
 Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'win-sqlclient-x86', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
-Get-ChildItem ./lib, ./lib/win, ./lib/mac | Where-Object BaseName -in (Get-ChildItem /opt/microsoft/powershell/7).BaseName -OutVariable files
+$psh = (whereis pwsh) -split " " | Select-Object -First 1 -Skip 1
+
+Get-ChildItem ./lib, ./lib/win, ./lib/mac | Where-Object BaseName -in (Get-ChildItem (Split-Path -Path $psh)).BaseName -OutVariable files
 
 if ($files) {
     Remove-Item $files -Recurse
@@ -177,6 +192,7 @@ if ($isLinux -or $IsMacOs) {
 }
 
 Get-ChildItem ./lib/*.xml, ./lib/*.pdb -Recurse -OutVariable xmlpdb
+
 if ($xmlpdb) {
     Remove-Item -Path $xmlpdb -Recurse -ErrorAction Ignore
 }
@@ -187,7 +203,12 @@ if ($xmlpdb) {
     if ((Get-ChildItem -Path C:\gallery\dbatools.library\core -ErrorAction Ignore)) {
         $null = Remove-Item C:\gallery\dbatools.library\core -Recurse
         $null = mkdir C:\gallery\dbatools.library\core
-        $null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library\core /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 *build*.ps1 /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
+        $null = mkdir C:\gallery\dbatools.library\core\lib
+        $null = mkdir C:\gallery\dbatools.library\core\third-party
+        #$null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library\core /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 *build*.ps1 /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
+
+        $null = robocopy C:\github\dbatools.library\lib C:\gallery\dbatools.library\core\lib /S | Out-String | Out-Null
+        $null = robocopy C:\github\dbatools.library\third-party C:\gallery\dbatools.library\core\third-party /S | Out-String | Out-Null
         Remove-Item c:\gallery\dbatools.library\core\dac.ps1 -ErrorAction Ignore
         Remove-Item c:\gallery\dbatools.library\core\dbatools.library.psd1 -ErrorAction Ignore
         #Copy-Item C:\github\dbatools.library\dbatools.core.library.psd1 C:\github\dbatools.core.library
