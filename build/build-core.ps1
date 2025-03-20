@@ -206,13 +206,13 @@ if ($xmlpdb) {
         $null = mkdir C:\gallery\dbatools.library\core\lib
         $null = mkdir C:\gallery\dbatools.library\core\third-party
         #$null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library\core /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 *build*.ps1 /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
+        }
+    $null = robocopy C:\github\dbatools.library\lib C:\gallery\dbatools.library\core\lib /S | Out-String | Out-Null
+    $null = robocopy C:\github\dbatools.library\third-party C:\gallery\dbatools.library\core\third-party /S | Out-String | Out-Null
+    Remove-Item c:\gallery\dbatools.library\core\dac.ps1 -ErrorAction Ignore
+    Remove-Item c:\gallery\dbatools.library\core\dbatools.library.psd1 -ErrorAction Ignore
+    #Copy-Item C:\github\dbatools.library\dbatools.core.library.psd1 C:\github\dbatools.core.library
 
-        $null = robocopy C:\github\dbatools.library\lib C:\gallery\dbatools.library\core\lib /S | Out-String | Out-Null
-        $null = robocopy C:\github\dbatools.library\third-party C:\gallery\dbatools.library\core\third-party /S | Out-String | Out-Null
-        Remove-Item c:\gallery\dbatools.library\core\dac.ps1 -ErrorAction Ignore
-        Remove-Item c:\gallery\dbatools.library\core\dbatools.library.psd1 -ErrorAction Ignore
-        #Copy-Item C:\github\dbatools.library\dbatools.core.library.psd1 C:\github\dbatools.core.library
+    #Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\*\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\1c735258e8b34ce113ad86a501235c1f2e263106) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
 
-        Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\*\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\1c735258e8b34ce113ad86a501235c1f2e263106) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
-    }
 #>
