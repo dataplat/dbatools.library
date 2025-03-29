@@ -14,7 +14,6 @@ if (-not (Get-Command unzip -ErrorAction SilentlyContinue)) {
     sudo apt-get install -y unzip
 }
 
-
 if (Test-Path ./lib) {
     write-warning "removing ./lib"
     rm -rf lib
@@ -43,7 +42,6 @@ Get-ChildItem -Path lib/net8.0 -File | Remove-Item
 Move-Item -Path lib/net8.0/publish/* -Destination lib/ #-ErrorAction Ignore
 Remove-Item -Path lib/net8.0 -Recurse -ErrorAction Ignore
 #publish got moved to lib
-
 
 Get-ChildItem ./lib -Recurse -Include *.pdb | Remove-Item
 Get-ChildItem ./lib -Recurse -Include *.xml | Remove-Item
@@ -83,10 +81,7 @@ if ($IsLinux -or $IsMacOs) {
     $null = New-Item -ItemType Directory ./lib/win-sqlclient-x86
 }
 
-
-
 $ProgressPreference = "SilentlyContinue"
-
 
 Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile ./temp/sqlpackage-linux.zip
 Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile ./temp/sqlpackage-macos.zip
@@ -97,16 +92,14 @@ Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/do
 
 $ProgressPreference = "Continue"
 
-
 # Expand-Archive is not fun on linux cuz it's prompts galore
-unzip ./temp/sqlpackage-linux.zip -d ./temp/linux
-unzip ./temp/sqlpackage-macos.zip -d ./lib/mac
-unzip ./temp/LumenWorksCsvReader.zip -d ./temp/LumenWorksCsvReader
-unzip ./temp/bogus.zip -d ./temp/bogus
+unzip -y ./temp/sqlpackage-linux.zip -d ./temp/linux
+unzip -y ./temp/sqlpackage-macos.zip -d ./lib/mac
+unzip -y ./temp/LumenWorksCsvReader.zip -d ./temp/LumenWorksCsvReader
+unzip -y ./temp/bogus.zip -d ./temp/bogus
 
 msiextract --directory $(Resolve-Path .\temp\dacfull) $(Resolve-Path .\temp\DacFramework.msi)
 msiextract --directory $(Resolve-Path .\temp\xe) $(Resolve-Path .\temp\XESmartTarget_x64.msi)
-
 
 Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination third-party/XESmartTarget
 Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe, *.config -Recurse | Copy-Item -Destination ./lib/win
@@ -118,9 +111,9 @@ Register-PackageSource -provider NuGet -name nugetRepository -Location https://w
 $parms = @{
     Provider         = "Nuget"
     Destination      = "$tempdir/nuget"
-    Source           = "nugetRepository"
-    Scope            = "CurrentUser"
-    Force            = $true
+    Source          = "nugetRepository"
+    Scope           = "CurrentUser"
+    Force           = $true
     SkipDependencies = $true
 }
 
@@ -144,27 +137,32 @@ $parms.Name = "Azure.Core"
 $parms.RequiredVersion = "1.38.0"
 $null = Install-Package @parms
 
+# Additional required dependencies
+$parms.Name = "System.Text.Json"
+$parms.RequiredVersion = "8.0.5"
+$null = Install-Package @parms
 
-# README cl: this dll is already there, as we're building dbatools csproj whose dependencies are already included !?
+$parms.Name = "Microsoft.Bcl.AsyncInterfaces"
+$parms.RequiredVersion = "9.0.3"
+$null = Install-Package @parms
+
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.6.0.1/runtimes/unix/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib
 # Copy to the 'x64' directory
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.6.0.1/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
 Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.70.0/lib/net8.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient/
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.2.0/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient/
 
-
 # Copy to the 'x86' directory, but with a different SNI DLL file. Remember,the SNI file is not managed code, it's _native_.
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.6.0.1/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient-x86/
 Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.70.0/lib/net8.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient-x86/
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.2.0/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient-x86/
 
-
-
 Copy-Item "$tempdir/nuget/Azure.Core.1.38.0/lib/net6.0/Azure.Core.dll" -Destination lib/
 Copy-Item "$tempdir/nuget/Microsoft.IdentityModel.Abstractions.8.3.1/lib/net8.0/Microsoft.IdentityModel.Abstractions.dll" -Destination lib/
+Copy-Item "$tempdir/nuget/System.Text.Json.8.0.5/lib/net8.0/System.Text.Json.dll" -Destination lib/
+Copy-Item "$tempdir/nuget/Microsoft.Bcl.AsyncInterfaces.9.0.3/lib/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll" -Destination lib/
 
 Copy-Item ./temp/linux/* -Destination lib -Exclude (Get-ChildItem lib -Recurse) -Recurse -Include *.exe, *.config -Verbose
-
 
 Copy-Item "./var/misc/core/*.dll" -Destination ./lib/
 Copy-Item "./var/misc/both/*.dll" -Destination ./lib/
@@ -185,7 +183,6 @@ if ($files) {
     Remove-Item $files -Recurse
 }
 
-
 if ($isLinux -or $IsMacOs) {
     chmod +x ./lib/sqlpackage
     chmod +x ./lib/mac/sqlpackage
@@ -197,22 +194,16 @@ if ($xmlpdb) {
     Remove-Item -Path $xmlpdb -Recurse -ErrorAction Ignore
 }
 
-#Import-Module ./dbatools.library.psd1
-
+# Uncomment these lines to copy files to the gallery location
 <#
-    if ((Get-ChildItem -Path C:\gallery\dbatools.library\core -ErrorAction Ignore)) {
-        $null = Remove-Item C:\gallery\dbatools.library\core -Recurse
-        $null = mkdir C:\gallery\dbatools.library\core
-        $null = mkdir C:\gallery\dbatools.library\core\lib
-        $null = mkdir C:\gallery\dbatools.library\core\third-party
-        #$null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library\core /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 *build*.ps1 /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
-        }
+if ((Get-ChildItem -Path C:\gallery\dbatools.library\core -ErrorAction Ignore)) {
+    $null = Remove-Item C:\gallery\dbatools.library\core -Recurse
+    $null = mkdir C:\gallery\dbatools.library\core
+    $null = mkdir C:\gallery\dbatools.library\core\lib
+    $null = mkdir C:\gallery\dbatools.library\core\third-party
     $null = robocopy C:\github\dbatools.library\lib C:\gallery\dbatools.library\core\lib /S | Out-String | Out-Null
     $null = robocopy C:\github\dbatools.library\third-party C:\gallery\dbatools.library\core\third-party /S | Out-String | Out-Null
     Remove-Item c:\gallery\dbatools.library\core\dac.ps1 -ErrorAction Ignore
     Remove-Item c:\gallery\dbatools.library\core\dbatools.library.psd1 -ErrorAction Ignore
-    #Copy-Item C:\github\dbatools.library\dbatools.core.library.psd1 C:\github\dbatools.core.library
-
-    #Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\*\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\1c735258e8b34ce113ad86a501235c1f2e263106) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
-
+}
 #>

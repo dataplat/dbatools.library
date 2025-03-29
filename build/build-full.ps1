@@ -98,6 +98,24 @@ $parms.Name = "Azure.Core"
 $parms.RequiredVersion = "1.38.0"
 $null = Install-Package @parms
 
+# Ensure Microsoft.Data.SqlClient.dll is properly copied
+$sqlClientPath = "$tempdir\nuget\Microsoft.Data.SqlClient.6.0.1\lib\net462\Microsoft.Data.SqlClient.dll"
+if (Test-Path $sqlClientPath) {
+    Copy-Item $sqlClientPath -Destination lib/ -Force
+} else {
+    # Try alternative paths
+    $sqlClientPath = Get-ChildItem -Path "$tempdir\nuget\Microsoft.Data.SqlClient.6.0.1" -Recurse -Include "Microsoft.Data.SqlClient.dll" |
+        Where-Object { $_.FullName -like "*\net*\*" } |
+        Select-Object -First 1
+
+    if ($sqlClientPath) {
+        Copy-Item $sqlClientPath.FullName -Destination lib/ -Force
+    } else {
+        Write-Error "Could not find Microsoft.Data.SqlClient.dll in NuGet package"
+        exit 1
+    }
+}
+
 
 
 Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.70.0\lib\net472\Microsoft.Identity.Client.dll" -Destination lib/
@@ -116,28 +134,48 @@ Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 
 Get-ChildItem -Directory -Path .\lib\ | Where-Object Name -notin 'x64', 'x86' | Remove-Item -Recurse
 
-if ((Get-ChildItem -Path C:\gallery\dbatools.library -ErrorAction Ignore)) {
-    $null = Remove-Item C:\gallery\dbatools.library -Recurse
-    $null = mkdir C:\gallery\dbatools.library
-    $null = mkdir C:\gallery\dbatools.library\desktop
-    $null = mkdir C:\gallery\dbatools.library\desktop\lib
-    #$null = mkdir C:\gallery\dbatools.library\desktop\x86
-    #$null = mkdir C:\gallery\dbatools.library\desktop\x64
-    $null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 build*.ps1 dbatools-core*.* /XD .git .github Tests .vscode project temp runtime runtimes replication var opt | Out-String | Out-Null
+# Remove existing gallery location if it exists
+if ((Test-Path -Path C:\gallery\dbatools.library)) {
+    Remove-Item C:\gallery\dbatools.library -Recurse -Force
+}
 
-    Remove-Item c:\gallery\dbatools.library\dac.ps1 -ErrorAction Ignore
-    Remove-Item c:\gallery\dbatools.library\dbatools.core.library.psd1 -ErrorAction Ignore
-    Copy-Item C:\github\dbatools.library\dbatools.library.psd1 C:\gallery\dbatools.library
-    Move-Item C:\github\dbatools.library\lib\x86 C:\gallery\dbatools.library\desktop\lib
-    Move-Item C:\github\dbatools.library\lib\x64 C:\gallery\dbatools.library\desktop\lib
-    Move-Item C:\github\dbatools.library\lib\* C:\gallery\dbatools.library\desktop\*
-    Remove-Item C:\gallery\dbatools.library\lib -Recurse
+# Create gallery directory structure
+$null = New-Item -ItemType Directory -Path C:\gallery\dbatools.library -Force
+$null = New-Item -ItemType Directory -Path C:\gallery\dbatools.library\desktop -Force
+$null = New-Item -ItemType Directory -Path C:\gallery\dbatools.library\desktop\lib -Force
 
+# Copy module files and other content
+$null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 build*.ps1 dbatools-core*.* /XD .git .github Tests .vscode project temp runtime runtimes replication var opt
 
-    #$null = Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\1c735258e8b34ce113ad86a501235c1f2e263106) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
+# Clean up and copy module files
+Remove-Item c:\gallery\dbatools.library\dac.ps1 -ErrorAction Ignore
+Remove-Item c:\gallery\dbatools.library\dbatools.core.library.psd1 -ErrorAction Ignore
+Copy-Item C:\github\dbatools.library\dbatools.library.psd1 C:\gallery\dbatools.library -Force
+
+# Move third-party and lib directories to desktop folder
+Move-Item C:\github\dbatools.library\third-party C:\gallery\dbatools.library\desktop\third-party -Force
+Move-Item C:\github\dbatools.library\lib C:\gallery\dbatools.library\desktop\lib -Force
+
+#$null = Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\1c735258e8b34ce113ad86a501235c1f2e263106) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
+
+# Verify required files exist
+$requiredFiles = @(
+    "C:\gallery\dbatools.library\dbatools.library.psd1",
+    "C:\gallery\dbatools.library\dbatools.library.psm1",
+    "C:\gallery\dbatools.library\desktop\lib\Microsoft.Data.SqlClient.dll",
+    "C:\gallery\dbatools.library\desktop\lib\Microsoft.SqlServer.Smo.dll",
+    "C:\gallery\dbatools.library\desktop\lib\Microsoft.Identity.Client.dll"
+)
+
+foreach ($file in $requiredFiles) {
+    if (-not (Test-Path $file)) {
+        Write-Error "Required file not found: $file"
+        exit 1
+    }
 }
 
 Import-Module C:\gallery\dbatools.library\dbatools.library.psd1 -Force
+
 Pop-Location
 # gotta copy the integration dlls
 <#
