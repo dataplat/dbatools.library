@@ -17,12 +17,12 @@ if (-not $scriptroot) {
 $root = Split-Path -Path $scriptroot
 Push-Location "$root\project"
 
-dotnet publish --configuration release --framework net462 | Out-String -OutVariable build
-dotnet test --framework net462 --verbosity normal | Out-String -OutVariable test
+dotnet publish --configuration release --framework net472 | Out-String -OutVariable build
+dotnet test --framework net472 --verbosity normal | Out-String -OutVariable test
 Pop-Location
 
-Move-Item -Path lib/net462/* -Destination lib/ -ErrorAction Ignore
-Remove-Item -Path lib/net462 -Recurse -ErrorAction Ignore
+Move-Item -Path lib/net472/* -Destination lib/ -ErrorAction Ignore
+Remove-Item -Path lib/net472 -Recurse -ErrorAction Ignore
 
 Get-ChildItem .\lib -Recurse -Include *.pdb | Remove-Item -Force
 Get-ChildItem .\lib -Recurse -Include *.xml | Remove-Item -Force
@@ -79,7 +79,7 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.2.2"
+$parms.RequiredVersion = "6.0.1"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
@@ -87,7 +87,7 @@ $parms.RequiredVersion = "5.2.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
-$parms.RequiredVersion = "4.67.1"
+$parms.RequiredVersion = "4.70.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.IdentityModel.Abstractions"
@@ -100,10 +100,10 @@ $null = Install-Package @parms
 
 
 
-Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.67.1\lib\net462\Microsoft.Identity.Client.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.70.0\lib\net472\Microsoft.Identity.Client.dll" -Destination lib/
 Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Azure.Core.1.38.0\lib\net461\Azure.Core.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Microsoft.IdentityModel.Abstractions.8.3.1\lib\net462\Microsoft.IdentityModel.Abstractions.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Azure.Core.1.38.0\lib\net472\Azure.Core.dll" -Destination lib/
+Copy-Item "$tempdir\nuget\Microsoft.IdentityModel.Abstractions.8.3.1\lib\net472\Microsoft.IdentityModel.Abstractions.dll" -Destination lib/
 
 
 

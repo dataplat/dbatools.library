@@ -125,7 +125,7 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "5.2.2"
+$parms.RequiredVersion = "6.0.1"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
@@ -133,7 +133,7 @@ $parms.RequiredVersion = "5.2.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.Identity.Client"
-$parms.RequiredVersion = "4.67.1"
+$parms.RequiredVersion = "4.70.0"
 $null = Install-Package @parms
 
 $parms.Name = "Microsoft.IdentityModel.Abstractions"
@@ -146,16 +146,16 @@ $null = Install-Package @parms
 
 
 # README cl: this dll is already there, as we're building dbatools csproj whose dependencies are already included !?
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.2.2/runtimes/unix/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.6.0.1/runtimes/unix/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib
 # Copy to the 'x64' directory
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.2.2/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
-Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.67.1/lib/net8.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient/
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.6.0.1/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient/
+Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.70.0/lib/net8.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient/
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.2.0/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient/
 
 
 # Copy to the 'x86' directory, but with a different SNI DLL file. Remember,the SNI file is not managed code, it's _native_.
-Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.5.2.2/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient-x86/
-Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.67.1/lib/net8.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient-x86/
+Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.6.0.1/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll" -Destination lib/win-sqlclient-x86/
+Copy-Item "$tempdir/nuget/Microsoft.Identity.Client.4.70.0/lib/net8.0/Microsoft.Identity.Client.dll" -Destination lib/win-sqlclient-x86/
 Copy-Item "$tempdir/nuget/Microsoft.Data.SqlClient.SNI.runtime.5.2.0/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll" -Destination lib/win-sqlclient-x86/
 
 
