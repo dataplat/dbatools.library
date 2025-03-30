@@ -118,7 +118,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.SqlServer.Management.XEvent',
         'Microsoft.SqlServer.Management.XEventDbScoped',
         'Microsoft.SqlServer.XEvent.XELite',
-        '../third-party/LumenWorks/LumenWorks.Framework.IO'
+        '../third-party/LumenWorks/core/LumenWorks.Framework.IO'
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions'
@@ -138,7 +138,8 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
         'Microsoft.Data.SqlClient',
-        '../third-party/LumenWorks/LumenWorks.Framework.IO'
+        "Microsoft.SqlServer.SqlWmiManagement",
+        '../third-party/LumenWorks/desktop/LumenWorks.Framework.IO'
     )
 }
 
@@ -159,10 +160,16 @@ if ($PSVersionTable.OS -match "ARM64") {
 # this takes 10ms
 $assemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
 
+# Import Bogus from the correct framework directory
 try {
-    $null = Import-Module ([IO.Path]::Combine($script:libraryroot, "third-party", "bogus", "bogus.dll"))
+    $boguspath = if ($PSVersionTable.PSEdition -eq "Core") {
+        [IO.Path]::Combine($script:libraryroot, "third-party", "bogus", "core", "bogus.dll")
+    } else {
+        [IO.Path]::Combine($script:libraryroot, "third-party", "bogus", "desktop", "bogus.dll")
+    }
+    $null = Import-Module $boguspath
 } catch {
-    Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
+    Write-Error "Could not import $boguspath : $($_ | Out-String)"
 }
 
 foreach ($name in $names) {

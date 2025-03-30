@@ -2,12 +2,13 @@ $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
 Push-Location C:\github\dbatools.library\
 
+# Silently clean up previous build artifacts
+# Clean up previous build artifacts
 if (Test-Path "C:\github\dbatools.library\lib") {
-    write-warning "removing C:\github\dbatools.library\lib"
-    Remove-Item -Path lib -Recurse -ErrorAction Ignore
-    Remove-Item -Path temp -Recurse -ErrorAction Ignore
-    Remove-Item -Path third-party -Recurse -ErrorAction Ignore
-    Remove-Item -Path third-party-licenses -Recurse -ErrorAction Ignore
+    Remove-Item -Path lib -Recurse -ErrorAction SilentlyContinue
+    Remove-Item -Path temp -Recurse -ErrorAction SilentlyContinue
+    Remove-Item -Path third-party -Recurse -ErrorAction SilentlyContinue
+    Remove-Item -Path third-party-licenses -Recurse -ErrorAction SilentlyContinue
 }
 
 $scriptroot = $PSScriptRoot
@@ -17,123 +18,129 @@ if (-not $scriptroot) {
 $root = Split-Path -Path $scriptroot
 Push-Location "$root\project"
 
-dotnet publish --configuration release --framework net472 | Out-String -OutVariable build
-dotnet test --framework net472 --verbosity normal | Out-String -OutVariable test
+# Publish .NET Framework (desktop)
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output C:\github\dbatools.library\lib\desktop --nologo | Out-String -OutVariable build
+
+# Publish .NET 8 (core)
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output C:\github\dbatools.library\lib\core --nologo | Out-String -OutVariable build
+
+# Run tests specifically for dbatools.Tests
+dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
 Pop-Location
 
-Move-Item -Path lib/net472/* -Destination lib/ -ErrorAction Ignore
-Remove-Item -Path lib/net472 -Recurse -ErrorAction Ignore
+Remove-Item -Path lib/net472 -Recurse -ErrorAction SilentlyContinue
+Remove-Item -Path lib/net8.0 -Recurse -ErrorAction SilentlyContinue
 
-Get-ChildItem .\lib -Recurse -Include *.pdb | Remove-Item -Force
-Get-ChildItem .\lib -Recurse -Include *.xml | Remove-Item -Force
-Get-ChildItem .\lib\ -Include runtimes -Recurse | Remove-Item -Force -Recurse
-Get-ChildItem .\lib\*\dbatools.deps.json -Recurse | Remove-Item -Force
+$tempdir = "C:\temp"
 
-if ($IsLinux -or $IsMacOs) {
-    $tempdir = "/tmp"
-} else {
-    $tempdir = "C:\temp"
-}
-
+# Create all required directories
 $null = New-Item -ItemType Directory $tempdir -Force -ErrorAction Ignore
 $null = New-Item -ItemType Directory ./temp/dacfull -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./temp/xe -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./third-party/XESmartTarget
-$null = New-Item -ItemType Directory ./third-party/bogus
-$null = New-Item -ItemType Directory ./third-party/LumenWorks
-$null = New-Item -ItemType Directory ./third-party/bogus
-$null = New-Item -ItemType Directory ./temp/bogus
+$null = New-Item -ItemType Directory ./temp/xe -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory ./temp/linux -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory ./temp/mac -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory ./third-party/XESmartTarget -Force
+$null = New-Item -ItemType Directory ./third-party/bogus -Force
+$null = New-Item -ItemType Directory ./third-party/bogus/core -Force
+$null = New-Item -ItemType Directory ./third-party/bogus/desktop -Force
+$null = New-Item -ItemType Directory ./third-party/LumenWorks -Force
+$null = New-Item -ItemType Directory ./third-party/LumenWorks/core -Force
+$null = New-Item -ItemType Directory ./third-party/LumenWorks/desktop -Force
+$null = New-Item -ItemType Directory ./lib/win -Force
+$null = New-Item -ItemType Directory ./lib/win-sqlclient -Force
+$null = New-Item -ItemType Directory ./lib/win-sqlclient-x86 -Force
+$null = New-Item -ItemType Directory ./lib/mac -Force
+$null = New-Item -ItemType Directory ./temp/bogus -Force
 
 $ProgressPreference = "SilentlyContinue"
 
+# Download all required packages
 Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile .\temp\DacFramework.msi
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile .\temp\bogus.zip
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile .\temp\LumenWorksCsvReader.zip
 Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.5.7/XESmartTarget_x64.msi -OutFile .\temp\XESmartTarget_x64.msi
+Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile .\temp\sqlpackage-linux.zip
+Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile .\temp\sqlpackage-macos.zip
 
 $ProgressPreference = "Continue"
+
+# Extract all packages
 7z x .\temp\LumenWorksCsvReader.zip "-o.\temp\LumenWorksCsvReader"
 7z x .\temp\bogus.zip "-o.\temp\bogus"
+7z x .\temp\sqlpackage-linux.zip "-o.\temp\linux"
+7z x .\temp\sqlpackage-macos.zip "-o.\temp\mac"
 
 msiexec /a $(Resolve-Path .\temp\DacFramework.msi) /qb TARGETDIR=$(Resolve-Path .\temp\dacfull)
 Start-Sleep 3
 msiexec /a $(Resolve-Path .\temp\XESmartTarget_x64.msi) /qb TARGETDIR=$(Resolve-Path .\temp\xe)
 Start-Sleep 3
 
-Get-ChildItem .\temp\dacfull\* -Include *.dll, *.exe, *.config -Exclude (Get-ChildItem .\lib -Recurse) -Recurse | Copy-Item -Destination ./lib
-#Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe -Recurse | Copy-Item -Destination lib/sqlpackage/windows
-Get-ChildItem "./temp/xe/*.dll" -Recurse | Copy-Item -Destination third-party/XESmartTarget
-Get-ChildItem "./temp/bogus/*/net40/bogus.dll" -Recurse | Copy-Item -Destination third-party/bogus/bogus.dll
+# Copy XESmartTarget preserving structure
+robocopy ./temp/xe/XESmartTarget ./third-party/XESmartTarget /E /NFL /NDL /NJH /NJS /nc /ns /np
 
-Copy-Item .\temp\LumenWorksCsvReader\lib\net461\LumenWorks.Framework.IO.dll -Destination ./third-party/LumenWorks/LumenWorks.Framework.IO.dll
+# Copy Bogus files for both frameworks
+Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./third-party/bogus/desktop/bogus.dll" -Force
+Copy-Item "./temp/bogus/lib/net6.0/bogus.dll" -Destination "./third-party/bogus/core/bogus.dll" -Force
 
-Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
+# Copy LumenWorks files for both frameworks
+Copy-Item "./temp/LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll" -Destination "./third-party/LumenWorks/desktop/LumenWorks.Framework.IO.dll" -Force
+Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll" -Destination "./third-party/LumenWorks/core/LumenWorks.Framework.IO.dll" -Force
 
-$parms = @{
-    Provider         = "Nuget"
-    Destination      = "$tempdir\nuget"
-    Source           = "nugetRepository"
-    Scope            = "CurrentUser"
-    Force            = $true
-    SkipDependencies = $true
-}
-
-$parms.Name = "Microsoft.Data.SqlClient"
-$parms.RequiredVersion = "6.0.1"
-$null = Install-Package @parms
-
-$parms.Name = "Microsoft.Data.SqlClient.SNI.runtime"
-$parms.RequiredVersion = "5.2.0"
-$null = Install-Package @parms
-
-$parms.Name = "Microsoft.Identity.Client"
-$parms.RequiredVersion = "4.70.0"
-$null = Install-Package @parms
-
-$parms.Name = "Microsoft.IdentityModel.Abstractions"
-$parms.RequiredVersion = "8.3.1"
-$null = Install-Package @parms
-
-$parms.Name = "Azure.Core"
-$parms.RequiredVersion = "1.38.0"
-$null = Install-Package @parms
-
-# Ensure Microsoft.Data.SqlClient.dll is properly copied
-$sqlClientPath = "$tempdir\nuget\Microsoft.Data.SqlClient.6.0.1\lib\net462\Microsoft.Data.SqlClient.dll"
-if (Test-Path $sqlClientPath) {
-    Copy-Item $sqlClientPath -Destination lib/ -Force
+# Copy DAC files based on architecture
+$dacPath = ".\temp\dacfull\Microsoft SQL Server\160\DAC\bin"
+if ($env:PROCESSOR_ARCHITECTURE -eq "x86") {
+    Copy-Item "$dacPath\Microsoft.SqlServer.Types.dll" -Destination "./lib/win-sqlclient-x86/" -Force
+    Copy-Item "$dacPath\Microsoft.Data.Tools.Schema.Sql.dll" -Destination "./lib/win-sqlclient-x86/" -Force
+    Copy-Item "$dacPath\Microsoft.Data.Tools.Utilities.dll" -Destination "./lib/win-sqlclient-x86/" -Force
+    Copy-Item "$dacPath\Microsoft.Data.SqlClient.*" -Destination "./lib/win-sqlclient-x86/" -Force
 } else {
-    # Try alternative paths
-    $sqlClientPath = Get-ChildItem -Path "$tempdir\nuget\Microsoft.Data.SqlClient.6.0.1" -Recurse -Include "Microsoft.Data.SqlClient.dll" |
-        Where-Object { $_.FullName -like "*\net*\*" } |
-        Select-Object -First 1
-
-    if ($sqlClientPath) {
-        Copy-Item $sqlClientPath.FullName -Destination lib/ -Force
-    } else {
-        Write-Error "Could not find Microsoft.Data.SqlClient.dll in NuGet package"
-        exit 1
-    }
+    Copy-Item "$dacPath\Microsoft.SqlServer.Types.dll" -Destination "./lib/win-sqlclient/" -Force
+    Copy-Item "$dacPath\Microsoft.Data.Tools.Schema.Sql.dll" -Destination "./lib/win-sqlclient/" -Force
+    Copy-Item "$dacPath\Microsoft.Data.Tools.Utilities.dll" -Destination "./lib/win-sqlclient/" -Force
+    Copy-Item "$dacPath\Microsoft.Data.SqlClient.*" -Destination "./lib/win-sqlclient/" -Force
 }
 
+# Copy Linux files
+$linux = @(
+    'libclrjit.so', 'libcoreclr.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so',
+    'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll',
+    'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.runtimeconfig.json',
+    'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll',
+    'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll',
+    'System.Memory.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll',
+    'System.Reflection.Metadata.dll', 'System.Runtime.dll',
+    'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll',
+    'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll'
+)
 
+$sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
+Copy-Item -Path $sqlp.FullName -Destination ./lib/
 
-Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.70.0\lib\net472\Microsoft.Identity.Client.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.SNI.runtime.5.2.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Azure.Core.1.38.0\lib\net472\Azure.Core.dll" -Destination lib/
-Copy-Item "$tempdir\nuget\Microsoft.IdentityModel.Abstractions.8.3.1\lib\net472\Microsoft.IdentityModel.Abstractions.dll" -Destination lib/
+# Copy Mac files
+Copy-Item "./temp/mac/*" -Destination "./lib/mac/" -Recurse -Force
 
+# Copy other framework-specific files
+Get-ChildItem .\temp\dacfull\* -Include *.dll, *.exe, *.config -Exclude (Get-ChildItem .\lib -Recurse) -Recurse | Copy-Item -Destination ./lib/desktop -Force
 
-
-Copy-Item "./var/misc/core/*.dll" -Destination ./lib/
-Copy-Item "./var/misc/both/*.dll" -Destination ./lib/
-Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse
+Copy-Item "./var/misc/core/*.dll" -Destination ./lib/core -Force
+Copy-Item "./var/misc/both/*.dll" -Destination ./lib -Force
+Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse -Force
 
 Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
 Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 
-Get-ChildItem -Directory -Path .\lib\ | Where-Object Name -notin 'x64', 'x86' | Remove-Item -Recurse
+# Set executable permissions for Linux/Mac
+if ($isLinux -or $IsMacOs) {
+    chmod +x ./lib/sqlpackage
+    chmod +x ./lib/mac/sqlpackage
+}
 
+
+Get-ChildItem .\lib -Recurse -Include *.pdb | Remove-Item -Force -ErrorAction SilentlyContinue
+Get-ChildItem .\lib -Recurse -Include *.xml | Remove-Item -Force
+Get-ChildItem .\lib\*\dbatools.deps.json -Recurse | Remove-Item -Force
+
+return
 # Remove existing gallery location if it exists
 if ((Test-Path -Path C:\gallery\dbatools.library)) {
     Remove-Item C:\gallery\dbatools.library -Recurse -Force
@@ -156,8 +163,6 @@ Copy-Item C:\github\dbatools.library\dbatools.library.psd1 C:\gallery\dbatools.l
 Move-Item C:\github\dbatools.library\third-party C:\gallery\dbatools.library\desktop\third-party -Force
 Move-Item C:\github\dbatools.library\lib C:\gallery\dbatools.library\desktop\lib -Force
 
-#$null = Get-ChildItem -Recurse -Path C:\gallery\dbatools.library\*.ps*, C:\gallery\dbatools.library\dbatools.dll | Set-AuthenticodeSignature -Certificate (Get-ChildItem -Path Cert:\CurrentUser\My\1c735258e8b34ce113ad86a501235c1f2e263106) -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
-
 # Verify required files exist
 $requiredFiles = @(
     "C:\gallery\dbatools.library\dbatools.library.psd1",
@@ -177,27 +182,3 @@ foreach ($file in $requiredFiles) {
 Import-Module C:\gallery\dbatools.library\dbatools.library.psd1 -Force
 
 Pop-Location
-# gotta copy the integration dlls
-<#
-already there
--rwxrwxrwx ctrlb            ctrlb              10/08/2022 03:08       12132752 Microsoft.Data.Tools.Schema.Sql.dll
--rwxrwxrwx ctrlb            ctrlb              10/08/2022 03:08         346040 Microsoft.Data.Tools.Utilities.dll
-#>
-
-#(Get-Item C:\github\dbatools.library\lib\Microsoft.Data.Tools.Schema.Sql.dll).VersionInfo.FileVersion
-#(Get-Item C:\github\dbatools.library\lib\Microsoft.Data.Tools.Utilities.dll).VersionInfo.FileVersion
-
-<#
-
-$script:instance1 = $script:instance2 = "localhost"
-Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true
-$db = Get-DbaDatabase -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac
-$publishprofile = New-DbaDacProfile -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -Path C:\temp
-$extractOptions = New-DbaDacOption -Action Export
-$extractOptions.ExtractAllTableData = $true
-$dacpac = Export-DbaDacPackage -SqlInstance $script:instance1 -Database dbatoolsci_publishdacpac -DacOption $extractOptions
-$dacpac
-$dacpac | Publish-DbaDacPackage -PublishXml $publishprofile.FileName -Database butt -SqlInstance $script:instance2 -Confirm:$false -Verbose
-$Error | Select-Object *
-
-#>
