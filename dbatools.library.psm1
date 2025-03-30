@@ -1,17 +1,13 @@
 function Get-DbatoolsLibraryPath {
     [CmdletBinding()]
     param()
-    if ($PSVersionTable.PSEdition -eq "Core") {
-        Join-Path -Path $PSScriptRoot -ChildPath core
-    } else {
-        Join-Path -Path $PSScriptRoot -ChildPath desktop
-    }
+    $PSScriptRoot
 }
 
 $script:libraryroot = Get-DbatoolsLibraryPath
 
 if ($PSVersionTable.PSEdition -ne "Core") {
-    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib")
+    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib", "desktop")
     $dir = ("$dir\").Replace('\', '\\')
 
     if (-not ("Redirector" -as [type])) {
@@ -34,6 +30,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                 {
                     string[] dlls = {
                         "System.Memory",
+                        "Azure.Core",
                         "System.Runtime.CompilerServices.Unsafe",
                         "System.Resources.Extensions",
                         "Microsoft.SqlServer.ConnectionInfo",
@@ -87,6 +84,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     }
 }
 
+
 if ($IsWindows -and $PSVersionTable.PSEdition -eq "Core") {
     if ($env:PROCESSOR_ARCHITECTURE -eq "x86") {
         $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "win-sqlclient-x86", "Microsoft.Data.SqlClient.dll")
@@ -94,7 +92,7 @@ if ($IsWindows -and $PSVersionTable.PSEdition -eq "Core") {
         $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "win-sqlclient", "Microsoft.Data.SqlClient.dll")
     }
 } else {
-    $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Data.SqlClient.dll")
+    $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "win-sqlclient", "Microsoft.Data.SqlClient.dll")
 }
 
 try {
@@ -118,7 +116,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.SqlServer.Management.XEvent',
         'Microsoft.SqlServer.Management.XEventDbScoped',
         'Microsoft.SqlServer.XEvent.XELite',
-        '../third-party/LumenWorks/core/LumenWorks.Framework.IO'
+        [IO.Path]::Combine("lib", "third-party", "LumenWorks", "core", "LumenWorks.Framework.IO")
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions'
@@ -136,10 +134,9 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.SqlServer.XEvent.XELite',
         'Azure.Core',
         'Azure.Identity',
-        'Microsoft.IdentityModel.Abstractions',
         'Microsoft.Data.SqlClient',
         "Microsoft.SqlServer.SqlWmiManagement",
-        '../third-party/LumenWorks/desktop/LumenWorks.Framework.IO'
+        [IO.Path]::Combine($script:libraryroot, "lib", "third-party", "LumenWorks", "desktop", "LumenWorks.Framework.IO")
     )
 }
 
@@ -163,9 +160,9 @@ $assemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
 # Import Bogus from the correct framework directory
 try {
     $boguspath = if ($PSVersionTable.PSEdition -eq "Core") {
-        [IO.Path]::Combine($script:libraryroot, "third-party", "bogus", "core", "bogus.dll")
+        [IO.Path]::Combine($script:libraryroot, "lib", "third-party", "bogus", "core", "bogus.dll")
     } else {
-        [IO.Path]::Combine($script:libraryroot, "third-party", "bogus", "desktop", "bogus.dll")
+        [IO.Path]::Combine($script:libraryroot, "lib", "third-party", "bogus", "desktop", "bogus.dll")
     }
     $null = Import-Module $boguspath
 } catch {
@@ -186,7 +183,8 @@ foreach ($name in $names) {
         continue
     }
 
-    $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", "$name.dll")
+    $subfolder = if ($PSVersionTable.PSEdition -eq "Core") { "core" } else { "desktop" }
+    $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", $subfolder, "$name.dll")
     $assemblyfullname = $assemblies.FullName | Out-String
     if (-not ($assemblyfullname.Contains("$name,".Replace("win-sqlclient\", "")))) {
         $null = try {

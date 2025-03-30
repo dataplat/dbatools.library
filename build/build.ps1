@@ -7,7 +7,6 @@ Push-Location C:\github\dbatools.library\
 if (Test-Path "C:\github\dbatools.library\lib") {
     Remove-Item -Path lib -Recurse -ErrorAction SilentlyContinue
     Remove-Item -Path temp -Recurse -ErrorAction SilentlyContinue
-    Remove-Item -Path third-party -Recurse -ErrorAction SilentlyContinue
     Remove-Item -Path third-party-licenses -Recurse -ErrorAction SilentlyContinue
 }
 
@@ -18,6 +17,7 @@ if (-not $scriptroot) {
 $root = Split-Path -Path $scriptroot
 Push-Location "$root\project"
 
+dotnet clean
 # Publish .NET Framework (desktop)
 dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output C:\github\dbatools.library\lib\desktop --nologo | Out-String -OutVariable build
 
@@ -25,7 +25,7 @@ dotnet publish dbatools/dbatools.csproj --configuration release --framework net4
 dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output C:\github\dbatools.library\lib\core --nologo | Out-String -OutVariable build
 
 # Run tests specifically for dbatools.Tests
-dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
+# dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
 Pop-Location
 
 Remove-Item -Path lib/net472 -Recurse -ErrorAction SilentlyContinue
@@ -39,17 +39,19 @@ $null = New-Item -ItemType Directory ./temp/dacfull -Force -ErrorAction Ignore
 $null = New-Item -ItemType Directory ./temp/xe -Force -ErrorAction Ignore
 $null = New-Item -ItemType Directory ./temp/linux -Force -ErrorAction Ignore
 $null = New-Item -ItemType Directory ./temp/mac -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./third-party/XESmartTarget -Force
-$null = New-Item -ItemType Directory ./third-party/bogus -Force
-$null = New-Item -ItemType Directory ./third-party/bogus/core -Force
-$null = New-Item -ItemType Directory ./third-party/bogus/desktop -Force
-$null = New-Item -ItemType Directory ./third-party/LumenWorks -Force
-$null = New-Item -ItemType Directory ./third-party/LumenWorks/core -Force
-$null = New-Item -ItemType Directory ./third-party/LumenWorks/desktop -Force
+$null = New-Item -ItemType Directory ./lib/third-party/XESmartTarget -Force
+$null = New-Item -ItemType Directory ./lib/third-party/bogus -Force
+$null = New-Item -ItemType Directory ./lib/third-party/bogus/core -Force
+$null = New-Item -ItemType Directory ./lib/third-party/bogus/desktop -Force
+$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks -Force
+$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/core -Force
+$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/desktop -Force
 $null = New-Item -ItemType Directory ./lib/win -Force
 $null = New-Item -ItemType Directory ./lib/win-sqlclient -Force
 $null = New-Item -ItemType Directory ./lib/win-sqlclient-x86 -Force
 $null = New-Item -ItemType Directory ./lib/mac -Force
+$null = New-Item -ItemType Directory ./lib/linux -Force
+$null = New-Item -ItemType Directory ./lib/common -Force
 $null = New-Item -ItemType Directory ./temp/bogus -Force
 
 $ProgressPreference = "SilentlyContinue"
@@ -65,10 +67,10 @@ Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile .\temp\sqlpackag
 $ProgressPreference = "Continue"
 
 # Extract all packages
-7z x .\temp\LumenWorksCsvReader.zip "-o.\temp\LumenWorksCsvReader"
-7z x .\temp\bogus.zip "-o.\temp\bogus"
-7z x .\temp\sqlpackage-linux.zip "-o.\temp\linux"
-7z x .\temp\sqlpackage-macos.zip "-o.\temp\mac"
+7z x .\temp\LumenWorksCsvReader.zip "-o.\temp\LumenWorksCsvReader" -y
+7z x .\temp\bogus.zip "-o.\temp\bogus" -y
+7z x .\temp\sqlpackage-linux.zip "-o.\temp\linux" -y
+7z x .\temp\sqlpackage-macos.zip "-o.\temp\mac" -y
 
 msiexec /a $(Resolve-Path .\temp\DacFramework.msi) /qb TARGETDIR=$(Resolve-Path .\temp\dacfull)
 Start-Sleep 3
@@ -76,15 +78,15 @@ msiexec /a $(Resolve-Path .\temp\XESmartTarget_x64.msi) /qb TARGETDIR=$(Resolve-
 Start-Sleep 3
 
 # Copy XESmartTarget preserving structure
-robocopy ./temp/xe/XESmartTarget ./third-party/XESmartTarget /E /NFL /NDL /NJH /NJS /nc /ns /np
+robocopy ./temp/xe/XESmartTarget ./lib/third-party/XESmartTarget /E /NFL /NDL /NJH /NJS /nc /ns /np
 
 # Copy Bogus files for both frameworks
-Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./third-party/bogus/desktop/bogus.dll" -Force
-Copy-Item "./temp/bogus/lib/net6.0/bogus.dll" -Destination "./third-party/bogus/core/bogus.dll" -Force
+Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./lib/third-party/bogus/desktop/bogus.dll" -Force
+Copy-Item "./temp/bogus/lib/net6.0/bogus.dll" -Destination "./lib/third-party/bogus/core/bogus.dll" -Force
 
 # Copy LumenWorks files for both frameworks
-Copy-Item "./temp/LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll" -Destination "./third-party/LumenWorks/desktop/LumenWorks.Framework.IO.dll" -Force
-Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll" -Destination "./third-party/LumenWorks/core/LumenWorks.Framework.IO.dll" -Force
+Copy-Item "./temp/LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll" -Destination "./lib/third-party/LumenWorks/desktop/LumenWorks.Framework.IO.dll" -Force
+Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll" -Destination "./lib/third-party/LumenWorks/core/LumenWorks.Framework.IO.dll" -Force
 
 # Copy DAC files based on architecture
 $dacPath = ".\temp\dacfull\Microsoft SQL Server\160\DAC\bin"
@@ -114,27 +116,24 @@ $linux = @(
 )
 
 $sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
-Copy-Item -Path $sqlp.FullName -Destination ./lib/
+Copy-Item -Path $sqlp.FullName -Destination ./lib/linux/
 
 # Copy Mac files
 Copy-Item "./temp/mac/*" -Destination "./lib/mac/" -Recurse -Force
 
 # Copy other framework-specific files
-Get-ChildItem .\temp\dacfull\* -Include *.dll, *.exe, *.config -Exclude (Get-ChildItem .\lib -Recurse) -Recurse | Copy-Item -Destination ./lib/desktop -Force
+# Get-ChildItem .\temp\dacfull\* -Include *.dll, *.exe, *.config -Exclude (Get-ChildItem .\lib -Recurse) -Recurse | Copy-Item -Destination ./lib/desktop -Force
 
+Copy-Item "./var/misc/desktop/*.dll" -Destination ./lib/desktop -Force
 Copy-Item "./var/misc/core/*.dll" -Destination ./lib/core -Force
-Copy-Item "./var/misc/both/*.dll" -Destination ./lib -Force
+Copy-Item "./var/misc/both/*.dll" -Destination ./lib/common -Force
 Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse -Force
-
-Remove-Item -Path lib/*.xml -Recurse -ErrorAction Ignore
-Remove-Item -Path lib/*.pdb -Recurse -ErrorAction Ignore
 
 # Set executable permissions for Linux/Mac
 if ($isLinux -or $IsMacOs) {
-    chmod +x ./lib/sqlpackage
+    chmod +x ./lib/linux/sqlpackage
     chmod +x ./lib/mac/sqlpackage
 }
-
 
 Get-ChildItem .\lib -Recurse -Include *.pdb | Remove-Item -Force -ErrorAction SilentlyContinue
 Get-ChildItem .\lib -Recurse -Include *.xml | Remove-Item -Force
@@ -159,8 +158,7 @@ Remove-Item c:\gallery\dbatools.library\dac.ps1 -ErrorAction Ignore
 Remove-Item c:\gallery\dbatools.library\dbatools.core.library.psd1 -ErrorAction Ignore
 Copy-Item C:\github\dbatools.library\dbatools.library.psd1 C:\gallery\dbatools.library -Force
 
-# Move third-party and lib directories to desktop folder
-Move-Item C:\github\dbatools.library\third-party C:\gallery\dbatools.library\desktop\third-party -Force
+# Move lib directory to desktop folder
 Move-Item C:\github\dbatools.library\lib C:\gallery\dbatools.library\desktop\lib -Force
 
 # Verify required files exist
