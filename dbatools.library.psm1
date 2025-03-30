@@ -29,6 +29,9 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                 protected Assembly AssemblyResolve(object sender, ResolveEventArgs e)
                 {
                     string[] dlls = {
+                        "Microsoft.Bcl.AsyncInterfaces",
+                        "System.Text.Json",
+                        "System.Buffers",
                         "System.Memory",
                         "Azure.Core",
                         "System.Runtime.CompilerServices.Unsafe",

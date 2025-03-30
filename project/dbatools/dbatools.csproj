@@ -42,17 +42,17 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Azure.Core" Version="1.41.0" />
-    <PackageReference Include="Azure.Identity" Version="1.11.4" />
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="1.1.1" />
-    <PackageReference Include="Microsoft.Data.SqlClient.SNI" Version="5.2.0" />
-    <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" Version="5.2.0" />
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
-    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.61.3" />
-    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="Azure.Core" Version="1.45.0" />
+    <PackageReference Include="Azure.Identity" Version="1.13.2" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Data.SqlClient.SNI" Version="6.0.2" />
+    <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" Version="6.0.2" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.70.0" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.70.0" />
+    <PackageReference Include="System.Memory" Version="4.6.2" />
     <PackageReference Include="System.Resources.Extensions" Version="9.0.3" />
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.3" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
     <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="172.64.0" />
     <PackageReference Include="Microsoft.SqlServer.XEvent.XELite" Version="2024.2.5.1" />
     <PackageReference Include="Microsoft.SqlServer.DacFx" Version="162.5.57" />
