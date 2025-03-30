@@ -30,22 +30,24 @@ if (-not $scriptroot) {
 $root = Split-Path -Path $scriptroot
 Push-Location "$root/project"
 
-dotnet clean
-dotnet publish --force --configuration release --verbosity diag --framework net8.0 | Out-String -OutVariable build
-dotnet test --configuration release --verbosity diag --framework net8.0 | Out-String -OutVariable test
+# Build and publish
+dotnet nuget locals all --clear
+dotnet restore --force --no-cache -p:DisableImplicitNuGetFallbackFolder=true
+dotnet publish --configuration release --framework net8.0 --no-restore -p:DisableImplicitNuGetFallbackFolder=true
 
+return
 ## the build is now in dbatools.library/lib
 Pop-Location
 
 Remove-Item -Path lib/dbatools.xml
-Get-ChildItem -Path lib/net8.0 -File | Remove-Item
+#Get-ChildItem -Path lib/net8.0 -File | Remove-Item
 Move-Item -Path lib/net8.0/publish/* -Destination lib/ #-ErrorAction Ignore
 Remove-Item -Path lib/net8.0 -Recurse -ErrorAction Ignore
 #publish got moved to lib
 
 Get-ChildItem ./lib -Recurse -Include *.pdb | Remove-Item
 Get-ChildItem ./lib -Recurse -Include *.xml | Remove-Item
-Get-ChildItem ./lib/ -Include runtimes -Recurse | Remove-Item -Recurse
+#Get-ChildItem ./lib/ -Include runtimes -Recurse | Remove-Item -Recurse
 Get-ChildItem ./lib/*/dbatools.deps.json -Recurse | Remove-Item
 
 if ($IsLinux -or $IsMacOs) {
@@ -93,10 +95,10 @@ Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/do
 $ProgressPreference = "Continue"
 
 # Expand-Archive is not fun on linux cuz it's prompts galore
-unzip -y ./temp/sqlpackage-linux.zip -d ./temp/linux
-unzip -y ./temp/sqlpackage-macos.zip -d ./lib/mac
-unzip -y ./temp/LumenWorksCsvReader.zip -d ./temp/LumenWorksCsvReader
-unzip -y ./temp/bogus.zip -d ./temp/bogus
+unzip -o ./temp/sqlpackage-linux.zip -d ./temp/linux
+unzip -o ./temp/sqlpackage-macos.zip -d ./lib/mac
+unzip -o ./temp/LumenWorksCsvReader.zip -d ./temp/LumenWorksCsvReader
+unzip -o ./temp/bogus.zip -d ./temp/bogus
 
 msiextract --directory $(Resolve-Path .\temp\dacfull) $(Resolve-Path .\temp\DacFramework.msi)
 msiextract --directory $(Resolve-Path .\temp\xe) $(Resolve-Path .\temp\XESmartTarget_x64.msi)
@@ -106,6 +108,7 @@ Get-ChildItem "./temp/dacfull/" -Include *.dll, *.exe, *.config -Recurse | Copy-
 Get-ChildItem "./temp/bogus/*/net6.0/bogus.dll" -Recurse | Copy-Item -Destination ./third-party/bogus/bogus.dll
 Copy-Item ./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll -Destination ./third-party/LumenWorks/LumenWorks.Framework.IO.dll
 
+<#
 Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 
 $parms = @{
@@ -161,7 +164,7 @@ Copy-Item "$tempdir/nuget/Azure.Core.1.38.0/lib/net6.0/Azure.Core.dll" -Destinat
 Copy-Item "$tempdir/nuget/Microsoft.IdentityModel.Abstractions.8.3.1/lib/net8.0/Microsoft.IdentityModel.Abstractions.dll" -Destination lib/
 Copy-Item "$tempdir/nuget/System.Text.Json.8.0.5/lib/net8.0/System.Text.Json.dll" -Destination lib/
 Copy-Item "$tempdir/nuget/Microsoft.Bcl.AsyncInterfaces.9.0.3/lib/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll" -Destination lib/
-
+#>
 Copy-Item ./temp/linux/* -Destination lib -Exclude (Get-ChildItem lib -Recurse) -Recurse -Include *.exe, *.config -Verbose
 
 Copy-Item "./var/misc/core/*.dll" -Destination ./lib/
@@ -170,17 +173,17 @@ Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse
 
 $linux = 'libclrjit.so', 'libcoreclr.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so', 'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml', 'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll', 'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll', 'System.Memory.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll', 'System.Reflection.Metadata.dll', 'System.Runtime.dll', 'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll', 'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll', 'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.pdb', 'sqlpackage.runtimeconfig.json', 'sqlpackage.xml'
 
-$sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
-Copy-Item -Path $sqlp.FullName -Destination ./lib/
+#$sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
+#Copy-Item -Path $sqlp.FullName -Destination ./lib/
 
-Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'win-sqlclient-x86', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
+#Get-ChildItem -Directory -Path ./lib | Where-Object Name -notin 'win-sqlclient', 'win-sqlclient-x86', 'x64', 'x86', 'win', 'mac', 'macos' | Remove-Item -Recurse
 
 $psh = (whereis pwsh) -split " " | Select-Object -First 1 -Skip 1
 
-Get-ChildItem ./lib, ./lib/win, ./lib/mac | Where-Object BaseName -in (Get-ChildItem (Split-Path -Path $psh)).BaseName -OutVariable files
+#Get-ChildItem ./lib, ./lib/win, ./lib/mac | Where-Object BaseName -in (Get-ChildItem (Split-Path -Path $psh)).BaseName -OutVariable files
 
 if ($files) {
-    Remove-Item $files -Recurse
+    #Remove-Item $files -Recurse
 }
 
 if ($isLinux -or $IsMacOs) {
