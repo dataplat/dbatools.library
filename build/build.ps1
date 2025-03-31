@@ -169,6 +169,20 @@ robocopy "./lib/desktop" "./lib/win-sqlclient-x86/native" Microsoft.Data.SqlClie
 
 # Core files are already in place from dotnet publish
 
+# Copy var/misc files to appropriate locations
+Write-Host "Copying additional assemblies from var/misc..."
+# Copy files that go to both core and desktop
+Get-ChildItem "./var/misc/both" -Filter "*.dll" | ForEach-Object {
+    Copy-Item $_.FullName -Destination "./lib/core/" -Force
+    Copy-Item $_.FullName -Destination "./lib/desktop/" -Force
+}
+
+# Copy core-specific files
+Get-ChildItem "./var/misc/core" -Filter "*.dll" | Copy-Item -Destination "./lib/core/" -Force
+
+# Copy desktop-specific files
+Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
+
 # Copy common files that are platform-independent
 Get-ChildItem "./lib/desktop" -Filter "Microsoft.SqlServer.*.dll" |
     Where-Object { $_.Name -notlike "*SqlClient*" } |
