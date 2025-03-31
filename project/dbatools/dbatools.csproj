@@ -45,8 +45,6 @@
     <PackageReference Include="Azure.Core" Version="1.45.0" />
     <PackageReference Include="Azure.Identity" Version="1.13.2" />
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.3" />
-    <PackageReference Include="Microsoft.Data.SqlClient.SNI" Version="6.0.2" />
-    <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" Version="6.0.2" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.70.0" />
     <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.70.0" />
     <PackageReference Include="System.Memory" Version="4.6.2" />
