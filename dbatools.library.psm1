@@ -19,6 +19,7 @@ if (-not (Test-Path $privateDir)) {
 # Define component load order (important for dependencies)
 $components = @(
     'assembly-lists.ps1',          # Must be first as others depend on its variables
+    'assembly-redirector.ps1',     # Assembly redirection for version conflicts
     'assembly-resolution.ps1',      # Depends on assembly lists
     'assembly-loader.ps1',         # Depends on both above
     'assembly-troubleshoot.ps1'    # Troubleshooting tools
@@ -45,7 +46,19 @@ try {
 # Register cleanup for module removal
 $MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = {
     if ($PSVersionTable.PSEdition -ne "Core") {
-        [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
+        try {
+            # Remove both event handlers
+            [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
+
+            # Get the redirector instance and remove its handler
+            $redirector = New-Object Redirector
+            [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
+
+            Write-Verbose "Successfully removed assembly resolve handlers"
+        }
+        catch {
+            Write-Warning "Error removing assembly resolve handlers: $_"
+        }
     }
 }
 

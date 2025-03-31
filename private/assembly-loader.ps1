@@ -30,6 +30,14 @@ function Initialize-DbatoolsAssemblyLoader {
     Write-Verbose "Starting assembly loader initialization"
     Write-Verbose "Library root: $script:libraryroot"
 
+    # Initialize the redirector first for non-Core PowerShell
+    if ($PSVersionTable.PSEdition -ne 'Core') {
+        Write-Verbose "Initializing assembly redirector for non-Core PowerShell"
+        Initialize-DbatoolsAssemblyRedirector
+        Write-Verbose "Redirector type exists after init: $('Redirector' -as [type])"
+        Write-Verbose "Redirector instance stored: $($null -ne $script:dbatoolsRedirector)"
+    }
+
     # Log all currently loaded SqlClient assemblies
     Write-Verbose "Currently loaded SqlClient assemblies:"
     [System.AppDomain]::CurrentDomain.GetAssemblies() |
@@ -62,10 +70,11 @@ function Initialize-DbatoolsAssemblyLoader {
         }
     }
 
-    # Pre-load dependency assemblies first
+    # Pre-load Azure identity dependencies first
     $dependencyAssemblies = @(
         'Microsoft.Identity.Client'
         'Microsoft.Identity.Client.Extensions.Msal'
+        'Microsoft.IdentityModel.Abstractions'
     )
 
     foreach ($depAssembly in $dependencyAssemblies) {
@@ -120,8 +129,12 @@ function Initialize-DbatoolsAssemblyLoader {
                     Write-Verbose "Successfully loaded: $assemblyName from $($assembly.Location)"
 
                     # Add detailed logging for SqlClient
+                    # Extra logging for SqlClient
                     if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
-                        Write-Verbose "Checking SqlClient native dependencies..."
+                        Write-Verbose "Successfully loaded SqlClient"
+                        Write-Verbose "Version: $($assembly.GetName().Version)"
+                        Write-Verbose "Location: $($assembly.Location)"
+                        Write-Verbose "Checking native dependencies..."
                         $nativePath = $script:PlatformAssemblies['Windows'][$platformInfo.Architecture].NativePath
                         Write-Verbose "Native path configured as: $nativePath"
                         Write-Verbose "Current process PATH: $([Environment]::GetEnvironmentVariable('PATH'))"
@@ -207,22 +220,33 @@ function Reset-DbatoolsAssemblyLoader {
     [CmdletBinding()]
     param()
 
-    # Remove assembly resolve handler in non-Core PowerShell
+    Write-Verbose "Starting assembly loader reset"
+
+    # Remove assembly resolve handlers in non-Core PowerShell
     if ($PSVersionTable.PSEdition -ne 'Core') {
-        [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
+        Write-Verbose "Removing existing assembly resolve handlers"
+
+        # Remove standard handler
+        if ($script:onAssemblyResolveEventHandler) {
+            Write-Verbose "Removing standard resolve handler"
+            [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
+        }
+
+        # Remove redirector handler if it exists
+        if ($script:dbatoolsRedirector) {
+            Write-Verbose "Removing redirector resolve handler"
+            [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:dbatoolsRedirector.EventHandler)
+            $script:dbatoolsRedirector = $null
+        }
     }
 
     # Re-initialize the assembly loader
+    Write-Verbose "Re-initializing assembly loader"
     Initialize-DbatoolsAssemblyLoader
-
-    # Re-add assembly resolve handler in non-Core PowerShell
-    if ($PSVersionTable.PSEdition -ne 'Core') {
-        [System.AppDomain]::CurrentDomain.add_AssemblyResolve($script:onAssemblyResolveEventHandler)
-    }
 }
 
 # Export functions for module use
 Export-ModuleMember -Function Initialize-DbatoolsAssemblyLoader,
-                              Test-DbatoolsAssemblyLoading,
-                              Get-DbatoolsLoadedAssembly,
-                              Reset-DbatoolsAssemblyLoader
+                            Test-DbatoolsAssemblyLoading,
+                            Get-DbatoolsLoadedAssembly,
+                            Reset-DbatoolsAssemblyLoader

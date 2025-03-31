@@ -3,9 +3,14 @@
 
 # Core assemblies required across all platforms
 $script:CoreAssemblies = @{
+    # Azure dependencies
     'Azure.Core' = $null
     'Azure.Identity' = $null
     'Microsoft.Identity.Client' = $null
+    'Microsoft.Identity.Client.Extensions.Msal' = $null
+    'Microsoft.IdentityModel.Abstractions' = $null
+
+    # SQL dependencies
     'Microsoft.Data.SqlClient' = $null
     'Microsoft.SqlServer.Smo' = $null
     'Microsoft.SqlServer.Management.Sdk.Sfc' = $null
@@ -32,29 +37,35 @@ $script:PlatformAssemblies = @{
         'x64' = @{
             'Path' = Join-Path $script:libraryroot "lib/win-sqlclient"
             'NativePath' = Join-Path $script:libraryroot "lib/win-sqlclient/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/win-sqlclient"  # For Azure dependencies
         }
         'x86' = @{
             'Path' = Join-Path $script:libraryroot "lib/win-sqlclient-x86"
             'NativePath' = Join-Path $script:libraryroot "lib/win-sqlclient-x86/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/win-sqlclient-x86"  # For Azure dependencies
         }
         'DAC' = Join-Path $script:libraryroot "lib/win-dac"
     }
     'Linux' = @{
         'DAC' = Join-Path $script:libraryroot "lib/linux-dac"
         'SqlClient' = Join-Path $script:libraryroot "lib/core"
+        'Dependencies' = Join-Path $script:libraryroot "lib/core"  # For Azure dependencies
     }
     'OSX' = @{
         'DAC' = Join-Path $script:libraryroot "lib/mac-dac"
         'SqlClient' = Join-Path $script:libraryroot "lib/core"
+        'Dependencies' = Join-Path $script:libraryroot "lib/core"  # For Azure dependencies
     }
 }
 
 # Assembly load order to handle dependencies
 [string[]]$script:AssemblyLoadOrder = @(
-    # SqlClient dependencies first
+    # Azure dependencies first
     'Azure.Core',
     'Azure.Identity',
     'Microsoft.Identity.Client',
+    'Microsoft.Identity.Client.Extensions.Msal',
+    'Microsoft.IdentityModel.Abstractions',
 
     # Core SQL Client and basics next
     'Microsoft.Data.SqlClient',
