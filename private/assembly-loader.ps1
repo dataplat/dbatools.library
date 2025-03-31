@@ -70,6 +70,9 @@ function Initialize-DbatoolsAssemblyLoader {
         }
     }
 
+    # Ensure System.Runtime.CompilerServices.Unsafe is in place
+    $nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination "lib\core\" -PassThru | Out-Null
+
     # Pre-load Azure identity dependencies first
     $dependencyAssemblies = @(
         'Microsoft.Identity.Client'

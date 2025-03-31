@@ -47,8 +47,10 @@
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.3" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.70.0" />
     <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.70.0" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="9.0.3" />
     <PackageReference Include="System.Memory" Version="4.6.2" />
-    <PackageReference Include="System.Resources.Extensions" Version="9.0.3" />
+    <PackageReference Include="System.Resources.Extensions" Version="8.0.0" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.1" />
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.3" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
     <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="172.64.0" />

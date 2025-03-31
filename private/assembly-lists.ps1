@@ -3,6 +3,13 @@
 
 # Core assemblies required across all platforms
 $script:CoreAssemblies = @{
+    # System dependencies
+    'System.Memory' = $null
+    'System.Runtime.CompilerServices.Unsafe' = $null
+    'System.Resources.Extensions' = $null
+    'System.Diagnostics.DiagnosticSource' = $null
+    'System.Private.CoreLib' = $null
+
     # Azure dependencies
     'Azure.Core' = $null
     'Azure.Identity' = $null
@@ -60,7 +67,14 @@ $script:PlatformAssemblies = @{
 
 # Assembly load order to handle dependencies
 [string[]]$script:AssemblyLoadOrder = @(
-    # Azure dependencies first
+    # System dependencies first
+    'System.Memory',
+    'System.Runtime.CompilerServices.Unsafe',
+    'System.Resources.Extensions',
+    'System.Diagnostics.DiagnosticSource',
+    'System.Private.CoreLib',
+
+    # Azure dependencies next
     'Azure.Core',
     'Azure.Identity',
     'Microsoft.Identity.Client',

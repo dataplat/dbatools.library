@@ -36,6 +36,14 @@ public class Redirector
     {
         Console.WriteLine("Redirector: AssemblyResolve called for " + e.Name);
 
+        string[] systemDlls = {
+            "System.Memory",
+            "System.Runtime.CompilerServices.Unsafe",
+            "System.Resources.Extensions",
+            "System.Diagnostics.DiagnosticSource",
+            "System.Private.CoreLib"
+        };
+
         string[] azureDlls = {
             "Azure.Core",
             "Azure.Identity",
@@ -59,7 +67,20 @@ public class Redirector
         var name = new AssemblyName(e.Name);
         var assemblyName = name.Name.ToString();
 
-        // Handle Azure dependencies first
+        // Handle System dependencies first
+        if (systemDlls.Contains(assemblyName))
+        {
+            string filelocation = "$dir" + assemblyName + ".dll";
+            Console.WriteLine("Redirector: Loading System dependency from " + filelocation);
+            if (System.IO.File.Exists(filelocation))
+            {
+                var asm = Assembly.LoadFrom(filelocation);
+                Console.WriteLine("Redirector: Loaded assembly version: " + asm.GetName().Version);
+                return asm;
+            }
+        }
+
+        // Handle Azure dependencies next
         if (azureDlls.Contains(assemblyName))
         {
             string filelocation = "$dir" + "win-sqlclient\\" + assemblyName + ".dll";

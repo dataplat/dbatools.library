@@ -58,6 +58,14 @@ function Get-DbatoolsAssemblyPath {
     $isDac = $script:DacAssemblies.ContainsKey($AssemblyName)
     $isSqlClient = $AssemblyName -eq 'Microsoft.Data.SqlClient'
     $isDependency = @(
+        # System dependencies
+        'System.Memory',
+        'System.Runtime.CompilerServices.Unsafe',
+        'System.Resources.Extensions',
+        'System.Diagnostics.DiagnosticSource',
+        'System.Private.CoreLib',
+
+        # Azure dependencies
         'Microsoft.Identity.Client',
         'Microsoft.Identity.Client.Extensions.Msal',
         'Azure.Core',
