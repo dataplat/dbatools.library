@@ -6,19 +6,49 @@ function Get-DbatoolsLibraryPath {
 
 $script:libraryroot = Get-DbatoolsLibraryPath
 
+# Ensure private directory exists
+$privateDir = Join-Path $PSScriptRoot "private"
+if (-not (Test-Path $privateDir)) {
+    $null = New-Item -ItemType Directory -Path $privateDir -Force
+}
+
+# Define component load order (important for dependencies)
 $components = @(
-    'assembly-resolution.ps1',
-    'assembly-lists.ps1',
-    'assembly-loader.ps1'
+    'assembly-lists.ps1',      # Must be first as others depend on its variables
+    'assembly-resolution.ps1', # Depends on assembly lists
+    'assembly-loader.ps1'      # Depends on both above
 )
 
+# Load component scripts
 foreach ($component in $components) {
     $componentPath = Join-Path $PSScriptRoot "private\$component"
-    . $componentPath
+    if (Test-Path $componentPath) {
+        . $componentPath
+    } else {
+        throw "Required component not found: $componentPath"
+    }
 }
 
-if ($PSVersionTable.PSEdition -ne "Core") {
-    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($onAssemblyResolveEventHandler)
+# Initialize assembly handling
+try {
+    Initialize-DbatoolsAssemblyLoader
+    Write-Verbose "Assembly loader initialized successfully"
+} catch {
+    throw "Failed to initialize assembly loader: $_"
 }
 
-Export-ModuleMember -Function Get-DbatoolsLibraryPath
+# Register cleanup for module removal
+$MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = {
+    if ($PSVersionTable.PSEdition -ne "Core") {
+        [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
+    }
+}
+
+# Export module functions
+Export-ModuleMember -Function @(
+    'Get-DbatoolsLibraryPath',
+    'Get-DbatoolsPlatformInfo',
+    'Get-DbatoolsLoadedAssembly',
+    'Test-DbatoolsAssemblyLoading',
+    'Reset-DbatoolsAssemblyLoader'
+)

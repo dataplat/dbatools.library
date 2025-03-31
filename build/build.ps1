@@ -46,11 +46,11 @@ $null = New-Item -ItemType Directory ./lib/third-party/bogus/desktop -Force
 $null = New-Item -ItemType Directory ./lib/third-party/LumenWorks -Force
 $null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/core -Force
 $null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/desktop -Force
-$null = New-Item -ItemType Directory ./lib/win -Force
+$null = New-Item -ItemType Directory ./lib/win-dac -Force
 $null = New-Item -ItemType Directory ./lib/win-sqlclient -Force
 $null = New-Item -ItemType Directory ./lib/win-sqlclient-x86 -Force
-$null = New-Item -ItemType Directory ./lib/mac -Force
-$null = New-Item -ItemType Directory ./lib/linux -Force
+$null = New-Item -ItemType Directory ./lib/mac-dac -Force
+$null = New-Item -ItemType Directory ./lib/linux-dac -Force
 $null = New-Item -ItemType Directory ./lib/common -Force
 $null = New-Item -ItemType Directory ./temp/bogus -Force
 
@@ -90,93 +90,38 @@ Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO
 
 # Copy DAC files based on architecture
 $dacPath = ".\temp\dacfull\Microsoft SQL Server\160\DAC\bin"
-if ($env:PROCESSOR_ARCHITECTURE -eq "x86") {
-    Copy-Item "$dacPath\Microsoft.SqlServer.Types.dll" -Destination "./lib/win-sqlclient-x86/" -Force
-    Copy-Item "$dacPath\Microsoft.Data.Tools.Schema.Sql.dll" -Destination "./lib/win-sqlclient-x86/" -Force
-    Copy-Item "$dacPath\Microsoft.Data.Tools.Utilities.dll" -Destination "./lib/win-sqlclient-x86/" -Force
-    Copy-Item "$dacPath\Microsoft.Data.SqlClient.*" -Destination "./lib/win-sqlclient-x86/" -Force
-} else {
-    Copy-Item "$dacPath\Microsoft.SqlServer.Types.dll" -Destination "./lib/win-sqlclient/" -Force
-    Copy-Item "$dacPath\Microsoft.Data.Tools.Schema.Sql.dll" -Destination "./lib/win-sqlclient/" -Force
-    Copy-Item "$dacPath\Microsoft.Data.Tools.Utilities.dll" -Destination "./lib/win-sqlclient/" -Force
-    Copy-Item "$dacPath\Microsoft.Data.SqlClient.*" -Destination "./lib/win-sqlclient/" -Force
-}
 
-# Copy Linux files
-$linux = @(
-    'libclrjit.so', 'libcoreclr.so', 'libhostfxr.so', 'libhostpolicy.so', 'libSystem.Native.so',
-    'libSystem.Security.Cryptography.Native.OpenSsl.so', 'Microsoft.Win32.Primitives.dll',
-    'sqlpackage', 'sqlpackage.deps.json', 'sqlpackage.dll', 'sqlpackage.runtimeconfig.json',
-    'System.Collections.Concurrent.dll', 'System.Collections.dll', 'System.Console.dll',
-    'System.Diagnostics.FileVersionInfo.dll', 'System.Diagnostics.TraceSource.dll', 'System.Linq.dll',
-    'System.Memory.dll', 'System.Private.CoreLib.dll', 'System.Private.Xml.dll',
-    'System.Reflection.Metadata.dll', 'System.Runtime.dll',
-    'System.Security.Cryptography.Algorithms.dll', 'System.Security.Cryptography.Primitives.dll',
-    'System.Threading.dll', 'System.Threading.Thread.dll', 'System.Xml.ReaderWriter.dll'
-)
+# Copy DAC files for each platform
+# Windows
+Copy-Item "$dacPath\Microsoft.SqlServer.Dac.dll" -Destination "./lib/win-dac/" -Force
+Copy-Item "$dacPath\Microsoft.SqlServer.Dac.Extensions.dll" -Destination "./lib/win-dac/" -Force
+Copy-Item "$dacPath\Microsoft.Data.Tools.Schema.Sql.dll" -Destination "./lib/win-dac/" -Force
+Copy-Item "$dacPath\Microsoft.SqlServer.TransactSql.ScriptDom.dll" -Destination "./lib/win-dac/" -Force
 
-$sqlp = Get-ChildItem ./temp/linux/* -Exclude (Get-ChildItem lib -Recurse) | Where-Object Name -in $linux
-Copy-Item -Path $sqlp.FullName -Destination ./lib/linux/
+# Linux and macOS
+Copy-Item "./temp/linux/Microsoft.SqlServer.Dac*" -Destination "./lib/linux-dac/" -Force
+Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/linux-dac/" -Force
+Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/mac-dac/" -Force
+Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/mac-dac/" -Force
 
-# Copy Mac files
-Copy-Item "./temp/mac/*" -Destination "./lib/mac/" -Recurse -Force
+# Copy SQL Client files
+Copy-Item "./lib/desktop/Microsoft.Data.SqlClient.dll" -Destination "./lib/win-sqlclient/" -Force
+Copy-Item "./lib/desktop/Microsoft.Data.SqlClient.SNI.x64.dll" -Destination "./lib/win-sqlclient/" -Force
+Copy-Item "./lib/desktop/Microsoft.Data.SqlClient.dll" -Destination "./lib/win-sqlclient-x86/" -Force
+Copy-Item "./lib/desktop/Microsoft.Data.SqlClient.SNI.x86.dll" -Destination "./lib/win-sqlclient-x86/" -Force
 
-# Copy other framework-specific files
-# Get-ChildItem .\temp\dacfull\* -Include *.dll, *.exe, *.config -Exclude (Get-ChildItem .\lib -Recurse) -Recurse | Copy-Item -Destination ./lib/desktop -Force
-
-Copy-Item "./var/misc/desktop/*.dll" -Destination ./lib/desktop -Force
-Copy-Item "./var/misc/core/*.dll" -Destination ./lib/core -Force
-Copy-Item "./var/misc/both/*.dll" -Destination ./lib/common -Force
-Copy-Item "./var/third-party-licenses" -Destination ./ -Recurse -Force
-
-# Set executable permissions for Linux/Mac
-if ($isLinux -or $IsMacOs) {
-    chmod +x ./lib/linux/sqlpackage
-    chmod +x ./lib/mac/sqlpackage
-}
-
-Get-ChildItem .\lib -Recurse -Include *.pdb | Remove-Item -Force -ErrorAction SilentlyContinue
-Get-ChildItem .\lib -Recurse -Include *.xml | Remove-Item -Force
-Get-ChildItem .\lib\*\dbatools.deps.json -Recurse | Remove-Item -Force
-
-return
-# Remove existing gallery location if it exists
-if ((Test-Path -Path C:\gallery\dbatools.library)) {
-    Remove-Item C:\gallery\dbatools.library -Recurse -Force
-}
-
-# Create gallery directory structure
-$null = New-Item -ItemType Directory -Path C:\gallery\dbatools.library -Force
-$null = New-Item -ItemType Directory -Path C:\gallery\dbatools.library\desktop -Force
-$null = New-Item -ItemType Directory -Path C:\gallery\dbatools.library\desktop\lib -Force
-
-# Copy module files and other content
-$null = robocopy c:\github\dbatools.library C:\gallery\dbatools.library /S /XF actions-build.ps1 .markdownlint.json *.psproj* *.git* *.yml *.md dac.ps1 build*.ps1 dbatools-core*.* /XD .git .github Tests .vscode project temp runtime runtimes replication var opt
-
-# Clean up and copy module files
-Remove-Item c:\gallery\dbatools.library\dac.ps1 -ErrorAction Ignore
-Remove-Item c:\gallery\dbatools.library\dbatools.core.library.psd1 -ErrorAction Ignore
-Copy-Item C:\github\dbatools.library\dbatools.library.psd1 C:\gallery\dbatools.library -Force
-
-# Move lib directory to desktop folder
-Move-Item C:\github\dbatools.library\lib C:\gallery\dbatools.library\desktop\lib -Force
-
-# Verify required files exist
-$requiredFiles = @(
-    "C:\gallery\dbatools.library\dbatools.library.psd1",
-    "C:\gallery\dbatools.library\dbatools.library.psm1",
-    "C:\gallery\dbatools.library\desktop\lib\Microsoft.Data.SqlClient.dll",
-    "C:\gallery\dbatools.library\desktop\lib\Microsoft.SqlServer.Smo.dll",
-    "C:\gallery\dbatools.library\desktop\lib\Microsoft.Identity.Client.dll"
-)
-
-foreach ($file in $requiredFiles) {
-    if (-not (Test-Path $file)) {
-        Write-Error "Required file not found: $file"
-        exit 1
+# Copy common files that are platform-independent
+Get-ChildItem "./lib/desktop" -Filter "Microsoft.SqlServer.*.dll" |
+    Where-Object { $_.Name -notlike "*SqlClient*" } |
+    ForEach-Object {
+        Copy-Item $_.FullName -Destination "./lib/common/" -Force
     }
-}
 
-Import-Module C:\gallery\dbatools.library\dbatools.library.psd1 -Force
+# Cleanup temporary files and artifacts
+Remove-Item -Path "./temp" -Recurse -Force -ErrorAction SilentlyContinue
+Get-ChildItem -Path "./lib" -Recurse -Include "*.pdf","*.xml" | Remove-Item -Force
 
-Pop-Location
+# Create private directory for assembly loading scripts
+$null = New-Item -ItemType Directory -Path "./private" -Force -ErrorAction SilentlyContinue
+
+Write-Host "Build completed successfully. Files organized and temporary artifacts cleaned up."
