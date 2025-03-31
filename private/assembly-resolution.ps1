@@ -55,7 +55,7 @@ function Get-DbatoolsAssemblyPath {
     }
 
     # Check assembly type
-    $isDac = $script:DacAssemblies.ContainsKey($AssemblyName)
+    $isDac = $script:DacAssemblies -contains $AssemblyName
     $isSqlClient = $AssemblyName -eq 'Microsoft.Data.SqlClient'
     $isDependency = @(
         # System dependencies
@@ -182,11 +182,13 @@ $script:onAssemblyResolveEventHandler = [System.ResolveEventHandler] {
         $platformInfo = Get-DbatoolsPlatformInfo
 
         # Get assembly path
-        $assemblyPath = Get-DbatoolsAssemblyPath `
-            -AssemblyName $assemblyName.Name `
-            -Platform $platformInfo.Platform `
-            -Architecture $platformInfo.Architecture `
-            -Runtime $platformInfo.Runtime
+        $params = @{
+            AssemblyName = $assemblyName.Name
+            Platform = $platformInfo.Platform
+            Architecture = $platformInfo.Architecture
+            Runtime = $platformInfo.Runtime
+        }
+        $assemblyPath = Get-DbatoolsAssemblyPath @params
 
         if (Test-Path $assemblyPath) {
             Write-Verbose "Loading assembly from: $assemblyPath"

@@ -57,8 +57,11 @@ function Initialize-DbatoolsAssemblyLoader {
     if ($platformInfo.Platform -eq 'Windows') {
         Write-Verbose "Initializing native dependencies for Windows $($platformInfo.Architecture)"
         Write-Verbose "Current PATH before native init: $([Environment]::GetEnvironmentVariable('PATH'))"
-        Initialize-SqlClientNativeLibraries -Platform $platformInfo.Platform `
-                                          -Architecture $platformInfo.Architecture
+        $nativeParams = @{
+            Platform = $platformInfo.Platform
+            Architecture = $platformInfo.Architecture
+        }
+        Initialize-SqlClientNativeLibraries @nativeParams
         Write-Verbose "Current PATH after native init: $([Environment]::GetEnvironmentVariable('PATH'))"
 
         # Verify native DLLs exist
@@ -81,11 +84,13 @@ function Initialize-DbatoolsAssemblyLoader {
     foreach ($depAssembly in $dependencyAssemblies) {
         try {
             Write-Verbose "Pre-loading dependency: $depAssembly"
-            $assemblyPath = Get-DbatoolsAssemblyPath `
-                -AssemblyName $depAssembly `
-                -Platform $platformInfo.Platform `
-                -Architecture $platformInfo.Architecture `
-                -Runtime $platformInfo.Runtime
+            $assemblyParams = @{
+                AssemblyName = $depAssembly
+                Platform = $platformInfo.Platform
+                Architecture = $platformInfo.Architecture
+                Runtime = $platformInfo.Runtime
+            }
+            $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
 
             if (Test-Path $assemblyPath) {
                 [System.Reflection.Assembly]::LoadFrom($assemblyPath) | Out-Null
@@ -117,11 +122,13 @@ function Initialize-DbatoolsAssemblyLoader {
                 continue
             }
 
-            $assemblyPath = Get-DbatoolsAssemblyPath `
-                -AssemblyName $assemblyName `
-                -Platform $platformInfo.Platform `
-                -Architecture $platformInfo.Architecture `
-                -Runtime $platformInfo.Runtime
+            $assemblyParams = @{
+                AssemblyName = $assemblyName
+                Platform = $platformInfo.Platform
+                Architecture = $platformInfo.Architecture
+                Runtime = $platformInfo.Runtime
+            }
+            $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
 
             if (Test-Path $assemblyPath) {
                 Write-Verbose "Loading assembly from path: $assemblyPath"
@@ -176,11 +183,13 @@ function Test-DbatoolsAssemblyLoading {
 
     try {
         $platformInfo = Get-DbatoolsPlatformInfo
-        $assemblyPath = Get-DbatoolsAssemblyPath `
-            -AssemblyName $AssemblyName `
-            -Platform $platformInfo.Platform `
-            -Architecture $platformInfo.Architecture `
-            -Runtime $platformInfo.Runtime
+        $assemblyParams = @{
+            AssemblyName = $AssemblyName
+            Platform = $platformInfo.Platform
+            Architecture = $platformInfo.Architecture
+            Runtime = $platformInfo.Runtime
+        }
+        $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
 
         if (-not (Test-Path $assemblyPath)) {
             Write-Warning "Assembly file not found: $assemblyPath"
@@ -204,7 +213,7 @@ function Get-DbatoolsLoadedAssembly {
     $loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
     $relevantAssemblies = $loadedAssemblies | Where-Object {
         $name = $_.GetName().Name
-        $script:CoreAssemblies.ContainsKey($name) -or $script:DacAssemblies.ContainsKey($name)
+        $script:CoreAssemblies -contains $name -or $script:DacAssemblies -contains $name
     }
 
     return $relevantAssemblies | ForEach-Object {

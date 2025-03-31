@@ -2,41 +2,117 @@
 # This file defines the required assemblies, their versions, and platform-specific mappings
 
 # Core assemblies required across all platforms
-$script:CoreAssemblies = @{
+$script:CoreAssemblies = @(
     # System dependencies
-    'System.Memory' = $null
-    'System.Runtime.CompilerServices.Unsafe' = $null
-    'System.Resources.Extensions' = $null
-    'System.Diagnostics.DiagnosticSource' = $null
-    'System.Private.CoreLib' = $null
+    'System.Memory',
+    'System.Runtime.CompilerServices.Unsafe',
+    'System.Resources.Extensions',
+    'System.Diagnostics.DiagnosticSource',
+    'System.Private.CoreLib',
 
     # Azure dependencies
-    'Azure.Core' = $null
-    'Azure.Identity' = $null
-    'Microsoft.Identity.Client' = $null
-    'Microsoft.Identity.Client.Extensions.Msal' = $null
-    'Microsoft.IdentityModel.Abstractions' = $null
+    'Azure.Core',
+    'Azure.Identity',
+    'Microsoft.Identity.Client',
+    'Microsoft.Identity.Client.Extensions.Msal',
+    'Microsoft.IdentityModel.Abstractions',
 
     # SQL dependencies
-    'Microsoft.Data.SqlClient' = $null
-    'Microsoft.SqlServer.Smo' = $null
-    'Microsoft.SqlServer.Management.Sdk.Sfc' = $null
-    'Microsoft.SqlServer.ConnectionInfo' = $null
-    'Microsoft.SqlServer.SqlEnum' = $null
-    'Microsoft.SqlServer.Management.HadrModel' = $null
-    'Microsoft.SqlServer.Management.HadrData' = $null
-    'Microsoft.SqlServer.Management.RegisteredServers' = $null
-    'Microsoft.SqlServer.Management.XEvent' = $null
-    'Microsoft.SqlServer.Management.XEventDbScoped' = $null
-}
+    'Microsoft.Data.SqlClient',
+    'Microsoft.SqlServer.Smo',
+    'Microsoft.SqlServer.Management.Sdk.Sfc',
+    'Microsoft.SqlServer.ConnectionInfo',
+    'Microsoft.SqlServer.SqlEnum',
+    'Microsoft.SqlServer.Types',
+    'Microsoft.SqlServer.Management.HadrModel',
+    'Microsoft.SqlServer.Management.HadrData',
+    'Microsoft.SqlServer.Management.RegisteredServers',
+    'Microsoft.SqlServer.Management.XEvent',
+    'Microsoft.SqlServer.Management.XEventDbScoped',
+    'Microsoft.SqlServer.Replication',
+    'Microsoft.SqlServer.Rmo',
+    'Microsoft.AnalysisServices',
+    'Microsoft.AnalysisServices.Core',
+    'Microsoft.AnalysisServices.Tabular',
+    'Microsoft.AnalysisServices.Tabular.Json',
+    'Microsoft.SqlServer.Diagnostics.STrace',
+    'Microsoft.SqlServer.IntegrationServices.Common.ObjectModel',
+    'Microsoft.SqlServer.Management.IntegrationServices',
+    'Microsoft.SqlServer.Management.IntegrationServicesEnum'
+)
 
 # DAC-specific assemblies
-$script:DacAssemblies = @{
-    'Microsoft.SqlServer.Dac' = $null
-    'Microsoft.SqlServer.Dac.Extensions' = $null
-    'Microsoft.Data.Tools.Schema.Sql' = $null
-    'Microsoft.SqlServer.TransactSql.ScriptDom' = $null
-}
+$script:DacAssemblies = @(
+    'Microsoft.SqlServer.Dac',
+    'Microsoft.SqlServer.Dac.Extensions',
+    'Microsoft.Data.Tools.Schema.Sql',
+    'Microsoft.SqlServer.TransactSql.ScriptDom'
+)
+
+# Assembly load order to handle dependencies
+$script:AssemblyLoadOrder = @(
+    # System dependencies first
+    'System.Memory',
+    'System.Runtime.CompilerServices.Unsafe',
+    'System.Resources.Extensions',
+    'System.Diagnostics.DiagnosticSource',
+    'System.Private.CoreLib',
+
+    # Azure dependencies next
+    'Azure.Core',
+    'Azure.Identity',
+    'Microsoft.Identity.Client',
+    'Microsoft.Identity.Client.Extensions.Msal',
+    'Microsoft.IdentityModel.Abstractions',
+
+    # Core SQL Client and basics next
+    'Microsoft.Data.SqlClient',
+    'Microsoft.SqlServer.Management.Sdk.Sfc',
+
+    # SMO components
+    'Microsoft.SqlServer.ConnectionInfo',
+    'Microsoft.SqlServer.SqlEnum',
+    'Microsoft.SqlServer.Smo',
+    'Microsoft.SqlServer.Types',
+
+    # Additional SMO features
+    'Microsoft.SqlServer.Management.RegisteredServers',
+    'Microsoft.SqlServer.Management.XEvent',
+    'Microsoft.SqlServer.Management.XEventDbScoped',
+    'Microsoft.SqlServer.Management.HadrData',
+    'Microsoft.SqlServer.Management.HadrModel',
+
+    # Replication components
+    'Microsoft.SqlServer.Replication',
+    'Microsoft.SqlServer.Rmo',
+
+    # SSIS components
+    'Microsoft.SqlServer.Diagnostics.STrace',
+    'Microsoft.SqlServer.IntegrationServices.Common.ObjectModel',
+    'Microsoft.SqlServer.Management.IntegrationServices',
+    'Microsoft.SqlServer.Management.IntegrationServicesEnum',
+
+    # Analysis Services components
+    'Microsoft.AnalysisServices.Core',
+    'Microsoft.AnalysisServices',
+    'Microsoft.AnalysisServices.Tabular',
+    'Microsoft.AnalysisServices.Tabular.Json',
+
+    # DAC components last
+    'Microsoft.SqlServer.TransactSql.ScriptDom',
+    'Microsoft.Data.Tools.Schema.Sql',
+    'Microsoft.SqlServer.Dac',
+    'Microsoft.SqlServer.Dac.Extensions'
+)
+
+# Common assemblies that are platform-independent
+$script:CommonAssemblies = @(
+    'Microsoft.SqlServer.Management.Sdk.Sfc',
+    'Microsoft.SqlServer.Smo',
+    'Microsoft.SqlServer.ConnectionInfo',
+    'Microsoft.SqlServer.SqlEnum',
+    'Microsoft.SqlServer.Types'
+)
 
 # Define platform-specific paths for assemblies and native dependencies
 $script:PlatformAssemblies = @{
@@ -64,50 +140,3 @@ $script:PlatformAssemblies = @{
         'Dependencies' = Join-Path $script:libraryroot "lib/core"  # For Azure dependencies
     }
 }
-
-# Assembly load order to handle dependencies
-[string[]]$script:AssemblyLoadOrder = @(
-    # System dependencies first
-    'System.Memory',
-    'System.Runtime.CompilerServices.Unsafe',
-    'System.Resources.Extensions',
-    'System.Diagnostics.DiagnosticSource',
-    'System.Private.CoreLib',
-
-    # Azure dependencies next
-    'Azure.Core',
-    'Azure.Identity',
-    'Microsoft.Identity.Client',
-    'Microsoft.Identity.Client.Extensions.Msal',
-    'Microsoft.IdentityModel.Abstractions',
-
-    # Core SQL Client and basics next
-    'Microsoft.Data.SqlClient',
-    'Microsoft.SqlServer.Management.Sdk.Sfc',
-
-    # SMO components
-    'Microsoft.SqlServer.ConnectionInfo',
-    'Microsoft.SqlServer.SqlEnum',
-    'Microsoft.SqlServer.Smo',
-
-    # Additional SMO features
-    'Microsoft.SqlServer.Management.RegisteredServers',
-    'Microsoft.SqlServer.Management.XEvent',
-    'Microsoft.SqlServer.Management.XEventDbScoped',
-    'Microsoft.SqlServer.Management.HadrData',
-    'Microsoft.SqlServer.Management.HadrModel',
-
-    # DAC components last
-    'Microsoft.SqlServer.TransactSql.ScriptDom',
-    'Microsoft.Data.Tools.Schema.Sql',
-    'Microsoft.SqlServer.Dac',
-    'Microsoft.SqlServer.Dac.Extensions'
-)
-
-# Common assemblies that are platform-independent
-[string[]]$script:CommonAssemblies = @(
-    'Microsoft.SqlServer.Management.Sdk.Sfc',
-    'Microsoft.SqlServer.Smo',
-    'Microsoft.SqlServer.ConnectionInfo',
-    'Microsoft.SqlServer.SqlEnum'
-)

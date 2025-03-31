@@ -34,14 +34,16 @@ function Test-DbatoolsAssemblyEnvironment {
 
     Write-Host "Required Assemblies Status:"
     Write-Host "========================="
-    $allAssemblies = @($script:CoreAssemblies.Keys) + @($script:DacAssemblies.Keys) | Select-Object -Unique
+    $allAssemblies = @($script:CoreAssemblies) + @($script:DacAssemblies) | Select-Object -Unique
     foreach ($assembly in $allAssemblies) {
         try {
-            $path = Get-DbatoolsAssemblyPath `
-                -AssemblyName $assembly `
-                -Platform $platformInfo.Platform `
-                -Architecture $platformInfo.Architecture `
-                -Runtime $platformInfo.Runtime
+            $params = @{
+                AssemblyName = $assembly
+                Platform = $platformInfo.Platform
+                Architecture = $platformInfo.Architecture
+                Runtime = $platformInfo.Runtime
+            }
+            $path = Get-DbatoolsAssemblyPath @params
 
             $exists = Test-Path $path
             $loaded = $null
@@ -84,7 +86,7 @@ function Reset-DbatoolsAssemblyCache {
         $loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
         $ourAssemblies = $loadedAssemblies | Where-Object {
             $name = $_.GetName().Name
-            $script:CoreAssemblies.ContainsKey($name) -or $script:DacAssemblies.ContainsKey($name)
+            $script:CoreAssemblies -contains $name -or $script:DacAssemblies -contains $name
         }
 
         Write-Verbose "Found $($ourAssemblies.Count) assemblies to process:"
@@ -109,7 +111,7 @@ function Reset-DbatoolsAssemblyCache {
 
         # Verify state after reset
         $remainingAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies() |
-            Where-Object { $script:CoreAssemblies.ContainsKey($_.GetName().Name) }
+            Where-Object { $script:CoreAssemblies -contains $_.GetName().Name }
         if ($remainingAssemblies) {
             Write-Verbose "Remaining assemblies after reset:"
             foreach ($asm in $remainingAssemblies) {
