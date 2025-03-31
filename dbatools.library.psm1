@@ -14,9 +14,10 @@ if (-not (Test-Path $privateDir)) {
 
 # Define component load order (important for dependencies)
 $components = @(
-    'assembly-lists.ps1',      # Must be first as others depend on its variables
-    'assembly-resolution.ps1', # Depends on assembly lists
-    'assembly-loader.ps1'      # Depends on both above
+    'assembly-lists.ps1',          # Must be first as others depend on its variables
+    'assembly-resolution.ps1',      # Depends on assembly lists
+    'assembly-loader.ps1',         # Depends on both above
+    'assembly-troubleshoot.ps1'    # Troubleshooting tools
 )
 
 # Load component scripts
@@ -50,5 +51,7 @@ Export-ModuleMember -Function @(
     'Get-DbatoolsPlatformInfo',
     'Get-DbatoolsLoadedAssembly',
     'Test-DbatoolsAssemblyLoading',
-    'Reset-DbatoolsAssemblyLoader'
+    'Reset-DbatoolsAssemblyLoader',
+    'Test-DbatoolsAssemblyEnvironment',
+    'Reset-DbatoolsAssemblyCache'
 )

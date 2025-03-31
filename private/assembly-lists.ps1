@@ -23,11 +23,17 @@ $script:DacAssemblies = @{
     'Microsoft.SqlServer.TransactSql.ScriptDom' = '170.18.0'
 }
 
-# Define platform-specific paths for assemblies
+# Define platform-specific paths for assemblies and native dependencies
 $script:PlatformAssemblies = @{
     'Windows' = @{
-        'x64' = Join-Path $script:libraryroot "lib/win-sqlclient"
-        'x86' = Join-Path $script:libraryroot "lib/win-sqlclient-x86"
+        'x64' = @{
+            'Path' = Join-Path $script:libraryroot "lib/win-sqlclient"
+            'NativePath' = Join-Path $script:libraryroot "lib/win-sqlclient/native"
+        }
+        'x86' = @{
+            'Path' = Join-Path $script:libraryroot "lib/win-sqlclient-x86"
+            'NativePath' = Join-Path $script:libraryroot "lib/win-sqlclient-x86/native"
+        }
         'DAC' = Join-Path $script:libraryroot "lib/win-dac"
     }
     'Linux' = @{

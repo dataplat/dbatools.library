@@ -19,7 +19,18 @@ Push-Location "$root\project"
 
 dotnet clean
 # Publish .NET Framework (desktop)
+Write-Host "Publishing .NET Framework build..."
 dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output C:\github\dbatools.library\lib\desktop --nologo | Out-String -OutVariable build
+
+# Verify desktop publish results
+Write-Host "Verifying desktop publish..."
+if (Test-Path "C:\github\dbatools.library\lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll") {
+    Write-Host "Found SNI x64 DLL in desktop output"
+    $dllInfo = Get-Item "C:\github\dbatools.library\lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll"
+    Write-Host "DLL Size: $($dllInfo.Length) bytes"
+} else {
+    Write-Host "WARNING: SNI x64 DLL not found in desktop output"
+}
 
 # Publish .NET 8 (core)
 dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output C:\github\dbatools.library\lib\core --nologo | Out-String -OutVariable build
@@ -91,6 +102,10 @@ Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO
 # Copy DAC files based on architecture
 $dacPath = ".\temp\dacfull\Microsoft SQL Server\160\DAC\bin"
 
+# Ensure lib directories exist for SqlClient native dependencies
+$null = New-Item -ItemType Directory ./lib/win-sqlclient/native -Force
+$null = New-Item -ItemType Directory ./lib/win-sqlclient-x86/native -Force
+
 # Copy DAC files for each platform
 # Windows
 Copy-Item "$dacPath\Microsoft.SqlServer.Dac.dll" -Destination "./lib/win-dac/" -Force
@@ -104,11 +119,55 @@ Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/linux-dac/" -
 Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/mac-dac/" -Force
 Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/mac-dac/" -Force
 
-# Copy SQL Client files
-Copy-Item "./lib/desktop/Microsoft.Data.SqlClient.dll" -Destination "./lib/win-sqlclient/" -Force
-Copy-Item "./lib/desktop/Microsoft.Data.SqlClient.SNI.x64.dll" -Destination "./lib/win-sqlclient/" -Force
-Copy-Item "./lib/desktop/Microsoft.Data.SqlClient.dll" -Destination "./lib/win-sqlclient-x86/" -Force
-Copy-Item "./lib/desktop/Microsoft.Data.SqlClient.SNI.x86.dll" -Destination "./lib/win-sqlclient-x86/" -Force
+# Copy SQL Client files with proper native dependency handling
+# x64 files
+# Verify source files before copy
+Write-Host "`nVerifying source files before copy..."
+$sourcePath = "./lib/desktop"
+$sourceFiles = @(
+    "Microsoft.Data.SqlClient.dll",
+    "Microsoft.Identity.Client.dll",
+    "Microsoft.Identity.Client.Extensions.Msal.dll",
+    "Microsoft.Data.SqlClient.SNI.x64.dll"
+)
+foreach ($file in $sourceFiles) {
+    if (Test-Path "$sourcePath/$file") {
+        $fileInfo = Get-Item "$sourcePath/$file"
+        Write-Host "Found $file - Size: $($fileInfo.Length) bytes"
+    } else {
+        Write-Host "WARNING: Missing source file $file"
+    }
+}
+
+# Use robocopy to preserve file integrity for native dependencies
+Write-Host "`nCopying files to win-sqlclient..."
+robocopy "./lib/desktop" "./lib/win-sqlclient" Microsoft.Data.SqlClient.dll Microsoft.Identity.Client.dll Microsoft.Identity.Client.Extensions.Msal.dll /NFL /NDL /NJH /NJS /nc /ns /np
+robocopy "./lib/desktop" "./lib/win-sqlclient/native" Microsoft.Data.SqlClient.SNI.x64.dll /NFL /NDL /NJH /NJS /nc /ns /np
+
+# Verify destination files after copy
+Write-Host "`nVerifying destination files after copy..."
+$destPaths = @{
+    "Microsoft.Data.SqlClient.dll" = "./lib/win-sqlclient"
+    "Microsoft.Identity.Client.dll" = "./lib/win-sqlclient"
+    "Microsoft.Identity.Client.Extensions.Msal.dll" = "./lib/win-sqlclient"
+    "Microsoft.Data.SqlClient.SNI.x64.dll" = "./lib/win-sqlclient/native"
+}
+foreach ($file in $destPaths.Keys) {
+    $path = Join-Path $destPaths[$file] $file
+    if (Test-Path $path) {
+        $fileInfo = Get-Item $path
+        Write-Host "Found $file in $($destPaths[$file]) - Size: $($fileInfo.Length) bytes"
+    } else {
+        Write-Host "WARNING: Missing destination file $path"
+    }
+}
+
+# x86 files
+# Use robocopy to preserve file integrity for x86 native dependencies
+robocopy "./lib/desktop" "./lib/win-sqlclient-x86" Microsoft.Data.SqlClient.dll Microsoft.Identity.Client.dll Microsoft.Identity.Client.Extensions.Msal.dll /NFL /NDL /NJH /NJS /nc /ns /np
+robocopy "./lib/desktop" "./lib/win-sqlclient-x86/native" Microsoft.Data.SqlClient.SNI.x86.dll /NFL /NDL /NJH /NJS /nc /ns /np
+
+# Core files are already in place from dotnet publish
 
 # Copy common files that are platform-independent
 Get-ChildItem "./lib/desktop" -Filter "Microsoft.SqlServer.*.dll" |

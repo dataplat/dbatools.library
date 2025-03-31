@@ -1,5 +1,39 @@
 # Assembly loading and initialization for dbatools.library
 
+function Initialize-SqlClientNativeLibraries {
+    [CmdletBinding()]
+    param(
+        [string]$Platform,
+        [string]$Architecture
+    )
+
+    if ($Platform -eq 'Windows') {
+        $platformInfo = $script:PlatformAssemblies[$Platform][$Architecture]
+        if (-not $platformInfo -or -not $platformInfo.NativePath) {
+            Write-Warning "Native path configuration not found for $Platform $Architecture"
+            return
+        }
+
+        # Add native path to PATH environment variable temporarily
+        $oldPath = [Environment]::GetEnvironmentVariable("PATH")
+        [Environment]::SetEnvironmentVariable("PATH", "$($platformInfo.NativePath);$oldPath")
+
+        # Load native SqlClient SNI library first
+        $sniPath = Join-Path $platformInfo.NativePath "Microsoft.Data.SqlClient.SNI.$Architecture.dll"
+        if (Test-Path $sniPath) {
+            try {
+                Write-Verbose "Loading native SqlClient dependency from: $sniPath"
+                Add-Type -Path $sniPath -ErrorAction Stop
+                Write-Verbose "Successfully loaded native SqlClient dependency"
+            } catch {
+                Write-Warning "Failed to load native SqlClient dependency from $sniPath : $_"
+            }
+        } else {
+            Write-Warning "Native SqlClient dependency not found: $sniPath"
+        }
+    }
+}
+
 function Initialize-DbatoolsAssemblyLoader {
     [CmdletBinding()]
     param()
@@ -7,9 +41,44 @@ function Initialize-DbatoolsAssemblyLoader {
     # Get platform information
     $platformInfo = Get-DbatoolsPlatformInfo
 
-    # Pre-load assemblies in specified order
+    Write-Verbose "Initializing assembly loader for platform: $($platformInfo.Platform), architecture: $($platformInfo.Architecture), runtime: $($platformInfo.Runtime)"
+
+    # Initialize native dependencies first
+    if ($platformInfo.Platform -eq 'Windows') {
+        Write-Verbose "Initializing native dependencies for Windows $($platformInfo.Architecture)"
+        Initialize-SqlClientNativeLibraries -Platform $platformInfo.Platform `
+                                          -Architecture $platformInfo.Architecture
+    }
+
+    # Pre-load dependency assemblies first
+    $dependencyAssemblies = @(
+        'Microsoft.Identity.Client'
+        'Microsoft.Identity.Client.Extensions.Msal'
+    )
+
+    foreach ($depAssembly in $dependencyAssemblies) {
+        try {
+            Write-Verbose "Pre-loading dependency: $depAssembly"
+            $assemblyPath = Get-DbatoolsAssemblyPath `
+                -AssemblyName $depAssembly `
+                -Platform $platformInfo.Platform `
+                -Architecture $platformInfo.Architecture `
+                -Runtime $platformInfo.Runtime
+
+            if (Test-Path $assemblyPath) {
+                [System.Reflection.Assembly]::LoadFrom($assemblyPath) | Out-Null
+                Write-Verbose "Successfully loaded dependency: $depAssembly"
+            }
+        } catch {
+            Write-Warning "Failed to load dependency $depAssembly : $_"
+        }
+    }
+
+    # Pre-load core assemblies in specified order
+    Write-Verbose "Loading core assemblies..."
     foreach ($assemblyName in $script:AssemblyLoadOrder) {
         try {
+            Write-Verbose "Attempting to load: $assemblyName"
             $assemblyPath = Get-DbatoolsAssemblyPath `
                 -AssemblyName $assemblyName `
                 -Platform $platformInfo.Platform `
@@ -18,24 +87,30 @@ function Initialize-DbatoolsAssemblyLoader {
 
             if (Test-Path $assemblyPath) {
                 Write-Verbose "Pre-loading assembly: $assemblyName"
-                [System.Reflection.Assembly]::LoadFrom($assemblyPath) | Out-Null
+                try {
+                    [System.Reflection.Assembly]::LoadFrom($assemblyPath) | Out-Null
+                    Write-Verbose "Successfully loaded: $assemblyName"
+                } catch {
+                    # Special handling for SqlClient
+                    if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
+                        Write-Warning "Failed to load platform-specific SqlClient, attempting fallback: $_"
+                        $fallbackPath = Join-Path $script:libraryroot "lib/core/$assemblyName.dll"
+                        if (Test-Path $fallbackPath) {
+                            [System.Reflection.Assembly]::LoadFrom($fallbackPath) | Out-Null
+                            Write-Verbose "Successfully loaded core SqlClient as fallback"
+                        } else {
+                            throw "Failed to load SqlClient and no fallback available"
+                        }
+                    } else {
+                        throw
+                    }
+                }
             } else {
                 Write-Warning "Assembly not found: $assemblyPath"
             }
         }
         catch {
-            # For SqlClient, we'll try fallback if available
-            if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
-                Write-Warning "Falling back to core SqlClient due to: $_"
-                $fallbackPath = Join-Path $script:libraryroot "lib/core/$assemblyName.dll"
-                if (Test-Path $fallbackPath) {
-                    [System.Reflection.Assembly]::LoadFrom($fallbackPath) | Out-Null
-                } else {
-                    throw "Failed to load SqlClient and no fallback available"
-                }
-            } else {
-                throw "Failed to load assembly $assemblyName : $_"
-            }
+            throw "Failed to load assembly $assemblyName : $_"
         }
     }
 }
