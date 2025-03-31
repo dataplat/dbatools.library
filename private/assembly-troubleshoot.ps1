@@ -72,8 +72,11 @@ function Reset-DbatoolsAssemblyCache {
     param()
 
     try {
+        Write-Verbose "Starting assembly cache reset"
+
         # Remove assembly resolve handler
         if ($PSVersionTable.PSEdition -ne 'Core') {
+            Write-Verbose "Removing assembly resolve handler"
             [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
         }
 
@@ -84,20 +87,40 @@ function Reset-DbatoolsAssemblyCache {
             $script:CoreAssemblies.ContainsKey($name) -or $script:DacAssemblies.ContainsKey($name)
         }
 
-        Write-Verbose "Attempting to clear $($ourAssemblies.Count) assemblies from current session"
+        Write-Verbose "Found $($ourAssemblies.Count) assemblies to process:"
+        foreach ($asm in $ourAssemblies) {
+            Write-Verbose "  $($asm.GetName().Name) v$($asm.GetName().Version) from $($asm.Location)"
+        }
 
-        # Reinitialize assembly loader
+        # Force GC collection to help unload assemblies
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+
+        Write-Verbose "Reinitializing assembly loader"
         Initialize-DbatoolsAssemblyLoader
 
         # Re-add assembly resolve handler
         if ($PSVersionTable.PSEdition -ne 'Core') {
+            Write-Verbose "Re-adding assembly resolve handler"
             [System.AppDomain]::CurrentDomain.add_AssemblyResolve($script:onAssemblyResolveEventHandler)
         }
 
         Write-Host "Assembly cache reset complete"
+
+        # Verify state after reset
+        $remainingAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+            Where-Object { $script:CoreAssemblies.ContainsKey($_.GetName().Name) }
+        if ($remainingAssemblies) {
+            Write-Verbose "Remaining assemblies after reset:"
+            foreach ($asm in $remainingAssemblies) {
+                Write-Verbose "  $($asm.GetName().Name) v$($asm.GetName().Version) from $($asm.Location)"
+            }
+        }
     }
     catch {
         Write-Warning "Error resetting assembly cache: $_"
+        Write-Warning "Stack trace: $($_.ScriptStackTrace)"
+        throw
     }
 }
 

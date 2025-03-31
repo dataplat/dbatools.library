@@ -90,18 +90,6 @@ function Get-DbatoolsAssemblyPath {
                 throw "Platform configuration not found for Windows $Architecture"
             }
 
-            if ($isSqlClient) {
-                # Check for native dependencies first
-                if ($platformInfo.NativePath) {
-                    $nativePath = Join-Path $platformInfo.NativePath "Microsoft.Data.SqlClient.SNI.$Architecture.dll"
-                    if (Test-Path $nativePath) {
-                        Write-Verbose "Native SqlClient dependency found at: $nativePath"
-                    } else {
-                        Write-Warning "Native SqlClient dependency missing: $nativePath"
-                    }
-                }
-            }
-
             # For SqlClient and its dependencies, use the platform-specific path
             if ($isSqlClient -or $isDependency) {
                 $basePath = $platformInfo.Path
@@ -126,9 +114,16 @@ function Get-DbatoolsAssemblyPath {
             $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
 
             # Ensure native dependencies are available
-            $nativeDll = Join-Path $basePath "Microsoft.Data.SqlClient.SNI.$Architecture.dll"
-            if (-not (Test-Path $nativeDll)) {
-                Write-Warning "Native SqlClient dependency missing: $nativeDll"
+            if ($platformInfo.NativePath) {
+                $nativeDll = Join-Path $platformInfo.NativePath "Microsoft.Data.SqlClient.SNI.$Architecture.dll"
+                Write-Verbose "Checking native SqlClient dependency at: $nativeDll"
+                if (-not (Test-Path $nativeDll)) {
+                    Write-Warning "Native SqlClient dependency missing: $nativeDll"
+                } else {
+                    Write-Verbose "Found native SqlClient dependency"
+                }
+            } else {
+                Write-Warning "Native path not configured for Windows $Architecture"
             }
 
             # Fallback to core version if needed

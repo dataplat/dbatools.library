@@ -14,22 +14,11 @@ function Initialize-SqlClientNativeLibraries {
             return
         }
 
-        # Add native path to PATH environment variable temporarily
-        $oldPath = [Environment]::GetEnvironmentVariable("PATH")
-        [Environment]::SetEnvironmentVariable("PATH", "$($platformInfo.NativePath);$oldPath")
-
-        # Load native SqlClient SNI library first
-        $sniPath = Join-Path $platformInfo.NativePath "Microsoft.Data.SqlClient.SNI.$Architecture.dll"
-        if (Test-Path $sniPath) {
-            try {
-                Write-Verbose "Loading native SqlClient dependency from: $sniPath"
-                Add-Type -Path $sniPath -ErrorAction Stop
-                Write-Verbose "Successfully loaded native SqlClient dependency"
-            } catch {
-                Write-Warning "Failed to load native SqlClient dependency from $sniPath : $_"
-            }
-        } else {
-            Write-Warning "Native SqlClient dependency not found: $sniPath"
+        # Add native path to PATH if not already present
+        $oldPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
+        if (-not $oldPath.Contains($platformInfo.NativePath)) {
+            Write-Verbose "Adding native path to PATH: $($platformInfo.NativePath)"
+            [Environment]::SetEnvironmentVariable("PATH", "$($platformInfo.NativePath);$oldPath", [System.EnvironmentVariableTarget]::Process)
         }
     }
 }
@@ -38,16 +27,39 @@ function Initialize-DbatoolsAssemblyLoader {
     [CmdletBinding()]
     param()
 
+    Write-Verbose "Starting assembly loader initialization"
+    Write-Verbose "Library root: $script:libraryroot"
+
+    # Log all currently loaded SqlClient assemblies
+    Write-Verbose "Currently loaded SqlClient assemblies:"
+    [System.AppDomain]::CurrentDomain.GetAssemblies() |
+        Where-Object { $_.GetName().Name -like '*SqlClient*' } |
+        ForEach-Object {
+            Write-Verbose "  Name: $($_.GetName().Name)"
+            Write-Verbose "  Version: $($_.GetName().Version)"
+            Write-Verbose "  Location: $($_.Location)"
+            Write-Verbose "  GAC: $($_.GlobalAssemblyCache)"
+        }
+
     # Get platform information
     $platformInfo = Get-DbatoolsPlatformInfo
+    Write-Verbose "Platform: $($platformInfo.Platform), architecture: $($platformInfo.Architecture), runtime: $($platformInfo.Runtime)"
 
-    Write-Verbose "Initializing assembly loader for platform: $($platformInfo.Platform), architecture: $($platformInfo.Architecture), runtime: $($platformInfo.Runtime)"
-
-    # Initialize native dependencies first
+    # Initialize native dependencies first - this must happen before any assembly loading
     if ($platformInfo.Platform -eq 'Windows') {
         Write-Verbose "Initializing native dependencies for Windows $($platformInfo.Architecture)"
+        Write-Verbose "Current PATH before native init: $([Environment]::GetEnvironmentVariable('PATH'))"
         Initialize-SqlClientNativeLibraries -Platform $platformInfo.Platform `
                                           -Architecture $platformInfo.Architecture
+        Write-Verbose "Current PATH after native init: $([Environment]::GetEnvironmentVariable('PATH'))"
+
+        # Verify native DLLs exist
+        $nativePath = $script:PlatformAssemblies['Windows'][$platformInfo.Architecture].NativePath
+        $expectedDlls = @('Microsoft.Data.SqlClient.SNI.dll')
+        foreach ($dll in $expectedDlls) {
+            $dllPath = Join-Path $nativePath $dll
+            Write-Verbose "Checking native DLL: $dllPath exists: $(Test-Path $dllPath)"
+        }
     }
 
     # Pre-load dependency assemblies first
@@ -78,7 +90,23 @@ function Initialize-DbatoolsAssemblyLoader {
     Write-Verbose "Loading core assemblies..."
     foreach ($assemblyName in $script:AssemblyLoadOrder) {
         try {
-            Write-Verbose "Attempting to load: $assemblyName"
+            Write-Verbose "Processing assembly: $assemblyName"
+
+            # Check if already loaded
+            $loadedAssembly = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                Where-Object { $_.GetName().Name -eq $assemblyName }
+
+            if ($loadedAssembly) {
+                Write-Verbose "Found loaded assembly: $assemblyName"
+                Write-Verbose "  Location: $($loadedAssembly.Location)"
+                Write-Verbose "  Version: $($loadedAssembly.GetName().Version)"
+                Write-Verbose "  Runtime Version: $($loadedAssembly.ImageRuntimeVersion)"
+                Write-Verbose "  Global Assembly Cache: $($loadedAssembly.GlobalAssemblyCache)"
+                Write-Verbose "  Full Name: $($loadedAssembly.FullName)"
+                Write-Verbose "Using already loaded assembly"
+                continue
+            }
+
             $assemblyPath = Get-DbatoolsAssemblyPath `
                 -AssemblyName $assemblyName `
                 -Platform $platformInfo.Platform `
@@ -86,10 +114,20 @@ function Initialize-DbatoolsAssemblyLoader {
                 -Runtime $platformInfo.Runtime
 
             if (Test-Path $assemblyPath) {
-                Write-Verbose "Pre-loading assembly: $assemblyName"
+                Write-Verbose "Loading assembly from path: $assemblyPath"
                 try {
-                    [System.Reflection.Assembly]::LoadFrom($assemblyPath) | Out-Null
-                    Write-Verbose "Successfully loaded: $assemblyName"
+                    $assembly = [System.Reflection.Assembly]::LoadFrom($assemblyPath)
+                    Write-Verbose "Successfully loaded: $assemblyName from $($assembly.Location)"
+
+                    # Add detailed logging for SqlClient
+                    if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
+                        Write-Verbose "Checking SqlClient native dependencies..."
+                        $nativePath = $script:PlatformAssemblies['Windows'][$platformInfo.Architecture].NativePath
+                        Write-Verbose "Native path configured as: $nativePath"
+                        Write-Verbose "Current process PATH: $([Environment]::GetEnvironmentVariable('PATH'))"
+                    }
+
+                    $assembly | Out-Null
                 } catch {
                     # Special handling for SqlClient
                     if ($assemblyName -eq 'Microsoft.Data.SqlClient') {

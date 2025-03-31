@@ -1,7 +1,11 @@
 function Get-DbatoolsLibraryPath {
     [CmdletBinding()]
     param()
-    $PSScriptRoot
+    Write-Verbose "PSScriptRoot: $PSScriptRoot"
+    Write-Verbose "Module Base: $($MyInvocation.MyCommand.Module.ModuleBase)"
+
+    # Use ModuleBase as it's more reliable when importing via absolute path
+    $MyInvocation.MyCommand.Module.ModuleBase
 }
 
 $script:libraryroot = Get-DbatoolsLibraryPath

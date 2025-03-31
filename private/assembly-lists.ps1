@@ -3,24 +3,27 @@
 
 # Core assemblies required across all platforms
 $script:CoreAssemblies = @{
-    'Microsoft.Data.SqlClient' = '5.1.5'
-    'Microsoft.SqlServer.Smo' = '170.18.0'
-    'Microsoft.SqlServer.Management.Sdk.Sfc' = '170.18.0'
-    'Microsoft.SqlServer.ConnectionInfo' = '170.18.0'
-    'Microsoft.SqlServer.SqlEnum' = '170.18.0'
-    'Microsoft.SqlServer.Management.HadrModel' = '170.18.0'
-    'Microsoft.SqlServer.Management.HadrData' = '170.18.0'
-    'Microsoft.SqlServer.Management.RegisteredServers' = '170.18.0'
-    'Microsoft.SqlServer.Management.XEvent' = '170.18.0'
-    'Microsoft.SqlServer.Management.XEventDbScoped' = '170.18.0'
+    'Azure.Core' = $null
+    'Azure.Identity' = $null
+    'Microsoft.Identity.Client' = $null
+    'Microsoft.Data.SqlClient' = $null
+    'Microsoft.SqlServer.Smo' = $null
+    'Microsoft.SqlServer.Management.Sdk.Sfc' = $null
+    'Microsoft.SqlServer.ConnectionInfo' = $null
+    'Microsoft.SqlServer.SqlEnum' = $null
+    'Microsoft.SqlServer.Management.HadrModel' = $null
+    'Microsoft.SqlServer.Management.HadrData' = $null
+    'Microsoft.SqlServer.Management.RegisteredServers' = $null
+    'Microsoft.SqlServer.Management.XEvent' = $null
+    'Microsoft.SqlServer.Management.XEventDbScoped' = $null
 }
 
 # DAC-specific assemblies
 $script:DacAssemblies = @{
-    'Microsoft.SqlServer.Dac' = '170.18.0'
-    'Microsoft.SqlServer.Dac.Extensions' = '170.18.0'
-    'Microsoft.Data.Tools.Schema.Sql' = '170.18.0'
-    'Microsoft.SqlServer.TransactSql.ScriptDom' = '170.18.0'
+    'Microsoft.SqlServer.Dac' = $null
+    'Microsoft.SqlServer.Dac.Extensions' = $null
+    'Microsoft.Data.Tools.Schema.Sql' = $null
+    'Microsoft.SqlServer.TransactSql.ScriptDom' = $null
 }
 
 # Define platform-specific paths for assemblies and native dependencies
@@ -48,7 +51,12 @@ $script:PlatformAssemblies = @{
 
 # Assembly load order to handle dependencies
 [string[]]$script:AssemblyLoadOrder = @(
-    # Core SQL Client and basics first
+    # SqlClient dependencies first
+    'Azure.Core',
+    'Azure.Identity',
+    'Microsoft.Identity.Client',
+
+    # Core SQL Client and basics next
     'Microsoft.Data.SqlClient',
     'Microsoft.SqlServer.Management.Sdk.Sfc',
 
