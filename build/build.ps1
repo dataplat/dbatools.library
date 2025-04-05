@@ -20,7 +20,7 @@ Push-Location "$root\project"
 dotnet clean
 # Publish .NET Framework (desktop)
 Write-Host "Publishing .NET Framework build..."
-dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output C:\github\dbatools.library\lib\desktop --nologo | Out-String -OutVariable build
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output C:\github\dbatools.library\lib\desktop --nologo --self-contained true | Out-String -OutVariable build
 
 # Verify desktop publish results
 Write-Host "Verifying desktop publish..."
@@ -33,7 +33,7 @@ if (Test-Path "C:\github\dbatools.library\lib\desktop\Microsoft.Data.SqlClient.S
 }
 
 # Publish .NET 8 (core)
-dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output C:\github\dbatools.library\lib\core --nologo | Out-String -OutVariable build
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output C:\github\dbatools.library\lib\core --nologo --self-contained true | Out-String -OutVariable build
 
 # Run tests specifically for dbatools.Tests
 # dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
