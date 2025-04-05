@@ -8,7 +8,8 @@ function Initialize-DbatoolsAssemblyRedirector {
     $dir = [System.IO.Path]::Combine($script:libraryroot, "lib")
     $dir = ("$dir\").Replace('\', '\\')
 
-    if (-not ("Redirector" -as [type])) {
+    # Only create type if not already defined
+    if (-not ("Redirector" -as [type]) -and $PSVersionTable.PSEdition -ne 'Core') {
             $source = @"
 using System;
 using System.Linq;
@@ -56,9 +57,25 @@ public class Redirector
 
     public readonly ResolveEventHandler EventHandler;
 
+    private static bool isResolving = false;
+
     protected Assembly AssemblyResolve(object sender, ResolveEventArgs e)
     {
+        // Guard against empty assembly names
+        if (e == null || string.IsNullOrEmpty(e.Name))
+        {
+            return null;
+        }
 
+        // Prevent recursive resolution
+        if (isResolving)
+        {
+            return null;
+        }
+
+        isResolving = true;
+        try
+        {
         // Only track essential system dependencies
         string[] systemDlls = {
             "System.Memory",
@@ -164,7 +181,12 @@ public class Redirector
                 }
             }
         }
-        return null;
+            return null;
+        }
+        finally
+        {
+            isResolving = false;
+        }
     }
 }
 "@
@@ -179,16 +201,18 @@ public class Redirector
             }
     }
 
-    try {
-        $redirector = New-Object Redirector
-        [System.AppDomain]::CurrentDomain.add_AssemblyResolve($redirector.EventHandler)
-
-        # Store the redirector instance in script scope for cleanup
-        $script:dbatoolsRedirector = $redirector
-    }
-    catch {
-        Write-Warning "Failed to initialize assembly redirector: $_"
-        throw
+    # Only initialize redirector for non-Core PowerShell if not already initialized
+    if ($PSVersionTable.PSEdition -ne 'Core' -and -not $script:dbatoolsRedirector) {
+        try {
+            $redirector = New-Object Redirector
+            [System.AppDomain]::CurrentDomain.add_AssemblyResolve($redirector.EventHandler)
+            # Store the redirector instance in script scope for cleanup
+            $script:dbatoolsRedirector = $redirector
+        }
+        catch {
+            Write-Warning "Failed to initialize assembly redirector: $_"
+            throw
+        }
     }
 }
 

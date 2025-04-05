@@ -63,13 +63,24 @@ function Initialize-DbatoolsAssemblyLoader {
         # Get platform information
         $platformDetails = Get-PlatformDetails
 
-        # Initialize the redirector for non-Core PowerShell
+        # Reset resolver states
+        $script:isResolving = $false
+        $script:resolverInitialized = $false
+
+        # Initialize resolvers for non-Core PowerShell
         if ($PSVersionTable.PSEdition -ne 'Core') {
             try {
+                # Initialize redirector first
                 Initialize-DbatoolsAssemblyRedirector
+
+                # Then initialize resolution handler if redirector succeeded
+                if ($script:dbatoolsRedirector) {
+                    [System.AppDomain]::CurrentDomain.add_AssemblyResolve($script:onAssemblyResolveEventHandler)
+                    $script:resolverInitialized = $true
+                }
             }
             catch {
-                Write-Warning "Failed to initialize assembly redirector: $($_.Exception.Message)"
+                Write-Warning "Failed to initialize assembly handlers: $($_.Exception.Message)"
                 Write-Warning "This may cause issues with assembly loading in Windows PowerShell"
             }
         }
@@ -254,15 +265,24 @@ function Reset-DbatoolsAssemblyLoader {
 
     # Remove assembly resolve handlers in non-Core PowerShell
     if ($PSVersionTable.PSEdition -ne 'Core') {
-        # Remove standard handler
-        if ($script:onAssemblyResolveEventHandler) {
-            [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
-        }
+        try {
+            # Remove standard handler
+            if ($script:onAssemblyResolveEventHandler -and $script:resolverInitialized) {
+                [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
+                $script:resolverInitialized = $false
+            }
 
-        # Remove redirector handler if it exists
-        if ($script:dbatoolsRedirector) {
-            [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:dbatoolsRedirector.EventHandler)
-            $script:dbatoolsRedirector = $null
+            # Remove redirector handler if it exists
+            if ($script:dbatoolsRedirector) {
+                [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:dbatoolsRedirector.EventHandler)
+                $script:dbatoolsRedirector = $null
+            }
+
+            # Reset resolver state
+            $script:isResolving = $false
+        }
+        catch {
+            Write-Warning "Error removing assembly handlers: $_"
         }
     }
 

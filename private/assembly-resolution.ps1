@@ -151,15 +151,24 @@ function Get-DbatoolsAssemblyPath {
 }
 
 # Assembly resolution event handler
+# Track resolution state to prevent recursion
+$script:isResolving = $false
+
 $script:onAssemblyResolveEventHandler = [System.ResolveEventHandler] {
     param($sender, $args)
 
-    try {
-        if (-not $args -or [string]::IsNullOrEmpty($args.Name)) {
-            Write-Warning "Empty assembly name provided to resolver"
-            return $null
-        }
+    # Guard against empty assembly names early
+    if (-not $args -or [string]::IsNullOrEmpty($args.Name)) {
+        return $null
+    }
 
+    # Prevent recursive resolution
+    if ($script:isResolving) {
+        return $null
+    }
+
+    $script:isResolving = $true
+    try {
         # Parse assembly name
         $assemblyName = [System.Reflection.AssemblyName]::new($args.Name)
         if ([string]::IsNullOrEmpty($assemblyName.Name)) {
@@ -196,11 +205,15 @@ $script:onAssemblyResolveEventHandler = [System.ResolveEventHandler] {
         Write-Warning "Error resolving assembly $($args.Name): $_"
         return $null
     }
+    finally {
+        $script:isResolving = $false
+    }
 }
 
-# Initialize assembly resolution for non-Core PowerShell
-if ($PSVersionTable.PSEdition -ne 'Core') {
+# Initialize assembly resolution for non-Core PowerShell if not already initialized
+if ($PSVersionTable.PSEdition -ne 'Core' -and -not $script:resolverInitialized) {
     [System.AppDomain]::CurrentDomain.add_AssemblyResolve($script:onAssemblyResolveEventHandler)
+    $script:resolverInitialized = $true
 }
 
 Export-ModuleMember -Function Get-DbatoolsPlatformInfo, Get-DbatoolsAssemblyPath
