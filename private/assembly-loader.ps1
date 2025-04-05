@@ -1,25 +1,57 @@
 # Assembly loading and initialization for dbatools.library
 
-function Initialize-SqlClientNativeLibraries {
+# Function to determine the platform and architecture for assembly loading
+function Get-PlatformDetails {
     [CmdletBinding()]
-    param(
-        [string]$Platform,
-        [string]$Architecture
-    )
+    param()
 
-    if ($Platform -eq 'Windows') {
-        $platformInfo = $script:PlatformAssemblies[$Platform][$Architecture]
-        if (-not $platformInfo -or -not $platformInfo.NativePath) {
-            Write-Warning "Native path configuration not found for $Platform $Architecture"
-            return
-        }
+    # Detect platform
+    # isLinux and isMacOS already exist
 
-        # Add native path to PATH if not already present
-        $oldPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
-        if (-not $oldPath.Contains($platformInfo.NativePath)) {
-            Write-Verbose "Adding native path to PATH: $($platformInfo.NativePath)"
-            [Environment]::SetEnvironmentVariable("PATH", "$($platformInfo.NativePath);$oldPath", [System.EnvironmentVariableTarget]::Process)
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        # PowerShell Core - use RuntimeInformation
+        $isWin = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
+    } else {
+        # Windows PowerShell - use environment
+        $isWin = $true
+    }
+
+    # Detect architecture
+    $arch = 'x64'
+    if ($env:PROCESSOR_ARCHITECTURE -eq 'x86') {
+        $arch = 'x86'
+    } elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+        $arch = 'arm64'
+    } elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM') {
+        $arch = 'arm'
+    }
+
+    # For Linux/OSX on PowerShell Core, we can try to detect ARM
+    if (($isLinux -or $isMacOS) -and ($PSVersionTable.PSEdition -eq 'Core')) {
+        if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') {
+            $arch = 'arm64'
+        } elseif ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm') {
+            $arch = 'arm'
         }
+    }
+
+    # Determine platform string
+    $platform = if ($isWin) {
+        'Windows'
+    } elseif ($isLinux) {
+        'Linux'
+    } elseif ($isMacOS) {
+        'OSX'
+    } else {
+        throw "Unsupported platform"
+    }
+
+    return @{
+        Platform = $platform
+        Architecture = $arch
+        IsWindows = $isWin
+        IsLinux = $isLinux
+        isMacOS = $isMacOS
     }
 }
 
@@ -50,26 +82,38 @@ function Initialize-DbatoolsAssemblyLoader {
         }
 
     # Get platform information
-    $platformInfo = Get-DbatoolsPlatformInfo
-    Write-Verbose "Platform: $($platformInfo.Platform), architecture: $($platformInfo.Architecture), runtime: $($platformInfo.Runtime)"
+    $platformDetails = Get-PlatformDetails
+    Write-Host "Loading assemblies for: $($platformDetails.Platform) $($platformDetails.Architecture)"
 
     # Initialize native dependencies first - this must happen before any assembly loading
-    if ($platformInfo.Platform -eq 'Windows') {
-        Write-Verbose "Initializing native dependencies for Windows $($platformInfo.Architecture)"
+    if ($platformDetails.IsWindows) {
+        # Get paths using existing platform assemblies configuration
+        $platformInfo = $script:PlatformAssemblies['Windows'][$platformDetails.Architecture]
+        $sniPath = $platformInfo.NativePath
+        $sqlClientPath = Join-Path $platformInfo.Path "Microsoft.Data.SqlClient.dll"
+
+        Write-Host "Using SqlClient from: $sqlClientPath"
+        Write-Host "Using SNI from: $sniPath"
+
         Write-Verbose "Current PATH before native init: $([Environment]::GetEnvironmentVariable('PATH'))"
-        $nativeParams = @{
-            Platform = $platformInfo.Platform
-            Architecture = $platformInfo.Architecture
+
+        # Update PATH to include SNI location
+        $oldPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
+        if (-not $oldPath.Contains($sniPath)) {
+            Write-Host "Adding SNI path to PATH: $sniPath"
+            Write-Verbose "Adding SNI path to PATH: $sniPath"
+            [Environment]::SetEnvironmentVariable("PATH", "$sniPath;$oldPath", [System.EnvironmentVariableTarget]::Process)
         }
-        Initialize-SqlClientNativeLibraries @nativeParams
         Write-Verbose "Current PATH after native init: $([Environment]::GetEnvironmentVariable('PATH'))"
 
         # Verify native DLLs exist
-        $nativePath = $script:PlatformAssemblies['Windows'][$platformInfo.Architecture].NativePath
         $expectedDlls = @('Microsoft.Data.SqlClient.SNI.dll')
         foreach ($dll in $expectedDlls) {
-            $dllPath = Join-Path $nativePath $dll
-            Write-Verbose "Checking native DLL: $dllPath exists: $(Test-Path $dllPath)"
+            $dllPath = Join-Path $sniPath $dll
+            if (-not (Test-Path $dllPath)) {
+                throw "Required native dependency not found: $dllPath"
+            }
+            Write-Host "Found native DLL: $dllPath"
         }
     }
 
@@ -134,7 +178,15 @@ function Initialize-DbatoolsAssemblyLoader {
                 Write-Verbose "Loading assembly from path: $assemblyPath"
                 try {
                     $assembly = [System.Reflection.Assembly]::LoadFrom($assemblyPath)
-                    Write-Verbose "Successfully loaded: $assemblyName from $($assembly.Location)"
+
+                    # Special logging for SqlClient
+                    if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
+                        Write-Host "Successfully loaded SqlClient:"
+                        Write-Host "  Version: $($assembly.GetName().Version)"
+                        Write-Host "  Location: $($assembly.Location)"
+                    } else {
+                        Write-Verbose "Successfully loaded: $assemblyName from $($assembly.Location)"
+                    }
 
                     # Add detailed logging for SqlClient
                     # Extra logging for SqlClient
@@ -150,19 +202,7 @@ function Initialize-DbatoolsAssemblyLoader {
 
                     $assembly | Out-Null
                 } catch {
-                    # Special handling for SqlClient
-                    if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
-                        Write-Warning "Failed to load platform-specific SqlClient, attempting fallback: $_"
-                        $fallbackPath = Join-Path $script:libraryroot "lib/core/$assemblyName.dll"
-                        if (Test-Path $fallbackPath) {
-                            [System.Reflection.Assembly]::LoadFrom($fallbackPath) | Out-Null
-                            Write-Verbose "Successfully loaded core SqlClient as fallback"
-                        } else {
-                            throw "Failed to load SqlClient and no fallback available"
-                        }
-                    } else {
-                        throw
-                    }
+                    throw
                 }
             } else {
                 Write-Warning "Assembly not found: $assemblyPath"
@@ -257,6 +297,7 @@ function Reset-DbatoolsAssemblyLoader {
 
 # Export functions for module use
 Export-ModuleMember -Function Initialize-DbatoolsAssemblyLoader,
-                            Test-DbatoolsAssemblyLoading,
-                            Get-DbatoolsLoadedAssembly,
-                            Reset-DbatoolsAssemblyLoader
+                             Test-DbatoolsAssemblyLoading,
+                             Get-DbatoolsLoadedAssembly,
+                             Reset-DbatoolsAssemblyLoader,
+                             Get-PlatformDetails
