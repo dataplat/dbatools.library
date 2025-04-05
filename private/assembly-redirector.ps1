@@ -32,8 +32,35 @@ public class Redirector
     public Redirector()
     {
         this.EventHandler = new ResolveEventHandler(AssemblyResolve);
-        string nativePath = "$dir" + "core\\runtimes\\win-x64\\native";
-        LoadLibrary(System.IO.Path.Combine(nativePath, "Microsoft.Data.SqlClient.SNI.dll"));
+
+        // Detect architecture
+        string arch = "x64";
+        if (Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") == "x86")
+            arch = "x86";
+        else if (Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") == "ARM64")
+            arch = "arm64";
+        else if (Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") == "ARM")
+            arch = "arm";
+
+        // Try both native paths
+        string nativePath = "$dir" + "core\\runtimes\\win-" + arch + "\\native";
+        string sniDll = System.IO.Path.Combine(nativePath, "Microsoft.Data.SqlClient.SNI.dll");
+
+        if (!System.IO.File.Exists(sniDll))
+        {
+            // Try architecture-specific name as fallback
+            sniDll = System.IO.Path.Combine(nativePath, "Microsoft.Data.SqlClient.SNI." + arch + ".dll");
+        }
+
+        if (System.IO.File.Exists(sniDll))
+        {
+            LoadLibrary(sniDll);
+            Console.WriteLine("Redirector: Loaded native SNI DLL from: " + sniDll);
+        }
+        else
+        {
+            Console.WriteLine("Redirector: Warning - Could not find SNI DLL in: " + nativePath);
+        }
     }
 
     public readonly ResolveEventHandler EventHandler;
@@ -65,9 +92,10 @@ public class Redirector
             "Microsoft.SqlServer.Types",
             "System.Configuration.ConfigurationManager",
             "Microsoft.SqlServer.Management.Sdk.Sfc",
-            "Microsoft.SqlServer.Management.IntegrationServices",
-           # "Microsoft.SqlServer.Replication",
-            "Microsoft.SqlServer.Rmo"
+            "Microsoft.SqlServer.Management.IntegrationServices"
+            // Removed problematic assemblies:
+            // "Microsoft.SqlServer.Replication",
+            // "Microsoft.SqlServer.Rmo"
         };
 
         var name = new AssemblyName(e.Name);
@@ -76,8 +104,19 @@ public class Redirector
         // Handle System dependencies first
         if (systemDlls.Contains(assemblyName))
         {
-            string filelocation = "$dir" + assemblyName + ".dll";
+            // Try desktop folder first for Windows PowerShell
+            string filelocation = "$dir" + "desktop\\net472\\" + assemblyName + ".dll";
             Console.WriteLine("Redirector: Loading System dependency from " + filelocation);
+            if (System.IO.File.Exists(filelocation))
+            {
+                var asm = Assembly.LoadFrom(filelocation);
+                Console.WriteLine("Redirector: Loaded assembly version: " + asm.GetName().Version);
+                return asm;
+            }
+
+            // Try core folder as fallback
+            filelocation = "$dir" + "core\\" + assemblyName + ".dll";
+            Console.WriteLine("Redirector: Trying core folder for System dependency: " + filelocation);
             if (System.IO.File.Exists(filelocation))
             {
                 var asm = Assembly.LoadFrom(filelocation);
@@ -113,8 +152,29 @@ public class Redirector
         // Handle SQL assemblies last
         if (sqlDlls.Contains(assemblyName))
         {
-            string filelocation = "$dir" + assemblyName + ".dll";
+            // Try win-sqlclient folder first
+            string filelocation = "$dir" + "win-sqlclient\\" + assemblyName + ".dll";
             Console.WriteLine("Redirector: Loading SQL dependency from " + filelocation);
+            if (System.IO.File.Exists(filelocation))
+            {
+                var asm = Assembly.LoadFrom(filelocation);
+                Console.WriteLine("Redirector: Loaded assembly version: " + asm.GetName().Version);
+                return asm;
+            }
+
+            // Try desktop folder next for Windows PowerShell
+            filelocation = "$dir" + "desktop\\net472\\" + assemblyName + ".dll";
+            Console.WriteLine("Redirector: Trying desktop folder for SQL dependency: " + filelocation);
+            if (System.IO.File.Exists(filelocation))
+            {
+                var asm = Assembly.LoadFrom(filelocation);
+                Console.WriteLine("Redirector: Loaded assembly version: " + asm.GetName().Version);
+                return asm;
+            }
+
+            // Try root lib folder as fallback
+            filelocation = "$dir" + assemblyName + ".dll";
+            Console.WriteLine("Redirector: Trying root folder for SQL dependency: " + filelocation);
             if (System.IO.File.Exists(filelocation))
             {
                 var asm = Assembly.LoadFrom(filelocation);
@@ -138,13 +198,15 @@ public class Redirector
 "@
             try {
                 Write-Verbose "Adding Redirector type definition"
-                Add-Type -TypeDefinition $source
+                Add-Type -TypeDefinition $source -ErrorAction Stop
                 Write-Verbose "Successfully added Redirector type"
                 Write-Verbose "Redirector type exists: $('Redirector' -as [type])"
             }
             catch {
-                Write-Warning "Failed to add Redirector type: $_"
-                throw
+                Write-Warning "Failed to add Redirector type: $($_.Exception.Message)"
+                Write-Warning "Source code that failed:"
+                Write-Warning $source
+                throw "Failed to initialize assembly redirector: $($_.Exception.Message)"
             }
     }
 

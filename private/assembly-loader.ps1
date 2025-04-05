@@ -59,287 +59,444 @@ function Initialize-DbatoolsAssemblyLoader {
     [CmdletBinding()]
     param()
 
-    Write-Verbose "Starting assembly loader initialization"
-    Write-Verbose "Library root: $script:libraryroot"
+    try {
+        Write-Verbose "Starting assembly loader initialization"
+        Write-Verbose "Library root: $script:libraryroot"
+        Write-Verbose "PowerShell Edition: $($PSVersionTable.PSEdition)"
+        Write-Verbose "PowerShell Version: $($PSVersionTable.PSVersion)"
 
-    # Initialize the redirector first for non-Core PowerShell
-    if ($PSVersionTable.PSEdition -ne 'Core') {
-        Write-Verbose "Initializing assembly redirector for non-Core PowerShell"
-        Initialize-DbatoolsAssemblyRedirector
-        Write-Verbose "Redirector type exists after init: $('Redirector' -as [type])"
-        Write-Verbose "Redirector instance stored: $($null -ne $script:dbatoolsRedirector)"
-    }
+        # Get platform information early for logging
+        $platformDetails = Get-PlatformDetails
+        Write-Verbose "Platform: $($platformDetails.Platform)"
+        Write-Verbose "Architecture: $($platformDetails.Architecture)"
 
-    # Log all currently loaded SqlClient assemblies
-    Write-Verbose "Currently loaded SqlClient assemblies:"
-    [System.AppDomain]::CurrentDomain.GetAssemblies() |
-        Where-Object { $_.GetName().Name -like '*SqlClient*' } |
-        ForEach-Object {
-            Write-Verbose "  $($_.GetName().Name) v$($_.GetName().Version) at $($_.Location)"
+        # Initialize the redirector first for non-Core PowerShell
+        if ($PSVersionTable.PSEdition -ne 'Core') {
+            Write-Verbose "Initializing assembly redirector for non-Core PowerShell"
+            try {
+                Initialize-DbatoolsAssemblyRedirector
+                Write-Verbose "Redirector type exists after init: $('Redirector' -as [type])"
+                Write-Verbose "Redirector instance stored: $($null -ne $script:dbatoolsRedirector)"
+            }
+            catch {
+                Write-Warning "Failed to initialize assembly redirector: $($_.Exception.Message)"
+                Write-Warning "This may cause issues with assembly loading in Windows PowerShell"
+                # Don't throw here - try to continue without redirector
+            }
         }
 
-    # Get platform information
-    $platformDetails = Get-PlatformDetails
-    Write-Verbose "Loading assemblies for: $($platformDetails.Platform) $($platformDetails.Architecture)"
+        # Log all currently loaded SqlClient assemblies
+        Write-Verbose "Currently loaded SqlClient assemblies:"
+        [System.AppDomain]::CurrentDomain.GetAssemblies() |
+            Where-Object { $_.GetName().Name -like '*SqlClient*' } |
+            ForEach-Object {
+                Write-Verbose "  $($_.GetName().Name) v$($_.GetName().Version) at $($_.Location)"
+            }
 
-    # Get runtime info from Get-DbatoolsPlatformInfo for consistency
-    $runtimeInfo = Get-DbatoolsPlatformInfo
+        # Get platform information
+        $platformDetails = Get-PlatformDetails
+        Write-Verbose "Loading assemblies for: $($platformDetails.Platform) $($platformDetails.Architecture)"
 
-    # Load native dependencies using PowerShell's Add-Type
-    if ($platformDetails.IsWindows) {
-        # Define native methods
-        $nativeCode = @'
+        # Get runtime info from Get-DbatoolsPlatformInfo for consistency
+        $runtimeInfo = Get-DbatoolsPlatformInfo
+
+        # Load native dependencies using PowerShell's Add-Type
+        if ($platformDetails.IsWindows) {
+            try {
+                # Define native methods with better error handling
+                $nativeCode = @'
 using System;
 using System.Runtime.InteropServices;
 
 public class NativeMethods {
-    [DllImport("kernel32.dll")]
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern IntPtr LoadLibrary(string dllToLoad);
+
+    public static bool TryLoadLibrary(string dllPath, out string errorMessage) {
+        errorMessage = null;
+        IntPtr result = LoadLibrary(dllPath);
+        if (result == IntPtr.Zero) {
+            int error = Marshal.GetLastWin32Error();
+            errorMessage = new System.ComponentModel.Win32Exception(error).Message;
+            return false;
+        }
+        return true;
+    }
 }
 '@
-        Add-Type -TypeDefinition $nativeCode -ErrorAction Stop
+                Write-Verbose "Adding native methods type definition"
+                Add-Type -TypeDefinition $nativeCode -ErrorAction Stop
 
-        # Get the correct native path
-        $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
+                # Get the correct native path
+                $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
+                Write-Verbose "Native path: $nativePath"
 
-        # Load SNI DLL using LoadLibrary
-        $sniPath = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
-        Write-Verbose "Loading native SNI DLL from: $sniPath"
-        [NativeMethods]::LoadLibrary($sniPath) | Out-Null
+                if (-not (Test-Path $nativePath)) {
+                    throw "Native path does not exist: $nativePath"
+                }
 
-        # Update PATH to include native DLL location first
-        $oldPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
-        if (-not $oldPath.Contains($nativePath)) {
-            Write-Verbose "Adding native path to PATH: $nativePath"
-            [Environment]::SetEnvironmentVariable("PATH", "$nativePath;$oldPath", [System.EnvironmentVariableTarget]::Process)
-        }
+                # Load SNI DLL using LoadLibrary with error handling
+                $sniPath = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
+                Write-Verbose "Loading native SNI DLL from: $sniPath"
 
-        # Check system capabilities for native DLL loading
-        Write-Verbose "Checking system native DLL loading capabilities..."
-        Write-Verbose "  OS Version: $([System.Environment]::OSVersion.Version)"
-        Write-Verbose "  OS Platform: $([System.Environment]::OSVersion.Platform)"
-        Write-Verbose "  Process Architecture: $([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)"
-        Write-Verbose "  Framework Description: $([System.Runtime.InteropServices.RuntimeInformation]::FrameworkDescription)"
-        Write-Verbose "  Runtime Identifier: $([System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier)"
+                if (-not (Test-Path $sniPath)) {
+                    throw "SNI DLL not found at: $sniPath"
+                }
 
-        # Get the correct runtime path for the current architecture
-        $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
-        $runtimePath = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+                $errorMessage = $null
+                if (-not [NativeMethods]::TryLoadLibrary($sniPath, [ref]$errorMessage)) {
+                    throw "Failed to load SNI DLL: $errorMessage"
+                }
 
-        Write-Verbose "Using runtime path: $runtimePath"
-        Write-Verbose "Using native path: $nativePath"
+                # Update PATH to include native DLL location first
+                $oldPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
+                if (-not $oldPath.Contains($nativePath)) {
+                    Write-Verbose "Adding native path to PATH: $nativePath"
+                    [Environment]::SetEnvironmentVariable("PATH", "$nativePath;$oldPath", [System.EnvironmentVariableTarget]::Process)
 
-        # Try both generic and architecture-specific SNI DLLs
-        $genericDll = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
-        $archSpecificDll = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
+                    # Verify PATH was updated
+                    $newPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
+                    if (-not $newPath.Contains($nativePath)) {
+                        throw "Failed to update PATH with native DLL location"
+                    }
+                }
+            }
+            catch {
+                Write-Warning "Failed to initialize native components: $($_.Exception.Message)"
+                throw
+            }
 
-        # Check if either DLL exists
-        if (-not (Test-Path $genericDll) -and -not (Test-Path $archSpecificDll)) {
-            Write-Verbose "Neither generic nor architecture-specific SNI DLL found"
-            Write-Verbose "Directory contents of $nativePath :"
+            # Check system capabilities for native DLL loading
+            Write-Verbose "Checking system native DLL loading capabilities..."
+            Write-Verbose "  OS Version: $([System.Environment]::OSVersion.Version)"
+            Write-Verbose "  OS Platform: $([System.Environment]::OSVersion.Platform)"
+            Write-Verbose "  Process Architecture: $([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)"
+            Write-Verbose "  Framework Description: $([System.Runtime.InteropServices.RuntimeInformation]::FrameworkDescription)"
+            Write-Verbose "  Runtime Identifier: $([System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier)"
+
+            # Get the correct runtime path for the current architecture
+            $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
+            $runtimePath = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+
+            Write-Verbose "Using runtime path: $runtimePath"
+            Write-Verbose "Using native path: $nativePath"
+
+            # Try both generic and architecture-specific SNI DLLs
+            $genericDll = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
+            $archSpecificDll = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
+
+            # Check if either DLL exists
+            if (-not (Test-Path $genericDll) -and -not (Test-Path $archSpecificDll)) {
+                Write-Verbose "Neither generic nor architecture-specific SNI DLL found"
+                Write-Verbose "Directory contents of $nativePath :"
+                Get-ChildItem $nativePath | ForEach-Object {
+                    Write-Verbose "  $($_.Name) - Size: $($_.Length) bytes, LastWrite: $($_.LastWriteTime)"
+                }
+                throw "SNI DLL not found at: $genericDll or $archSpecificDll"
+            }
+
+            # If arch-specific exists, copy it to generic name
+            if (Test-Path $archSpecificDll) {
+                Write-Verbose "Found architecture-specific SNI DLL, copying to generic name"
+                # Copy-Item -Path $archSpecificDll -Destination $genericDll -Force
+                $sniDll = $genericDll
+            } else {
+                Write-Verbose "Using generic SNI DLL - this may not work for current architecture"
+                $sniDll = $genericDll
+            }
+
+            # Get detailed file info for found DLL
+            $sniFileInfo = Get-Item $sniDll
+            Write-Verbose "Found SNI DLL:"
+            Write-Verbose "  Path: $sniDll"
+            Write-Verbose "  Size: $($sniFileInfo.Length) bytes"
+            Write-Verbose "  Last Modified: $($sniFileInfo.LastWriteTime)"
+            Write-Verbose "  Version: $($sniFileInfo.VersionInfo.FileVersion)"
+
+            # Verify native path is in PATH and check its position
+            $newPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
+            Write-Verbose "Current PATH: $newPath"
+
+            # Check native path position
+            $pathElements = $newPath -split ';'
+            $nativePathIndex = [array]::IndexOf($pathElements, $nativePath)
+            Write-Verbose "Native path position in PATH: $nativePathIndex"
+            Write-Verbose "PATH elements in order:"
+            $pathElements | ForEach-Object {
+                Write-Verbose "  $_"
+            }
+
+            # Verify native path is in PATH
+            if (-not $newPath.Contains($nativePath)) {
+                throw "Failed to update PATH with native DLL location"
+            }
+            Write-Verbose "Current PATH after native init: $([Environment]::GetEnvironmentVariable('PATH'))"
+
+            # Check for potential DLL conflicts in PATH
+            Write-Verbose "Scanning PATH for potential SNI DLL conflicts..."
+            $pathDirs = $newPath -split ';'
+            foreach ($dir in $pathDirs) {
+                if (Test-Path (Join-Path $dir "Microsoft.Data.SqlClient.SNI*.dll")) {
+                    $conflictDll = Get-Item (Join-Path $dir "Microsoft.Data.SqlClient.SNI*.dll")
+                    Write-Verbose "Found potential conflicting SNI DLL:"
+                    Write-Verbose "  Path: $($conflictDll.FullName)"
+                    Write-Verbose "  Version: $($conflictDll.VersionInfo.FileVersion)"
+                    Write-Verbose "  Product: $($conflictDll.VersionInfo.ProductName)"
+                }
+            }
+
+            # Check native DLL dependencies
+            Write-Verbose "Checking native DLL dependencies..."
+            try {
+                $dllPath = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
+                $assembly = [System.Reflection.Assembly]::LoadFile($dllPath)
+                Write-Verbose "Native DLL assembly details:"
+                Write-Verbose "  Runtime Version: $($assembly.ImageRuntimeVersion)"
+                Write-Verbose "  Architecture: $([System.Reflection.Assembly]::LoadFile($dllPath).GetName().ProcessorArchitecture)"
+            }
+            catch {
+                Write-Verbose "Failed to inspect native DLL: $($_.Exception.Message)"
+                Write-Verbose "Full error: $_"
+            }
+
+            # Add extra debug logging with file details
+            Write-Verbose "Native DLL directory contents with details:"
             Get-ChildItem $nativePath | ForEach-Object {
-                Write-Verbose "  $($_.Name) - Size: $($_.Length) bytes, LastWrite: $($_.LastWriteTime)"
+                Write-Verbose "  $($_.Name)"
+                Write-Verbose "    Size: $($_.Length) bytes"
+                Write-Verbose "    LastWrite: $($_.LastWriteTime)"
+                if ($_.Extension -eq '.dll') {
+                    Write-Verbose "    Version: $($_.VersionInfo.FileVersion)"
+                    Write-Verbose "    Product: $($_.VersionInfo.ProductName)"
+                    Write-Verbose "    Description: $($_.VersionInfo.FileDescription)"
+                }
             }
-            throw "SNI DLL not found at: $genericDll or $archSpecificDll"
+
+            # Note: SNI DLL is native - cannot verify loading with Add-Type
+            Write-Verbose "Note: Cannot verify native SNI DLL loading directly - will be loaded by SqlClient"
         }
 
-        # If arch-specific exists, copy it to generic name
-        if (Test-Path $archSpecificDll) {
-            Write-Verbose "Found architecture-specific SNI DLL, copying to generic name"
-            # Copy-Item -Path $archSpecificDll -Destination $genericDll -Force
-            $sniDll = $genericDll
-        } else {
-            Write-Verbose "Using generic SNI DLL - this may not work for current architecture"
-            $sniDll = $genericDll
-        }
+        # Pre-load Azure identity and other required dependencies
+        $dependencyAssemblies = @(
+            'Microsoft.Identity.Client'
+            'Microsoft.Identity.Client.Extensions.Msal'
+            'Microsoft.IdentityModel.Abstractions'
+            'System.Configuration.ConfigurationManager'
+        )
 
-        # Get detailed file info for found DLL
-        $sniFileInfo = Get-Item $sniDll
-        Write-Verbose "Found SNI DLL:"
-        Write-Verbose "  Path: $sniDll"
-        Write-Verbose "  Size: $($sniFileInfo.Length) bytes"
-        Write-Verbose "  Last Modified: $($sniFileInfo.LastWriteTime)"
-        Write-Verbose "  Version: $($sniFileInfo.VersionInfo.FileVersion)"
+        foreach ($depAssembly in $dependencyAssemblies) {
+            try {
+                Write-Verbose "Pre-loading dependency: $depAssembly"
+                $assemblyParams = @{
+                    AssemblyName = $depAssembly
+                    Platform = $platformDetails.Platform
+                    Architecture = $platformDetails.Architecture
+                    Runtime = $runtimeInfo.Runtime
+                }
+                $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
 
-        # Verify native path is in PATH and check its position
-        $newPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
-        Write-Verbose "Current PATH: $newPath"
+                if (-not (Test-Path $assemblyPath)) {
+                    Write-Warning "Dependency not found: $assemblyPath"
+                    continue
+                }
 
-        # Check native path position
-        $pathElements = $newPath -split ';'
-        $nativePathIndex = [array]::IndexOf($pathElements, $nativePath)
-        Write-Verbose "Native path position in PATH: $nativePathIndex"
-        Write-Verbose "PATH elements in order:"
-        $pathElements | ForEach-Object {
-            Write-Verbose "  $_"
-        }
+                # Check if already loaded
+                $loadedAssembly = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                    Where-Object { $_.GetName().Name -eq $depAssembly }
 
-        # Verify native path is in PATH
-        if (-not $newPath.Contains($nativePath)) {
-            throw "Failed to update PATH with native DLL location"
-        }
-        Write-Verbose "Current PATH after native init: $([Environment]::GetEnvironmentVariable('PATH'))"
+                if ($loadedAssembly) {
+                    Write-Verbose "Dependency already loaded: $depAssembly v$($loadedAssembly.GetName().Version)"
+                    continue
+                }
 
-        # Check for potential DLL conflicts in PATH
-        Write-Verbose "Scanning PATH for potential SNI DLL conflicts..."
-        $pathDirs = $newPath -split ';'
-        foreach ($dir in $pathDirs) {
-            if (Test-Path (Join-Path $dir "Microsoft.Data.SqlClient.SNI*.dll")) {
-                $conflictDll = Get-Item (Join-Path $dir "Microsoft.Data.SqlClient.SNI*.dll")
-                Write-Verbose "Found potential conflicting SNI DLL:"
-                Write-Verbose "  Path: $($conflictDll.FullName)"
-                Write-Verbose "  Version: $($conflictDll.VersionInfo.FileVersion)"
-                Write-Verbose "  Product: $($conflictDll.VersionInfo.ProductName)"
+                # Load assembly
+                $assembly = [System.Reflection.Assembly]::LoadFrom($assemblyPath)
+                Write-Verbose "Successfully loaded dependency: $depAssembly v$($assembly.GetName().Version)"
+
+                # Skip type verification for known system assemblies
+                if ($depAssembly -notin @('System.Runtime.CompilerServices.Unsafe', 'System.Memory')) {
+                    # Verify key types are available for non-system assemblies
+                    try {
+                        $testType = $assembly.GetTypes() | Select-Object -First 1
+                        if (-not $testType) {
+                            Write-Verbose "No public types found in assembly, but this may be expected"
+                        }
+                    }
+                    catch {
+                        Write-Verbose "Could not enumerate types in $depAssembly, but this may be expected for system assemblies"
+                    }
+                }
             }
-        }
-
-        # Check native DLL dependencies
-        Write-Verbose "Checking native DLL dependencies..."
-        try {
-            $dllPath = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
-            $assembly = [System.Reflection.Assembly]::LoadFile($dllPath)
-            Write-Verbose "Native DLL assembly details:"
-            Write-Verbose "  Runtime Version: $($assembly.ImageRuntimeVersion)"
-            Write-Verbose "  Architecture: $([System.Reflection.Assembly]::LoadFile($dllPath).GetName().ProcessorArchitecture)"
-        }
-        catch {
-            Write-Verbose "Failed to inspect native DLL: $($_.Exception.Message)"
-            Write-Verbose "Full error: $_"
-        }
-
-        # Add extra debug logging with file details
-        Write-Verbose "Native DLL directory contents with details:"
-        Get-ChildItem $nativePath | ForEach-Object {
-            Write-Verbose "  $($_.Name)"
-            Write-Verbose "    Size: $($_.Length) bytes"
-            Write-Verbose "    LastWrite: $($_.LastWriteTime)"
-            if ($_.Extension -eq '.dll') {
-                Write-Verbose "    Version: $($_.VersionInfo.FileVersion)"
-                Write-Verbose "    Product: $($_.VersionInfo.ProductName)"
-                Write-Verbose "    Description: $($_.VersionInfo.FileDescription)"
-            }
-        }
-
-        # Note: SNI DLL is native - cannot verify loading with Add-Type
-        Write-Verbose "Note: Cannot verify native SNI DLL loading directly - will be loaded by SqlClient"
-    }
-
-    # Pre-load Azure identity and other required dependencies
-    $dependencyAssemblies = @(
-        'Microsoft.Identity.Client'
-        'Microsoft.Identity.Client.Extensions.Msal'
-        'Microsoft.IdentityModel.Abstractions'
-        'System.Configuration.ConfigurationManager'
-    )
-
-    foreach ($depAssembly in $dependencyAssemblies) {
-        try {
-            Write-Verbose "Pre-loading dependency: $depAssembly"
-            $assemblyParams = @{
-                AssemblyName = $depAssembly
-                Platform = $platformDetails.Platform
-                Architecture = $platformDetails.Architecture
-                Runtime = $runtimeInfo.Runtime
-            }
-            $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
-
-            if (Test-Path $assemblyPath) {
-                [System.Reflection.Assembly]::LoadFrom($assemblyPath) | Out-Null
-                Write-Verbose "Successfully loaded dependency: $depAssembly"
-            }
-        } catch {
-            Write-Verbose "Failed to load dependency $depAssembly : $_"
-        }
-    }
-
-    # Pre-load core assemblies in specified order
-    Write-Verbose "Loading core assemblies..."
-    foreach ($assemblyName in $script:AssemblyLoadOrder) {
-        try {
-            Write-Verbose "Processing assembly: $assemblyName"
-
-            # Check if already loaded
-            $loadedAssembly = [System.AppDomain]::CurrentDomain.GetAssemblies() |
-                Where-Object { $_.GetName().Name -eq $assemblyName }
-            if ($loadedAssembly) {
-                Write-Verbose "Using already loaded assembly: $assemblyName v$($loadedAssembly.GetName().Version) at $($loadedAssembly.Location)"
+            catch {
+                Write-Warning "Failed to load dependency $depAssembly : $($_.Exception.Message)"
+                if ($_.Exception.InnerException) {
+                    Write-Warning "Inner exception: $($_.Exception.InnerException.Message)"
+                }
+                # Continue loading other dependencies
                 continue
             }
+        }
 
-            $assemblyParams = @{
-                AssemblyName = $assemblyName
-                Platform = $platformDetails.Platform
-                Architecture = $platformDetails.Architecture
-                Runtime = $runtimeInfo.Runtime
-            }
-            $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
+        # Pre-load core assemblies in specified order with enhanced error handling and validation
+        Write-Verbose "Loading core assemblies..."
 
-            if (Test-Path $assemblyPath) {
-                Write-Verbose "Loading assembly from path: $assemblyPath"
-                try {
-                    # Enhanced logging for SqlClient pre-load
-                    if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
-                        Write-Verbose "Preparing to load SqlClient..."
-                        Write-Verbose "Assembly path: $assemblyPath"
-                        Write-Verbose "Checking assembly file details:"
-                        $fileInfo = Get-Item $assemblyPath
-                        Write-Verbose "  Size: $($fileInfo.Length) bytes"
-                        Write-Verbose "  Last Modified: $($fileInfo.LastWriteTime)"
-                        Write-Verbose "  Version: $($fileInfo.VersionInfo.FileVersion)"
+        # Track loaded assemblies and their versions
+        $script:LoadedAssemblies = @{}
 
-                        Write-Verbose "Checking loaded assemblies for potential conflicts:"
-                        [System.AppDomain]::CurrentDomain.GetAssemblies() |
-                            Where-Object { $_.GetName().Name -like '*SqlClient*' } |
-                            ForEach-Object {
-                                Write-Verbose "  Already loaded: $($_.GetName().Name)"
-                                Write-Verbose "    Version: $($_.GetName().Version)"
-                                Write-Verbose "    Location: $($_.Location)"
-                            }
+        foreach ($assemblyName in $script:AssemblyLoadOrder) {
+            try {
+                Write-Verbose "Processing assembly: $assemblyName"
+
+                # Check if already loaded
+                $loadedAssembly = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                    Where-Object { $_.GetName().Name -eq $assemblyName }
+
+                if ($loadedAssembly) {
+                    $version = $loadedAssembly.GetName().Version
+                    Write-Verbose "Using already loaded assembly: $assemblyName v$version at $($loadedAssembly.Location)"
+                    $script:LoadedAssemblies[$assemblyName] = @{
+                        Version = $version
+                        Location = $loadedAssembly.Location
+                        LoadedFrom = "AppDomain"
+                    }
+                    continue
+                }
+
+                $assemblyParams = @{
+                    AssemblyName = $assemblyName
+                    Platform = $platformDetails.Platform
+                    Architecture = $platformDetails.Architecture
+                    Runtime = $runtimeInfo.Runtime
+                }
+                $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
+
+                if (-not (Test-Path $assemblyPath)) {
+                    Write-Warning "Assembly not found: $assemblyPath"
+                    continue
+                }
+
+                # Get file details before loading
+                $fileInfo = Get-Item $assemblyPath
+                Write-Verbose "Found assembly file:"
+                Write-Verbose "  Path: $assemblyPath"
+                Write-Verbose "  Size: $($fileInfo.Length) bytes"
+                Write-Verbose "  Last Modified: $($fileInfo.LastWriteTime)"
+                Write-Verbose "  Version: $($fileInfo.VersionInfo.FileVersion)"
+
+                # Check for assembly conflicts
+                $conflictingAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                    Where-Object {
+                        $_.GetName().Name -eq $assemblyName -or
+                        $_.GetName().Name -like "*$assemblyName*"
                     }
 
+                if ($conflictingAssemblies) {
+                    Write-Warning "Found potentially conflicting assemblies:"
+                    foreach ($asm in $conflictingAssemblies) {
+                        Write-Warning "  $($asm.GetName().Name) v$($asm.GetName().Version) at $($asm.Location)"
+                    }
+                }
+
+                # Load the assembly
+                Write-Verbose "Loading assembly from path: $assemblyPath"
+                try {
                     $assembly = [System.Reflection.Assembly]::LoadFrom($assemblyPath)
 
-                    # Enhanced logging for SqlClient post-load
+                    # Verify assembly was loaded correctly
+                    if (-not $assembly) {
+                        throw "Assembly loaded but returned null"
+                    }
+
+                    # Store assembly info
+                    $script:LoadedAssemblies[$assemblyName] = @{
+                        Version = $assembly.GetName().Version
+                        Location = $assembly.Location
+                        LoadedFrom = "File"
+                    }
+
+                    # Special handling for SqlClient
                     if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
+                        Write-Verbose "Verifying SqlClient functionality..."
+
+                        # Check native dependencies
+                        $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
+                        $sniDll = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
+
+                        if (-not (Test-Path $sniDll)) {
+                            Write-Warning "SNI DLL not found at: $sniDll"
+                        }
+
+                        # Verify key types are available
+                        $requiredTypes = @(
+                            'Microsoft.Data.SqlClient.SqlConnection',
+                            'Microsoft.Data.SqlClient.SqlCommand'
+                        )
+
+                        foreach ($type in $requiredTypes) {
+                            if (-not ($assembly.GetType($type))) {
+                                throw "Required type not found in SqlClient: $type"
+                            }
+                        }
+
                         Write-Verbose "Successfully loaded SqlClient:"
                         Write-Verbose "  Version: $($assembly.GetName().Version)"
                         Write-Verbose "  Location: $($assembly.Location)"
-
-                        Write-Verbose "Checking loaded assembly details:"
-                        Write-Verbose "  Full Name: $($assembly.FullName)"
                         Write-Verbose "  Runtime Version: $($assembly.ImageRuntimeVersion)"
-                        Write-Verbose "  Global Assembly Cache: $($assembly.GlobalAssemblyCache)"
-
-                        Write-Verbose "Checking assembly dependencies:"
+                        Write-Verbose "  Dependencies:"
                         $assembly.GetReferencedAssemblies() | ForEach-Object {
-                            Write-Verbose "  Referenced: $($_.Name) v$($_.Version)"
+                            Write-Verbose "    $($_.Name) v$($_.Version)"
                         }
-                    } else {
-                        Write-Verbose "Successfully loaded: $assemblyName from $($assembly.Location)"
                     }
 
-                    # Extra logging for SqlClient
-                    if ($assemblyName -eq 'Microsoft.Data.SqlClient') {
-                        Write-Verbose "Checking native dependencies..."
-                        $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
-                        Write-Verbose "Native path configured as: $nativePath"
-                        Write-Verbose "Current process PATH: $([Environment]::GetEnvironmentVariable('PATH'))"
-                        Write-Verbose "Verifying SNI DLL exists in native path..."
-                        $sniDll = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
-                        Write-Verbose "SNI DLL exists: $(Test-Path $sniDll)"
+                    # Skip type verification for system assemblies
+                    if ($assemblyName -notin @('System.Runtime.CompilerServices.Unsafe', 'System.Memory')) {
+                        Write-Verbose "Verifying types for non-system assembly: $assemblyName"
+                        try {
+                            $testType = $assembly.GetTypes() | Select-Object -First 1
+                            if ($testType) {
+                                Write-Verbose "Successfully verified assembly types"
+                            }
+                        }
+                        catch {
+                            Write-Verbose "Could not enumerate types in $assemblyName, but this may be expected"
+                        }
                     }
-
-                    $assembly | Out-Null
-                } catch {
-                    throw
+                    else {
+                        Write-Verbose "Skipping type verification for system assembly: $assemblyName"
+                    }
                 }
-            } else {
-                Write-Verbose "Assembly not found: $assemblyPath"
+                catch {
+                    $errorMsg = $_.Exception.Message
+                    if ($_.Exception.InnerException) {
+                        $errorMsg += "`nInner Exception: $($_.Exception.InnerException.Message)"
+                    }
+                    throw "Failed to load $assemblyName : $errorMsg"
+                }
+            }
+            catch {
+                Write-Warning "Error processing $assemblyName :`n$($_.Exception.Message)"
+                if ($PSVersionTable.PSEdition -ne 'Core') {
+                    Write-Warning "This error occurred in Windows PowerShell - you may want to try PowerShell Core instead"
+                }
+                throw
             }
         }
-        catch {
-            throw "Failed to load assembly $assemblyName : $_"
+
+        # Log summary of loaded assemblies
+        Write-Verbose "Assembly loading summary:"
+        foreach ($entry in $script:LoadedAssemblies.GetEnumerator()) {
+            Write-Verbose "  $($entry.Key):"
+            Write-Verbose "    Version: $($entry.Value.Version)"
+            Write-Verbose "    Location: $($entry.Value.Location)"
+            Write-Verbose "    Loaded From: $($entry.Value.LoadedFrom)"
         }
+    }
+    catch {
+        Write-Warning "Failed to initialize assembly loader: $($_.Exception.Message)"
+        if ($_.Exception.InnerException) {
+            Write-Warning "Inner Exception: $($_.Exception.InnerException.Message)"
+        }
+        throw
     }
 }
 
@@ -426,7 +583,7 @@ function Reset-DbatoolsAssemblyLoader {
 
 # Export functions for module use
 Export-ModuleMember -Function Initialize-DbatoolsAssemblyLoader,
-                             Test-DbatoolsAssemblyLoading,
-                             Get-DbatoolsLoadedAssembly,
-                             Reset-DbatoolsAssemblyLoader,
-                             Get-PlatformDetails
+                            Test-DbatoolsAssemblyLoading,
+                            Get-DbatoolsLoadedAssembly,
+                            Reset-DbatoolsAssemblyLoader,
+                            Get-PlatformDetails
