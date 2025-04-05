@@ -85,7 +85,7 @@ public class Redirector
         if (systemDlls.Contains(assemblyName))
         {
             // Try desktop folder first for Windows PowerShell
-            string filelocation = "$dir" + "desktop\\net472\\" + assemblyName + ".dll";
+            string filelocation = "$dir" + "desktop\\" + assemblyName + ".dll";
             if (System.IO.File.Exists(filelocation))
             {
                 var asm = Assembly.LoadFrom(filelocation);
@@ -105,7 +105,7 @@ public class Redirector
         if (azureDlls.Contains(assemblyName))
         {
             // Try desktop folder first for Windows PowerShell
-            string filelocation = "$dir" + "desktop\\net472\\" + assemblyName + ".dll";
+            string filelocation = "$dir" + "desktop\\" + assemblyName + ".dll";
             if (System.IO.File.Exists(filelocation))
             {
                 var asm = Assembly.LoadFrom(filelocation);
@@ -125,7 +125,7 @@ public class Redirector
         if (sqlDlls.Contains(assemblyName))
         {
             // Try desktop folder first for Windows PowerShell
-            string filelocation = "$dir" + "desktop\\net472\\" + assemblyName + ".dll";
+            string filelocation = "$dir" + "desktop\\" + assemblyName + ".dll";
             if (System.IO.File.Exists(filelocation))
             {
                 var asm = Assembly.LoadFrom(filelocation);
@@ -149,11 +149,19 @@ public class Redirector
             }
         }
 
+        // Handle version binding redirects
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
             var info = assembly.GetName();
-            if (info.FullName == e.Name) {
-                return assembly;
+            if (info.Name == name.Name) {
+                // For System.Memory, allow newer versions to satisfy older version requests
+                if (info.Name == "System.Memory" && info.Version > name.Version) {
+                    return assembly;
+                }
+                // For exact version matches
+                if (info.FullName == e.Name) {
+                    return assembly;
+                }
             }
         }
         return null;
