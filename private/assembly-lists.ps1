@@ -115,6 +115,8 @@ $script:PlatformAssemblies = @{
 
 if ($PSVersionTable.PSEdition -ne 'Core') {
     # Change the path for Windows PowerShell (5.1) to use the desktop version
+    # But preserve the DAC path
+    $dacPath = $script:PlatformAssemblies['Windows']['DAC']
     $script:PlatformAssemblies['Windows'] = @{
         'x64' = @{
             'Path' = Join-Path $script:libraryroot "lib/desktop"
@@ -126,5 +128,6 @@ if ($PSVersionTable.PSEdition -ne 'Core') {
             'NativePath' = Join-Path $script:libraryroot "lib/desktop"
             'Dependencies' = Join-Path $script:libraryroot "lib/desktop"
         }
+        'DAC' = $dacPath
     }
 }
