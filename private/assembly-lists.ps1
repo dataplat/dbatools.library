@@ -19,7 +19,12 @@ $script:CoreAssemblies = @(
     'Microsoft.SqlServer.Types',
     'Microsoft.SqlServer.SqlWmiManagement',
     'Microsoft.SqlServer.WmiEnum',
-    'Microsoft.SqlServer.Management.RegisteredServers'
+    'Microsoft.SqlServer.Management.RegisteredServers',
+    'Microsoft.SqlServer.Management.Collector',
+    'Microsoft.SqlServer.Management.XEvent',
+    'Microsoft.SqlServer.Management.XEventDbScoped',
+    'Microsoft.SqlServer.XEvent.XELite',
+    'Microsoft.SqlServer.SmoExtended'
 )
 
 # DAC-specific assemblies
@@ -47,6 +52,11 @@ $script:AssemblyLoadOrder = @(
     'Microsoft.SqlServer.SqlWmiManagement',
     'Microsoft.SqlServer.WmiEnum',
     'Microsoft.SqlServer.Management.RegisteredServers',
+    'Microsoft.SqlServer.Management.Collector',
+    'Microsoft.SqlServer.Management.XEvent',
+    'Microsoft.SqlServer.Management.XEventDbScoped',
+    'Microsoft.SqlServer.XEvent.XELite',
+    'Microsoft.SqlServer.SmoExtended',
 
     # DAC components last
     'Microsoft.Data.Tools.Schema.Sql',
@@ -61,7 +71,12 @@ $script:CommonAssemblies = @(
     'Microsoft.SqlServer.Types',
     'Microsoft.SqlServer.SqlWmiManagement',
     'Microsoft.SqlServer.WmiEnum',
-    'Microsoft.SqlServer.Management.RegisteredServers'
+    'Microsoft.SqlServer.Management.RegisteredServers',
+    'Microsoft.SqlServer.Management.Collector',
+    'Microsoft.SqlServer.Management.XEvent',
+    'Microsoft.SqlServer.Management.XEventDbScoped',
+    'Microsoft.SqlServer.XEvent.XELite',
+    'Microsoft.SqlServer.SmoExtended'
 )
 
 # Define platform-specific paths for assemblies and native dependencies
