@@ -108,7 +108,7 @@ function Get-DbatoolsAssemblyPath {
 
                 # Try fallback to core for dependencies
                 if (-not (Test-Path $assemblyPath) -and $isDependency) {
-                    Write-Verbose "Attempting fallback to core for dependency: $AssemblyName"
+                    Write-Debug "Attempting fallback to core for dependency: $AssemblyName"
                     $basePath = Join-Path $script:libraryroot "lib/core"
                     $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
                 }
@@ -124,11 +124,11 @@ function Get-DbatoolsAssemblyPath {
             # Ensure native dependencies are available
             if ($platformInfo.NativePath) {
                 $nativeDll = Join-Path $platformInfo.NativePath "Microsoft.Data.SqlClient.SNI.$Architecture.dll"
-                Write-Verbose "Checking native SqlClient dependency at: $nativeDll"
+                Write-Debug "Checking native SqlClient dependency at: $nativeDll"
                 if (-not (Test-Path $nativeDll)) {
                     Write-Warning "Native SqlClient dependency missing: $nativeDll"
                 } else {
-                    Write-Verbose "Found native SqlClient dependency"
+                    Write-Debug "Found native SqlClient dependency"
                 }
             } else {
                 Write-Warning "Native path not configured for Windows $Architecture"
@@ -191,7 +191,7 @@ $script:onAssemblyResolveEventHandler = [System.ResolveEventHandler] {
         $assemblyPath = Get-DbatoolsAssemblyPath @params
 
         if (Test-Path $assemblyPath) {
-            Write-Verbose "Loading assembly from: $assemblyPath"
+            Write-Debug "Loading assembly from: $assemblyPath"
             try {
                 return [System.Reflection.Assembly]::LoadFrom($assemblyPath)
             } catch {

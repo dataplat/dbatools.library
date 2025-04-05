@@ -1,8 +1,8 @@
 function Get-DbatoolsLibraryPath {
     [CmdletBinding()]
     param()
-    Write-Verbose "PSScriptRoot: $PSScriptRoot"
-    Write-Verbose "Module Base: $($MyInvocation.MyCommand.Module.ModuleBase)"
+    Write-Debug "PSScriptRoot: $PSScriptRoot"
+    Write-Debug "Module Base: $($MyInvocation.MyCommand.Module.ModuleBase)"
 
     # Use ModuleBase as it's more reliable when importing via absolute path
     $MyInvocation.MyCommand.Module.ModuleBase
@@ -38,7 +38,7 @@ foreach ($component in $components) {
 # Initialize assembly handling
 try {
     Initialize-DbatoolsAssemblyLoader
-    Write-Verbose "Assembly loader initialized successfully"
+    Write-Debug "Assembly loader initialized successfully"
 } catch {
     throw "Failed to initialize assembly loader: $_"
 }
@@ -54,7 +54,7 @@ $MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = {
             $redirector = New-Object Redirector
             [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
 
-            Write-Verbose "Successfully removed assembly resolve handlers"
+            Write-Debug "Successfully removed assembly resolve handlers"
         }
         catch {
             Write-Warning "Error removing assembly resolve handlers: $_"

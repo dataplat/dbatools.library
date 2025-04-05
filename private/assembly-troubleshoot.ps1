@@ -74,11 +74,11 @@ function Reset-DbatoolsAssemblyCache {
     param()
 
     try {
-        Write-Verbose "Starting assembly cache reset"
+        Write-Debug "Starting assembly cache reset"
 
         # Remove assembly resolve handler
         if ($PSVersionTable.PSEdition -ne 'Core') {
-            Write-Verbose "Removing assembly resolve handler"
+            Write-Debug "Removing assembly resolve handler"
             [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($script:onAssemblyResolveEventHandler)
         }
 
@@ -89,21 +89,21 @@ function Reset-DbatoolsAssemblyCache {
             $script:CoreAssemblies -contains $name -or $script:DacAssemblies -contains $name
         }
 
-        Write-Verbose "Found $($ourAssemblies.Count) assemblies to process:"
+        Write-Debug "Found $($ourAssemblies.Count) assemblies to process:"
         foreach ($asm in $ourAssemblies) {
-            Write-Verbose "  $($asm.GetName().Name) v$($asm.GetName().Version) from $($asm.Location)"
+            Write-Debug "  $($asm.GetName().Name) v$($asm.GetName().Version) from $($asm.Location)"
         }
 
         # Force GC collection to help unload assemblies
         [System.GC]::Collect()
         [System.GC]::WaitForPendingFinalizers()
 
-        Write-Verbose "Reinitializing assembly loader"
+        Write-Debug "Reinitializing assembly loader"
         Initialize-DbatoolsAssemblyLoader
 
         # Re-add assembly resolve handler
         if ($PSVersionTable.PSEdition -ne 'Core') {
-            Write-Verbose "Re-adding assembly resolve handler"
+            Write-Debug "Re-adding assembly resolve handler"
             [System.AppDomain]::CurrentDomain.add_AssemblyResolve($script:onAssemblyResolveEventHandler)
         }
 
@@ -113,9 +113,9 @@ function Reset-DbatoolsAssemblyCache {
         $remainingAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies() |
             Where-Object { $script:CoreAssemblies -contains $_.GetName().Name }
         if ($remainingAssemblies) {
-            Write-Verbose "Remaining assemblies after reset:"
+            Write-Debug "Remaining assemblies after reset:"
             foreach ($asm in $remainingAssemblies) {
-                Write-Verbose "  $($asm.GetName().Name) v$($asm.GetName().Version) from $($asm.Location)"
+                Write-Debug "  $($asm.GetName().Name) v$($asm.GetName().Version) from $($asm.Location)"
             }
         }
     }
