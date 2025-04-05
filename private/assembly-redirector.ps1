@@ -22,12 +22,18 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Runtime.InteropServices;
 
 public class Redirector
 {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr LoadLibrary(string lpFileName);
+
     public Redirector()
     {
         this.EventHandler = new ResolveEventHandler(AssemblyResolve);
+        string nativePath = "$dir" + "core\\runtimes\\win-x64\\native";
+        LoadLibrary(System.IO.Path.Combine(nativePath, "Microsoft.Data.SqlClient.SNI.dll"));
     }
 
     public readonly ResolveEventHandler EventHandler;

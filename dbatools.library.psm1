@@ -70,5 +70,6 @@ Export-ModuleMember -Function @(
     'Test-DbatoolsAssemblyLoading',
     'Reset-DbatoolsAssemblyLoader',
     'Test-DbatoolsAssemblyEnvironment',
-    'Reset-DbatoolsAssemblyCache'
+    'Reset-DbatoolsAssemblyCache',
+    'Get-PlatformDetails'
 )
