@@ -112,7 +112,13 @@ function Get-DbatoolsAssemblyPath {
 
             # Ensure native dependencies are available
             if ($platformInfo.NativePath) {
-                $nativeDll = Join-Path $platformInfo.NativePath "Microsoft.Data.SqlClient.SNI.$Architecture.dll"
+                $nativeDll = if ($Runtime -eq 'desktop') {
+                    # For PowerShell 5.1 (Desktop), look in Desktop folder with architecture in filename
+                    Join-Path $env:USERPROFILE "Desktop\Microsoft.Data.SqlClient.SNI.$Architecture.dll"
+                } else {
+                    # For PowerShell Core, look in runtime folder without architecture in filename
+                    Join-Path $platformInfo.NativePath "Microsoft.Data.SqlClient.SNI.dll"
+                }
                 Write-Debug "Checking native SqlClient dependency at: $nativeDll"
                 if (-not (Test-Path $nativeDll)) {
                     Write-Warning "Native SqlClient dependency missing: $nativeDll"
