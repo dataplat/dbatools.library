@@ -70,6 +70,8 @@ $script:AssemblyLoadOrder = @(
     'Microsoft.SqlServer.SqlEnum',
     'Microsoft.SqlServer.Smo',
     'Microsoft.SqlServer.Types',
+    'Microsoft.SqlServer.SqlWmiManagement',
+    'Microsoft.SqlServer.WmiEnum'
 
     # Additional SMO features
     'Microsoft.SqlServer.Management.RegisteredServers',
@@ -103,7 +105,9 @@ $script:CommonAssemblies = @(
     'Microsoft.SqlServer.Smo',
     'Microsoft.SqlServer.ConnectionInfo',
     'Microsoft.SqlServer.SqlEnum',
-    'Microsoft.SqlServer.Types'
+    'Microsoft.SqlServer.Types',
+    'Microsoft.SqlServer.SqlWmiManagement',
+    'Microsoft.SqlServer.WmiEnum'
 )
 
 # Define platform-specific paths for assemblies and native dependencies
