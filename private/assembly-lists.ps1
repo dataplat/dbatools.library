@@ -34,11 +34,7 @@ $script:CoreAssemblies = @(
     'Microsoft.AnalysisServices',
     'Microsoft.AnalysisServices.Core',
     'Microsoft.AnalysisServices.Tabular',
-    'Microsoft.AnalysisServices.Tabular.Json',
-    'Microsoft.SqlServer.Diagnostics.STrace',
-    'Microsoft.SqlServer.IntegrationServices.Common.ObjectModel',
-    'Microsoft.SqlServer.Management.IntegrationServices',
-    'Microsoft.SqlServer.Management.IntegrationServicesEnum'
+    'Microsoft.AnalysisServices.Tabular.Json'
 )
 
 # DAC-specific assemblies
@@ -87,10 +83,6 @@ $script:AssemblyLoadOrder = @(
     #'Microsoft.SqlServer.Rmo',
 
     # SSIS components
-    'Microsoft.SqlServer.Diagnostics.STrace',
-    'Microsoft.SqlServer.IntegrationServices.Common.ObjectModel',
-    'Microsoft.SqlServer.Management.IntegrationServices',
-    'Microsoft.SqlServer.Management.IntegrationServicesEnum',
 
     # Analysis Services components
     'Microsoft.AnalysisServices.Core',

@@ -62,7 +62,6 @@ $null = New-Item -ItemType Directory ./lib/win-sqlclient -Force
 $null = New-Item -ItemType Directory ./lib/win-sqlclient-x86 -Force
 $null = New-Item -ItemType Directory ./lib/mac-dac -Force
 $null = New-Item -ItemType Directory ./lib/linux-dac -Force
-$null = New-Item -ItemType Directory ./lib/common -Force
 $null = New-Item -ItemType Directory ./temp/bogus -Force
 
 $ProgressPreference = "SilentlyContinue"
@@ -182,13 +181,10 @@ Get-ChildItem "./var/misc/core" -Filter "*.dll" | Copy-Item -Destination "./lib/
 
 # Copy desktop-specific files
 Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
+Get-ChildItem "./var/misc/both" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
 
-# Copy common files that are platform-independent
-Get-ChildItem "./lib/desktop" -Filter "Microsoft.SqlServer.*.dll" |
-    Where-Object { $_.Name -notlike "*SqlClient*" } |
-    ForEach-Object {
-        Copy-Item $_.FullName -Destination "./lib/common/" -Force
-    }
+# Copy platform-independent SQL Server assemblies to core
+#Get-ChildItem "./var/misc/both" -Filter "*.dll" | Copy-Item -Destination "./lib/core/" -Force
 
 # Cleanup temporary files and artifacts
 Remove-Item -Path "./temp" -Recurse -Force -ErrorAction SilentlyContinue

@@ -85,35 +85,89 @@ function Initialize-DbatoolsAssemblyLoader {
     $platformDetails = Get-PlatformDetails
     Write-Host "Loading assemblies for: $($platformDetails.Platform) $($platformDetails.Architecture)"
 
+    # Get runtime info from Get-DbatoolsPlatformInfo for consistency
+    $runtimeInfo = Get-DbatoolsPlatformInfo
+
     # Initialize native dependencies first - this must happen before any assembly loading
     if ($platformDetails.IsWindows) {
-        # Get paths using existing platform assemblies configuration
-        $platformInfo = $script:PlatformAssemblies['Windows'][$platformDetails.Architecture]
-        $sniPath = $platformInfo.NativePath
-        $sqlClientPath = Join-Path $platformInfo.Path "Microsoft.Data.SqlClient.dll"
+        # Get the correct runtime path for the current architecture
+        $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
+        $runtimePath = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
 
-        Write-Host "Using SqlClient from: $sqlClientPath"
-        Write-Host "Using SNI from: $sniPath"
+        Write-Host "Using runtime path: $runtimePath"
+        Write-Host "Using native path: $nativePath"
+
+        # Verify the SNI DLL exists and get detailed info
+        $sniDll = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
+        if (-not (Test-Path $sniDll)) {
+            Write-Warning "SNI DLL not found at: $sniDll"
+            Write-Verbose "Directory contents of $nativePath :"
+            Get-ChildItem $nativePath | ForEach-Object {
+                Write-Verbose "  $($_.Name) - Size: $($_.Length) bytes, LastWrite: $($_.LastWriteTime)"
+            }
+            throw "SNI DLL not found at: $sniDll"
+        }
+
+        # Get detailed file info
+        $sniFileInfo = Get-Item $sniDll
+        Write-Verbose "Found SNI DLL:"
+        Write-Verbose "  Path: $sniDll"
+        Write-Verbose "  Size: $($sniFileInfo.Length) bytes"
+        Write-Verbose "  Last Modified: $($sniFileInfo.LastWriteTime)"
+        Write-Verbose "  Version: $((Get-Item $sniDll).VersionInfo.FileVersion)"
+        Write-Host "Found SNI DLL at: $sniDll"
 
         Write-Verbose "Current PATH before native init: $([Environment]::GetEnvironmentVariable('PATH'))"
 
-        # Update PATH to include SNI location
+        # Update PATH to include native DLL location
         $oldPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
-        if (-not $oldPath.Contains($sniPath)) {
-            Write-Host "Adding SNI path to PATH: $sniPath"
-            Write-Verbose "Adding SNI path to PATH: $sniPath"
-            [Environment]::SetEnvironmentVariable("PATH", "$sniPath;$oldPath", [System.EnvironmentVariableTarget]::Process)
+        if (-not $oldPath.Contains($nativePath)) {
+            Write-Host "Adding native path to PATH: $nativePath"
+            Write-Verbose "Adding native path to PATH: $nativePath"
+            [Environment]::SetEnvironmentVariable("PATH", "$nativePath;$oldPath", [System.EnvironmentVariableTarget]::Process)
+        }
+
+        # Double check PATH was updated and verify native path location
+        $newPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
+        Write-Verbose "Updated PATH: $newPath"
+
+        # Split PATH and check native path position
+        $pathElements = $newPath -split ';'
+        $nativePathIndex = [array]::IndexOf($pathElements, $nativePath)
+        Write-Verbose "Native path position in PATH: $nativePathIndex"
+        Write-Verbose "PATH elements in order:"
+        $pathElements | ForEach-Object {
+            Write-Verbose "  $_"
+        }
+
+        # Verify native path is in PATH
+        if (-not $newPath.Contains($nativePath)) {
+            throw "Failed to update PATH with native DLL location"
         }
         Write-Verbose "Current PATH after native init: $([Environment]::GetEnvironmentVariable('PATH'))"
 
-        # Verify native DLLs exist
-        $expectedDlls = @('Microsoft.Data.SqlClient.SNI.dll')
-        foreach ($dll in $expectedDlls) {
-            $dllPath = Join-Path $sniPath $dll
-            if (-not (Test-Path $dllPath)) {
-                throw "Required native dependency not found: $dllPath"
+        # Add extra debug logging with file details
+        Write-Verbose "Native DLL directory contents with details:"
+        Get-ChildItem $nativePath | ForEach-Object {
+            Write-Verbose "  $($_.Name)"
+            Write-Verbose "    Size: $($_.Length) bytes"
+            Write-Verbose "    LastWrite: $($_.LastWriteTime)"
+            if ($_.Extension -eq '.dll') {
+                Write-Verbose "    Version: $($_.VersionInfo.FileVersion)"
+                Write-Verbose "    Product: $($_.VersionInfo.ProductName)"
+                Write-Verbose "    Description: $($_.VersionInfo.FileDescription)"
             }
-            Write-Host "Found native DLL: $dllPath"
+        }
+
+        # Try to verify DLL can be loaded
+        Write-Verbose "Attempting to verify SNI DLL can be loaded..."
+        try {
+            Add-Type -Path $sniDll -ErrorAction Stop
+            Write-Verbose "Successfully verified SNI DLL can be loaded"
+        }
+        catch {
+            Write-Warning "Failed to verify SNI DLL loading: $($_.Exception.Message)"
+            Write-Verbose "Full error details: $($_)"
         }
     }
 
@@ -130,9 +184,9 @@ function Initialize-DbatoolsAssemblyLoader {
             Write-Verbose "Pre-loading dependency: $depAssembly"
             $assemblyParams = @{
                 AssemblyName = $depAssembly
-                Platform = $platformInfo.Platform
-                Architecture = $platformInfo.Architecture
-                Runtime = $platformInfo.Runtime
+                Platform = $platformDetails.Platform
+                Architecture = $platformDetails.Architecture
+                Runtime = $runtimeInfo.Runtime
             }
             $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
 
@@ -168,9 +222,9 @@ function Initialize-DbatoolsAssemblyLoader {
 
             $assemblyParams = @{
                 AssemblyName = $assemblyName
-                Platform = $platformInfo.Platform
-                Architecture = $platformInfo.Architecture
-                Runtime = $platformInfo.Runtime
+                Platform = $platformDetails.Platform
+                Architecture = $platformDetails.Architecture
+                Runtime = $runtimeInfo.Runtime
             }
             $assemblyPath = Get-DbatoolsAssemblyPath @assemblyParams
 
@@ -195,9 +249,12 @@ function Initialize-DbatoolsAssemblyLoader {
                         Write-Verbose "Version: $($assembly.GetName().Version)"
                         Write-Verbose "Location: $($assembly.Location)"
                         Write-Verbose "Checking native dependencies..."
-                        $nativePath = $script:PlatformAssemblies['Windows'][$platformInfo.Architecture].NativePath
+                        $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
                         Write-Verbose "Native path configured as: $nativePath"
                         Write-Verbose "Current process PATH: $([Environment]::GetEnvironmentVariable('PATH'))"
+                        Write-Verbose "Verifying SNI DLL exists in native path..."
+                        $sniDll = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
+                        Write-Verbose "SNI DLL exists: $(Test-Path $sniDll)"
                     }
 
                     $assembly | Out-Null
