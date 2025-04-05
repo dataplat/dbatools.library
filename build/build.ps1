@@ -58,8 +58,6 @@ $null = New-Item -ItemType Directory ./lib/third-party/LumenWorks -Force
 $null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/core -Force
 $null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/desktop -Force
 $null = New-Item -ItemType Directory ./lib/win-dac -Force
-$null = New-Item -ItemType Directory ./lib/win-sqlclient -Force
-$null = New-Item -ItemType Directory ./lib/win-sqlclient-x86 -Force
 $null = New-Item -ItemType Directory ./lib/mac-dac -Force
 $null = New-Item -ItemType Directory ./lib/linux-dac -Force
 $null = New-Item -ItemType Directory ./temp/bogus -Force
@@ -101,10 +99,6 @@ Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO
 # Copy DAC files based on architecture
 $dacPath = ".\temp\dacfull\Microsoft SQL Server\160\DAC\bin"
 
-# Ensure lib directories exist for SqlClient native dependencies
-$null = New-Item -ItemType Directory ./lib/win-sqlclient/native -Force
-$null = New-Item -ItemType Directory ./lib/win-sqlclient-x86/native -Force
-
 # Copy DAC files for each platform
 # Windows
 Copy-Item "$dacPath\Microsoft.SqlServer.Dac.dll" -Destination "./lib/win-dac/" -Force
@@ -117,54 +111,6 @@ Copy-Item "./temp/linux/Microsoft.SqlServer.Dac*" -Destination "./lib/linux-dac/
 Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/linux-dac/" -Force
 Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/mac-dac/" -Force
 Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/mac-dac/" -Force
-
-# Copy SQL Client files with proper native dependency handling
-# x64 files
-# Verify source files before copy
-Write-Host "`nVerifying source files before copy..."
-$sourcePath = "./lib/desktop"
-$sourceFiles = @(
-    "Microsoft.Data.SqlClient.dll",
-    "Microsoft.Identity.Client.dll",
-    "Microsoft.Identity.Client.Extensions.Msal.dll",
-    "Microsoft.Data.SqlClient.SNI.x64.dll"
-)
-foreach ($file in $sourceFiles) {
-    if (Test-Path "$sourcePath/$file") {
-        $fileInfo = Get-Item "$sourcePath/$file"
-        Write-Host "Found $file - Size: $($fileInfo.Length) bytes"
-    } else {
-        Write-Host "WARNING: Missing source file $file"
-    }
-}
-
-# Use robocopy to preserve file integrity for native dependencies
-Write-Host "`nCopying files to win-sqlclient..."
-robocopy "./lib/desktop" "./lib/win-sqlclient" Microsoft.Data.SqlClient.dll Microsoft.Identity.Client.dll Microsoft.Identity.Client.Extensions.Msal.dll /NFL /NDL /NJH /NJS /nc /ns /np
-robocopy "./lib/desktop" "./lib/win-sqlclient/native" Microsoft.Data.SqlClient.SNI.x64.dll /NFL /NDL /NJH /NJS /nc /ns /np
-
-# Verify destination files after copy
-Write-Host "`nVerifying destination files after copy..."
-$destPaths = @{
-    "Microsoft.Data.SqlClient.dll" = "./lib/win-sqlclient"
-    "Microsoft.Identity.Client.dll" = "./lib/win-sqlclient"
-    "Microsoft.Identity.Client.Extensions.Msal.dll" = "./lib/win-sqlclient"
-    "Microsoft.Data.SqlClient.SNI.x64.dll" = "./lib/win-sqlclient/native"
-}
-foreach ($file in $destPaths.Keys) {
-    $path = Join-Path $destPaths[$file] $file
-    if (Test-Path $path) {
-        $fileInfo = Get-Item $path
-        Write-Host "Found $file in $($destPaths[$file]) - Size: $($fileInfo.Length) bytes"
-    } else {
-        Write-Host "WARNING: Missing destination file $path"
-    }
-}
-
-# x86 files
-# Use robocopy to preserve file integrity for x86 native dependencies
-robocopy "./lib/desktop" "./lib/win-sqlclient-x86" Microsoft.Data.SqlClient.dll Microsoft.Identity.Client.dll Microsoft.Identity.Client.Extensions.Msal.dll /NFL /NDL /NJH /NJS /nc /ns /np
-robocopy "./lib/desktop" "./lib/win-sqlclient-x86/native" Microsoft.Data.SqlClient.SNI.x86.dll /NFL /NDL /NJH /NJS /nc /ns /np
 
 # Core files are already in place from dotnet publish
 
@@ -183,9 +129,6 @@ Get-ChildItem "./var/misc/core" -Filter "*.dll" | Copy-Item -Destination "./lib/
 Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
 Get-ChildItem "./var/misc/both" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
 
-# Copy platform-independent SQL Server assemblies to core
-#Get-ChildItem "./var/misc/both" -Filter "*.dll" | Copy-Item -Destination "./lib/core/" -Force
-
 # Cleanup temporary files and artifacts
 Remove-Item -Path "./temp" -Recurse -Force -ErrorAction SilentlyContinue
 Get-ChildItem -Path "./lib" -Recurse -Include "*.pdf","*.xml" | Remove-Item -Force
@@ -193,7 +136,7 @@ Get-ChildItem -Path "./lib" -Recurse -Include "*.pdf","*.xml" | Remove-Item -For
 # Create private directory for assembly loading scripts
 $null = New-Item -ItemType Directory -Path "./private" -Force -ErrorAction SilentlyContinue
 
- # Ensure System.Runtime.CompilerServices.Unsafe is in place
-    $nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination "C:\github\dbatools.library\lib\core\" -PassThru | Out-Null
+# Ensure System.Runtime.CompilerServices.Unsafe is in place
+$nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination "C:\github\dbatools.library\lib\core\" -PassThru | Out-Null
 
 Write-Host "Build completed successfully. Files organized and temporary artifacts cleaned up."

@@ -91,27 +91,16 @@ function Get-DbatoolsAssemblyPath {
         $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
     }
     elseif ($isSqlClient) {
-        if ($Platform -eq 'Windows') {
-            # Windows SqlClient and dependencies need platform-specific handling
+        if ($Platform -eq 'Windows' -and $Runtime -eq 'desktop') {
+            # Windows PowerShell (5.1) should always use desktop version
+            $basePath = Join-Path $libraryBase "lib/desktop"
+            $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
+        }
+        elseif ($Platform -eq 'Windows') {
+            # Windows Core PowerShell uses platform-specific handling
             $platformInfo = $script:PlatformAssemblies[$Platform][$Architecture]
             if (-not $platformInfo) {
                 throw "Platform configuration not found for Windows $Architecture"
-            }
-
-            # For SqlClient and its dependencies, use the platform-specific path
-            if ($isSqlClient -or $isDependency) {
-                $basePath = $platformInfo.Path
-                if (-not $basePath) {
-                    throw "Assembly path not found for Windows $Architecture"
-                }
-                $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
-
-                # Try fallback to core for dependencies
-                if (-not (Test-Path $assemblyPath) -and $isDependency) {
-                    Write-Debug "Attempting fallback to core for dependency: $AssemblyName"
-                    $basePath = Join-Path $script:libraryroot "lib/core"
-                    $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
-                }
             }
 
             # Get main assembly path
@@ -132,12 +121,6 @@ function Get-DbatoolsAssemblyPath {
                 }
             } else {
                 Write-Warning "Native path not configured for Windows $Architecture"
-            }
-
-            # Fallback to core version if needed
-            if (-not (Test-Path $assemblyPath)) {
-                $basePath = Join-Path $libraryBase "lib/core"
-                $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
             }
         } else {
             # Non-Windows platforms use core SqlClient

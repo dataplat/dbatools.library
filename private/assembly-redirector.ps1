@@ -104,7 +104,8 @@ public class Redirector
         // Handle Azure dependencies next
         if (azureDlls.Contains(assemblyName))
         {
-            string filelocation = "$dir" + "win-sqlclient\\" + assemblyName + ".dll";
+            // Try desktop folder first for Windows PowerShell
+            string filelocation = "$dir" + "desktop\\net472\\" + assemblyName + ".dll";
             if (System.IO.File.Exists(filelocation))
             {
                 var asm = Assembly.LoadFrom(filelocation);
@@ -123,23 +124,23 @@ public class Redirector
         // Handle SQL assemblies last
         if (sqlDlls.Contains(assemblyName))
         {
-            // Try win-sqlclient folder first
-            string filelocation = "$dir" + "win-sqlclient\\" + assemblyName + ".dll";
+            // Try desktop folder first for Windows PowerShell
+            string filelocation = "$dir" + "desktop\\net472\\" + assemblyName + ".dll";
             if (System.IO.File.Exists(filelocation))
             {
                 var asm = Assembly.LoadFrom(filelocation);
                 return asm;
             }
 
-            // Try desktop folder next for Windows PowerShell
-            filelocation = "$dir" + "desktop\\net472\\" + assemblyName + ".dll";
+            // Try core folder as fallback
+            filelocation = "$dir" + "core\\" + assemblyName + ".dll";
             if (System.IO.File.Exists(filelocation))
             {
                 var asm = Assembly.LoadFrom(filelocation);
                 return asm;
             }
 
-            // Try root lib folder as fallback
+            // Try root lib folder as last resort
             filelocation = "$dir" + assemblyName + ".dll";
             if (System.IO.File.Exists(filelocation))
             {
