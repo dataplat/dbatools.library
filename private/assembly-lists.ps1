@@ -18,7 +18,8 @@ $script:CoreAssemblies = @(
     'Microsoft.SqlServer.ConnectionInfo',
     'Microsoft.SqlServer.Types',
     'Microsoft.SqlServer.SqlWmiManagement',
-    'Microsoft.SqlServer.WmiEnum'
+    'Microsoft.SqlServer.WmiEnum',
+    'Microsoft.SqlServer.Management.RegisteredServers'
 )
 
 # DAC-specific assemblies
@@ -45,6 +46,7 @@ $script:AssemblyLoadOrder = @(
     'Microsoft.SqlServer.Types',
     'Microsoft.SqlServer.SqlWmiManagement',
     'Microsoft.SqlServer.WmiEnum',
+    'Microsoft.SqlServer.Management.RegisteredServers',
 
     # DAC components last
     'Microsoft.Data.Tools.Schema.Sql',
@@ -58,7 +60,8 @@ $script:CommonAssemblies = @(
     'Microsoft.SqlServer.ConnectionInfo',
     'Microsoft.SqlServer.Types',
     'Microsoft.SqlServer.SqlWmiManagement',
-    'Microsoft.SqlServer.WmiEnum'
+    'Microsoft.SqlServer.WmiEnum',
+    'Microsoft.SqlServer.Management.RegisteredServers'
 )
 
 # Define platform-specific paths for assemblies and native dependencies
