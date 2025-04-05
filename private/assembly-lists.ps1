@@ -29,7 +29,7 @@ $script:CoreAssemblies = @(
     'Microsoft.SqlServer.Management.RegisteredServers',
     'Microsoft.SqlServer.Management.XEvent',
     'Microsoft.SqlServer.Management.XEventDbScoped',
-    'Microsoft.SqlServer.Replication',
+    #'Microsoft.SqlServer.Replication',
     'Microsoft.SqlServer.Rmo',
     'Microsoft.AnalysisServices',
     'Microsoft.AnalysisServices.Core',
@@ -45,8 +45,8 @@ $script:CoreAssemblies = @(
 $script:DacAssemblies = @(
     'Microsoft.SqlServer.Dac',
     'Microsoft.SqlServer.Dac.Extensions',
-    'Microsoft.Data.Tools.Schema.Sql',
-    'Microsoft.SqlServer.TransactSql.ScriptDom'
+    'Microsoft.Data.Tools.Schema.Sql'
+    #'Microsoft.SqlServer.TransactSql.ScriptDom'
 )
 
 # Assembly load order to handle dependencies
@@ -83,8 +83,8 @@ $script:AssemblyLoadOrder = @(
     'Microsoft.SqlServer.Management.HadrModel',
 
     # Replication components
-    'Microsoft.SqlServer.Replication',
-    'Microsoft.SqlServer.Rmo',
+    #'Microsoft.SqlServer.Replication',
+    #'Microsoft.SqlServer.Rmo',
 
     # SSIS components
     'Microsoft.SqlServer.Diagnostics.STrace',
@@ -99,7 +99,7 @@ $script:AssemblyLoadOrder = @(
     'Microsoft.AnalysisServices.Tabular.Json',
 
     # DAC components last
-    'Microsoft.SqlServer.TransactSql.ScriptDom',
+    #'Microsoft.SqlServer.TransactSql.ScriptDom',
     'Microsoft.Data.Tools.Schema.Sql',
     'Microsoft.SqlServer.Dac',
     'Microsoft.SqlServer.Dac.Extensions'
@@ -118,25 +118,56 @@ $script:CommonAssemblies = @(
 $script:PlatformAssemblies = @{
     'Windows' = @{
         'x64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/win-sqlclient"
-            'NativePath' = Join-Path $script:libraryroot "lib/win-sqlclient/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/win-sqlclient"  # For Azure dependencies
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/win-x64/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
         }
         'x86' = @{
-            'Path' = Join-Path $script:libraryroot "lib/win-sqlclient-x86"
-            'NativePath' = Join-Path $script:libraryroot "lib/win-sqlclient-x86/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/win-sqlclient-x86"  # For Azure dependencies
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/win-x86/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+        }
+        'arm64' = @{
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/win-arm64/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+        }
+        'arm' = @{
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/win-arm/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
         }
         'DAC' = Join-Path $script:libraryroot "lib/win-dac"
     }
     'Linux' = @{
+        'x64' = @{
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-x64/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+        }
+        'arm' = @{
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-arm/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+        }
+        'arm64' = @{
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-arm64/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+        }
+        'musl-x64' = @{
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-musl-x64/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+        }
         'DAC' = Join-Path $script:libraryroot "lib/linux-dac"
-        'SqlClient' = Join-Path $script:libraryroot "lib/core"
-        'Dependencies' = Join-Path $script:libraryroot "lib/core"  # For Azure dependencies
     }
     'OSX' = @{
+        'x64' = @{
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/osx/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+        }
         'DAC' = Join-Path $script:libraryroot "lib/mac-dac"
-        'SqlClient' = Join-Path $script:libraryroot "lib/core"
-        'Dependencies' = Join-Path $script:libraryroot "lib/core"  # For Azure dependencies
     }
 }

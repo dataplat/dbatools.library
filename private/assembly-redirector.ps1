@@ -60,7 +60,7 @@ public class Redirector
             "System.Configuration.ConfigurationManager",
             "Microsoft.SqlServer.Management.Sdk.Sfc",
             "Microsoft.SqlServer.Management.IntegrationServices",
-            "Microsoft.SqlServer.Replication",
+           # "Microsoft.SqlServer.Replication",
             "Microsoft.SqlServer.Rmo"
         };
 
