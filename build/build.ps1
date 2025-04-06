@@ -122,12 +122,8 @@ Get-ChildItem "./var/misc/both" -Filter "*.dll" | ForEach-Object {
     Copy-Item $_.FullName -Destination "./lib/desktop/" -Force
 }
 
-# Copy core-specific files
-Get-ChildItem "./var/misc/core" -Filter "*.dll" | Copy-Item -Destination "./lib/core/" -Force
-
 # Copy desktop-specific files
 Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
-Get-ChildItem "./var/misc/both" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
 
 # Cleanup temporary files and artifacts
 Remove-Item -Path "./temp" -Recurse -Force -ErrorAction SilentlyContinue
