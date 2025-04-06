@@ -57,6 +57,7 @@ function Get-DbatoolsAssemblyPath {
     # Check assembly type
     $isDac = $script:DacAssemblies -contains $AssemblyName
     $isSqlClient = $AssemblyName -eq 'Microsoft.Data.SqlClient'
+    $isThirdParty = @('Bogus', 'LumenWorks.Framework.IO') -contains $AssemblyName
     $isDependency = @(
         # System dependencies
         'System.Memory',
@@ -132,6 +133,23 @@ function Get-DbatoolsAssemblyPath {
             # Non-Windows platforms use core SqlClient
             $basePath = Join-Path $libraryBase "lib/core"
             $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
+        }
+    }
+    elseif ($isThirdParty) {
+        # Third-party assemblies use platform-specific paths
+        if ($Platform -eq 'Windows') {
+            $platformInfo = $script:PlatformAssemblies[$Platform][$Architecture]
+            if (-not $platformInfo) {
+                throw "Platform configuration not found for Windows $Architecture"
+            }
+            if (-not $platformInfo.ThirdParty -or -not $platformInfo.ThirdParty[$AssemblyName]) {
+                throw "Third-party path not found for $AssemblyName"
+            }
+            $basePath = $platformInfo.ThirdParty[$AssemblyName]
+            $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
+        }
+        else {
+            throw "Third-party assemblies not supported on $Platform"
         }
     }
     else {
