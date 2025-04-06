@@ -138,4 +138,3 @@ $nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCac
 Remove-Item -Path "./lib/release" -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host "Build completed successfully. Files organized and temporary artifacts cleaned up."
-Write-Host "Build completed successfully. Files organized and temporary artifacts cleaned up."

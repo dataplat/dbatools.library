@@ -31,6 +31,21 @@ $script:CoreAssemblies = @(
     'Microsoft.SqlServer.SmoExtended'
 )
 
+# Add Analysis Services assemblies if running under DSC
+if ($Env:SMODefaultModuleName) {
+    $script:CoreAssemblies += @(
+        'Microsoft.AnalysisServices.Core',
+        'Microsoft.AnalysisServices',
+        'Microsoft.AnalysisServices.Tabular',
+        'Microsoft.AnalysisServices.Tabular.Json'
+    )
+}
+
+# Remove XEvent assemblies for ARM64 platforms
+if ($PSVersionTable.OS -match "ARM64") {
+    $script:CoreAssemblies = $script:CoreAssemblies | Where-Object { $PSItem -notmatch "XE" }
+}
+
 # DAC-specific assemblies
 $script:DacAssemblies = @(
     'Microsoft.SqlServer.Dac',
@@ -64,12 +79,29 @@ $script:AssemblyLoadOrder = @(
     'Microsoft.SqlServer.Management.XEvent',
     'Microsoft.SqlServer.Management.XEventDbScoped',
     'Microsoft.SqlServer.XEvent.XELite',
-    'Microsoft.SqlServer.SmoExtended',
+    'Microsoft.SqlServer.SmoExtended'
+)
 
-    # DAC components last
+# Add Analysis Services assemblies to load order if running under DSC
+if ($Env:SMODefaultModuleName) {
+    $script:AssemblyLoadOrder += @(
+        'Microsoft.AnalysisServices.Core',
+        'Microsoft.AnalysisServices',
+        'Microsoft.AnalysisServices.Tabular',
+        'Microsoft.AnalysisServices.Tabular.Json'
+    )
+}
+
+# Add DAC components last
+$script:AssemblyLoadOrder += @(
     'Microsoft.Data.Tools.Schema.Sql',
     'Microsoft.SqlServer.Dac'
 )
+
+# Remove XEvent assemblies from load order for ARM64 platforms
+if ($PSVersionTable.OS -match "ARM64") {
+    $script:AssemblyLoadOrder = $script:AssemblyLoadOrder | Where-Object { $PSItem -notmatch "XE" }
+}
 
 # Common assemblies that are platform-independent
 $script:CommonAssemblies = @(
