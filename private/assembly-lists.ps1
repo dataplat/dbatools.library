@@ -28,8 +28,20 @@ $script:CoreAssemblies = @(
     'Microsoft.SqlServer.Management.XEvent',
     'Microsoft.SqlServer.Management.XEventDbScoped',
     'Microsoft.SqlServer.XEvent.XELite',
-    'Microsoft.SqlServer.SmoExtended'
+    'Microsoft.SqlServer.SmoExtended',
+    'Microsoft.SqlServer.Management.IntegrationServices'
 )
+
+# x64-only assemblies that should only be loaded on 64-bit systems
+$script:X64Assemblies = @(
+    'Microsoft.SqlServer.Replication',
+    'Microsoft.SqlServer.Rmo'
+)
+
+# Add x64-only assemblies if on 64-bit system
+if ($env:PROCESSOR_ARCHITECTURE -ne "x86") {
+    $script:CoreAssemblies += $script:X64Assemblies
+}
 
 # Add Analysis Services assemblies if running under DSC
 if ($Env:SMODefaultModuleName) {
@@ -79,8 +91,17 @@ $script:AssemblyLoadOrder = @(
     'Microsoft.SqlServer.Management.XEvent',
     'Microsoft.SqlServer.Management.XEventDbScoped',
     'Microsoft.SqlServer.XEvent.XELite',
-    'Microsoft.SqlServer.SmoExtended'
+    'Microsoft.SqlServer.SmoExtended',
+    'Microsoft.SqlServer.Management.IntegrationServices'
 )
+
+# Add x64-only assemblies if on 64-bit system
+if ($env:PROCESSOR_ARCHITECTURE -ne "x86") {
+    $script:AssemblyLoadOrder += @(
+        'Microsoft.SqlServer.Replication',
+        'Microsoft.SqlServer.Rmo'
+    )
+}
 
 # Add Analysis Services assemblies to load order if running under DSC
 if ($Env:SMODefaultModuleName) {
@@ -116,7 +137,8 @@ $script:CommonAssemblies = @(
     'Microsoft.SqlServer.Management.XEvent',
     'Microsoft.SqlServer.Management.XEventDbScoped',
     'Microsoft.SqlServer.XEvent.XELite',
-    'Microsoft.SqlServer.SmoExtended'
+    'Microsoft.SqlServer.SmoExtended',
+    'Microsoft.SqlServer.Management.IntegrationServices'
 )
 
 # Define platform-specific paths for assemblies and native dependencies
