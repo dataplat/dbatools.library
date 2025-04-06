@@ -10,6 +10,8 @@ $script:CoreAssemblies = @(
     # Azure dependencies
     'Azure.Core',
     'Azure.Identity',
+    'Microsoft.Identity.Client',
+    'Microsoft.IdentityModel.Abstractions',
 
     # Third-party dependencies
     'Bogus',
@@ -28,9 +30,13 @@ $script:CoreAssemblies = @(
     'Microsoft.SqlServer.Management.XEvent',
     'Microsoft.SqlServer.Management.XEventDbScoped',
     'Microsoft.SqlServer.XEvent.XELite',
-    'Microsoft.SqlServer.SmoExtended',
-    'Microsoft.SqlServer.Management.IntegrationServices'
+    'Microsoft.SqlServer.SmoExtended'
 )
+
+# Add Integration Services for non-Core PowerShell
+if ($PSVersionTable.PSEdition -ne "Core") {
+    $script:CoreAssemblies += 'Microsoft.SqlServer.Management.IntegrationServices'
+}
 
 # x64-only assemblies that should only be loaded on 64-bit systems
 $script:X64Assemblies = @(
@@ -71,6 +77,8 @@ $script:AssemblyLoadOrder = @(
     'System.Runtime.CompilerServices.Unsafe',
 
     # Azure dependencies next
+    'Microsoft.IdentityModel.Abstractions',
+    'Microsoft.Identity.Client',
     'Azure.Core',
     'Azure.Identity',
 
@@ -91,9 +99,13 @@ $script:AssemblyLoadOrder = @(
     'Microsoft.SqlServer.Management.XEvent',
     'Microsoft.SqlServer.Management.XEventDbScoped',
     'Microsoft.SqlServer.XEvent.XELite',
-    'Microsoft.SqlServer.SmoExtended',
-    'Microsoft.SqlServer.Management.IntegrationServices'
+    'Microsoft.SqlServer.SmoExtended'
 )
+
+# Add Integration Services for non-Core PowerShell
+if ($PSVersionTable.PSEdition -ne "Core") {
+    $script:AssemblyLoadOrder += 'Microsoft.SqlServer.Management.IntegrationServices'
+}
 
 # Add x64-only assemblies if on 64-bit system
 if ($env:PROCESSOR_ARCHITECTURE -ne "x86") {
@@ -137,8 +149,7 @@ $script:CommonAssemblies = @(
     'Microsoft.SqlServer.Management.XEvent',
     'Microsoft.SqlServer.Management.XEventDbScoped',
     'Microsoft.SqlServer.XEvent.XELite',
-    'Microsoft.SqlServer.SmoExtended',
-    'Microsoft.SqlServer.Management.IntegrationServices'
+    'Microsoft.SqlServer.SmoExtended'
 )
 
 # Define platform-specific paths for assemblies and native dependencies

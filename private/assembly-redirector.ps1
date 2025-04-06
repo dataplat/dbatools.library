@@ -85,7 +85,9 @@ public class Redirector
         // Only track core Azure dependencies
         string[] azureDlls = {
             "Azure.Core",
-            "Azure.Identity"
+            "Azure.Identity",
+            "Microsoft.Identity.Client",
+            "Microsoft.IdentityModel.Abstractions"
         };
 
         // Only track essential SQL dependencies
