@@ -14,4 +14,4 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ../..:/workspaces
+      - ../:/workspaces
