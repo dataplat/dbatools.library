@@ -26,6 +26,18 @@
         "AZURE_API_BASE": {
             "description": "This is your Azure base URL for the Azure AI API.",
             "documentationUrl": "https://learn.microsoft.com/en-us/azure/api-management/api-management-authenticate-authorize-azure-openai"
+        },
+        "OLLAMA_HOST": {
+            "description": "This is the host for the Ollama API.",
+            "documentationUrl": "https://ollama.com/docs/api"
+        },
+        "CLAUDE_CODE_DANGEROUSLY_SKIP_PERMISSIONS": {
+            "description": "This is a flag to skip permissions for the Claude Code API.",
+            "documentationUrl": "https://www.anthropic.com/engineering/claude-code-best-practices"
+        },
+        "BRAVE_API_KEY": {
+            "description": "This is your Brave Search API key.",
+            "documentationUrl": "https://search.brave.com/api"
         }
     },
     "customizations": {

@@ -1,12 +1,43 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(find:*)",
-      "Bash(rg:*)",
-      "Bash(grep:*)",
-      "Bash(ls:*)",
-      "Bash(pwsh:*)"
+    "mcpServers": {
+        "filesystem": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "/workspaces"
+            ]
+        },
+        "brave-search": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-brave-search"
+            ]
+        }
+    },
+    "allowedTools": [
+        "Task",
+        "Bash",
+        "Glob",
+        "Grep",
+        "LS",
+        "Read",
+        "Edit",
+        "MultiEdit",
+        "Write",
+        "WebFetch",
+        "WebSearch"
     ],
-    "deny": []
-  }
+    "permissions": {
+        "allow": [
+            "Bash(find:*)",
+            "Bash(rg:*)",
+            "Bash(grep:*)",
+            "Bash(ls:*)",
+            "Bash(pwsh:*)"
+        ],
+        "deny": []
+    },
+    "theme": "dark"
 }

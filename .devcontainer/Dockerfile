@@ -21,7 +21,6 @@ RUN apt-get update && \
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update && \
     apt-get install -y --no-install-recommends nodejs && \
-    npm install -g @anthropic-ai/claude-code && \
     rm -rf /var/lib/apt/lists/*
 
 # Set up PowerShell profiles
@@ -33,7 +32,16 @@ RUN mkdir -p /home/vscode/.config/powershell && \
     chmod +x /home/vscode/*.ps1 && \
     chown -R vscode:vscode /home/vscode
 
+# Switch to non-root user for local install
 USER vscode
 WORKDIR /home/vscode
+
+# Local Claude install
+RUN npm install @anthropic-ai/claude-code && \
+    npm install ccusage && \
+    npm install @modelcontextprotocol/server-brave-search
+
+# Add local node_modules/.bin to PATH
+ENV PATH="/home/vscode/node_modules/.bin:$PATH"
 
 CMD ["sleep", "infinity"]

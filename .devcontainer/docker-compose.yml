@@ -7,8 +7,9 @@ services:
       - GITHUB_PAT=${GITHUB_PAT:-}
       - AZURE_API_KEY=${AZURE_API_KEY:-}
       - AZURE_API_BASE=${AZURE_API_BASE:-}
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      - CLAUDE_CODE_DANGEROUSLY_SKIP_PERMISSIONS=true
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - CLAUDE_CODE_DANGEROUSLY_SKIP_PERMISSIONS=${CLAUDE_CODE_DANGEROUSLY_SKIP_PERMISSIONS:-true}
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
     build:
       context: .
       dockerfile: Dockerfile
