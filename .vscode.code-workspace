@@ -1,7 +1,7 @@
 {
 	"folders": [
 		{
-			"path": "."
+			"path": "../dbatools.library"
 		},
 		{
 			"path": "../dbatools"
@@ -13,6 +13,7 @@
         "powershell.scriptAnalysis.settingsPath": "bin\\PSScriptAnalyzerRules.psd1",
         "powershell.codeFormatting.addWhitespaceAroundPipe": true,
         "polyglot-notebook.defaultNotebookExtension": ".ipynb",
-        "polyglot-notebook.defaultNotebookLanguage": "pwsh"
+        "polyglot-notebook.defaultNotebookLanguage": "pwsh",
+        "powershell.cwd": "dbatools"
     }
 }
