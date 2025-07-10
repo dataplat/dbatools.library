@@ -69,6 +69,7 @@ Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile .\temp\DacFramework.msi
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile .\temp\bogus.zip
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile .\temp\LumenWorksCsvReader.zip
 Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.5.7/XESmartTarget_x64.msi -OutFile .\temp\XESmartTarget_x64.msi
+Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/2.0.4.0/XESmartTarget-linux-2.0.4.0.zip -OutFile .\temp\XESmartTarget-linux.zip
 Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile .\temp\sqlpackage-linux.zip
 Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile .\temp\sqlpackage-macos.zip
 
@@ -77,6 +78,7 @@ $ProgressPreference = "Continue"
 # Extract all packages
 7z x .\temp\LumenWorksCsvReader.zip "-o.\temp\LumenWorksCsvReader" -y
 7z x .\temp\bogus.zip "-o.\temp\bogus" -y
+7z x .\temp\XESmartTarget-linux.zip "-o.\temp\xe-linux" -y
 7z x .\temp\sqlpackage-linux.zip "-o.\temp\linux" -y
 7z x .\temp\sqlpackage-macos.zip "-o.\temp\mac" -y
 
@@ -87,6 +89,9 @@ Start-Sleep 3
 
 # Copy XESmartTarget preserving structure
 robocopy ./temp/xe/XESmartTarget ./lib/third-party/XESmartTarget /E /NFL /NDL /NJH /NJS /nc /ns /np
+
+# Copy Linux XESmartTarget
+Copy-Item "./temp/xe-linux/*" -Destination "./lib/third-party/XESmartTarget/" -Recurse -Force
 
 # Copy Bogus files for both frameworks
 Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./lib/third-party/bogus/desktop/bogus.dll" -Force

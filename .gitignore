@@ -21,10 +21,6 @@ msbuild.binlog
 # Local constant file
 tests/constants.local.ps1
 
-# For those that want to use Docker images for testing
-# Integration with Docker requires the docker compose file to exist within the project folder
-docker-compose.yml
-
 ### NCrunch ###
 # NCrunch
 *.ncrunch*
@@ -41,3 +37,4 @@ lib/
 /third-party
 /third-party-licenses
 /OLDLIB
+.devcontainer/.env
