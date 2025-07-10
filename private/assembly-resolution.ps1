@@ -137,20 +137,15 @@ function Get-DbatoolsAssemblyPath {
     }
     elseif ($isThirdParty) {
         # Third-party assemblies use platform-specific paths
-        if ($Platform -eq 'Windows') {
-            $platformInfo = $script:PlatformAssemblies[$Platform][$Architecture]
-            if (-not $platformInfo) {
-                throw "Platform configuration not found for Windows $Architecture"
-            }
-            if (-not $platformInfo.ThirdParty -or -not $platformInfo.ThirdParty[$AssemblyName]) {
-                throw "Third-party path not found for $AssemblyName"
-            }
-            $basePath = $platformInfo.ThirdParty[$AssemblyName]
-            $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
+        $platformInfo = $script:PlatformAssemblies[$Platform][$Architecture]
+        if (-not $platformInfo) {
+            throw "Platform configuration not found for $Platform $Architecture"
         }
-        else {
-            throw "Third-party assemblies not supported on $Platform"
+        if (-not $platformInfo.ThirdParty -or -not $platformInfo.ThirdParty[$AssemblyName]) {
+            throw "Third-party path not found for $AssemblyName on $Platform $Architecture"
         }
+        $basePath = $platformInfo.ThirdParty[$AssemblyName]
+        $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
     }
     else {
         # Common assemblies use runtime-specific paths

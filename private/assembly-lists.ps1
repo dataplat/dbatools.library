@@ -44,9 +44,23 @@ $script:X64Assemblies = @(
     'Microsoft.SqlServer.Rmo'
 )
 
-# Add x64-only assemblies if on 64-bit system
+# Add x64-only assemblies if on 64-bit system and Windows
 if ($env:PROCESSOR_ARCHITECTURE -ne "x86") {
-    $script:CoreAssemblies += $script:X64Assemblies
+    # Determine platform for replication assembly filtering
+    $currentPlatform = if ($PSVersionTable.PSVersion.Major -ge 6) {
+        if ($IsWindows) { 'Windows' }
+        elseif ($IsLinux) { 'Linux' }
+        else { 'OSX' }
+    } else {
+        'Windows' # PowerShell 5.1 and below only runs on Windows
+    }
+    
+    if ($currentPlatform -eq 'Windows') {
+        $script:CoreAssemblies += $script:X64Assemblies
+    } else {
+        # On non-Windows platforms, only add Rmo (skip Replication)
+        $script:CoreAssemblies += 'Microsoft.SqlServer.Rmo'
+    }
 }
 
 # Add Analysis Services assemblies if running under DSC
@@ -107,12 +121,23 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     $script:AssemblyLoadOrder += 'Microsoft.SqlServer.Management.IntegrationServices'
 }
 
-# Add x64-only assemblies if on 64-bit system
+# Add x64-only assemblies if on 64-bit system and Windows
 if ($env:PROCESSOR_ARCHITECTURE -ne "x86") {
-    $script:AssemblyLoadOrder += @(
-        'Microsoft.SqlServer.Replication',
-        'Microsoft.SqlServer.Rmo'
-    )
+    # Determine platform for replication assembly filtering
+    $currentPlatform = if ($PSVersionTable.PSVersion.Major -ge 6) {
+        if ($IsWindows) { 'Windows' }
+        elseif ($IsLinux) { 'Linux' }
+        else { 'OSX' }
+    } else {
+        'Windows' # PowerShell 5.1 and below only runs on Windows
+    }
+    
+    if ($currentPlatform -eq 'Windows') {
+        $script:AssemblyLoadOrder += @(
+            'Microsoft.SqlServer.Replication',
+            'Microsoft.SqlServer.Rmo'
+        )
+    }
 }
 
 # Add Analysis Services assemblies to load order if running under DSC
@@ -198,21 +223,37 @@ $script:PlatformAssemblies = @{
             'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
             'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-x64/native"
             'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'ThirdParty' = @{
+                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+            }
         }
         'arm' = @{
             'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
             'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-arm/native"
             'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'ThirdParty' = @{
+                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+            }
         }
         'arm64' = @{
             'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
             'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-arm64/native"
             'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'ThirdParty' = @{
+                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+            }
         }
         'musl-x64' = @{
             'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
             'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-musl-x64/native"
             'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'ThirdParty' = @{
+                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+            }
         }
         'DAC' = Join-Path $script:libraryroot "lib/linux-dac"
     }
@@ -221,6 +262,10 @@ $script:PlatformAssemblies = @{
             'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
             'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/osx/native"
             'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'ThirdParty' = @{
+                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+            }
         }
         'DAC' = Join-Path $script:libraryroot "lib/mac-dac"
     }
