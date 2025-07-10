@@ -102,7 +102,7 @@ Copy-Item "./temp/LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll" -D
 Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll" -Destination "./lib/third-party/LumenWorks/core/LumenWorks.Framework.IO.dll" -Force
 
 # Copy DAC files based on architecture
-$dacPath = ".\temp\dacfull\Microsoft SQL Server\160\DAC\bin"
+$dacPath = ".\temp\dacfull\Microsoft SQL Server\170\DAC\bin"
 
 # Copy DAC files for each platform
 # Windows
