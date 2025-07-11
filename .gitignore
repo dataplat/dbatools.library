@@ -38,3 +38,4 @@ lib/
 /third-party-licenses
 /OLDLIB
 .devcontainer/.env
+dbatools.library.zip
