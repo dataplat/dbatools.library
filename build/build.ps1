@@ -2,6 +2,14 @@ $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
 Push-Location C:\github\dbatools.library\
 
+# Update module version to today's date
+$today = Get-Date -Format "yyyy.M.d"
+$psd1Path = Join-Path $PSScriptRoot "..\dbatools.library.psd1"
+$psd1Content = Get-Content $psd1Path -Raw
+$psd1Content = $psd1Content -replace "ModuleVersion\s*=\s*'[\d\.]+'", "ModuleVersion          = '$today'"
+Set-Content -Path $psd1Path -Value $psd1Content -NoNewline
+Write-Host "Updated module version to: $today"
+
 # Silently clean up previous build artifacts
 # Clean up previous build artifacts
 if (Test-Path "C:\github\dbatools.library\lib") {
@@ -142,4 +150,73 @@ $nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCac
 # Remove lib/release folder
 Remove-Item -Path "./lib/release" -Recurse -Force -ErrorAction SilentlyContinue
 
+# Create zip file for testing (release format)
+Write-Host "Creating dbatools.library.zip for testing..."
+$zipPath = Join-Path $root "dbatools.library.zip"
+Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
+
+# Create a temporary directory with the release structure
+$tempReleaseDir = Join-Path $tempdir "dbatools.library"
+$null = New-Item -ItemType Directory -Path $tempReleaseDir -Force
+
+# Copy root module files
+Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $tempReleaseDir -Force
+Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $tempReleaseDir -Force
+Copy-Item -Path (Join-Path $root "LICENSE") -Destination $tempReleaseDir -Force -ErrorAction SilentlyContinue
+
+# Create core structure
+$coreDir = Join-Path $tempReleaseDir "core"
+$null = New-Item -ItemType Directory -Path $coreDir -Force
+$null = New-Item -ItemType Directory -Path (Join-Path $coreDir "lib") -Force
+
+# Copy core assemblies
+Copy-Item -Path (Join-Path $root "lib\core\*") -Destination (Join-Path $coreDir "lib") -Recurse -Force
+
+# Move third-party to core root
+if (Test-Path (Join-Path $root "lib\third-party")) {
+    Copy-Item -Path (Join-Path $root "lib\third-party") -Destination $coreDir -Recurse -Force
+}
+
+# Create platform-specific folders in core/lib
+$null = New-Item -ItemType Directory -Path (Join-Path $coreDir "lib\mac") -Force
+$null = New-Item -ItemType Directory -Path (Join-Path $coreDir "lib\win") -Force
+$null = New-Item -ItemType Directory -Path (Join-Path $coreDir "lib\win-sqlclient") -Force
+
+# Copy mac-specific DAC files to core/lib/mac if they exist
+if (Test-Path (Join-Path $root "lib\mac-dac")) {
+    Copy-Item -Path (Join-Path $root "lib\mac-dac\*") -Destination (Join-Path $coreDir "lib\mac") -Force
+}
+
+# Copy win-specific DAC files to core/lib/win if they exist
+if (Test-Path (Join-Path $root "lib\win-dac")) {
+    Copy-Item -Path (Join-Path $root "lib\win-dac\*") -Destination (Join-Path $coreDir "lib\win") -Force
+}
+
+# Create desktop structure
+$desktopDir = Join-Path $tempReleaseDir "desktop"
+$null = New-Item -ItemType Directory -Path $desktopDir -Force
+$null = New-Item -ItemType Directory -Path (Join-Path $desktopDir "lib") -Force
+
+# Copy desktop assemblies
+Copy-Item -Path (Join-Path $root "lib\desktop\*") -Destination (Join-Path $desktopDir "lib") -Recurse -Force
+
+# Move third-party to desktop root
+if (Test-Path (Join-Path $root "lib\third-party")) {
+    Copy-Item -Path (Join-Path $root "lib\third-party") -Destination $desktopDir -Recurse -Force
+}
+
+# Copy third-party-licenses
+if (Test-Path (Join-Path $root "var\third-party-licenses")) {
+    Copy-Item -Path (Join-Path $root "var\third-party-licenses") -Destination $tempReleaseDir -Recurse -Force
+}
+
+# Create the zip file from the parent directory to get the right structure
+Push-Location $tempdir
+Compress-Archive -Path "dbatools.library" -DestinationPath $zipPath -CompressionLevel Optimal -Force
+Pop-Location
+
+# Clean up temp directory
+Remove-Item -Path $tempReleaseDir -Recurse -Force -ErrorAction SilentlyContinue
+
+Write-Host "Created test zip: $zipPath"
 Write-Host "Build completed successfully. Files organized and temporary artifacts cleaned up."
