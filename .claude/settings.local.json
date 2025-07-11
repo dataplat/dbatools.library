@@ -353,6 +353,7 @@
         ]
     },
     "env": {
+        "CLAUDE_CODE_DANGEROUSLY_SKIP_PERMISSIONS": "1",
         "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
         "DISABLE_COST_WARNINGS": "0",
         "BASH_DEFAULT_TIMEOUT_MS": "300000",

@@ -43,7 +43,7 @@
     "customizations": {
         "vscode": {
             "settings": {
-                "terminal.integrated.allowEnvironmentInheritance": true,
+                "terminal.integrated.shellIntegration.enabled": false,
                 "terminal.integrated.cwd": "/workspaces/${localWorkspaceFolderBasename}",
                 "powershell.powerShellAdditionalExePaths": {
                     "PowerShell": "/usr/bin/pwsh"
