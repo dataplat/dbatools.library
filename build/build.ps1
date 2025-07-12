@@ -153,20 +153,54 @@ Copy-Item "./temp/LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll" -D
 Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll" -Destination "./lib/third-party/LumenWorks/core/LumenWorks.Framework.IO.dll" -Force
 
 # Copy DAC files based on architecture
-$dacPath = ".\temp\dacfull\Microsoft SQL Server\170\DAC\bin"
+$dacPath = Join-Path ".\temp\dacfull" "Microsoft SQL Server\170\DAC\bin"
 
 # Copy DAC files for each platform
 # Windows
-Copy-Item "$dacPath\Microsoft.SqlServer.Dac.dll" -Destination "./lib/win-dac/" -Force
-Copy-Item "$dacPath\Microsoft.SqlServer.Dac.Extensions.dll" -Destination "./lib/win-dac/" -Force
-Copy-Item "$dacPath\Microsoft.Data.Tools.Schema.Sql.dll" -Destination "./lib/win-dac/" -Force
-Copy-Item "$dacPath\Microsoft.SqlServer.TransactSql.ScriptDom.dll" -Destination "./lib/win-dac/" -Force
+Copy-Item (Join-Path $dacPath "Microsoft.SqlServer.Dac.dll") -Destination "./lib/win-dac/" -Force
+Copy-Item (Join-Path $dacPath "Microsoft.SqlServer.Dac.Extensions.dll") -Destination "./lib/win-dac/" -Force
+Copy-Item (Join-Path $dacPath "Microsoft.Data.Tools.Schema.Sql.dll") -Destination "./lib/win-dac/" -Force
+Copy-Item (Join-Path $dacPath "Microsoft.SqlServer.TransactSql.ScriptDom.dll") -Destination "./lib/win-dac/" -Force
+# Copy SqlPackage.exe for Windows
+Copy-Item (Join-Path $dacPath "SqlPackage.exe") -Destination "./lib/win-dac/" -Force
 
-# Linux and macOS
+# Linux
 Copy-Item "./temp/linux/Microsoft.SqlServer.Dac*" -Destination "./lib/linux-dac/" -Force
 Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/linux-dac/" -Force
+# Copy sqlpackage executable for Linux (it's a .NET app launcher)
+if (Test-Path "./temp/linux/sqlpackage") {
+    Copy-Item "./temp/linux/sqlpackage" -Destination "./lib/linux-dac/" -Force
+} else {
+    # Create a launcher script if sqlpackage doesn't exist
+    $sqlpackageScript = @'
+#!/usr/bin/env bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+exec dotnet "$DIR/sqlpackage.dll" "$@"
+'@
+    Set-Content -Path "./lib/linux-dac/sqlpackage" -Value $sqlpackageScript -Force
+    # Note: chmod +x will need to be done on Linux
+}
+# Copy sqlpackage.dll for Linux
+Copy-Item "./temp/linux/sqlpackage.dll" -Destination "./lib/linux-dac/" -Force -ErrorAction SilentlyContinue
+
+# macOS
 Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/mac-dac/" -Force
 Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/mac-dac/" -Force
+# Copy sqlpackage executable for macOS
+if (Test-Path "./temp/mac/sqlpackage") {
+    Copy-Item "./temp/mac/sqlpackage" -Destination "./lib/mac-dac/" -Force
+} else {
+    # Create a launcher script if sqlpackage doesn't exist
+    $sqlpackageScript = @'
+#!/usr/bin/env bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+exec dotnet "$DIR/sqlpackage.dll" "$@"
+'@
+    Set-Content -Path "./lib/mac-dac/sqlpackage" -Value $sqlpackageScript -Force
+    # Note: chmod +x will need to be done on macOS
+}
+# Copy sqlpackage.dll for macOS
+Copy-Item "./temp/mac/sqlpackage.dll" -Destination "./lib/mac-dac/" -Force -ErrorAction SilentlyContinue
 
 # Core files are already in place from dotnet publish
 
