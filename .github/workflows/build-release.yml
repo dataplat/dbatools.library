@@ -242,7 +242,7 @@ jobs:
         # Check if this is a manually triggered release or version-based release
         if ("${{ github.event_name }}" -eq "workflow_dispatch") {
           # For manual triggers, always create preview version
-          $previewVersion = "$date-preview-$branch-$timestamp"
+          $previewVersion = "$date-preview-$branch$timestamp"
         } else {
           # For version-based releases, check if version already contains preview
           $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
@@ -252,7 +252,7 @@ jobs:
             $previewVersion = "$currentVersion-$branch-$timestamp"
           } else {
             # Create new preview version
-            $previewVersion = "$date-preview-$branch-$timestamp"
+            $previewVersion = "$date-preview-$branch$timestamp"
           }
         }
 
