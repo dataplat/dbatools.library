@@ -105,6 +105,18 @@ Start-Sleep 3
 
 # Copy XESmartTarget preserving structure
 robocopy ./temp/xe/XESmartTarget ./lib/third-party/XESmartTarget /E /NFL /NDL /NJH /NJS /nc /ns /np
+$robocopyExitCode = $LASTEXITCODE
+Write-Host "Robocopy exit code: $robocopyExitCode"
+if ($robocopyExitCode -ge 8) {
+    Write-Host "Robocopy failed with exit code $robocopyExitCode" -ForegroundColor Red
+    exit $robocopyExitCode
+} elseif ($robocopyExitCode -eq 0) {
+    Write-Host "Robocopy: No files were copied (source and destination are in sync)" -ForegroundColor Yellow
+} else {
+    Write-Host "Robocopy completed successfully (exit code $robocopyExitCode means files were copied)" -ForegroundColor Green
+}
+# Reset exit code to 0 for successful robocopy operations
+$LASTEXITCODE = 0
 
 # Copy Linux XESmartTarget
 Copy-Item "./temp/xe-linux/*" -Destination "./lib/third-party/XESmartTarget/" -Recurse -Force
