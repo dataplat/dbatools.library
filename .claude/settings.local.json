@@ -1,24 +1,10 @@
 {
     "model": "opus",
     "cleanupPeriodDays": 30,
+    "dangerously-skip-permissions": true,
     "permissions": {
-        "allow": [
-            "Bash(**)",
-            "Edit(./**)",
-            "Edit(../dbatools/**)",
-            "Read(./**)",
-            "Read(../dbatools/**)",
-            "Write(./**)",
-            "Write(../dbatools/**)",
-            "MultiEdit(./**)",
-            "MultiEdit(../dbatools/**)",
-            "WebSearch(*)",
-            "WebFetch(domain:*)",
-            "Task(**)",
-            "Grep(**)",
-            "Glob(**)",
-            "LS(**)"
-        ],
+        "defaultMode": "bypassPermissions",
+        "allow": ["*"],
         "deny": [
             "Bash(rm -rf /)",
             "Bash(sudo rm:*)",
@@ -27,7 +13,6 @@
         ]
     },
     "env": {
-        "CLAUDE_CODE_DANGEROUSLY_SKIP_PERMISSIONS": "1",
         "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
         "DISABLE_COST_WARNINGS": "0",
         "DISABLE_AUTOUPDATER": "1",
