@@ -17,5 +17,11 @@ if ($psopenaiModule) {
     Set-Content $parameterPath $content
 }
 
+# add dbatools to the safe directory list
+git config --global --add safe.directory /workspaces/dbatools
+
+# set claude, these seem to stick better in config
+claude config set autoUpdates false --global
+
 # Reload profile with some settings we need
 . $profile
