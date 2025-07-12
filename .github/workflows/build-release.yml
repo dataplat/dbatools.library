@@ -229,32 +229,53 @@ jobs:
       with:
         name: dbatools-library-zip
 
-    - name: Get version from module
+    - name: Generate preview version and update manifest
       if: steps.check_preview.outputs.should_release == 'True'
       id: get_version
       shell: pwsh
       run: |
-        $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
-        $version = $manifest.ModuleVersion
-        Write-Host "Module version: $version"
-        "version=$version" | Out-File -Append $env:GITHUB_OUTPUT
-
-        # Create preview tag based on version and timestamp
+        # Generate preview version in expected format
+        $date = Get-Date -Format "yyyy.M.d"
         $timestamp = Get-Date -Format "yyyyMMdd.HHmmss"
         $branch = "${{ github.ref_name }}"
-        $shortSha = "${{ github.sha }}".Substring(0,7)
-        $previewTag = "v$version-preview-$timestamp-$shortSha"
-        Write-Host "Preview tag: $previewTag"
+
+        # Check if this is a manually triggered release or version-based release
+        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          # For manual triggers, always create preview version
+          $previewVersion = "$date-preview-$branch-$timestamp"
+        } else {
+          # For version-based releases, check if version already contains preview
+          $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
+          $currentVersion = $manifest.ModuleVersion
+          if ($currentVersion -like "*preview*") {
+            # Use existing preview version and enhance it with branch and timestamp
+            $previewVersion = "$currentVersion-$branch-$timestamp"
+          } else {
+            # Create new preview version
+            $previewVersion = "$date-preview-$branch-$timestamp"
+          }
+        }
+
+        Write-Host "Preview version: $previewVersion"
         Write-Host "Branch: $branch"
-        "preview_tag=$previewTag" | Out-File -Append $env:GITHUB_OUTPUT
+
+        # Update module manifest with preview version
+        $manifestPath = "./dbatools.library.psd1"
+        $content = Get-Content $manifestPath -Raw
+        $content = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$previewVersion'"
+        Set-Content $manifestPath $content
+
+        Write-Host "Updated module manifest with version: $previewVersion"
+
+        "version=$previewVersion" | Out-File -Append $env:GITHUB_OUTPUT
         "branch=$branch" | Out-File -Append $env:GITHUB_OUTPUT
 
     - name: Create Preview Release
       if: steps.check_preview.outputs.should_release == 'True'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.get_version.outputs.preview_tag }}
-        name: Preview Release ${{ steps.get_version.outputs.version }}
+        tag_name: v${{ steps.get_version.outputs.version }}
+        name: Preview Release v${{ steps.get_version.outputs.version }}
         body: |
           This is an automated preview release.
 
@@ -270,7 +291,7 @@ jobs:
 
           ```powershell
           # Download and extract the zip file
-          Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.preview_tag }}/dbatools.library.zip" -OutFile dbatools.library.zip
+          Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/v${{ steps.get_version.outputs.version }}/dbatools.library.zip" -OutFile dbatools.library.zip
           Expand-Archive -Path dbatools.library.zip -DestinationPath . -Force
 
           # Import the module
