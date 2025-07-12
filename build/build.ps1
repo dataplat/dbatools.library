@@ -254,6 +254,12 @@ Get-ChildItem -Path "./lib" -Recurse -Include "*.pdf","*.xml" | Remove-Item -For
 # Create private directory for assembly loading scripts
 $null = New-Item -ItemType Directory -Path "./private" -Force -ErrorAction SilentlyContinue
 
+# Copy assembly loading scripts to private directory
+if (Test-Path (Join-Path $root "private")) {
+    Copy-Item -Path (Join-Path $root "private\*") -Destination "./private/" -Force -ErrorAction SilentlyContinue
+    Write-Host "Copied assembly loading scripts to private directory"
+}
+
 # Ensure System.Runtime.CompilerServices.Unsafe is in place
 $nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination (Join-Path $root "lib\core\") -PassThru | Out-Null
 # Remove lib/release folder
@@ -272,6 +278,12 @@ $null = New-Item -ItemType Directory -Path $tempReleaseDir -Force
 Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $tempReleaseDir -Force
 Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $tempReleaseDir -Force
 Copy-Item -Path (Join-Path $root "LICENSE") -Destination $tempReleaseDir -Force -ErrorAction SilentlyContinue
+
+# Copy private folder with assembly loading scripts
+if (Test-Path (Join-Path $root "private")) {
+    Copy-Item -Path (Join-Path $root "private") -Destination $tempReleaseDir -Recurse -Force
+    Write-Host "Included private folder in release package"
+}
 
 # Create core structure
 $coreDir = Join-Path $tempReleaseDir "core"
