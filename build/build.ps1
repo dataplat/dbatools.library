@@ -145,62 +145,72 @@ $LASTEXITCODE = 0
 Copy-Item "./temp/xe-linux/*" -Destination "./lib/third-party/XESmartTarget/" -Recurse -Force
 
 # Copy Bogus files for both frameworks
-Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./lib/third-party/bogus/desktop/bogus.dll" -Force
-Copy-Item "./temp/bogus/lib/net6.0/bogus.dll" -Destination "./lib/third-party/bogus/core/bogus.dll" -Force
+Write-Host "Copying Bogus.dll..." -ForegroundColor Green
+
+# Ensure directories exist
+if (!(Test-Path "./lib/third-party/bogus/core")) {
+    New-Item -ItemType Directory -Path "./lib/third-party/bogus/core" -Force
+}
+if (!(Test-Path "./lib/third-party/bogus/desktop")) {
+    New-Item -ItemType Directory -Path "./lib/third-party/bogus/desktop" -Force
+}
+
+# Copy Bogus.dll for .NET Framework
+if (Test-Path "./temp/bogus/lib/net40/bogus.dll") {
+    Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./lib/third-party/bogus/desktop/bogus.dll" -Force
+} else {
+    Write-Warning "Bogus.dll for .NET Framework (net40) not found at expected location"
+}
+
+# Copy Bogus.dll for .NET Core
+if (Test-Path "./temp/bogus/lib/net6.0/bogus.dll") {
+    Copy-Item "./temp/bogus/lib/net6.0/bogus.dll" -Destination "./lib/third-party/bogus/core/bogus.dll" -Force
+} elseif (Test-Path "./temp/bogus/lib/netstandard2.0/bogus.dll") {
+    Copy-Item "./temp/bogus/lib/netstandard2.0/bogus.dll" -Destination "./lib/third-party/bogus/core/bogus.dll" -Force
+} else {
+    Write-Warning "Bogus.dll for .NET Core not found in expected locations"
+}
 
 # Copy LumenWorks files for both frameworks
 Copy-Item "./temp/LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll" -Destination "./lib/third-party/LumenWorks/desktop/LumenWorks.Framework.IO.dll" -Force
 Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll" -Destination "./lib/third-party/LumenWorks/core/LumenWorks.Framework.IO.dll" -Force
 
-# Copy DAC files based on architecture
+# Copy ALL SqlPackage files for each platform
+Write-Host "Copying SqlPackage files for all platforms..." -ForegroundColor Green
+
+# Windows - Copy ALL files from DAC bin directory
 $dacPath = Join-Path ".\temp\dacfull" "Microsoft SQL Server\170\DAC\bin"
-
-# Copy DAC files for each platform
-# Windows
-Copy-Item (Join-Path $dacPath "Microsoft.SqlServer.Dac.dll") -Destination "./lib/win-dac/" -Force
-Copy-Item (Join-Path $dacPath "Microsoft.SqlServer.Dac.Extensions.dll") -Destination "./lib/win-dac/" -Force
-Copy-Item (Join-Path $dacPath "Microsoft.Data.Tools.Schema.Sql.dll") -Destination "./lib/win-dac/" -Force
-Copy-Item (Join-Path $dacPath "Microsoft.SqlServer.TransactSql.ScriptDom.dll") -Destination "./lib/win-dac/" -Force
-# Copy SqlPackage.exe for Windows
-Copy-Item (Join-Path $dacPath "SqlPackage.exe") -Destination "./lib/win-dac/" -Force
-
-# Linux
-Copy-Item "./temp/linux/Microsoft.SqlServer.Dac*" -Destination "./lib/linux-dac/" -Force
-Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/linux-dac/" -Force
-# Copy sqlpackage executable for Linux (it's a .NET app launcher)
-if (Test-Path "./temp/linux/sqlpackage") {
-    Copy-Item "./temp/linux/sqlpackage" -Destination "./lib/linux-dac/" -Force
+if (Test-Path $dacPath) {
+    Write-Host "Copying ALL SqlPackage files for Windows..." -ForegroundColor Green
+    if (!(Test-Path "./lib/win-dac")) {
+        New-Item -ItemType Directory -Path "./lib/win-dac" -Force
+    }
+    Copy-Item (Join-Path $dacPath "*") -Destination "./lib/win-dac/" -Recurse -Force
 } else {
-    # Create a launcher script if sqlpackage doesn't exist
-    $sqlpackageScript = @'
-#!/usr/bin/env bash
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-exec dotnet "$DIR/sqlpackage.dll" "$@"
-'@
-    Set-Content -Path "./lib/linux-dac/sqlpackage" -Value $sqlpackageScript -Force
-    # Note: chmod +x will need to be done on Linux
+    Write-Warning "Windows DAC path not found: $dacPath"
 }
-# Copy sqlpackage.dll for Linux
-Copy-Item "./temp/linux/sqlpackage.dll" -Destination "./lib/linux-dac/" -Force -ErrorAction SilentlyContinue
 
-# macOS
-Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/mac-dac/" -Force
-Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/mac-dac/" -Force
-# Copy sqlpackage executable for macOS
-if (Test-Path "./temp/mac/sqlpackage") {
-    Copy-Item "./temp/mac/sqlpackage" -Destination "./lib/mac-dac/" -Force
+# Linux - Copy ALL files from temp/linux
+if (Test-Path "./temp/linux") {
+    Write-Host "Copying ALL SqlPackage files for Linux..." -ForegroundColor Green
+    if (!(Test-Path "./lib/linux-dac")) {
+        New-Item -ItemType Directory -Path "./lib/linux-dac" -Force
+    }
+    Copy-Item "./temp/linux/*" -Destination "./lib/linux-dac/" -Recurse -Force
 } else {
-    # Create a launcher script if sqlpackage doesn't exist
-    $sqlpackageScript = @'
-#!/usr/bin/env bash
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-exec dotnet "$DIR/sqlpackage.dll" "$@"
-'@
-    Set-Content -Path "./lib/mac-dac/sqlpackage" -Value $sqlpackageScript -Force
-    # Note: chmod +x will need to be done on macOS
+    Write-Warning "Linux SqlPackage path not found: ./temp/linux"
 }
-# Copy sqlpackage.dll for macOS
-Copy-Item "./temp/mac/sqlpackage.dll" -Destination "./lib/mac-dac/" -Force -ErrorAction SilentlyContinue
+
+# macOS - Copy ALL files from temp/mac
+if (Test-Path "./temp/mac") {
+    Write-Host "Copying ALL SqlPackage files for macOS..." -ForegroundColor Green
+    if (!(Test-Path "./lib/mac-dac")) {
+        New-Item -ItemType Directory -Path "./lib/mac-dac" -Force
+    }
+    Copy-Item "./temp/mac/*" -Destination "./lib/mac-dac/" -Recurse -Force
+} else {
+    Write-Warning "macOS SqlPackage path not found: ./temp/mac"
+}
 
 # Core files are already in place from dotnet publish
 
