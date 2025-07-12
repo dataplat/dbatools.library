@@ -54,7 +54,7 @@ if ($env:PROCESSOR_ARCHITECTURE -ne "x86") {
     } else {
         'Windows' # PowerShell 5.1 and below only runs on Windows
     }
-    
+
     if ($currentPlatform -eq 'Windows') {
         $script:CoreAssemblies += $script:X64Assemblies
     } else {
@@ -131,7 +131,7 @@ if ($env:PROCESSOR_ARCHITECTURE -ne "x86") {
     } else {
         'Windows' # PowerShell 5.1 and below only runs on Windows
     }
-    
+
     if ($currentPlatform -eq 'Windows') {
         $script:AssemblyLoadOrder += @(
             'Microsoft.SqlServer.Replication',
@@ -261,6 +261,15 @@ $script:PlatformAssemblies = @{
         'x64' = @{
             'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
             'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/osx/native"
+            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'ThirdParty' = @{
+                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+            }
+        }
+        'arm64' = @{
+            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/osx-arm64/native"
             'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
             'ThirdParty' = @{
                 'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"

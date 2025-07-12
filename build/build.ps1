@@ -145,6 +145,11 @@ Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/linux-dac/" -
 Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/mac-dac/" -Force
 Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/mac-dac/" -Force
 
+# Copy SqlPackage executables
+Copy-Item "./temp/linux/SqlPackage" -Destination "./lib/linux-dac/SqlPackage" -Force
+Copy-Item "./temp/mac/SqlPackage" -Destination "./lib/mac-dac/SqlPackage" -Force
+Copy-Item "$dacPath\SqlPackage.exe" -Destination "./lib/win-dac/SqlPackage.exe" -Force
+
 # Core files are already in place from dotnet publish
 
 # Copy var/misc files to appropriate locations
