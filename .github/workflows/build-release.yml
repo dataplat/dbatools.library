@@ -236,7 +236,7 @@ jobs:
       run: |
         # Generate preview version in expected format
         $date = Get-Date -Format "yyyy.M.d"
-        $timestamp = Get-Date -Format "yyyyMMdd.HHmmss"
+        $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
         $branch = "${{ github.ref_name }}"
 
         # Check if this is a manually triggered release or version-based release
