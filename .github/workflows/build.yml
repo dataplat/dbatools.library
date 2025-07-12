@@ -38,7 +38,13 @@ jobs:
         Write-Host "Loaded dbatools.library version: $($module.Version)"
         Write-Host "Module path: $($module.Path)"
 
-    - uses: actions/upload-artifact@v4
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
       with:
-        name: library
-        path: lib
+        name: dbatools-library
+        path: |
+          lib/
+          dbatools.library.psd1
+          dbatools.library.psm1
+          private/
+          LICENSE

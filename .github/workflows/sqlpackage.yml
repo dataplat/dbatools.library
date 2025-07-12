@@ -1,10 +1,18 @@
 name: sqlpackage test
-on: [pull_request]
+on:
+  workflow_run:
+    workflows: ["Build and test library", "Build and Publish Preview Release"]
+    types:
+      - completed
+    branches: [ main, master, development ]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Module imports on all platforms
+  test:
+    name: Test SqlPackage on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     strategy:
       fail-fast: false
       matrix:
@@ -13,28 +21,108 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install and cache PowerShell modules
-      uses: potatoqualitee/psmodulecache@v5.1
+    - name: Download library artifacts (workflow_run)
+      if: github.event_name == 'workflow_run'
+      uses: actions/download-artifact@v4
       with:
-          modules-to-cache: dbatools.library:2023.1.29
+        name: dbatools-library
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        run-id: ${{ github.event.workflow_run.id }}
 
-    - name: Execute sqlpackage
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          6.0.x
+          8.0.x
+
+    - name: Build Module
+      if: github.event_name != 'workflow_run'
       shell: pwsh
       run: |
-        return
-        Import-Module ./dbatools.psd1 -ErrorAction Stop
-        (Get-DbaManagementObject).LoadTemplate -ne $null
-        $libpath = Split-Path -Path (Get-Module dbatools*library).Path
+        Write-Host "Building dbatools.library module..."
+        ./build/build.ps1
+        Write-Host "Build completed"
 
-        if ($IsWindows) {
-          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath lib, win, sqlpackage.exe
-        }
-        if ($IsMacOS) {
-          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath lib, mac, sqlpackage
-        }
-        if ($IsLinux) {
-          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath lib, sqlpackage
+    - name: Test SqlPackage
+      shell: pwsh
+      run: |
+        # Import the built module
+        Import-Module ./dbatools.library.psd1 -Force -ErrorAction Stop
+
+        # Get module info
+        $module = Get-Module dbatools.library
+        Write-Host "Loaded dbatools.library version: $($module.Version)"
+
+        # Display module version info
+        Write-Host "Module loaded successfully with version: $($module.Version)"
+        Write-Host "Module path: $($module.ModuleBase)"
+
+        # Determine SqlPackage path based on OS
+        $modulePath = $module.ModuleBase
+        if ($IsWindows -or $PSVersionTable.PSVersion.Major -eq 5) {
+            Write-Host "Testing Windows SqlPackage..."
+            $dacPath = Join-Path $modulePath "lib/win-dac"
+            $sqlPackageName = "SqlPackage.exe"
+        } elseif ($IsLinux) {
+            Write-Host "Testing Linux SqlPackage..."
+            $dacPath = Join-Path $modulePath "lib/linux-dac"
+            $sqlPackageName = "SqlPackage"
+        } elseif ($IsMacOS) {
+            Write-Host "Testing macOS SqlPackage..."
+            $dacPath = Join-Path $modulePath "lib/mac-dac"
+            $sqlPackageName = "SqlPackage"
+        } else {
+            Write-Error "Unknown operating system"
+            exit 1
         }
 
-        . $sqlpackage | Select-String "Specifies a name value pair" | Should -Not -BeNullorEmpty
+        # Check if SqlPackage directory exists
+        if (-not (Test-Path $dacPath)) {
+            Write-Error "SqlPackage directory not found: $dacPath"
+            Write-Host "Available directories in lib:"
+            Get-ChildItem (Join-Path $modulePath "lib") -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
+            exit 1
+        }
+
+        # Check if SqlPackage executable exists
+        $sqlPackagePath = Join-Path $dacPath $sqlPackageName
+        if (-not (Test-Path $sqlPackagePath)) {
+            Write-Error "SqlPackage executable not found: $sqlPackagePath"
+            Write-Host "Files in $dacPath:"
+            Get-ChildItem $dacPath | ForEach-Object { Write-Host "  - $($_.Name)" }
+            exit 1
+        }
+
+        Write-Host "SqlPackage found at: $sqlPackagePath"
+
+        # Make SqlPackage executable on non-Windows platforms
+        if ($IsLinux -or $IsMacOS) {
+            chmod +x $sqlPackagePath
+        }
+
+        # Test SqlPackage execution
+        try {
+            Write-Host "Testing SqlPackage execution..."
+            $versionOutput = & $sqlPackagePath /Version 2>&1
+            Write-Host "SqlPackage version: $versionOutput"
+
+            # Basic functionality test - show help
+            Write-Host "`nTesting SqlPackage help command..."
+            $helpOutput = & $sqlPackagePath /? 2>&1 | Select-Object -First 10
+            $helpOutput | ForEach-Object { Write-Host $_ }
+            Write-Host "... (output truncated)"
+
+            # Verify expected output from help
+            $helpString = $helpOutput -join "`n"
+            if ($helpString -match "Specifies a name value pair" -or $helpString -match "SqlPackage" -or $helpString -match "Command") {
+                Write-Host "`nSqlPackage test completed successfully!"
+            } else {
+                Write-Error "SqlPackage help output does not contain expected content"
+                exit 1
+            }
+        } catch {
+            Write-Error "Failed to execute SqlPackage: $_"
+            exit 1
+        }
 
