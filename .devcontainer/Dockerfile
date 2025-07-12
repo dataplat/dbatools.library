@@ -32,6 +32,9 @@ RUN mkdir -p /home/vscode/.config/powershell && \
     chmod +x /home/vscode/*.ps1 && \
     chown -R vscode:vscode /home/vscode
 
+# stfu about my multi workspace project
+RUN git config --system --add safe.directory '*'
+
 # Switch to non-root user for local install
 USER vscode
 WORKDIR /home/vscode
