@@ -102,8 +102,6 @@ function Wait-SpecificMsiProcess {
         [int]$TimeoutMinutes = 30
     )
 
-    $timeoutTime = (Get-Date).AddMinutes($TimeoutMinutes)
-
     Write-Host "Waiting for MSI process $ProcessId to complete..." -ForegroundColor Yellow
 
     try {
