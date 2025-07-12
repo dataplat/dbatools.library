@@ -1,0 +1,16 @@
+services:
+  default:
+    environment:
+      # Default environment variables with fallback values
+      - ACCEPT_EULA=${ACCEPT_EULA:-Y}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GITHUB_PAT=${GITHUB_PAT:-}
+      - AZURE_API_KEY=${AZURE_API_KEY:-}
+      - AZURE_API_BASE=${AZURE_API_BASE:-}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../..:/workspaces

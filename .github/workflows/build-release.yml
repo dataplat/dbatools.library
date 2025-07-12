@@ -1,0 +1,304 @@
+name: Build and Publish Preview Release
+
+# This workflow builds the module and creates a preview release on GitHub
+# It triggers automatically when:
+# - The module version contains "preview" (checked on every push)
+# - Manually triggered via workflow_dispatch (useful when module is not found on PowerShell Gallery)
+#
+# To trigger a preview release:
+# 1. Set ModuleVersion in dbatools.library.psd1 to include "preview" (e.g., '2025.7.11-preview')
+# 2. OR manually trigger the workflow from GitHub Actions tab
+
+on:
+  push:
+    # Runs on any branch, checks module version for "preview"
+  pull_request:
+  workflow_dispatch:
+    # Manual trigger for when module is not available on PowerShell Gallery
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          6.0.x
+
+    - name: Install .NET Framework targeting packs
+      shell: pwsh
+      run: |
+        # Install .NET Framework developer packs for building
+        choco install netfx-4.7.2-devpack -y --no-progress
+
+    - name: Build library
+      shell: pwsh
+      run: |
+        # Run the build script
+        .\build\build.ps1
+
+    - name: Verify build output
+      shell: pwsh
+      run: |
+        # Check that all expected directories exist
+        $root = Get-Location
+        $expectedPaths = @(
+          "lib\core",
+          "lib\desktop",
+          "lib\win-dac",
+          "lib\linux-dac",
+          "lib\mac-dac",
+          "lib\third-party\XESmartTarget",
+          "lib\third-party\bogus\core",
+          "lib\third-party\bogus\desktop",
+          "lib\third-party\LumenWorks\core",
+          "lib\third-party\LumenWorks\desktop"
+        )
+
+        $missingPaths = @()
+        foreach ($path in $expectedPaths) {
+          if (-not (Test-Path (Join-Path $root $path))) {
+            $missingPaths += $path
+          }
+        }
+
+        if ($missingPaths.Count -gt 0) {
+          Write-Error "Missing expected paths: $($missingPaths -join ', ')"
+          exit 1
+        }
+
+        Write-Host "All expected paths verified successfully"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dbatools-library
+        path: |
+          lib/
+          dbatools.library.psd1
+          dbatools.library.psm1
+          private/
+          LICENSE
+
+    - name: Upload release zip
+      uses: actions/upload-artifact@v4
+      with:
+        name: dbatools-library-zip
+        path: dbatools.library.zip
+
+  test-sqlpackage:
+    name: Test SqlPackage on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: build-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download library artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dbatools-library
+
+    - name: Test SqlPackage
+      shell: pwsh
+      run: |
+        # Import the built module
+        Import-Module ./dbatools.library.psd1 -Force -ErrorAction Stop
+
+        # Get module info
+        $module = Get-Module dbatools.library
+        Write-Host "Loaded dbatools.library version: $($module.Version)"
+
+        # Display module version info
+        Write-Host "Module loaded successfully with version: $($module.Version)"
+        Write-Host "Module path: $($module.ModuleBase)"
+
+        # Determine SqlPackage path based on OS
+        $modulePath = $module.ModuleBase
+        if ($IsWindows -or $PSVersionTable.PSVersion.Major -eq 5) {
+            Write-Host "Testing Windows SqlPackage..."
+            $dacPath = Join-Path $modulePath "lib/win-dac"
+            $sqlPackageName = "SqlPackage.exe"
+        } elseif ($IsLinux) {
+            Write-Host "Testing Linux SqlPackage..."
+            $dacPath = Join-Path $modulePath "lib/linux-dac"
+            $sqlPackageName = "SqlPackage"
+        } elseif ($IsMacOS) {
+            Write-Host "Testing macOS SqlPackage..."
+            $dacPath = Join-Path $modulePath "lib/mac-dac"
+            $sqlPackageName = "SqlPackage"
+        } else {
+            Write-Error "Unknown operating system"
+            exit 1
+        }
+
+        # Check if SqlPackage directory exists
+        if (-not (Test-Path $dacPath)) {
+            Write-Error "SqlPackage directory not found: $dacPath"
+            Write-Host "Available directories in lib:"
+            Get-ChildItem (Join-Path $modulePath "lib") -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
+            exit 1
+        }
+
+        # Check if SqlPackage executable exists
+        $sqlPackagePath = Join-Path $dacPath $sqlPackageName
+        if (-not (Test-Path $sqlPackagePath)) {
+            Write-Error "SqlPackage executable not found: $sqlPackagePath"
+            Write-Host "Files in $dacPath :"
+            Get-ChildItem $dacPath | ForEach-Object { Write-Host "  - $($_.Name)" }
+            exit 1
+        }
+
+        Write-Host "SqlPackage found at: $sqlPackagePath"
+
+        # Make SqlPackage executable on non-Windows platforms
+        if ($IsLinux -or $IsMacOS) {
+            chmod +x $sqlPackagePath
+        }
+
+        # Test SqlPackage execution
+        try {
+            Write-Host "Testing SqlPackage execution..."
+            $versionOutput = & $sqlPackagePath /Version 2>&1
+            Write-Host "SqlPackage version: $versionOutput"
+
+            # Basic functionality test - show help
+            Write-Host "`nTesting SqlPackage help command..."
+            $helpOutput = & $sqlPackagePath /? 2>&1 | Select-Object -First 10
+            $helpOutput | ForEach-Object { Write-Host $_ }
+            Write-Host "... (output truncated)"
+
+            # Verify expected output from help
+            $helpString = $helpOutput -join "`n"
+            if ($helpString -match "Specifies a name value pair" -or $helpString -match "SqlPackage" -or $helpString -match "Command") {
+                Write-Host "`nSqlPackage test completed successfully!"
+            } else {
+                Write-Error "SqlPackage help output does not contain expected content"
+                exit 1
+            }
+        } catch {
+            Write-Error "Failed to execute SqlPackage: $_"
+            exit 1
+        }
+
+  create-preview-release:
+    needs: [build-windows, test-sqlpackage]
+    runs-on: windows-latest
+    # Create release if manually triggered OR if version contains "preview"
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check if preview release should be created
+      id: check_preview
+      shell: pwsh
+      run: |
+        $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
+        $version = $manifest.ModuleVersion
+        Write-Host "Module version: $version"
+
+        # Check if version contains "preview" or if manually triggered
+        $shouldRelease = $false
+        if ($version -like "*preview*") {
+          Write-Host "Version contains 'preview' - will create release"
+          $shouldRelease = $true
+        } elseif ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          Write-Host "Manually triggered - will create release"
+          $shouldRelease = $true
+        } else {
+          Write-Host "No preview release needed"
+        }
+
+        "should_release=$shouldRelease" | Out-File -Append $env:GITHUB_OUTPUT
+
+    - name: Download release zip
+      if: steps.check_preview.outputs.should_release == 'True'
+      uses: actions/download-artifact@v4
+      with:
+        name: dbatools-library-zip
+
+    - name: Generate preview version and update manifest
+      if: steps.check_preview.outputs.should_release == 'True'
+      id: get_version
+      shell: pwsh
+      run: |
+        # Generate preview version in expected format
+        $date = Get-Date -Format "yyyy.M.d"
+        $timestamp = Get-Date -Format "yyyyMMdd.HHmmss"
+        $branch = "${{ github.ref_name }}"
+
+        # Check if this is a manually triggered release or version-based release
+        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          # For manual triggers, always create preview version
+          $previewVersion = "$date-preview-$branch-$timestamp"
+        } else {
+          # For version-based releases, check if version already contains preview
+          $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
+          $currentVersion = $manifest.ModuleVersion
+          if ($currentVersion -like "*preview*") {
+            # Use existing preview version and enhance it with branch and timestamp
+            $previewVersion = "$currentVersion-$branch-$timestamp"
+          } else {
+            # Create new preview version
+            $previewVersion = "$date-preview-$branch-$timestamp"
+          }
+        }
+
+        Write-Host "Preview version: $previewVersion"
+        Write-Host "Branch: $branch"
+
+        # Update module manifest with preview version
+        $manifestPath = "./dbatools.library.psd1"
+        $content = Get-Content $manifestPath -Raw
+        $content = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$previewVersion'"
+        Set-Content $manifestPath $content
+
+        Write-Host "Updated module manifest with version: $previewVersion"
+
+        "version=$previewVersion" | Out-File -Append $env:GITHUB_OUTPUT
+        "branch=$branch" | Out-File -Append $env:GITHUB_OUTPUT
+
+    - name: Create Preview Release
+      if: steps.check_preview.outputs.should_release == 'True'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.get_version.outputs.version }}
+        name: Preview Release v${{ steps.get_version.outputs.version }}
+        body: |
+          This is an automated preview release.
+
+          **Trigger Reason:** ${{ github.event_name == 'workflow_dispatch' && 'Manual workflow dispatch' || 'Version contains preview' }}
+
+          **Module Version:** ${{ steps.get_version.outputs.version }}
+          **Branch:** ${{ steps.get_version.outputs.branch }}
+          **Commit:** ${{ github.sha }}
+          **Commit Message:** ${{ github.event.head_commit.message }}
+          **Build Date:** ${{ github.event.head_commit.timestamp }}
+
+          ## Installation
+
+          ```powershell
+          # Download and extract the zip file
+          Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/v${{ steps.get_version.outputs.version }}/dbatools.library.zip" -OutFile dbatools.library.zip
+          Expand-Archive -Path dbatools.library.zip -DestinationPath . -Force
+
+          # Import the module
+          Import-Module ./dbatools.library/dbatools.library.psd1
+          ```
+
+          ⚠️ **Note:** This is a preview release and should not be used in production.
+        draft: false
+        prerelease: true
+        files: dbatools.library.zip
