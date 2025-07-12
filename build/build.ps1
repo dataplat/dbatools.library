@@ -155,19 +155,33 @@ if (!(Test-Path "./lib/third-party/bogus/desktop")) {
     New-Item -ItemType Directory -Path "./lib/third-party/bogus/desktop" -Force
 }
 
-# Copy Bogus.dll for .NET Framework
+# Copy Bogus.dll for .NET Framework (handle case sensitivity)
 if (Test-Path "./temp/bogus/lib/net40/bogus.dll") {
-    Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./lib/third-party/bogus/desktop/bogus.dll" -Force
+    Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./lib/third-party/bogus/desktop/Bogus.dll" -Force
+} elseif (Test-Path "./temp/bogus/lib/net40/Bogus.dll") {
+    Copy-Item "./temp/bogus/lib/net40/Bogus.dll" -Destination "./lib/third-party/bogus/desktop/Bogus.dll" -Force
 } else {
     Write-Warning "Bogus.dll for .NET Framework (net40) not found at expected location"
 }
 
-# Copy Bogus.dll for .NET Core
+# Copy Bogus.dll for .NET Core (handle case sensitivity)
+$bogusCoreCopied = $false
+# Try net6.0 first (both lowercase and uppercase)
 if (Test-Path "./temp/bogus/lib/net6.0/bogus.dll") {
-    Copy-Item "./temp/bogus/lib/net6.0/bogus.dll" -Destination "./lib/third-party/bogus/core/bogus.dll" -Force
+    Copy-Item "./temp/bogus/lib/net6.0/bogus.dll" -Destination "./lib/third-party/bogus/core/Bogus.dll" -Force
+    $bogusCoreCopied = $true
+} elseif (Test-Path "./temp/bogus/lib/net6.0/Bogus.dll") {
+    Copy-Item "./temp/bogus/lib/net6.0/Bogus.dll" -Destination "./lib/third-party/bogus/core/Bogus.dll" -Force
+    $bogusCoreCopied = $true
 } elseif (Test-Path "./temp/bogus/lib/netstandard2.0/bogus.dll") {
-    Copy-Item "./temp/bogus/lib/netstandard2.0/bogus.dll" -Destination "./lib/third-party/bogus/core/bogus.dll" -Force
-} else {
+    Copy-Item "./temp/bogus/lib/netstandard2.0/bogus.dll" -Destination "./lib/third-party/bogus/core/Bogus.dll" -Force
+    $bogusCoreCopied = $true
+} elseif (Test-Path "./temp/bogus/lib/netstandard2.0/Bogus.dll") {
+    Copy-Item "./temp/bogus/lib/netstandard2.0/Bogus.dll" -Destination "./lib/third-party/bogus/core/Bogus.dll" -Force
+    $bogusCoreCopied = $true
+}
+
+if (-not $bogusCoreCopied) {
     Write-Warning "Bogus.dll for .NET Core not found in expected locations"
 }
 
@@ -197,6 +211,14 @@ if (Test-Path "./temp/linux") {
         New-Item -ItemType Directory -Path "./lib/linux-dac" -Force
     }
     Copy-Item "./temp/linux/*" -Destination "./lib/linux-dac/" -Recurse -Force
+
+    # Fix SqlPackage naming for Linux - rename lowercase to uppercase if it exists
+    $linuxSqlPackageLowerCase = "./lib/linux-dac/sqlpackage"
+    $linuxSqlPackageUpperCase = "./lib/linux-dac/SqlPackage"
+    if (Test-Path $linuxSqlPackageLowerCase) {
+        Write-Host "Renaming lowercase 'sqlpackage' to 'SqlPackage' for Linux compatibility"
+        Move-Item $linuxSqlPackageLowerCase $linuxSqlPackageUpperCase -Force
+    }
 } else {
     Write-Warning "Linux SqlPackage path not found: ./temp/linux"
 }
