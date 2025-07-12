@@ -4,39 +4,41 @@ defaults:
   run:
     shell: pwsh
 jobs:
-  linux-tests:
-    runs-on: ubuntu-latest
+  # Linux tests are disabled - build-core.ps1 script not found
+  # Keeping Windows build test only for now
+  windows-tests:
+    runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          6.0.x
+
+    - name: Install .NET Framework targeting packs
+      shell: pwsh
+      run: |
+        # Install .NET Framework developer packs for building
+        choco install netfx-4.7.2-devpack -y --no-progress
 
     - name: Build the library
       shell: pwsh
       run: |
-        sudo apt-get install msitools -y
-        ./build/build-core.ps1
+        ./build/build.ps1
 
-    - name: Execute sqlpackage
+    - name: Test module import
       shell: pwsh
       run: |
-        return
         Import-Module ./dbatools.library.psd1 -Force
-        
-        $libpath = Split-Path -Path (Get-Module dbatools*library).Path
+        $module = Get-Module dbatools.library
+        Write-Host "Loaded dbatools.library version: $($module.Version)"
+        Write-Host "Module path: $($module.Path)"
 
-        if ($IsWindows) {
-          $sqlpackage = "./lib/sqlpackage/windows/sqlpackage.exe"
-        }
-        if ($IsMacOS) {
-          $sqlpackage = "./lib/sqlpackage/mac/sqlpackage"
-        }
-        if ($IsLinux) {
-          $sqlpackage = "./lib/net6.0/sqlpackage"
-        }
-
-        . $sqlpackage | Select-String "Specifies a name value pair" | Should -Not -BeNullorEmpty
-
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: library
         path: lib

@@ -76,7 +76,7 @@ jobs:
         Write-Host "All expected paths verified successfully"
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dbatools-library
         path: |
@@ -87,7 +87,7 @@ jobs:
           LICENSE
 
     - name: Upload release zip
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dbatools-library-zip
         path: dbatools.library.zip
@@ -126,7 +126,7 @@ jobs:
 
     - name: Download release zip
       if: steps.check_preview.outputs.should_release == 'True'
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: dbatools-library-zip
 
