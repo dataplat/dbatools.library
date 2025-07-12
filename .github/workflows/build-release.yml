@@ -1,0 +1,184 @@
+name: Build and Publish Preview Release
+
+# This workflow builds the module and creates a preview release on GitHub
+# It triggers automatically when:
+# - The module version contains "preview" (checked on every push)
+# - Manually triggered via workflow_dispatch (useful when module is not found on PowerShell Gallery)
+#
+# To trigger a preview release:
+# 1. Set ModuleVersion in dbatools.library.psd1 to include "preview" (e.g., '2025.7.11-preview')
+# 2. OR manually trigger the workflow from GitHub Actions tab
+
+on:
+  push:
+    # Runs on any branch, checks module version for "preview"
+  pull_request:
+  workflow_dispatch:
+    # Manual trigger for when module is not available on PowerShell Gallery
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          6.0.x
+
+    - name: Install .NET Framework targeting packs
+      shell: pwsh
+      run: |
+        # Install .NET Framework developer packs for building
+        choco install netfx-4.7.2-devpack -y --no-progress
+
+    - name: Build library
+      shell: pwsh
+      run: |
+        # Run the build script
+        .\build\build.ps1
+
+    - name: Verify build output
+      shell: pwsh
+      run: |
+        # Check that all expected directories exist
+        $root = Get-Location
+        $expectedPaths = @(
+          "lib\core",
+          "lib\desktop",
+          "lib\win-dac",
+          "lib\linux-dac",
+          "lib\mac-dac",
+          "lib\third-party\XESmartTarget",
+          "lib\third-party\bogus\core",
+          "lib\third-party\bogus\desktop",
+          "lib\third-party\LumenWorks\core",
+          "lib\third-party\LumenWorks\desktop"
+        )
+
+        $missingPaths = @()
+        foreach ($path in $expectedPaths) {
+          if (-not (Test-Path (Join-Path $root $path))) {
+            $missingPaths += $path
+          }
+        }
+
+        if ($missingPaths.Count -gt 0) {
+          Write-Error "Missing expected paths: $($missingPaths -join ', ')"
+          exit 1
+        }
+
+        Write-Host "All expected paths verified successfully"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dbatools-library
+        path: |
+          lib/
+          dbatools.library.psd1
+          dbatools.library.psm1
+          private/
+          LICENSE
+
+    - name: Upload release zip
+      uses: actions/upload-artifact@v3
+      with:
+        name: dbatools-library-zip
+        path: dbatools.library.zip
+
+  create-preview-release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    # Create release if manually triggered OR if version contains "preview"
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check if preview release should be created
+      id: check_preview
+      shell: pwsh
+      run: |
+        $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
+        $version = $manifest.ModuleVersion
+        Write-Host "Module version: $version"
+
+        # Check if version contains "preview" or if manually triggered
+        $shouldRelease = $false
+        if ($version -like "*preview*") {
+          Write-Host "Version contains 'preview' - will create release"
+          $shouldRelease = $true
+        } elseif ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          Write-Host "Manually triggered - will create release"
+          $shouldRelease = $true
+        } else {
+          Write-Host "No preview release needed"
+        }
+
+        "should_release=$shouldRelease" | Out-File -Append $env:GITHUB_OUTPUT
+
+    - name: Download release zip
+      if: steps.check_preview.outputs.should_release == 'True'
+      uses: actions/download-artifact@v3
+      with:
+        name: dbatools-library-zip
+
+    - name: Get version from module
+      if: steps.check_preview.outputs.should_release == 'True'
+      id: get_version
+      shell: pwsh
+      run: |
+        $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
+        $version = $manifest.ModuleVersion
+        Write-Host "Module version: $version"
+        "version=$version" | Out-File -Append $env:GITHUB_OUTPUT
+
+        # Create preview tag based on version and timestamp
+        $timestamp = Get-Date -Format "yyyyMMdd.HHmmss"
+        $branch = "${{ github.ref_name }}"
+        $shortSha = "${{ github.sha }}".Substring(0,7)
+        $previewTag = "v$version-preview-$timestamp-$shortSha"
+        Write-Host "Preview tag: $previewTag"
+        Write-Host "Branch: $branch"
+        "preview_tag=$previewTag" | Out-File -Append $env:GITHUB_OUTPUT
+        "branch=$branch" | Out-File -Append $env:GITHUB_OUTPUT
+
+    - name: Create Preview Release
+      if: steps.check_preview.outputs.should_release == 'True'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.preview_tag }}
+        name: Preview Release ${{ steps.get_version.outputs.version }}
+        body: |
+          This is an automated preview release.
+
+          **Trigger Reason:** ${{ github.event_name == 'workflow_dispatch' && 'Manual workflow dispatch' || 'Version contains preview' }}
+
+          **Module Version:** ${{ steps.get_version.outputs.version }}
+          **Branch:** ${{ steps.get_version.outputs.branch }}
+          **Commit:** ${{ github.sha }}
+          **Commit Message:** ${{ github.event.head_commit.message }}
+          **Build Date:** ${{ github.event.head_commit.timestamp }}
+
+          ## Installation
+
+          ```powershell
+          # Download and extract the zip file
+          Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.preview_tag }}/dbatools.library.zip" -OutFile dbatools.library.zip
+          Expand-Archive -Path dbatools.library.zip -DestinationPath . -Force
+
+          # Import the module
+          Import-Module ./dbatools.library/dbatools.library.psd1
+          ```
+
+          ⚠️ **Note:** This is a preview release and should not be used in production.
+        draft: false
+        prerelease: true
+        files: dbatools.library.zip

@@ -1,47 +1,55 @@
 $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
-Push-Location C:\github\dbatools.library\
+
+# Get script root and project root
+$scriptroot = $PSScriptRoot
+if (-not $scriptroot) {
+    $scriptroot = Split-Path -Path $MyInvocation.MyCommand.Path
+}
+$root = Split-Path -Path $scriptroot
+Push-Location $root
 
 # Update module version to today's date
 $today = Get-Date -Format "yyyy.M.d"
-$psd1Path = Join-Path $PSScriptRoot "..\dbatools.library.psd1"
+$psd1Path = Join-Path $root "dbatools.library.psd1"
 $psd1Content = Get-Content $psd1Path -Raw
 $psd1Content = $psd1Content -replace "ModuleVersion\s*=\s*'[\d\.]+'", "ModuleVersion          = '$today'"
 Set-Content -Path $psd1Path -Value $psd1Content -NoNewline
 Write-Host "Updated module version to: $today"
 
-# Silently clean up previous build artifacts
 # Clean up previous build artifacts
-if (Test-Path "C:\github\dbatools.library\lib") {
-    Remove-Item -Path lib -Recurse -ErrorAction SilentlyContinue
-    Remove-Item -Path temp -Recurse -ErrorAction SilentlyContinue
-    Remove-Item -Path third-party-licenses -Recurse -ErrorAction SilentlyContinue
-}
+$libPath = Join-Path $root "lib"
+$tempPath = Join-Path $root "temp"
+$licensePath = Join-Path $root "third-party-licenses"
 
-$scriptroot = $PSScriptRoot
-if (-not $scriptroot) {
-    $scriptroot = "C:\github\dbatools.library\build"
+if (Test-Path $libPath) {
+    Remove-Item -Path $libPath -Recurse -ErrorAction SilentlyContinue
 }
-$root = Split-Path -Path $scriptroot
+if (Test-Path $tempPath) {
+    Remove-Item -Path $tempPath -Recurse -ErrorAction SilentlyContinue
+}
+if (Test-Path $licensePath) {
+    Remove-Item -Path $licensePath -Recurse -ErrorAction SilentlyContinue
+}
 Push-Location "$root\project"
 
 dotnet clean
 # Publish .NET Framework (desktop)
 Write-Host "Publishing .NET Framework build..."
-dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output C:\github\dbatools.library\lib\desktop --nologo --self-contained true | Out-String -OutVariable build
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output (Join-Path $root "lib\desktop") --nologo --self-contained true | Out-String -OutVariable build
 
 # Verify desktop publish results
 Write-Host "Verifying desktop publish..."
-if (Test-Path "C:\github\dbatools.library\lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll") {
+if (Test-Path (Join-Path $root "lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll")) {
     Write-Host "Found SNI x64 DLL in desktop output"
-    $dllInfo = Get-Item "C:\github\dbatools.library\lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll"
+    $dllInfo = Get-Item (Join-Path $root "lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll")
     Write-Host "DLL Size: $($dllInfo.Length) bytes"
 } else {
     Write-Host "WARNING: SNI x64 DLL not found in desktop output"
 }
 
 # Publish .NET 8 (core)
-dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output C:\github\dbatools.library\lib\core --nologo --self-contained true | Out-String -OutVariable build
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output (Join-Path $root "lib\core") --nologo --self-contained true | Out-String -OutVariable build
 
 # Run tests specifically for dbatools.Tests
 # dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
@@ -50,7 +58,7 @@ Pop-Location
 Remove-Item -Path lib/net472 -Recurse -ErrorAction SilentlyContinue
 Remove-Item -Path lib/net8.0 -Recurse -ErrorAction SilentlyContinue
 
-$tempdir = "C:\temp"
+$tempdir = Join-Path $env:TEMP "dbatools-build"
 
 # Create all required directories
 $null = New-Item -ItemType Directory $tempdir -Force -ErrorAction Ignore
@@ -146,7 +154,7 @@ Get-ChildItem -Path "./lib" -Recurse -Include "*.pdf","*.xml" | Remove-Item -For
 $null = New-Item -ItemType Directory -Path "./private" -Force -ErrorAction SilentlyContinue
 
 # Ensure System.Runtime.CompilerServices.Unsafe is in place
-$nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination "C:\github\dbatools.library\lib\core\" -PassThru | Out-Null
+$nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination (Join-Path $root "lib\core\") -PassThru | Out-Null
 # Remove lib/release folder
 Remove-Item -Path "./lib/release" -Recurse -Force -ErrorAction SilentlyContinue
 
