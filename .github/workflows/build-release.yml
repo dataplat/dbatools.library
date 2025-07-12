@@ -243,30 +243,31 @@ jobs:
         # Check if this is a manually triggered release or version-based release
         if ("${{ github.event_name }}" -eq "workflow_dispatch") {
           # For manual triggers, always create preview version
-          $previewVersion = "$date-preview$branch$timestamp"
+          $previewVersion = "$date-preview-$branch-$timestamp"
         } else {
           # For version-based releases, check if version already contains preview
           $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
           $currentVersion = $manifest.ModuleVersion
           if ($currentVersion -like "*preview*") {
             # Use existing preview version and enhance it with branch and timestamp
-            $previewVersion = "$currentVersion$branch$timestamp"
+            $previewVersion = "$currentVersion-$branch-$timestamp"
           } else {
             # Create new preview version
-            $previewVersion = "$date-preview$branch$timestamp"
+            $previewVersion = "$date-preview-$branch-$timestamp"
           }
         }
 
         Write-Host "Preview version: $previewVersion"
         Write-Host "Branch: $branch"
 
-        # Update module manifest with preview version
+        # Update module manifest with preview version (strip everything after -preview for psd1)
+        $psd1Version = if ($previewVersion -match '^(.*?-preview)') { $matches[1] } else { $previewVersion }
         $manifestPath = "./dbatools.library.psd1"
         $content = Get-Content $manifestPath -Raw
-        $content = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$previewVersion'"
+        $content = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$psd1Version'"
         Set-Content $manifestPath $content
 
-        Write-Host "Updated module manifest with version: $previewVersion"
+        Write-Host "Updated module manifest with version: $psd1Version (full preview version: $previewVersion)"
 
         "version=$previewVersion" >> $env:GITHUB_OUTPUT
         "branch=$branch" >> $env:GITHUB_OUTPUT
