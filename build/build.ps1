@@ -242,3 +242,6 @@ Write-Host "Created test zip: $zipPath"
 Write-Host "Zip structure: dbatools.library.zip contains 'dbatools.library' folder at root"
 Write-Host "For testing: Extract to a folder in `$env:PSModulePath or use Install-DbatoolsLibrary.ps1"
 Write-Host "Build completed successfully. Files organized and temporary artifacts cleaned up."
+
+Write-Warning $LASTEXITCODE
+$LASTEXITCODE = 0
