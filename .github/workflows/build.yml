@@ -1,6 +1,5 @@
 name: Build and test library
-on:
-  workflow_dispatch:
+on: [push]
 defaults:
   run:
     shell: pwsh

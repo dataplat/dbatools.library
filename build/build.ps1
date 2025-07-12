@@ -157,16 +157,16 @@ $dacPath = ".\temp\dacfull\Microsoft SQL Server\170\DAC\bin"
 
 # Copy DAC files for each platform
 # Windows
-Copy-Item "$dacPath\Microsoft.SqlServer.Dac.dll" -Destination "./lib/core/win-dac/" -Force
-Copy-Item "$dacPath\Microsoft.SqlServer.Dac.Extensions.dll" -Destination "./lib/core/win-dac/" -Force
-Copy-Item "$dacPath\Microsoft.Data.Tools.Schema.Sql.dll" -Destination "./lib/core/win-dac/" -Force
-Copy-Item "$dacPath\Microsoft.SqlServer.TransactSql.ScriptDom.dll" -Destination "./lib/core/win-dac/" -Force
+Copy-Item "$dacPath\Microsoft.SqlServer.Dac.dll" -Destination "./lib/win-dac/" -Force
+Copy-Item "$dacPath\Microsoft.SqlServer.Dac.Extensions.dll" -Destination "./lib/win-dac/" -Force
+Copy-Item "$dacPath\Microsoft.Data.Tools.Schema.Sql.dll" -Destination "./lib/win-dac/" -Force
+Copy-Item "$dacPath\Microsoft.SqlServer.TransactSql.ScriptDom.dll" -Destination "./lib/win-dac/" -Force
 
 # Linux and macOS
-Copy-Item "./temp/linux/Microsoft.SqlServer.Dac*" -Destination "./lib/core/linux-dac/" -Force
-Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/core/linux-dac/" -Force
-Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/core/mac-dac/" -Force
-Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/core/mac-dac/" -Force
+Copy-Item "./temp/linux/Microsoft.SqlServer.Dac*" -Destination "./lib/linux-dac/" -Force
+Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/linux-dac/" -Force
+Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/mac-dac/" -Force
+Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/mac-dac/" -Force
 
 # Core files are already in place from dotnet publish
 
