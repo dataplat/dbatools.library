@@ -1,6 +1,9 @@
 $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
 
+# Import MSI waiting functions
+. "$PSScriptRoot\Wait-MsiInstall.ps1"
+
 # Get script root and project root
 $scriptroot = $PSScriptRoot
 if (-not $scriptroot) {
@@ -98,10 +101,30 @@ $ProgressPreference = "Continue"
 7z x .\temp\sqlpackage-linux.zip "-o.\temp\linux" -y
 7z x .\temp\sqlpackage-macos.zip "-o.\temp\mac" -y
 
-msiexec /a $(Resolve-Path .\temp\DacFramework.msi) /qb TARGETDIR=$(Resolve-Path .\temp\dacfull)
-Start-Sleep 3
-msiexec /a $(Resolve-Path .\temp\XESmartTarget_x64.msi) /qb TARGETDIR=$(Resolve-Path .\temp\xe)
-Start-Sleep 3
+# Install DacFramework MSI with proper waiting
+Write-Host "Installing DacFramework MSI..."
+$dacMsiPath = Resolve-Path .\temp\DacFramework.msi
+$dacTargetDir = Resolve-Path .\temp\dacfull
+$dacProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/a", "`"$dacMsiPath`"", "/qb", "TARGETDIR=`"$dacTargetDir`"" -PassThru -Wait
+$dacExitCode = $dacProcess.ExitCode
+Write-Host "DacFramework MSI installation completed with exit code: $dacExitCode"
+if ($dacExitCode -ne 0) {
+    Write-Warning "DacFramework MSI installation may have failed with exit code: $dacExitCode"
+}
+
+# Small delay to ensure resources are released
+Start-Sleep -Seconds 2
+
+# Install XESmartTarget MSI with proper waiting
+Write-Host "Installing XESmartTarget MSI..."
+$xeTargetDir = Resolve-Path .\temp\xe
+$xeMsiPath = Resolve-Path .\temp\XESmartTarget_x64.msi
+$xeProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/a", "`"$xeMsiPath`"", "/qb", "TARGETDIR=`"$xeTargetDir`"" -PassThru -Wait
+$xeExitCode = $xeProcess.ExitCode
+Write-Host "XESmartTarget MSI installation completed with exit code: $xeExitCode"
+if ($xeExitCode -ne 0) {
+    Write-Warning "XESmartTarget MSI installation may have failed with exit code: $xeExitCode"
+}
 
 # Copy XESmartTarget preserving structure
 robocopy ./temp/xe/XESmartTarget ./lib/third-party/XESmartTarget /E /NFL /NDL /NJH /NJS /nc /ns /np
@@ -144,11 +167,6 @@ Copy-Item "./temp/linux/Microsoft.SqlServer.Dac*" -Destination "./lib/linux-dac/
 Copy-Item "./temp/linux/Microsoft.Data.Tools*" -Destination "./lib/linux-dac/" -Force
 Copy-Item "./temp/mac/Microsoft.SqlServer.Dac*" -Destination "./lib/mac-dac/" -Force
 Copy-Item "./temp/mac/Microsoft.Data.Tools*" -Destination "./lib/mac-dac/" -Force
-
-# Copy SqlPackage executables
-Copy-Item "./temp/linux/SqlPackage" -Destination "./lib/linux-dac/SqlPackage" -Force
-Copy-Item "./temp/mac/SqlPackage" -Destination "./lib/mac-dac/SqlPackage" -Force
-Copy-Item "$dacPath\SqlPackage.exe" -Destination "./lib/win-dac/SqlPackage.exe" -Force
 
 # Core files are already in place from dotnet publish
 
