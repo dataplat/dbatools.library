@@ -221,16 +221,16 @@ jobs:
           Write-Host "No preview release needed"
         }
 
-        "should_release=$shouldRelease" | Out-File -Append $env:GITHUB_OUTPUT
+        "should_release=$($shouldRelease.ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
     - name: Download release zip
-      if: steps.check_preview.outputs.should_release == 'True'
+      if: steps.check_preview.outputs.should_release == 'true'
       uses: actions/download-artifact@v4
       with:
         name: dbatools-library-zip
 
     - name: Generate preview version and update manifest
-      if: steps.check_preview.outputs.should_release == 'True'
+      if: steps.check_preview.outputs.should_release == 'true'
       id: get_version
       shell: pwsh
       run: |
@@ -238,21 +238,22 @@ jobs:
         $date = Get-Date -Format "yyyy.M.d"
         $timestamp = Get-Date -Format "yyyyMMddHHmmss"
         $branch = "${{ github.ref_name }}"
+        $branch = ($branch -replace '[^A-Za-z0-9]', '')
 
         # Check if this is a manually triggered release or version-based release
         if ("${{ github.event_name }}" -eq "workflow_dispatch") {
           # For manual triggers, always create preview version
-          $previewVersion = "$date-preview-$branch$timestamp"
+          $previewVersion = "$date-preview$branch$timestamp"
         } else {
           # For version-based releases, check if version already contains preview
           $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
           $currentVersion = $manifest.ModuleVersion
           if ($currentVersion -like "*preview*") {
             # Use existing preview version and enhance it with branch and timestamp
-            $previewVersion = "$currentVersion-$branch-$timestamp"
+            $previewVersion = "$currentVersion$branch$timestamp"
           } else {
             # Create new preview version
-            $previewVersion = "$date-preview-$branch$timestamp"
+            $previewVersion = "$date-preview$branch$timestamp"
           }
         }
 
@@ -267,11 +268,11 @@ jobs:
 
         Write-Host "Updated module manifest with version: $previewVersion"
 
-        "version=$previewVersion" | Out-File -Append $env:GITHUB_OUTPUT
-        "branch=$branch" | Out-File -Append $env:GITHUB_OUTPUT
+        "version=$previewVersion" >> $env:GITHUB_OUTPUT
+        "branch=$branch" >> $env:GITHUB_OUTPUT
 
     - name: Create Preview Release
-      if: steps.check_preview.outputs.should_release == 'True'
+      if: steps.check_preview.outputs.should_release == 'true'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ steps.get_version.outputs.version }}
