@@ -5,8 +5,8 @@ function Initialize-DbatoolsAssemblyRedirector {
     [CmdletBinding()]
     param()
 
-    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib")
-    $dir = ("$dir\").Replace('\', '\\')
+    # Use the library root directly without adding "lib"
+    $dir = ("$script:libraryroot\").Replace('\', '\\')
 
     # Only create type if not already defined
     if (-not ("Redirector" -as [type]) -and $PSVersionTable.PSEdition -ne 'Core') {
@@ -35,14 +35,27 @@ public class Redirector
         else if (Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") == "ARM")
             arch = "arm";
 
-        // Try both native paths
-        string nativePath = "$dir" + "core\\runtimes\\win-" + arch + "\\native";
-        string sniDll = System.IO.Path.Combine(nativePath, "Microsoft.Data.SqlClient.SNI.dll");
+        // Try desktop path first for Windows PowerShell
+        string desktopPath = "$dir" + "desktop\\lib\\runtimes\\win-" + arch + "\\native";
+        string corePath = "$dir" + "core\\lib\\runtimes\\win-" + arch + "\\native";
+        string sniDll = System.IO.Path.Combine(desktopPath, "Microsoft.Data.SqlClient.SNI.dll");
 
         if (!System.IO.File.Exists(sniDll))
         {
-            // Try architecture-specific name as fallback
-            sniDll = System.IO.Path.Combine(nativePath, "Microsoft.Data.SqlClient.SNI." + arch + ".dll");
+            // Try architecture-specific name in desktop path
+            sniDll = System.IO.Path.Combine(desktopPath, "Microsoft.Data.SqlClient.SNI." + arch + ".dll");
+
+            if (!System.IO.File.Exists(sniDll))
+            {
+                // Fall back to core path
+                sniDll = System.IO.Path.Combine(corePath, "Microsoft.Data.SqlClient.SNI.dll");
+
+                if (!System.IO.File.Exists(sniDll))
+                {
+                    // Try architecture-specific name in core path as last resort
+                    sniDll = System.IO.Path.Combine(corePath, "Microsoft.Data.SqlClient.SNI." + arch + ".dll");
+                }
+            }
         }
 
         if (System.IO.File.Exists(sniDll))
@@ -51,7 +64,7 @@ public class Redirector
         }
         else
         {
-            Console.WriteLine("Redirector: Warning - Could not find SNI DLL in: " + nativePath);
+            Console.WriteLine("Redirector: Warning - Could not find SNI DLL in desktop or core paths. Tried: " + desktopPath + " and " + corePath);
         }
     }
 

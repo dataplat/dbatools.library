@@ -12,6 +12,8 @@ if (-not $scriptroot) {
 $root = Split-Path -Path $scriptroot
 Push-Location $root
 
+Write-Warning $root
+
 # Update module version to today's date
 $today = Get-Date -Format "yyyy.M.d"
 $psd1Path = Join-Path $root "dbatools.library.psd1"
@@ -20,91 +22,165 @@ $psd1Content = $psd1Content -replace "ModuleVersion\s*=\s*'[\d\.]+'", "ModuleVer
 Set-Content -Path $psd1Path -Value $psd1Content -NoNewline
 Write-Host "Updated module version to: $today"
 
-# Clean up previous build artifacts
-$libPath = Join-Path $root "lib"
-$tempPath = Join-Path $root "temp"
-$licensePath = Join-Path $root "third-party-licenses"
+# Create centralized build directory
+$artifactsDir = Join-Path $root "artifacts"
+$dbatoolsLibraryDir = Join-Path $artifactsDir "dbatools.library"
+$libPath = $dbatoolsLibraryDir
+$tempPath = Join-Path $artifactsDir "temp"
+$publishDir = Join-Path $artifactsDir "publish"
+$licensePath = Join-Path $dbatoolsLibraryDir "third-party-licenses"
 
-if (Test-Path $libPath) {
-    Remove-Item -Path $libPath -Recurse -ErrorAction SilentlyContinue
+# Clean up previous build artifacts
+if (Test-Path $artifactsDir) {
+    Remove-Item -Path $artifactsDir -Recurse -ErrorAction SilentlyContinue
 }
-if (Test-Path $tempPath) {
-    Remove-Item -Path $tempPath -Recurse -ErrorAction SilentlyContinue
-}
-if (Test-Path $licensePath) {
-    Remove-Item -Path $licensePath -Recurse -ErrorAction SilentlyContinue
-}
+
+# Create build directory structure
+$null = New-Item -ItemType Directory -Path $artifactsDir -Force
+$null = New-Item -ItemType Directory -Path $dbatoolsLibraryDir -Force
+$null = New-Item -ItemType Directory -Path $tempPath -Force
+$null = New-Item -ItemType Directory -Path $publishDir -Force
+
+Write-Host "Created centralized build directory at: $artifactsDir" -ForegroundColor Cyan
+Write-Host "All build artifacts will be placed in this directory to keep the root clean." -ForegroundColor Yellow
 Push-Location "$root\project"
 
 dotnet clean
-# Publish .NET Framework (desktop)
-Write-Host "Publishing .NET Framework build..."
-dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output (Join-Path $root "lib\desktop") --nologo --self-contained true | Out-String -OutVariable build
 
-# Verify desktop publish results
+# Create temp directories for publish output
+$tempDesktopPublish = Join-Path $publishDir "desktop-temp"
+$tempCorePublish = Join-Path $publishDir "core-temp"
+$null = New-Item -ItemType Directory -Path $tempDesktopPublish -Force
+$null = New-Item -ItemType Directory -Path $tempCorePublish -Force
+
+Write-Host "Created publish directories at: $publishDir" -ForegroundColor Cyan
+
+# Publish .NET Framework (desktop) to temp directory first
+Write-Host "Publishing .NET Framework build..."
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output $tempDesktopPublish --nologo --self-contained true | Out-String -OutVariable build
+
+# Copy desktop publish output preserving structure
+Write-Host "Copying .NET Framework output with preserved structure..."
+$null = New-Item -ItemType Directory -Path (Join-Path $libPath "desktop/lib") -Force
+Copy-Item -Path "$tempDesktopPublish\*" -Destination (Join-Path $libPath "desktop/lib") -Recurse -Force
+
+
+# Verify and patch desktop publish output
 Write-Host "Verifying desktop publish..."
-if (Test-Path (Join-Path $root "lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll")) {
-    Write-Host "Found SNI x64 DLL in desktop output"
-    $dllInfo = Get-Item (Join-Path $root "lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll")
-    Write-Host "DLL Size: $($dllInfo.Length) bytes"
-} else {
-    Write-Host "WARNING: SNI x64 DLL not found in desktop output"
+
+$desktopSniPath = Join-Path $libPath "desktop\lib\Microsoft.Data.SqlClient.SNI.dll"
+$coreSniPath = Join-Path $libPath "core\lib\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"
+
+
+# Publish .NET 8 (core) to temp directory first
+Write-Host "Publishing .NET 8 build..."
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output $tempCorePublish --nologo --self-contained true | Out-String -OutVariable build
+
+# Copy core publish output preserving structure
+Write-Host "Copying .NET 8 output with preserved structure..."
+$null = New-Item -ItemType Directory -Path (Join-Path $libPath "core/lib") -Force
+Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $libPath "core/lib") -Recurse -Force
+
+# Handle legacy lib/release output directory if it exists (for backward compatibility)
+$legacyReleaseDir = Join-Path $root "lib\release"
+if (Test-Path $legacyReleaseDir) {
+    Write-Host "Found legacy lib/release directory, copying to artifacts/release" -ForegroundColor Yellow
+    $artifactsReleaseDir = Join-Path $artifactsDir "release"
+    $null = New-Item -ItemType Directory -Path $artifactsReleaseDir -Force
+    Copy-Item -Path "$legacyReleaseDir\*" -Destination $artifactsReleaseDir -Recurse -Force
+
+    # Inform about the change
+    Write-Host "NOTE: The lib directory in the root is deprecated. Please use artifacts/release instead." -ForegroundColor Yellow
 }
 
-# Publish .NET 8 (core)
-dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output (Join-Path $root "lib\core") --nologo --self-contained true | Out-String -OutVariable build
+# Verify core runtime dependencies
+Write-Host "Verifying .NET 8 runtime dependencies..."
+$sniPath = Join-Path $libPath "core\lib\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"
+if (Test-Path $sniPath) {
+    $sniBase = Join-Path $libPath "core\lib\runtimes"
+    $targetBase = Join-Path $libPath "desktop\lib\runtimes"
+
+    $architectures = @("win-x86", "win-x64", "win-arm", "win-arm64")
+
+    foreach ($arch in $architectures) {
+        $sniPath = Join-Path $sniBase "$arch\native\Microsoft.Data.SqlClient.SNI.dll"
+        if (Test-Path $sniPath) {
+            Write-Host "Found SNI DLL at: $sniPath" -ForegroundColor Green
+            $dllInfo = Get-Item $sniPath
+            Write-Host "DLL Size: $($dllInfo.Length) bytes"
+
+            $destFolder = Join-Path $targetBase "$arch\native"
+            New-Item -ItemType Directory -Path $destFolder -Force | Out-Null
+            Copy-Item $sniPath -Destination $destFolder -Force
+
+            Write-Host "Copied to: $destFolder" -ForegroundColor Cyan
+        } else {
+            Write-Warning "Missing: $sniPath"
+        }
+    }
+
+} else {
+    Write-Host "ERROR: SNI DLL not found at expected location: $sniPath" -ForegroundColor Red
+    # Check if runtimes folder exists at all
+    if (Test-Path (Join-Path $libPath "core\lib\runtimes")) {
+        Write-Host "Runtimes folder exists. Contents:"
+        Get-ChildItem -Path (Join-Path $libPath "core\lib\runtimes") -Recurse | Select-Object FullName
+    } else {
+        Write-Host "ERROR: Runtimes folder not found in output!" -ForegroundColor Red
+    }
+}
 
 # Run tests specifically for dbatools.Tests
 # dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
 Pop-Location
 
-Remove-Item -Path lib/net472 -Recurse -ErrorAction SilentlyContinue
-Remove-Item -Path lib/net8.0 -Recurse -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $libPath "desktop/net472") -Recurse -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $libPath "core/net8.0") -Recurse -ErrorAction SilentlyContinue
 
 $tempdir = Join-Path $env:TEMP "dbatools-build"
 
 # Create all required directories
 $null = New-Item -ItemType Directory $tempdir -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./temp/dacfull -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./temp/xe -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./temp/linux -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./temp/mac -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory ./lib/third-party/XESmartTarget -Force
-$null = New-Item -ItemType Directory ./lib/third-party/bogus -Force
-$null = New-Item -ItemType Directory ./lib/third-party/bogus/core -Force
-$null = New-Item -ItemType Directory ./lib/third-party/bogus/desktop -Force
-$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks -Force
-$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/core -Force
-$null = New-Item -ItemType Directory ./lib/third-party/LumenWorks/desktop -Force
-$null = New-Item -ItemType Directory ./lib/win-dac -Force
-$null = New-Item -ItemType Directory ./lib/mac-dac -Force
-$null = New-Item -ItemType Directory ./lib/linux-dac -Force
-$null = New-Item -ItemType Directory ./temp/bogus -Force
+$null = New-Item -ItemType Directory (Join-Path $tempPath "dacfull") -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory (Join-Path $tempPath "xe") -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory (Join-Path $tempPath "linux") -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory (Join-Path $tempPath "mac") -Force -ErrorAction Ignore
+$null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/XESmartTarget") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/bogus") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/LumenWorks") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/XESmartTarget") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/bogus") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/LumenWorks") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/dac/windows") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/dac/mac") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/dac/linux") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/runtimes") -Force
+$null = New-Item -ItemType Directory (Join-Path $tempPath "bogus") -Force
 
 $ProgressPreference = "SilentlyContinue"
 
 # Download all required packages
-Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile .\temp\DacFramework.msi
-Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile .\temp\bogus.zip
-Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile .\temp\LumenWorksCsvReader.zip
-Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.5.7/XESmartTarget_x64.msi -OutFile .\temp\XESmartTarget_x64.msi
-Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/2.0.4.0/XESmartTarget-linux-2.0.4.0.zip -OutFile .\temp\XESmartTarget-linux.zip
-Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile .\temp\sqlpackage-linux.zip
-Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile .\temp\sqlpackage-macos.zip
+Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile (Join-Path $tempPath "DacFramework.msi")
+Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile (Join-Path $tempPath "bogus.zip")
+Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile (Join-Path $tempPath "LumenWorksCsvReader.zip")
+Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.5.7/XESmartTarget_x64.msi -OutFile (Join-Path $tempPath "XESmartTarget_x64.msi")
+Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/2.0.4.0/XESmartTarget-linux-2.0.4.0.zip -OutFile (Join-Path $tempPath "XESmartTarget-linux.zip")
+Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile (Join-Path $tempPath "sqlpackage-linux.zip")
+Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile (Join-Path $tempPath "sqlpackage-macos.zip")
 
 $ProgressPreference = "Continue"
 
 # Extract all packages
-7z x .\temp\LumenWorksCsvReader.zip "-o.\temp\LumenWorksCsvReader" -y
-7z x .\temp\bogus.zip "-o.\temp\bogus" -y
-7z x .\temp\XESmartTarget-linux.zip "-o.\temp\xe-linux" -y
-7z x .\temp\sqlpackage-linux.zip "-o.\temp\linux" -y
-7z x .\temp\sqlpackage-macos.zip "-o.\temp\mac" -y
+7z x (Join-Path $tempPath "LumenWorksCsvReader.zip") "-o$(Join-Path $tempPath "LumenWorksCsvReader")" -y
+7z x (Join-Path $tempPath "bogus.zip") "-o$(Join-Path $tempPath "bogus")" -y
+7z x (Join-Path $tempPath "XESmartTarget-linux.zip") "-o$(Join-Path $tempPath "xe-linux")" -y
+7z x (Join-Path $tempPath "sqlpackage-linux.zip") "-o$(Join-Path $tempPath "linux")" -y
+7z x (Join-Path $tempPath "sqlpackage-macos.zip") "-o$(Join-Path $tempPath "mac")" -y
 
 # Install DacFramework MSI with proper waiting
 Write-Host "Installing DacFramework MSI..."
-$dacMsiPath = Resolve-Path .\temp\DacFramework.msi
-$dacTargetDir = Resolve-Path .\temp\dacfull
+$dacMsiPath = Resolve-Path (Join-Path $tempPath "DacFramework.msi")
+$dacTargetDir = Resolve-Path (Join-Path $tempPath "dacfull")
 $dacProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/a", "`"$dacMsiPath`"", "/qb", "TARGETDIR=`"$dacTargetDir`"" -PassThru -Wait
 $dacExitCode = $dacProcess.ExitCode
 Write-Host "DacFramework MSI installation completed with exit code: $dacExitCode"
@@ -117,8 +193,8 @@ Start-Sleep -Seconds 2
 
 # Install XESmartTarget MSI with proper waiting
 Write-Host "Installing XESmartTarget MSI..."
-$xeTargetDir = Resolve-Path .\temp\xe
-$xeMsiPath = Resolve-Path .\temp\XESmartTarget_x64.msi
+$xeTargetDir = Resolve-Path (Join-Path $tempPath "xe")
+$xeMsiPath = Resolve-Path (Join-Path $tempPath "XESmartTarget_x64.msi")
 $xeProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/a", "`"$xeMsiPath`"", "/qb", "TARGETDIR=`"$xeTargetDir`"" -PassThru -Wait
 $xeExitCode = $xeProcess.ExitCode
 Write-Host "XESmartTarget MSI installation completed with exit code: $xeExitCode"
@@ -127,7 +203,8 @@ if ($xeExitCode -ne 0) {
 }
 
 # Copy XESmartTarget preserving structure
-robocopy ./temp/xe/XESmartTarget ./lib/third-party/XESmartTarget /E /NFL /NDL /NJH /NJS /nc /ns /np
+robocopy (Join-Path $tempPath "xe/XESmartTarget") (Join-Path $libPath "desktop/third-party/XESmartTarget") /E /NFL /NDL /NJH /NJS /nc /ns /np
+robocopy (Join-Path $tempPath "xe/XESmartTarget") (Join-Path $libPath "core/third-party/XESmartTarget") /E /NFL /NDL /NJH /NJS /nc /ns /np
 $robocopyExitCode = $LASTEXITCODE
 Write-Host "Robocopy exit code: $robocopyExitCode"
 if ($robocopyExitCode -ge 8) {
@@ -142,24 +219,17 @@ if ($robocopyExitCode -ge 8) {
 $LASTEXITCODE = 0
 
 # Copy Linux XESmartTarget
-Copy-Item "./temp/xe-linux/*" -Destination "./lib/third-party/XESmartTarget/" -Recurse -Force
+Copy-Item (Join-Path $tempPath "xe-linux/*") -Destination (Join-Path $libPath "desktop/third-party/XESmartTarget/") -Recurse -Force
+Copy-Item (Join-Path $tempPath "xe-linux/*") -Destination (Join-Path $libPath "core/third-party/XESmartTarget/") -Recurse -Force
 
 # Copy Bogus files for both frameworks
 Write-Host "Copying Bogus.dll..." -ForegroundColor Green
 
-# Ensure directories exist
-if (!(Test-Path "./lib/third-party/bogus/core")) {
-    New-Item -ItemType Directory -Path "./lib/third-party/bogus/core" -Force
-}
-if (!(Test-Path "./lib/third-party/bogus/desktop")) {
-    New-Item -ItemType Directory -Path "./lib/third-party/bogus/desktop" -Force
-}
-
 # Copy Bogus.dll for .NET Framework (handle case sensitivity)
-if (Test-Path "./temp/bogus/lib/net40/bogus.dll") {
-    Copy-Item "./temp/bogus/lib/net40/bogus.dll" -Destination "./lib/third-party/bogus/desktop/Bogus.dll" -Force
-} elseif (Test-Path "./temp/bogus/lib/net40/Bogus.dll") {
-    Copy-Item "./temp/bogus/lib/net40/Bogus.dll" -Destination "./lib/third-party/bogus/desktop/Bogus.dll" -Force
+if (Test-Path (Join-Path $tempPath "bogus/lib/net40/bogus.dll")) {
+    Copy-Item (Join-Path $tempPath "bogus/lib/net40/bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force
+} elseif (Test-Path (Join-Path $tempPath "bogus/lib/net40/Bogus.dll")) {
+    Copy-Item (Join-Path $tempPath "bogus/lib/net40/Bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force
 } else {
     Write-Warning "Bogus.dll for .NET Framework (net40) not found at expected location"
 }
@@ -167,17 +237,17 @@ if (Test-Path "./temp/bogus/lib/net40/bogus.dll") {
 # Copy Bogus.dll for .NET Core (handle case sensitivity)
 $bogusCoreCopied = $false
 # Try net6.0 first (both lowercase and uppercase)
-if (Test-Path "./temp/bogus/lib/net6.0/bogus.dll") {
-    Copy-Item "./temp/bogus/lib/net6.0/bogus.dll" -Destination "./lib/third-party/bogus/core/Bogus.dll" -Force
+if (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll")) {
+    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
     $bogusCoreCopied = $true
-} elseif (Test-Path "./temp/bogus/lib/net6.0/Bogus.dll") {
-    Copy-Item "./temp/bogus/lib/net6.0/Bogus.dll" -Destination "./lib/third-party/bogus/core/Bogus.dll" -Force
+} elseif (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll")) {
+    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
     $bogusCoreCopied = $true
-} elseif (Test-Path "./temp/bogus/lib/netstandard2.0/bogus.dll") {
-    Copy-Item "./temp/bogus/lib/netstandard2.0/bogus.dll" -Destination "./lib/third-party/bogus/core/Bogus.dll" -Force
+} elseif (Test-Path (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll")) {
+    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
     $bogusCoreCopied = $true
-} elseif (Test-Path "./temp/bogus/lib/netstandard2.0/Bogus.dll") {
-    Copy-Item "./temp/bogus/lib/netstandard2.0/Bogus.dll" -Destination "./lib/third-party/bogus/core/Bogus.dll" -Force
+} elseif (Test-Path (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll")) {
+    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
     $bogusCoreCopied = $true
 }
 
@@ -186,52 +256,43 @@ if (-not $bogusCoreCopied) {
 }
 
 # Copy LumenWorks files for both frameworks
-Copy-Item "./temp/LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll" -Destination "./lib/third-party/LumenWorks/desktop/LumenWorks.Framework.IO.dll" -Force
-Copy-Item "./temp/LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll" -Destination "./lib/third-party/LumenWorks/core/LumenWorks.Framework.IO.dll" -Force
+Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "desktop/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
+Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "core/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
 
 # Copy ALL SqlPackage files for each platform
 Write-Host "Copying SqlPackage files for all platforms..." -ForegroundColor Green
 
 # Windows - Copy ALL files from DAC bin directory
-$dacPath = Join-Path ".\temp\dacfull" "Microsoft SQL Server\170\DAC\bin"
+$dacPath = Join-Path (Join-Path $tempPath "dacfull") "Microsoft SQL Server\170\DAC\bin"
 if (Test-Path $dacPath) {
     Write-Host "Copying ALL SqlPackage files for Windows..." -ForegroundColor Green
-    if (!(Test-Path "./lib/win-dac")) {
-        New-Item -ItemType Directory -Path "./lib/win-dac" -Force
-    }
-    Copy-Item (Join-Path $dacPath "*") -Destination "./lib/win-dac/" -Recurse -Force
+    Copy-Item (Join-Path $dacPath "*") -Destination (Join-Path $libPath "core/lib/dac/windows/") -Recurse -Force
 } else {
     Write-Warning "Windows DAC path not found: $dacPath"
 }
 
 # Linux - Copy ALL files from temp/linux
-if (Test-Path "./temp/linux") {
+if (Test-Path (Join-Path $tempPath "linux")) {
     Write-Host "Copying ALL SqlPackage files for Linux..." -ForegroundColor Green
-    if (!(Test-Path "./lib/linux-dac")) {
-        New-Item -ItemType Directory -Path "./lib/linux-dac" -Force
-    }
-    Copy-Item "./temp/linux/*" -Destination "./lib/linux-dac/" -Recurse -Force
+    Copy-Item (Join-Path $tempPath "linux/*") -Destination (Join-Path $libPath "core/lib/dac/linux/") -Recurse -Force
 
     # Fix SqlPackage naming for Linux - rename lowercase to uppercase if it exists
-    $linuxSqlPackageLowerCase = "./lib/linux-dac/sqlpackage"
-    $linuxSqlPackageUpperCase = "./lib/linux-dac/SqlPackage"
+    $linuxSqlPackageLowerCase = Join-Path $libPath "core/lib/dac/linux/sqlpackage"
+    $linuxSqlPackageUpperCase = Join-Path $libPath "core/lib/dac/linux/SqlPackage"
     if (Test-Path $linuxSqlPackageLowerCase) {
         Write-Host "Renaming lowercase 'sqlpackage' to 'SqlPackage' for Linux compatibility"
         Move-Item $linuxSqlPackageLowerCase $linuxSqlPackageUpperCase -Force
     }
 } else {
-    Write-Warning "Linux SqlPackage path not found: ./temp/linux"
+    Write-Warning "Linux SqlPackage path not found: $(Join-Path $tempPath "linux")"
 }
 
 # macOS - Copy ALL files from temp/mac
-if (Test-Path "./temp/mac") {
+if (Test-Path (Join-Path $tempPath "mac")) {
     Write-Host "Copying ALL SqlPackage files for macOS..." -ForegroundColor Green
-    if (!(Test-Path "./lib/mac-dac")) {
-        New-Item -ItemType Directory -Path "./lib/mac-dac" -Force
-    }
-    Copy-Item "./temp/mac/*" -Destination "./lib/mac-dac/" -Recurse -Force
+    Copy-Item (Join-Path $tempPath "mac/*") -Destination (Join-Path $libPath "core/lib/dac/mac/") -Recurse -Force
 } else {
-    Write-Warning "macOS SqlPackage path not found: ./temp/mac"
+    Write-Warning "macOS SqlPackage path not found: $(Join-Path $tempPath "mac")"
 }
 
 # Core files are already in place from dotnet publish
@@ -240,97 +301,114 @@ if (Test-Path "./temp/mac") {
 Write-Host "Copying additional assemblies from var/misc..."
 # Copy files that go to both core and desktop
 Get-ChildItem "./var/misc/both" -Filter "*.dll" | ForEach-Object {
-    Copy-Item $_.FullName -Destination "./lib/core/" -Force
-    Copy-Item $_.FullName -Destination "./lib/desktop/" -Force
+    Copy-Item $_.FullName -Destination (Join-Path $libPath "core/lib/") -Force
+    Copy-Item $_.FullName -Destination (Join-Path $libPath "desktop/lib/") -Force
 }
 
 # Copy desktop-specific files
-Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
+Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | Copy-Item -Destination (Join-Path $libPath "desktop/lib/") -Force
 
 # Cleanup temporary files and artifacts
-Remove-Item -Path "./temp" -Recurse -Force -ErrorAction SilentlyContinue
-Get-ChildItem -Path "./lib" -Recurse -Include "*.pdf","*.xml" | Remove-Item -Force
+Write-Host "Cleaning up temporary files..."
+# We don't remove the artifacts directory since it's our centralized build output
+Get-ChildItem -Path (Join-Path $libPath "*") -Recurse -Include "*.pdf","*.xml" | Remove-Item -Force
 
 # Create private directory for assembly loading scripts
 $null = New-Item -ItemType Directory -Path "./private" -Force -ErrorAction SilentlyContinue
 
+# Copy assembly loading scripts to private directory
+if (Test-Path (Join-Path $root "private")) {
+    Copy-Item -Path (Join-Path $root "private\*") -Destination "./private/" -Force -ErrorAction SilentlyContinue
+    Write-Host "Copied assembly loading scripts to private directory"
+}
+
 # Ensure System.Runtime.CompilerServices.Unsafe is in place
-$nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination (Join-Path $root "lib\core\") -PassThru | Out-Null
-# Remove lib/release folder
-Remove-Item -Path "./lib/release" -Recurse -Force -ErrorAction SilentlyContinue
+$nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination (Join-Path $libPath "core/lib/") -PassThru -Force -ErrorAction SilentlyContinue | Out-Null
+
+# Copy root module files
+Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $dbatoolsLibraryDir -Force
+Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $dbatoolsLibraryDir -Force
+Copy-Item -Path (Join-Path $root "LICENSE") -Destination $dbatoolsLibraryDir -Force -ErrorAction SilentlyContinue
+Write-Host "Copied module files to artifacts/dbatools.library" -ForegroundColor Green
+
+# Copy private folder with assembly loading scripts
+if (Test-Path (Join-Path $root "private")) {
+    Copy-Item -Path (Join-Path $root "private") -Destination $dbatoolsLibraryDir -Recurse -Force
+    Write-Host "Included private folder in artifacts/dbatools.library" -ForegroundColor Green
+}
+
+# Copy third-party-licenses
+$licensePath = Join-Path $dbatoolsLibraryDir "third-party-licenses"
+$null = New-Item -ItemType Directory -Path $licensePath -Force
+
+if (Test-Path (Join-Path $root "var/third-party-licenses")) {
+    Copy-Item -Path (Join-Path $root "var/third-party-licenses/*") -Destination $licensePath -Recurse -Force
+    Write-Host "Included third-party-licenses in artifacts/dbatools.library" -ForegroundColor Green
+} elseif (Test-Path (Join-Path $artifactsDir "third-party-licenses")) {
+    Copy-Item -Path (Join-Path $artifactsDir "third-party-licenses/*") -Destination $licensePath -Recurse -Force
+    Write-Host "Included third-party-licenses from artifacts in artifacts/dbatools.library" -ForegroundColor Green
+}
 
 # Create zip file for testing (release format)
 Write-Host "Creating dbatools.library.zip for testing..."
-$zipPath = Join-Path $root "dbatools.library.zip"
+$zipPath = Join-Path $artifactsDir "dbatools.library.zip"
 Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
-
-# Create a temporary directory with the release structure
-$tempReleaseDir = Join-Path $tempdir "dbatools.library"
-$null = New-Item -ItemType Directory -Path $tempReleaseDir -Force
-
-# Copy root module files
-Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $tempReleaseDir -Force
-Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $tempReleaseDir -Force
-Copy-Item -Path (Join-Path $root "LICENSE") -Destination $tempReleaseDir -Force -ErrorAction SilentlyContinue
-
-# Create core structure
-$coreDir = Join-Path $tempReleaseDir "core"
-$null = New-Item -ItemType Directory -Path $coreDir -Force
-$null = New-Item -ItemType Directory -Path (Join-Path $coreDir "lib") -Force
-
-# Copy core assemblies
-Copy-Item -Path (Join-Path $root "lib\core\*") -Destination (Join-Path $coreDir "lib") -Recurse -Force
-
-# Move third-party to core root
-if (Test-Path (Join-Path $root "lib\third-party")) {
-    Copy-Item -Path (Join-Path $root "lib\third-party") -Destination $coreDir -Recurse -Force
-}
-
-# Create platform-specific folders in core/lib
-$null = New-Item -ItemType Directory -Path (Join-Path $coreDir "lib\mac") -Force
-$null = New-Item -ItemType Directory -Path (Join-Path $coreDir "lib\win") -Force
-$null = New-Item -ItemType Directory -Path (Join-Path $coreDir "lib\win-sqlclient") -Force
-
-# Copy mac-specific DAC files to core/lib/mac if they exist
-if (Test-Path (Join-Path $root "lib\mac-dac")) {
-    Copy-Item -Path (Join-Path $root "lib\mac-dac\*") -Destination (Join-Path $coreDir "lib\mac") -Force
-}
-
-# Copy win-specific DAC files to core/lib/win if they exist
-if (Test-Path (Join-Path $root "lib\win-dac")) {
-    Copy-Item -Path (Join-Path $root "lib\win-dac\*") -Destination (Join-Path $coreDir "lib\win") -Force
-}
-
-# Create desktop structure
-$desktopDir = Join-Path $tempReleaseDir "desktop"
-$null = New-Item -ItemType Directory -Path $desktopDir -Force
-$null = New-Item -ItemType Directory -Path (Join-Path $desktopDir "lib") -Force
-
-# Copy desktop assemblies
-Copy-Item -Path (Join-Path $root "lib\desktop\*") -Destination (Join-Path $desktopDir "lib") -Recurse -Force
-
-# Move third-party to desktop root
-if (Test-Path (Join-Path $root "lib\third-party")) {
-    Copy-Item -Path (Join-Path $root "lib\third-party") -Destination $desktopDir -Recurse -Force
-}
 
 # Copy third-party-licenses
 if (Test-Path (Join-Path $root "var\third-party-licenses")) {
     Copy-Item -Path (Join-Path $root "var\third-party-licenses") -Destination $tempReleaseDir -Recurse -Force
+} elseif (Test-Path (Join-Path $artifactsDir "third-party-licenses")) {
+    Copy-Item -Path (Join-Path $artifactsDir "third-party-licenses") -Destination $tempReleaseDir -Recurse -Force
 }
 
-# Create the zip file from the parent directory to get the right structure
-Push-Location $tempdir
+Write-Host "All build artifacts are centralized in: $artifactsDir" -ForegroundColor Green
+
+# Create the zip file directly from the artifacts/dbatools.library directory
+Push-Location $artifactsDir
 Compress-Archive -Path "dbatools.library" -DestinationPath $zipPath -CompressionLevel Optimal -Force
 Pop-Location
-
-# Clean up temp directory
-Remove-Item -Path $tempReleaseDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host "Created test zip: $zipPath"
 Write-Host "Zip structure: dbatools.library.zip contains 'dbatools.library' folder at root"
 Write-Host "For testing: Extract to a folder in `$env:PSModulePath or use Install-DbatoolsLibrary.ps1"
-Write-Host "Build completed successfully. Files organized and temporary artifacts cleaned up."
+
+# Final validation of critical files
+Write-Host "`n=== Final Build Validation ===" -ForegroundColor Cyan
+$validationErrors = @()
+
+# Check for critical runtime dependencies
+$criticalFiles = @(
+    @{Path = "core\lib\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"; Description = ".NET Core SNI DLL (Windows x64)"},
+    @{Path = "core\lib\Microsoft.Data.SqlClient.dll"; Description = ".NET Core SqlClient"},
+    @{Path = "desktop\lib\Microsoft.Data.SqlClient.dll"; Description = ".NET Framework SqlClient"},
+    @{Path = "core\lib\dbatools.dll"; Description = ".NET Core dbatools assembly"},
+    @{Path = "desktop\lib\dbatools.dll"; Description = ".NET Framework dbatools assembly"}
+)
+
+foreach ($file in $criticalFiles) {
+    $fullPath = Join-Path $libPath $file.Path
+    if (Test-Path $fullPath) {
+        Write-Host "[OK] Found: $($file.Description)" -ForegroundColor Green
+    } else {
+        Write-Host "[ERROR] Missing: $($file.Description) at $($file.Path)" -ForegroundColor Red
+        $validationErrors += "Missing: $($file.Description)"
+    }
+}
+
+# Check if runtimes folder structure exists
+if (Test-Path (Join-Path $libPath "core\lib\runtimes")) {
+    Write-Host "[OK] Runtimes folder structure preserved" -ForegroundColor Green
+} else {
+    Write-Host "[ERROR] Runtimes folder structure missing!" -ForegroundColor Red
+    $validationErrors += "Runtimes folder structure missing"
+}
+
+if ($validationErrors.Count -eq 0) {
+    Write-Host "`nBuild completed successfully. All critical files present." -ForegroundColor Green
+} else {
+    Write-Host "`nBuild completed with errors:" -ForegroundColor Red
+    $validationErrors | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+}
 
 # if github actions and lastexitcode =0 then exit with success
 if ($env:GITHUB_ACTIONS -and $LASTEXITCODE -eq 0) {

@@ -4,44 +4,30 @@
 function Get-PlatformDetails {
     [CmdletBinding()]
     param()
-
-    # Detect platform
-    # isLinux and isMacOS already exist
-
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        # PowerShell Core - use RuntimeInformation
-        $isWin = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
-    } else {
-        # Windows PowerShell - use environment
-        $isWin = $true
+    $isWin = $IsWindows -or (-not $isLinux -and -not $isMacOS)
+    if (-not $env:PROCESSOR_ARCHITECTURE) {
+        $env:PROCESSOR_ARCHITECTURE = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLower()
     }
-
-    # Detect architecture
-    $arch = 'x64'
-    if ($env:PROCESSOR_ARCHITECTURE -eq 'x86') {
-        $arch = 'x86'
-    } elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-        $arch = 'arm64'
-    } elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM') {
-        $arch = 'arm'
-    }
-
-    # For Linux/OSX on PowerShell Core, we can try to detect ARM
-    if (($isLinux -or $isMacOS) -and ($PSVersionTable.PSEdition -eq 'Core')) {
-        if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') {
-            $arch = 'arm64'
-        } elseif ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm') {
-            $arch = 'arm'
+    $arch = switch ($env:PROCESSOR_ARCHITECTURE.ToLower()) {
+        "x86"   { "x86" }
+        "amd64" { "x64" }
+        "arm64" { "arm64" }
+        "arm"   { "arm" }
+        default {
+            if ($PSVersionTable.PSEdition -eq 'Core') {
+                [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLower()
+            } else {
+                "x64"
+            }
         }
     }
 
-    # Determine platform string
     $platform = if ($isWin) {
-        'Windows'
+        "Windows"
     } elseif ($isLinux) {
-        'Linux'
+        "Linux"
     } elseif ($isMacOS) {
-        'OSX'
+        "OSX"
     } else {
         throw "Unsupported platform"
     }
@@ -51,7 +37,7 @@ function Get-PlatformDetails {
         Architecture = $arch
         IsWindows = $isWin
         IsLinux = $isLinux
-        isMacOS = $isMacOS
+        IsMacOS = $isMacOS
     }
 }
 
@@ -113,12 +99,30 @@ public class NativeMethods {
 '@
             Add-Type -TypeDefinition $nativeCode -ErrorAction Stop
 
-            # Setup native path and load SNI DLL
-            $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
-            $sniPath = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
+            # First try desktop path for Windows PowerShell
+            $desktopPath = Join-Path $script:libraryroot "desktop/lib/runtimes/win-$($platformDetails.Architecture)/native"
+            $corePath = Join-Path $script:libraryroot "core/lib/runtimes/win-$($platformDetails.Architecture)/native"
 
+            # Try desktop path first
+            $sniPath = Join-Path $desktopPath "Microsoft.Data.SqlClient.SNI.dll"
+
+            # If not found, try architecture-specific name in desktop path
             if (-not (Test-Path $sniPath)) {
-                throw "SNI DLL not found at: $sniPath"
+                $sniPath = Join-Path $desktopPath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
+
+                # If still not found, try core path
+                if (-not (Test-Path $sniPath)) {
+                    $sniPath = Join-Path $corePath "Microsoft.Data.SqlClient.SNI.dll"
+
+                    # Last resort: try architecture-specific name in core path
+                    if (-not (Test-Path $sniPath)) {
+                        $sniPath = Join-Path $corePath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
+
+                        if (-not (Test-Path $sniPath)) {
+                            throw "SNI DLL not found in any expected location. Tried desktop and core paths."
+                        }
+                    }
+                }
             }
 
             $errorMessage = $null
@@ -128,6 +132,8 @@ public class NativeMethods {
 
             # Add native path to PATH
             $oldPath = [Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Process)
+            # Get the directory path from the SNI DLL path
+            $nativePath = [System.IO.Path]::GetDirectoryName($sniPath)
             if (-not $oldPath.Contains($nativePath)) {
                 [Environment]::SetEnvironmentVariable("PATH", "$nativePath;$oldPath", [System.EnvironmentVariableTarget]::Process)
             }
@@ -136,8 +142,8 @@ public class NativeMethods {
 
         # Pre-load required dependencies
         $dependencyAssemblies = @(
-            'Microsoft.Identity.Client'
-            'System.Configuration.ConfigurationManager'
+            #'Microsoft.Identity.Client'
+            #'System.Configuration.ConfigurationManager'
         )
 
         # Load dependencies

@@ -61,7 +61,8 @@
                 "ms-dotnettools.dotnet-interactive-vscode",
                 "rooveterinaryinc.roo-cline",
                 "github.copilot-chat",
-                "github.copilot"
+                "github.copilot",
+                "bedirt.gpt-token-counter-live"
             ]
         }
     },

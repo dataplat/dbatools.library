@@ -16,8 +16,8 @@
   </PropertyGroup>
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
-    <OutputPath>..\..\lib\$(Configuration)\</OutputPath>
-    <DocumentationFile>..\..\lib\$(Configuration)\dbatools.xml</DocumentationFile>
+    <OutputPath>..\..\artifacts\lib\$(Configuration)\</OutputPath>
+    <DocumentationFile>..\..\artifacts\lib\$(Configuration)\dbatools.xml</DocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

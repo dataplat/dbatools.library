@@ -5,13 +5,13 @@
 $script:CoreAssemblies = @(
     # System dependencies
     'System.Memory',
-    'System.Runtime.CompilerServices.Unsafe',
+    #'System.Runtime.CompilerServices.Unsafe',
 
     # Azure dependencies
     'Azure.Core',
     'Azure.Identity',
     'Microsoft.Identity.Client',
-    'Microsoft.IdentityModel.Abstractions',
+    #'Microsoft.IdentityModel.Abstractions',
 
     # Third-party dependencies
     'Bogus',
@@ -88,10 +88,10 @@ $script:DacAssemblies = @(
 $script:AssemblyLoadOrder = @(
     # System dependencies first
     'System.Memory',
-    'System.Runtime.CompilerServices.Unsafe',
+    #'System.Runtime.CompilerServices.Unsafe',
 
     # Azure dependencies next
-    'Microsoft.IdentityModel.Abstractions',
+    #'Microsoft.IdentityModel.Abstractions',
     'Microsoft.Identity.Client',
     'Azure.Core',
     'Azure.Identity',
@@ -181,102 +181,102 @@ $script:CommonAssemblies = @(
 $script:PlatformAssemblies = @{
     'Windows' = @{
         'x64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/win-x64/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/win-x64/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
         'x86' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/win-x86/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/win-x86/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
         'arm64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/win-arm64/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/win-arm64/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
         'arm' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/win-arm/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/win/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/win-arm/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
-        'DAC' = Join-Path $script:libraryroot "lib/win-dac"
+        'DAC' = Join-Path $script:libraryroot "core/lib/dac/windows"
     }
     'Linux' = @{
         'x64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-x64/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/linux-x64/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
         'arm' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-arm/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/linux-arm/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
         'arm64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-arm64/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/linux-arm64/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
         'musl-x64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/linux-musl-x64/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/linux-musl-x64/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
-        'DAC' = Join-Path $script:libraryroot "lib/linux-dac"
+        'DAC' = Join-Path $script:libraryroot "core/lib/dac/linux"
     }
     'OSX' = @{
         'x64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/osx/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/osx/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
         'arm64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
-            'NativePath' = Join-Path $script:libraryroot "lib/core/runtimes/osx-arm64/native"
-            'Dependencies' = Join-Path $script:libraryroot "lib/core/runtimes/unix/lib/net6.0"
+            'Path' = Join-Path $script:libraryroot "core/lib"
+            'NativePath' = Join-Path $script:libraryroot "core/lib/runtimes/osx-arm64/native"
+            'Dependencies' = Join-Path $script:libraryroot "core/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/core"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/core"
+                'Bogus' = Join-Path $script:libraryroot "core/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "core/third-party/LumenWorks"
             }
         }
-        'DAC' = Join-Path $script:libraryroot "lib/mac-dac"
+        'DAC' = Join-Path $script:libraryroot "core/lib/dac/mac"
     }
 }
 
@@ -286,21 +286,21 @@ if ($PSVersionTable.PSEdition -ne 'Core') {
     $dacPath = $script:PlatformAssemblies['Windows']['DAC']
     $script:PlatformAssemblies['Windows'] = @{
         'x64' = @{
-            'Path' = Join-Path $script:libraryroot "lib/desktop"
-            'NativePath' = Join-Path $script:libraryroot "lib/desktop"
-            'Dependencies' = Join-Path $script:libraryroot "lib/desktop"
+            'Path' = Join-Path $script:libraryroot "desktop/lib"
+            'NativePath' = Join-Path $script:libraryroot "desktop/lib"
+            'Dependencies' = Join-Path $script:libraryroot "desktop/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/desktop"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/desktop"
+                'Bogus' = Join-Path $script:libraryroot "desktop/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "desktop/third-party/LumenWorks"
             }
         }
         'x86' = @{
-            'Path' = Join-Path $script:libraryroot "lib/desktop"
-            'NativePath' = Join-Path $script:libraryroot "lib/desktop"
-            'Dependencies' = Join-Path $script:libraryroot "lib/desktop"
+            'Path' = Join-Path $script:libraryroot "desktop/lib"
+            'NativePath' = Join-Path $script:libraryroot "desktop/lib"
+            'Dependencies' = Join-Path $script:libraryroot "desktop/lib"
             'ThirdParty' = @{
-                'Bogus' = Join-Path $script:libraryroot "lib/third-party/bogus/desktop"
-                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "lib/third-party/LumenWorks/desktop"
+                'Bogus' = Join-Path $script:libraryroot "desktop/third-party/bogus"
+                'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "desktop/third-party/LumenWorks"
             }
         }
         'DAC' = $dacPath

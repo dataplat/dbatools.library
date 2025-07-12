@@ -61,7 +61,7 @@ function Get-DbatoolsAssemblyPath {
     $isDependency = @(
         # System dependencies
         'System.Memory',
-        'System.Runtime.CompilerServices.Unsafe',
+        #'System.Runtime.CompilerServices.Unsafe',
         'System.Resources.Extensions',
         'System.Diagnostics.DiagnosticSource',
         'System.Private.CoreLib',
@@ -94,7 +94,7 @@ function Get-DbatoolsAssemblyPath {
     elseif ($isSqlClient) {
         if ($Platform -eq 'Windows' -and $Runtime -eq 'desktop') {
             # Windows PowerShell (5.1) should always use desktop version
-            $basePath = Join-Path $libraryBase "lib/desktop"
+            $basePath = Join-Path $libraryBase "desktop/lib"
             $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
         }
         elseif ($Platform -eq 'Windows') {
@@ -114,8 +114,8 @@ function Get-DbatoolsAssemblyPath {
             # Ensure native dependencies are available
             if ($platformInfo.NativePath) {
                 $nativeDll = if ($Runtime -eq 'desktop') {
-                    # For PowerShell 5.1 (Desktop), look in lib/desktop with architecture in filename
-                    Join-Path $libraryBase "lib/desktop/Microsoft.Data.SqlClient.SNI.$Architecture.dll"
+                    # For PowerShell 5.1 (Desktop), look in desktop/lib with architecture in filename
+                    Join-Path $libraryBase "desktop/lib/Microsoft.Data.SqlClient.SNI.$Architecture.dll"
                 } else {
                     # For PowerShell Core, look in runtime folder without architecture in filename
                     Join-Path $platformInfo.NativePath "Microsoft.Data.SqlClient.SNI.dll"
@@ -131,7 +131,7 @@ function Get-DbatoolsAssemblyPath {
             }
         } else {
             # Non-Windows platforms use core SqlClient
-            $basePath = Join-Path $libraryBase "lib/core"
+            $basePath = Join-Path $libraryBase "core/lib"
             $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
         }
     }
@@ -149,7 +149,7 @@ function Get-DbatoolsAssemblyPath {
     }
     else {
         # Common assemblies use runtime-specific paths
-        $basePath = Join-Path $libraryBase "lib/$Runtime"
+        $basePath = Join-Path $libraryBase "$Runtime/lib"
         if (-not (Test-Path $basePath)) {
             throw "Runtime path not found: $basePath"
         }

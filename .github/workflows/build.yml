@@ -31,10 +31,59 @@ jobs:
       run: |
         ./build/build.ps1
 
+    - name: Verify critical files and directories
+      shell: pwsh
+      run: |
+        Write-Host "Verifying critical files and directories before upload..." -ForegroundColor Cyan
+
+        $artifactsDir = "./artifacts/dbatools.library"
+        $criticalPaths = @(
+          "desktop\lib",
+          "desktop\lib\runtimes\win-x64\native",
+          "desktop\third-party",
+          "core\lib",
+          "core\lib\runtimes\win-x64\native",
+          "core\lib\dac\windows",
+          "core\lib\dac\linux",
+          "core\lib\dac\mac",
+          "core\third-party",
+          "private"
+        )
+
+        $missingPaths = @()
+
+        foreach ($path in $criticalPaths) {
+          $fullPath = Join-Path $artifactsDir $path
+          if (Test-Path $fullPath) {
+            Write-Host "✅ Found: $path" -ForegroundColor Green
+          } else {
+            Write-Host "❌ Missing: $path" -ForegroundColor Red
+            $missingPaths += $path
+          }
+        }
+
+        if ($missingPaths.Count -gt 0) {
+          Write-Host "Critical paths are missing! Build may be incomplete." -ForegroundColor Red
+          Write-Host "Missing paths:"
+          $missingPaths | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+
+          # List what was actually built
+          Write-Host "`nActual directory structure:" -ForegroundColor Yellow
+          Get-ChildItem -Path $artifactsDir -Recurse -Directory |
+            Select-Object -ExpandProperty FullName |
+            ForEach-Object { $_.Replace("$artifactsDir\", "") } |
+            Sort-Object |
+            ForEach-Object { Write-Host "  $_" }
+
+          exit 1
+        } else {
+          Write-Host "All critical paths verified successfully!" -ForegroundColor Green
+        }
+
     - name: Test module import
       shell: pwsh
       run: |
-        Import-Module ./dbatools.library.psd1 -Force
+        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
         $module = Get-Module dbatools.library
         Write-Host "Loaded dbatools.library version: $($module.Version)"
         Write-Host "Module path: $($module.Path)"
@@ -44,8 +93,4 @@ jobs:
       with:
         name: dbatools-library
         path: |
-          lib/
-          dbatools.library.psd1
-          dbatools.library.psm1
-          private/
-          LICENSE
+          artifacts/dbatools.library/

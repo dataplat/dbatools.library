@@ -39,3 +39,4 @@ lib/
 /OLDLIB
 .devcontainer/.env
 dbatools.library.zip
+/artifacts
