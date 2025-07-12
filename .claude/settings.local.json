@@ -1,0 +1,23 @@
+{
+    "model": "opus",
+    "cleanupPeriodDays": 30,
+    "dangerously-skip-permissions": true,
+    "permissions": {
+        "defaultMode": "bypassPermissions",
+        "allow": ["*"],
+        "deny": [
+            "Bash(rm -rf /)",
+            "Bash(sudo rm:*)",
+            "Write(/etc/**)",
+            "Edit(/etc/**)"
+        ]
+    },
+    "env": {
+        "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+        "DISABLE_COST_WARNINGS": "0",
+        "DISABLE_AUTOUPDATER": "1",
+        "BASH_DEFAULT_TIMEOUT_MS": "300000",
+        "BASH_MAX_TIMEOUT_MS": "1200000",
+        "SHELL": "/usr/bin/pwsh"
+    }
+}
