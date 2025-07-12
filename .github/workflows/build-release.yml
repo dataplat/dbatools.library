@@ -94,7 +94,7 @@ jobs:
 
   create-preview-release:
     needs: build-windows
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     # Create release if manually triggered OR if version contains "preview"
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
 
