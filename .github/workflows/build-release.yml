@@ -15,6 +15,11 @@ on:
   pull_request:
   workflow_dispatch:
     # Manual trigger for when module is not available on PowerShell Gallery
+    inputs:
+      dbatools_branch:
+        description: 'dbatools branch to use (default: dev)'
+        required: false
+        default: 'development'
 
 jobs:
   build-windows:
@@ -188,6 +193,165 @@ jobs:
             }
         } catch {
             Write-Error "Failed to execute SqlPackage: $_"
+            exit 1
+        }
+
+    - name: Install dbatools from GitHub
+      shell: pwsh
+      run: |
+        # Ensure TEMP environment variable is set
+        if (-not $Env:TEMP) {
+            $Env:TEMP = [System.IO.Path]::GetTempPath()
+        }
+
+        # Determine module path based on PowerShell edition
+        $modulePath = if ($PSVersionTable.PSEdition -eq 'Core') {
+          Join-Path $HOME ".local/share/powershell/Modules"
+        } else {
+          Join-Path $HOME "Documents/WindowsPowerShell/Modules"
+        }
+
+        # Create module directory if it doesn't exist
+        if (-not (Test-Path $modulePath)) {
+          New-Item -ItemType Directory -Path $modulePath -Force | Out-Null
+        }
+
+        # Download dbatools from GitHub
+        $branch = "${{ github.event.inputs.dbatools_branch || 'dev' }}"
+        Write-Host "Downloading dbatools from GitHub (branch: $branch)..."
+
+        $zipUrl = "https://github.com/dataplat/dbatools/archive/refs/heads/$branch.zip"
+        $tempZip = Join-Path $Env:TEMP "dbatools-$branch.zip"
+        $tempExtract = Join-Path $Env:TEMP "dbatools-extract"
+
+        # Download the zip file
+        Invoke-WebRequest -Uri $zipUrl -OutFile $tempZip -UseBasicParsing
+
+        # Extract the zip file
+        if (Test-Path $tempExtract) {
+          Remove-Item -Path $tempExtract -Recurse -Force
+        }
+        Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+
+        # Find the extracted folder (it will be named dbatools-{branch})
+        $extractedFolder = Get-ChildItem -Path $tempExtract -Directory | Select-Object -First 1
+
+        # Move to the correct location in modules directory
+        $dbatoolsPath = Join-Path $modulePath "dbatools"
+        if (Test-Path $dbatoolsPath) {
+          Remove-Item -Path $dbatoolsPath -Recurse -Force
+        }
+        Move-Item -Path $extractedFolder.FullName -Destination $dbatoolsPath -Force
+
+        # Clean up temporary files
+        Remove-Item -Path $tempZip -Force
+        Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
+
+        # Verify installation
+        if (Test-Path (Join-Path $dbatoolsPath "dbatools.psd1")) {
+          Write-Host "dbatools installed successfully to: $dbatoolsPath"
+          $moduleInfo = Test-ModuleManifest -Path (Join-Path $dbatoolsPath "dbatools.psd1") -ErrorAction SilentlyContinue
+          if ($moduleInfo) {
+            Write-Host "dbatools version: $($moduleInfo.Version)"
+          }
+        } else {
+          throw "dbatools installation failed - module manifest not found"
+        }
+
+    - name: Update dbatools.psm1 for platform-specific library
+      shell: pwsh
+      run: |
+        # Determine module path based on PowerShell edition
+        $modulePath = if ($PSVersionTable.PSEdition -eq 'Core') {
+          Join-Path $HOME ".local/share/powershell/Modules"
+        } else {
+          Join-Path $HOME "Documents/WindowsPowerShell/Modules"
+        }
+
+        Write-Host "Module base path: $modulePath"
+
+        # Find the dbatools module folder
+        $dbatoolsPath = Get-ChildItem -Path $modulePath -Filter "dbatools" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+
+        if (-not $dbatoolsPath) {
+            Write-Error "dbatools module not found in $modulePath"
+            Write-Host "Contents of module path:"
+            Get-ChildItem -Path $modulePath -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  - $($_.Name)" }
+            exit 1
+        }
+
+        $psmPath = Join-Path $dbatoolsPath.FullName "dbatools.psm1"
+
+        if (-not (Test-Path $psmPath)) {
+            Write-Error "dbatools.psm1 not found at: $psmPath"
+            Write-Host "Contents of dbatools module folder:"
+            Get-ChildItem $dbatoolsPath.FullName | ForEach-Object { Write-Host "  - $($_.Name)" }
+            exit 1
+        }
+
+        Write-Host "Found dbatools.psm1 at: $psmPath"
+
+        # Read the current content
+        $content = Get-Content $psmPath -Raw
+
+        # Determine platform-specific folder
+        if ($PSVersionTable.PSEdition -eq 'Core') {
+            $libFolder = 'core'
+            Write-Host "PowerShell Core detected - using 'core' library folder"
+        } else {
+            $libFolder = 'desktop'
+            Write-Host "Windows PowerShell detected - using 'desktop' library folder"
+        }
+
+        # Fix the regex pattern to match the actual line in dbatools.psm1
+        # The actual line is: $dll = [System.IO.Path]::Combine($script:libraryroot, "dbatools.dll")
+        $oldLine = '\$dll = \[System\.IO\.Path\]::Combine\(\$script:libraryroot, "dbatools\.dll"\)'
+        $newLine = "`$dll = [System.IO.Path]::Combine(`$script:libraryroot, `"lib`", `"$libFolder`", `"dbatools.dll`")"
+
+        # Check if the line exists
+        if ($content -match $oldLine) {
+            Write-Host "Found line to replace"
+            $content = $content -replace $oldLine, $newLine
+
+            # Write back the modified content
+            $content | Set-Content $psmPath -NoNewline
+
+            # Verify the change was made
+            $verifyContent = Get-Content $psmPath -Raw
+            if ($verifyContent -match [regex]::Escape($newLine)) {
+                Write-Host "Successfully updated dbatools.psm1 with platform-specific library path"
+            } else {
+                Write-Error "Failed to verify the path update in dbatools.psm1"
+                exit 1
+            }
+        } else {
+            Write-Error "Could not find the expected line in dbatools.psm1"
+            Write-Host "Looking for pattern: $oldLine"
+            Write-Host "First 70 lines of dbatools.psm1:"
+            Get-Content $psmPath | Select-Object -First 70 | ForEach-Object -Begin { $i = 1 } -Process { Write-Host "${i}: $_"; $i++ }
+            exit 1
+        }
+
+    - name: Import modules and run test
+      shell: pwsh
+      run: |
+        Write-Host "Importing dbatools.library..."
+        Import-Module ./dbatools.library.psd1 -Force
+
+        Write-Host "Importing dbatools..."
+        Import-Module dbatools -Force
+
+        Write-Host "Testing Get-DbaManagementObject..."
+        try {
+            $result = Get-DbaManagementObject
+            if ($result.LoadTemplate) {
+                Write-Host "Test passed: Get-DbaManagementObject returned valid result"
+            } else {
+                Write-Error "Test failed: Get-DbaManagementObject did not have LoadTemplate property"
+                exit 1
+            }
+        } catch {
+            Write-Error "Test failed with exception: $_"
             exit 1
         }
 
