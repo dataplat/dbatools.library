@@ -5,7 +5,7 @@
 $script:CoreAssemblies = @(
     # System dependencies
     'System.Memory',
-    'System.Runtime.CompilerServices.Unsafe',
+    #'System.Runtime.CompilerServices.Unsafe',
 
     # Azure dependencies
     'Azure.Core',
@@ -88,7 +88,7 @@ $script:DacAssemblies = @(
 $script:AssemblyLoadOrder = @(
     # System dependencies first
     'System.Memory',
-    'System.Runtime.CompilerServices.Unsafe',
+    #'System.Runtime.CompilerServices.Unsafe',
 
     # Azure dependencies next
     'Microsoft.IdentityModel.Abstractions',

@@ -61,7 +61,7 @@ function Get-DbatoolsAssemblyPath {
     $isDependency = @(
         # System dependencies
         'System.Memory',
-        'System.Runtime.CompilerServices.Unsafe',
+        #'System.Runtime.CompilerServices.Unsafe',
         'System.Resources.Extensions',
         'System.Diagnostics.DiagnosticSource',
         'System.Private.CoreLib',
