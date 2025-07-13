@@ -12,6 +12,8 @@ if (-not $scriptroot) {
 $root = Split-Path -Path $scriptroot
 Push-Location $root
 
+Write-Warning $root
+
 # Update module version to today's date
 $today = Get-Date -Format "yyyy.M.d"
 $psd1Path = Join-Path $root "dbatools.library.psd1"
@@ -316,7 +318,7 @@ if (Test-Path (Join-Path $root "private")) {
 }
 
 # Ensure System.Runtime.CompilerServices.Unsafe is in place
-$nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination (Join-Path $root "lib\core\") -PassThru | Out-Null
+$nugetCache = "$env:USERPROFILE\.nuget\packages"; Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1 | Copy-Item -Destination (Join-Path $root "lib\core\") -PassThru -Force -ErrorAction SilentlyContinue | Out-Null
 # Remove lib/release folder
 Remove-Item -Path "./lib/release" -Recurse -Force -ErrorAction SilentlyContinue
 
