@@ -37,9 +37,21 @@ if (Test-Path $licensePath) {
 Push-Location "$root\project"
 
 dotnet clean
-# Publish .NET Framework (desktop)
+
+# Create temp directories for publish output
+$tempDesktopPublish = Join-Path $root "temp\desktop-publish"
+$tempCorePublish = Join-Path $root "temp\core-publish"
+$null = New-Item -ItemType Directory -Path $tempDesktopPublish -Force
+$null = New-Item -ItemType Directory -Path $tempCorePublish -Force
+
+# Publish .NET Framework (desktop) to temp directory first
 Write-Host "Publishing .NET Framework build..."
-dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output (Join-Path $root "lib\desktop") --nologo --self-contained true | Out-String -OutVariable build
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output $tempDesktopPublish --nologo --self-contained true | Out-String -OutVariable build
+
+# Copy desktop publish output preserving structure
+Write-Host "Copying .NET Framework output with preserved structure..."
+$null = New-Item -ItemType Directory -Path (Join-Path $root "lib\desktop") -Force
+Copy-Item -Path "$tempDesktopPublish\*" -Destination (Join-Path $root "lib\desktop") -Recurse -Force
 
 # Verify desktop publish results
 Write-Host "Verifying desktop publish..."
@@ -51,8 +63,32 @@ if (Test-Path (Join-Path $root "lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll
     Write-Host "WARNING: SNI x64 DLL not found in desktop output"
 }
 
-# Publish .NET 8 (core)
-dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output (Join-Path $root "lib\core") --nologo --self-contained true | Out-String -OutVariable build
+# Publish .NET 8 (core) to temp directory first
+Write-Host "Publishing .NET 8 build..."
+dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output $tempCorePublish --nologo --self-contained true | Out-String -OutVariable build
+
+# Copy core publish output preserving structure
+Write-Host "Copying .NET 8 output with preserved structure..."
+$null = New-Item -ItemType Directory -Path (Join-Path $root "lib\core") -Force
+Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $root "lib\core") -Recurse -Force
+
+# Verify core runtime dependencies
+Write-Host "Verifying .NET 8 runtime dependencies..."
+$sniPath = Join-Path $root "lib\core\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"
+if (Test-Path $sniPath) {
+    Write-Host "SUCCESS: Found SNI DLL at expected location: $sniPath" -ForegroundColor Green
+    $dllInfo = Get-Item $sniPath
+    Write-Host "DLL Size: $($dllInfo.Length) bytes"
+} else {
+    Write-Host "ERROR: SNI DLL not found at expected location: $sniPath" -ForegroundColor Red
+    # Check if runtimes folder exists at all
+    if (Test-Path (Join-Path $root "lib\core\runtimes")) {
+        Write-Host "Runtimes folder exists. Contents:"
+        Get-ChildItem -Path (Join-Path $root "lib\core\runtimes") -Recurse | Select-Object FullName
+    } else {
+        Write-Host "ERROR: Runtimes folder not found in output!" -ForegroundColor Red
+    }
+}
 
 # Run tests specifically for dbatools.Tests
 # dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
@@ -248,6 +284,7 @@ Get-ChildItem "./var/misc/both" -Filter "*.dll" | ForEach-Object {
 Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | Copy-Item -Destination "./lib/desktop/" -Force
 
 # Cleanup temporary files and artifacts
+Write-Host "Cleaning up temporary files..."
 Remove-Item -Path "./temp" -Recurse -Force -ErrorAction SilentlyContinue
 Get-ChildItem -Path "./lib" -Recurse -Include "*.pdf","*.xml" | Remove-Item -Force
 
@@ -342,7 +379,44 @@ Remove-Item -Path $tempReleaseDir -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "Created test zip: $zipPath"
 Write-Host "Zip structure: dbatools.library.zip contains 'dbatools.library' folder at root"
 Write-Host "For testing: Extract to a folder in `$env:PSModulePath or use Install-DbatoolsLibrary.ps1"
-Write-Host "Build completed successfully. Files organized and temporary artifacts cleaned up."
+
+# Final validation of critical files
+Write-Host "`n=== Final Build Validation ===" -ForegroundColor Cyan
+$validationErrors = @()
+
+# Check for critical runtime dependencies
+$criticalFiles = @(
+    @{Path = "lib\core\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"; Description = ".NET Core SNI DLL (Windows x64)"},
+    @{Path = "lib\core\Microsoft.Data.SqlClient.dll"; Description = ".NET Core SqlClient"},
+    @{Path = "lib\desktop\Microsoft.Data.SqlClient.dll"; Description = ".NET Framework SqlClient"},
+    @{Path = "lib\core\dbatools.dll"; Description = ".NET Core dbatools assembly"},
+    @{Path = "lib\desktop\dbatools.dll"; Description = ".NET Framework dbatools assembly"}
+)
+
+foreach ($file in $criticalFiles) {
+    $fullPath = Join-Path $root $file.Path
+    if (Test-Path $fullPath) {
+        Write-Host "[OK] Found: $($file.Description)" -ForegroundColor Green
+    } else {
+        Write-Host "[ERROR] Missing: $($file.Description) at $($file.Path)" -ForegroundColor Red
+        $validationErrors += "Missing: $($file.Description)"
+    }
+}
+
+# Check if runtimes folder structure exists
+if (Test-Path (Join-Path $root "lib\core\runtimes")) {
+    Write-Host "[OK] Runtimes folder structure preserved" -ForegroundColor Green
+} else {
+    Write-Host "[ERROR] Runtimes folder structure missing!" -ForegroundColor Red
+    $validationErrors += "Runtimes folder structure missing"
+}
+
+if ($validationErrors.Count -eq 0) {
+    Write-Host "`nBuild completed successfully. All critical files present." -ForegroundColor Green
+} else {
+    Write-Host "`nBuild completed with errors:" -ForegroundColor Red
+    $validationErrors | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+}
 
 # if github actions and lastexitcode =0 then exit with success
 if ($env:GITHUB_ACTIONS -and $LASTEXITCODE -eq 0) {
