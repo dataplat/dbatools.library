@@ -290,36 +290,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Check if preview release should be created
-      id: check_preview
-      shell: pwsh
-      run: |
-        $manifest = Import-PowerShellDataFile ./dbatools.library.psd1
-        $version = $manifest.ModuleVersion
-        Write-Host "Module version: $version"
-
-        # Check if version contains "preview" or if manually triggered
-        $shouldRelease = $false
-        if ($version -like "*preview*") {
-          Write-Host "Version contains 'preview' - will create release"
-          $shouldRelease = $true
-        } elseif ("${{ github.event_name }}" -eq "workflow_dispatch") {
-          Write-Host "Manually triggered - will create release"
-          $shouldRelease = $true
-        } else {
-          Write-Host "No preview release needed"
-        }
-
-        "should_release=$($shouldRelease.ToString().ToLower())" >> $env:GITHUB_OUTPUT
-
     - name: Download release zip
-      if: steps.check_preview.outputs.should_release == 'true'
       uses: actions/download-artifact@v4
       with:
         name: dbatools-library-zip
 
     - name: Generate preview version and update manifest
-      if: steps.check_preview.outputs.should_release == 'true'
       id: get_version
       shell: pwsh
       run: |
@@ -362,7 +338,6 @@ jobs:
         "branch=$branch" >> $env:GITHUB_OUTPUT
 
     - name: Create Preview Release
-      if: steps.check_preview.outputs.should_release == 'true'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ steps.get_version.outputs.version }}
