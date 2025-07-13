@@ -429,4 +429,5 @@ jobs:
           ⚠️ **Note:** This is a preview release and should not be used in production.
         draft: false
         prerelease: true
-        files: artifacts/dbatools.library.zip
+        files: |
+          ./dbatools.library.zip
