@@ -114,7 +114,13 @@ public class NativeMethods {
             Add-Type -TypeDefinition $nativeCode -ErrorAction Stop
 
             # Setup native path and load SNI DLL
-            $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
+            # Use desktop path for Windows PowerShell, core path for PowerShell Core
+            if ($PSVersionTable.PSEdition -eq 'Core') {
+                $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
+            } else {
+                # For Windows PowerShell, SNI DLL is in the desktop directory
+                $nativePath = Join-Path $script:libraryroot "lib/desktop"
+            }
             $sniPath = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
 
             if (-not (Test-Path $sniPath)) {
