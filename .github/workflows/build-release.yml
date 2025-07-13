@@ -17,7 +17,7 @@ on:
     # Manual trigger for when module is not available on PowerShell Gallery
     inputs:
       dbatools_branch:
-        description: 'dbatools branch to use (default: dev)'
+        description: 'dbatools branch to use (default: newver)'
         required: false
         default: 'newver'
 
@@ -222,7 +222,7 @@ jobs:
         }
 
         # Download dbatools from GitHub
-        $branch = "${{ github.event.inputs.dbatools_branch || 'dev' }}"
+        $branch = "${{ github.event.inputs.dbatools_branch }}"
         Write-Host "Downloading dbatools from GitHub (branch: $branch)..."
 
         $zipUrl = "https://github.com/dataplat/dbatools/archive/refs/heads/$branch.zip"
