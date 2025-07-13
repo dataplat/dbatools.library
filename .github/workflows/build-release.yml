@@ -19,7 +19,6 @@ on:
       dbatools_branch:
         description: 'dbatools branch to use (default: newver)'
         required: false
-        default: 'newver'
 
 jobs:
   build-windows:
@@ -222,7 +221,7 @@ jobs:
         }
 
         # Download dbatools from GitHub
-        $branch = "${{ github.event.inputs.dbatools_branch }}"
+        $branch = "${{ github.event.inputs.dbatools_branch || 'newver' }}"
         Write-Host "Downloading dbatools from GitHub (branch: $branch)..."
 
         $zipUrl = "https://github.com/dataplat/dbatools/archive/refs/heads/$branch.zip"
