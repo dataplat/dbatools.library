@@ -76,7 +76,6 @@ Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $root "lib\core") -
 Write-Host "Verifying .NET 8 runtime dependencies..."
 $sniPath = Join-Path $root "lib\core\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"
 if (Test-Path $sniPath) {
-    $root = "C:\github\dbatools.library"
     $sniBase = Join-Path $root "lib\core\runtimes"
     $targetBase = Join-Path $root "lib\desktop\runtimes"
 
