@@ -4,44 +4,30 @@
 function Get-PlatformDetails {
     [CmdletBinding()]
     param()
-
-    # Detect platform
-    # isLinux and isMacOS already exist
-
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        # PowerShell Core - use RuntimeInformation
-        $isWin = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
-    } else {
-        # Windows PowerShell - use environment
-        $isWin = $true
+    $isWin = $IsWindows -or (-not $isLinux -and -not $isMacOS)
+    if (-not $env:PROCESSOR_ARCHITECTURE) {
+        $env:PROCESSOR_ARCHITECTURE = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLower()
     }
-
-    # Detect architecture
-    $arch = 'x64'
-    if ($env:PROCESSOR_ARCHITECTURE -eq 'x86') {
-        $arch = 'x86'
-    } elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-        $arch = 'arm64'
-    } elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM') {
-        $arch = 'arm'
-    }
-
-    # For Linux/OSX on PowerShell Core, we can try to detect ARM
-    if (($isLinux -or $isMacOS) -and ($PSVersionTable.PSEdition -eq 'Core')) {
-        if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') {
-            $arch = 'arm64'
-        } elseif ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm') {
-            $arch = 'arm'
+    $arch = switch ($env:PROCESSOR_ARCHITECTURE.ToLower()) {
+        "x86"   { "x86" }
+        "amd64" { "x64" }
+        "arm64" { "arm64" }
+        "arm"   { "arm" }
+        default {
+            if ($PSVersionTable.PSEdition -eq 'Core') {
+                [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLower()
+            } else {
+                "x64"
+            }
         }
     }
 
-    # Determine platform string
     $platform = if ($isWin) {
-        'Windows'
+        "Windows"
     } elseif ($isLinux) {
-        'Linux'
+        "Linux"
     } elseif ($isMacOS) {
-        'OSX'
+        "OSX"
     } else {
         throw "Unsupported platform"
     }
@@ -51,7 +37,7 @@ function Get-PlatformDetails {
         Architecture = $arch
         IsWindows = $isWin
         IsLinux = $isLinux
-        isMacOS = $isMacOS
+        IsMacOS = $isMacOS
     }
 }
 
@@ -113,14 +99,7 @@ public class NativeMethods {
 '@
             Add-Type -TypeDefinition $nativeCode -ErrorAction Stop
 
-            # Setup native path and load SNI DLL
-            # Use desktop path for Windows PowerShell, core path for PowerShell Core
-            if ($PSVersionTable.PSEdition -eq 'Core') {
-                $nativePath = Join-Path $script:libraryroot "lib/core/runtimes/win-$($platformDetails.Architecture)/native"
-            } else {
-                # For Windows PowerShell, SNI DLL is in the desktop directory
-                $nativePath = Join-Path $script:libraryroot "lib/desktop"
-            }
+            $nativePath = Join-Path $script:libraryroot "lib/desktop/runtimes/win-$($platformDetails.Architecture)/native"
             $sniPath = Join-Path $nativePath "Microsoft.Data.SqlClient.SNI.dll"
 
             if (-not (Test-Path $sniPath)) {

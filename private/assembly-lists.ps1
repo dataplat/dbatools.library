@@ -11,7 +11,7 @@ $script:CoreAssemblies = @(
     'Azure.Core',
     'Azure.Identity',
     'Microsoft.Identity.Client',
-    'Microsoft.IdentityModel.Abstractions',
+    #'Microsoft.IdentityModel.Abstractions',
 
     # Third-party dependencies
     'Bogus',
@@ -91,7 +91,7 @@ $script:AssemblyLoadOrder = @(
     #'System.Runtime.CompilerServices.Unsafe',
 
     # Azure dependencies next
-    'Microsoft.IdentityModel.Abstractions',
+    #'Microsoft.IdentityModel.Abstractions',
     'Microsoft.Identity.Client',
     'Azure.Core',
     'Azure.Identity',

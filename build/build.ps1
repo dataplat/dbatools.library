@@ -53,15 +53,13 @@ Write-Host "Copying .NET Framework output with preserved structure..."
 $null = New-Item -ItemType Directory -Path (Join-Path $root "lib\desktop") -Force
 Copy-Item -Path "$tempDesktopPublish\*" -Destination (Join-Path $root "lib\desktop") -Recurse -Force
 
-# Verify desktop publish results
+
+# Verify and patch desktop publish output
 Write-Host "Verifying desktop publish..."
-if (Test-Path (Join-Path $root "lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll")) {
-    Write-Host "Found SNI x64 DLL in desktop output"
-    $dllInfo = Get-Item (Join-Path $root "lib\desktop\Microsoft.Data.SqlClient.SNI.x64.dll")
-    Write-Host "DLL Size: $($dllInfo.Length) bytes"
-} else {
-    Write-Host "WARNING: SNI x64 DLL not found in desktop output"
-}
+
+$desktopSniPath = Join-Path $root "lib\desktop\Microsoft.Data.SqlClient.SNI.dll"
+$coreSniPath = Join-Path $root "lib\core\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"
+
 
 # Publish .NET 8 (core) to temp directory first
 Write-Host "Publishing .NET 8 build..."
@@ -76,9 +74,29 @@ Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $root "lib\core") -
 Write-Host "Verifying .NET 8 runtime dependencies..."
 $sniPath = Join-Path $root "lib\core\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"
 if (Test-Path $sniPath) {
-    Write-Host "SUCCESS: Found SNI DLL at expected location: $sniPath" -ForegroundColor Green
-    $dllInfo = Get-Item $sniPath
-    Write-Host "DLL Size: $($dllInfo.Length) bytes"
+    $root = "C:\github\dbatools.library"
+    $sniBase = Join-Path $root "lib\core\runtimes"
+    $targetBase = Join-Path $root "lib\desktop\runtimes"
+
+    $architectures = @("win-x86", "win-x64", "win-arm", "win-arm64")
+
+    foreach ($arch in $architectures) {
+        $sniPath = Join-Path $sniBase "$arch\native\Microsoft.Data.SqlClient.SNI.dll"
+        if (Test-Path $sniPath) {
+            Write-Host "Found SNI DLL at: $sniPath" -ForegroundColor Green
+            $dllInfo = Get-Item $sniPath
+            Write-Host "DLL Size: $($dllInfo.Length) bytes"
+
+            $destFolder = Join-Path $targetBase "$arch\native"
+            New-Item -ItemType Directory -Path $destFolder -Force | Out-Null
+            Copy-Item $sniPath -Destination $destFolder -Force
+
+            Write-Host "Copied to: $destFolder" -ForegroundColor Cyan
+        } else {
+            Write-Warning "Missing: $sniPath"
+        }
+    }
+
 } else {
     Write-Host "ERROR: SNI DLL not found at expected location: $sniPath" -ForegroundColor Red
     # Check if runtimes folder exists at all
