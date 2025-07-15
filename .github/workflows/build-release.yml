@@ -347,7 +347,7 @@ jobs:
         try {
             $result = Connect-DbaInstance -SqlInstance localhost
         } catch {
-            if ($PSItem.Exception.Message -notmatch "not accessible" {
+            if ($PSItem.Exception.Message -notmatch "not accessible") {
               Write-Error "Test failed with exception: $_"
               exit 1
             } else {
