@@ -52,12 +52,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Download Linux artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: core-lib-linux
-        path: artifacts/core-lib-linux/
-
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -77,13 +71,15 @@ jobs:
         # Run the build script
         .\build\build.ps1
 
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: core-lib-linux
+        path: artifacts/core-lib-linux/
+
     - name: Extract core-lib-linux artifact and copy to core/lib
       shell: pwsh
-      run: |
-        Get-ChildItem -Path "$env:RUNNER_TEMP" -Recurse -Filter "core-lib-linux.zip" -OutVariable artifactZip
-        $extractPath = "artifacts/core-lib-linux"
-        Expand-Archive -Path $artifactZip[0].FullName -DestinationPath $extractPath -Force
-        Copy-Item -Path "$extractPath\*" -Destination "artifacts/dbatools.library/core/lib" -Recurse -Force
+      run: Copy-Item -Path "artifacts/core-lib-linux/*" -Destination "artifacts/dbatools.library/core/lib" -Recurse -Force
 
     - name: Verify critical files and directories
       shell: pwsh
