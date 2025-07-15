@@ -134,7 +134,7 @@ if (Test-Path $coreRuntimesPath) {
     }
 }
 
-Copy-Item (Join-Path $libPath "core\lib\runtimes\unix\lib\net6.0\Microsoft.Data.SqlClient.dll") -Destination (Join-Path $libPath "core/lib/") -Force
+Copy-Item (Join-Path $libPath "core\lib\runtimes\unix\lib\net8.0\Microsoft.Data.SqlClient.dll") -Destination (Join-Path $libPath "core/lib/") -Force
 
 if ($CoreOnly) {
     Write-Host "CoreOnly specified - returning after core build"
@@ -184,11 +184,11 @@ $parms = @{
 }
 
 $parms.Name = "Microsoft.Identity.Client"
-$parms.RequiredVersion = "4.61.3.0"
+$parms.RequiredVersion = "4.56.0"
 $null = Install-Package @parms
 
 # Copy DLLs to appropriate lib directories
-Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.61.3\lib\net462\Microsoft.Identity.Client.dll" -Destination (Join-Path $libPath "desktop/lib/") -Force
+Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.56.0\lib\net461\Microsoft.Identity.Client.dll" -Destination (Join-Path $libPath "desktop/lib/") -Force
 
 # Download all required packages
 Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile (Join-Path $tempPath "DacFramework.msi")
