@@ -1,5 +1,6 @@
 param(
-    [switch]$NoZip
+    [switch]$NoZip,
+    [switch]$CoreOnly
 )
 $PSDefaultParameterValues["*:Force"] = $true
 $PSDefaultParameterValues["*:Confirm"] = $false
@@ -14,8 +15,6 @@ if (-not $scriptroot) {
 }
 $root = Split-Path -Path $scriptroot
 Push-Location $root
-
-Write-Warning $root
 
 # Update module version to today's date
 $today = Get-Date -Format "yyyy.M.d"
@@ -79,6 +78,11 @@ dotnet publish dbatools/dbatools.csproj --configuration release --framework net8
 Write-Host "Copying .NET 8 output with preserved structure..."
 $null = New-Item -ItemType Directory -Path (Join-Path $libPath "core/lib") -Force
 Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $libPath "core/lib") -Recurse -Force
+
+if ($CoreOnly) {
+    Write-Host "CoreOnly specified - returning after core build"
+    return
+}
 
 # Handle legacy lib/release output directory if it exists (for backward compatibility)
 $legacyReleaseDir = Join-Path $root "lib\release"
