@@ -77,9 +77,13 @@ jobs:
         # Run the build script
         .\build\build.ps1
 
-    - name: Copy Linux core/lib files
+    - name: Extract core-lib-linux artifact and copy to core/lib
       shell: pwsh
-      run: Copy-Item -Path ".\artifacts\core-lib-linux\*" -Destination ".\artifacts\dbatools.library\core\lib" -Recurse -Force
+      run: |
+        Get-ChildItem -Path "$env:RUNNER_TEMP" -Recurse -Filter "core-lib-linux.zip" -OutVariable artifactZip
+        $extractPath = "artifacts/core-lib-linux"
+        Expand-Archive -Path $artifactZip[0].FullName -DestinationPath $extractPath -Force
+        Copy-Item -Path "$extractPath\*" -Destination "artifacts/dbatools.library/core/lib" -Recurse -Force
 
     - name: Verify critical files and directories
       shell: pwsh
