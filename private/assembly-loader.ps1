@@ -165,7 +165,6 @@ public class NativeMethods {
         # Pre-load required dependencies
         $dependencyAssemblies = @(
             'Microsoft.Identity.Client'
-            'System.Configuration.ConfigurationManager'
         )
 
         # Load dependencies
