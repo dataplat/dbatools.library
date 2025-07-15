@@ -151,6 +151,7 @@ $null = New-Item -ItemType Directory (Join-Path $tempPath "mac") -Force -ErrorAc
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/XESmartTarget") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/LumenWorks") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/dac/windows") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/XESmartTarget") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/LumenWorks") -Force
@@ -262,6 +263,15 @@ Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/netstandard2.0/LumenWork
 
 # Copy ALL SqlPackage files for each platform
 Write-Host "Copying SqlPackage files for all platforms..." -ForegroundColor Green
+
+# Windows - Copy ALL files from DAC bin directory
+$dacPath = Join-Path (Join-Path $tempPath "dacfull") "Microsoft SQL Server\170\DAC\bin"
+if (Test-Path $dacPath) {
+    Write-Host "Copying ALL SqlPackage files for Windows..." -ForegroundColor Green
+    Copy-Item (Join-Path $dacPath "*") -Destination (Join-Path $libPath "core/lib/dac/windows/") -Recurse -Force
+} else {
+    Write-Warning "Windows DAC path not found: $dacPath"
+}
 
 # Linux - Copy ALL files from temp/linux
 if (Test-Path (Join-Path $tempPath "linux")) {
