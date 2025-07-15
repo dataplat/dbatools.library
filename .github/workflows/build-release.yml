@@ -79,8 +79,7 @@ jobs:
 
     - name: Copy Linux core/lib files
       shell: pwsh
-      run: Copy-Item -Path "$(System.DefaultWorkingDirectory)/artifacts/core-lib-linux/*" -Destination "$(System.DefaultWorkingDirectory)/artifacts/dbatools.library/core/lib/" -Recurse -Force
-
+      run: Copy-Item -Path ".\artifacts\core-lib-linux\*" -Destination ".\artifacts\dbatools.library\core\lib" -Recurse -Force
 
     - name: Verify critical files and directories
       shell: pwsh
