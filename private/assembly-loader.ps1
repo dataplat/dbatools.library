@@ -99,30 +99,52 @@ public class NativeMethods {
 '@
             Add-Type -TypeDefinition $nativeCode -ErrorAction Stop
 
-            # First try desktop path for Windows PowerShell
+            # Get runtime info to determine correct path
+            $runtimeInfo = Get-DbatoolsPlatformInfo
+
             $desktopPath = Join-Path $script:libraryroot "desktop/lib/runtimes/win-$($platformDetails.Architecture)/native"
             $corePath = Join-Path $script:libraryroot "core/lib/runtimes/win-$($platformDetails.Architecture)/native"
 
-            # Try desktop path first
-            $sniPath = Join-Path $desktopPath "Microsoft.Data.SqlClient.SNI.dll"
+            # Choose path based on PowerShell edition
+            if ($runtimeInfo.Runtime -eq 'desktop') {
+                # PowerShell 5.1 (Desktop) - try desktop path first
+                $sniPath = Join-Path $desktopPath "Microsoft.Data.SqlClient.SNI.dll"
 
-            # If not found, try architecture-specific name in desktop path
-            if (-not (Test-Path $sniPath)) {
-                $sniPath = Join-Path $desktopPath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
-
-                # If still not found, try core path
+                # If not found, try architecture-specific name in desktop path
                 if (-not (Test-Path $sniPath)) {
-                    $sniPath = Join-Path $corePath "Microsoft.Data.SqlClient.SNI.dll"
+                    $sniPath = Join-Path $desktopPath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
 
-                    # Last resort: try architecture-specific name in core path
+                    # Fallback to core path if desktop doesn't have it
                     if (-not (Test-Path $sniPath)) {
-                        $sniPath = Join-Path $corePath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
+                        $sniPath = Join-Path $corePath "Microsoft.Data.SqlClient.SNI.dll"
 
                         if (-not (Test-Path $sniPath)) {
-                            throw "SNI DLL not found in any expected location. Tried desktop and core paths."
+                            $sniPath = Join-Path $corePath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
                         }
                     }
                 }
+            } else {
+                # PowerShell Core - try core path first
+                $sniPath = Join-Path $corePath "Microsoft.Data.SqlClient.SNI.dll"
+
+                # If not found, try architecture-specific name in core path
+                if (-not (Test-Path $sniPath)) {
+                    $sniPath = Join-Path $corePath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
+
+                    # Fallback to desktop path if core doesn't have it
+                    if (-not (Test-Path $sniPath)) {
+                        $sniPath = Join-Path $desktopPath "Microsoft.Data.SqlClient.SNI.dll"
+
+                        if (-not (Test-Path $sniPath)) {
+                            $sniPath = Join-Path $desktopPath "Microsoft.Data.SqlClient.SNI.$($platformDetails.Architecture).dll"
+                        }
+                    }
+                }
+            }
+
+            # Final check
+            if (-not (Test-Path $sniPath)) {
+                throw "SNI DLL not found in any expected location. Tried both desktop and core paths for runtime: $($runtimeInfo.Runtime)"
             }
 
             $errorMessage = $null

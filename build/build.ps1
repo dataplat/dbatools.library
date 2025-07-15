@@ -79,39 +79,58 @@ Write-Host "Copying .NET 8 output with preserved structure..."
 $null = New-Item -ItemType Directory -Path (Join-Path $libPath "core/lib") -Force
 Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $libPath "core/lib") -Recurse -Force
 
-# Verify core runtime dependencies
+# Verify and organize runtime dependencies
 Write-Host "Verifying .NET 8 runtime dependencies..."
-$sniPath = Join-Path $libPath "core\lib\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"
-if (Test-Path $sniPath) {
-    $sniBase = Join-Path $libPath "core\lib\runtimes"
-    $targetBase = Join-Path $libPath "desktop\lib\runtimes"
+$coreRuntimesPath = Join-Path $libPath "core\lib\runtimes"
+$desktopRuntimesPath = Join-Path $libPath "desktop\lib\runtimes"
+
+# Ensure desktop runtimes directory exists
+New-Item -ItemType Directory -Path $desktopRuntimesPath -Force | Out-Null
+
+if (Test-Path $coreRuntimesPath) {
+    Write-Host "Core runtimes folder found. Processing native dependencies..." -ForegroundColor Green
 
     $architectures = @("win-x86", "win-x64", "win-arm", "win-arm64")
 
     foreach ($arch in $architectures) {
-        $sniPath = Join-Path $sniBase "$arch\native\Microsoft.Data.SqlClient.SNI.dll"
-        if (Test-Path $sniPath) {
-            Write-Host "Found SNI DLL at: $sniPath" -ForegroundColor Green
-            $dllInfo = Get-Item $sniPath
-            Write-Host "DLL Size: $($dllInfo.Length) bytes"
+        $coreArchPath = Join-Path $coreRuntimesPath "$arch\native"
+        $desktopArchPath = Join-Path $desktopRuntimesPath "$arch\native"
 
-            $destFolder = Join-Path $targetBase "$arch\native"
-            New-Item -ItemType Directory -Path $destFolder -Force | Out-Null
-            Copy-Item $sniPath -Destination $destFolder -Force
+        if (Test-Path $coreArchPath) {
+            Write-Host "Processing architecture: $arch" -ForegroundColor Cyan
 
-            Write-Host "Copied to: $destFolder" -ForegroundColor Cyan
+            # Ensure desktop architecture directory exists
+            New-Item -ItemType Directory -Path $desktopArchPath -Force | Out-Null
+
+            # Copy all native files from core to desktop for Windows PowerShell compatibility
+            Get-ChildItem -Path $coreArchPath -File | ForEach-Object {
+                $sourcePath = $_.FullName
+                $destPath = Join-Path $desktopArchPath $_.Name
+
+                Copy-Item $sourcePath -Destination $destPath -Force
+                Write-Host "  Copied: $($_.Name)" -ForegroundColor Green
+            }
+
+            # Verify SNI DLL specifically
+            $sniPath = Join-Path $coreArchPath "Microsoft.Data.SqlClient.SNI.dll"
+            if (Test-Path $sniPath) {
+                $dllInfo = Get-Item $sniPath
+                Write-Host "  SNI DLL verified - Size: $($dllInfo.Length) bytes" -ForegroundColor Green
+            } else {
+                Write-Warning "  SNI DLL not found for $arch"
+            }
         } else {
-            Write-Warning "Missing: $sniPath"
+            Write-Warning "Architecture path not found: $coreArchPath"
         }
     }
 } else {
-    Write-Host "ERROR: SNI DLL not found at expected location: $sniPath" -ForegroundColor Red
-    # Check if runtimes folder exists at all
-    if (Test-Path (Join-Path $libPath "core\lib\runtimes")) {
-        Write-Host "Runtimes folder exists. Contents:"
-        Get-ChildItem -Path (Join-Path $libPath "core\lib\runtimes") -Recurse | Select-Object FullName
-    } else {
-        Write-Host "ERROR: Runtimes folder not found in output!" -ForegroundColor Red
+    Write-Host "ERROR: Core runtimes folder not found at: $coreRuntimesPath" -ForegroundColor Red
+
+    # Check what's actually in the core lib directory
+    $coreLibPath = Join-Path $libPath "core\lib"
+    if (Test-Path $coreLibPath) {
+        Write-Host "Core lib directory contents:" -ForegroundColor Yellow
+        Get-ChildItem -Path $coreLibPath -Recurse | Where-Object { $_.Name -like "*SNI*" } | Select-Object FullName
     }
 }
 
@@ -139,6 +158,7 @@ $null = New-Item -ItemType Directory (Join-Path $tempPath "mac") -Force -ErrorAc
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/XESmartTarget") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/LumenWorks") -Force
+$null = New-Item -ItemType Directory (Join-Path $libPath "desktop/lib/dac") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/dac/windows") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/XESmartTarget") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/bogus") -Force
@@ -172,6 +192,7 @@ Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.61.3\lib\net462\Microsoft.
 
 # Download all required packages
 Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile (Join-Path $tempPath "DacFramework.msi")
+Invoke-WebRequest -Uri https://aka.ms/sqlpackage-windows -OutFile (Join-Path $tempPath "sqlpackage-windows.zip")
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile (Join-Path $tempPath "bogus.zip")
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile (Join-Path $tempPath "LumenWorksCsvReader.zip")
 Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.5.7/XESmartTarget_x64.msi -OutFile (Join-Path $tempPath "XESmartTarget_x64.msi")
@@ -185,6 +206,7 @@ $ProgressPreference = "Continue"
 7z x (Join-Path $tempPath "LumenWorksCsvReader.zip") "-o$(Join-Path $tempPath "LumenWorksCsvReader")" -y
 7z x (Join-Path $tempPath "bogus.zip") "-o$(Join-Path $tempPath "bogus")" -y
 7z x (Join-Path $tempPath "XESmartTarget-linux.zip") "-o$(Join-Path $tempPath "xe-linux")" -y
+7z x (Join-Path $tempPath "sqlpackage-windows.zip") "-o$(Join-Path $tempPath "windows")" -y
 7z x (Join-Path $tempPath "sqlpackage-linux.zip") "-o$(Join-Path $tempPath "linux")" -y
 7z x (Join-Path $tempPath "sqlpackage-macos.zip") "-o$(Join-Path $tempPath "mac")" -y
 
@@ -273,13 +295,21 @@ Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/netstandard2.0/LumenWork
 # Copy ALL SqlPackage files for each platform
 Write-Host "Copying SqlPackage files for all platforms..." -ForegroundColor Green
 
-# Windows - Copy ALL files from DAC bin directory
+# Windows - Copy ALL files from DAC bin directory to desktop/lib/dac (dacfx-msi)
 $dacPath = Join-Path (Join-Path $tempPath "dacfull") "Microsoft SQL Server\170\DAC\bin"
 if (Test-Path $dacPath) {
-    Write-Host "Copying ALL SqlPackage files for Windows..." -ForegroundColor Green
-    Copy-Item (Join-Path $dacPath "*") -Destination (Join-Path $libPath "core/lib/dac/windows/") -Recurse -Force
+    Write-Host "Copying dacfx-msi files to desktop/lib/dac..." -ForegroundColor Green
+    Copy-Item (Join-Path $dacPath "*") -Destination (Join-Path $libPath "desktop/lib/dac/") -Recurse -Force
 } else {
     Write-Warning "Windows DAC path not found: $dacPath"
+}
+
+# Windows Core - Copy ALL files from SqlPackage Windows download to core/lib/dac/windows
+if (Test-Path (Join-Path $tempPath "windows")) {
+    Write-Host "Copying SqlPackage Windows files to core/lib/dac/windows..." -ForegroundColor Green
+    Copy-Item (Join-Path $tempPath "windows/*") -Destination (Join-Path $libPath "core/lib/dac/windows/") -Recurse -Force
+} else {
+    Write-Warning "Windows SqlPackage path not found: $(Join-Path $tempPath "windows")"
 }
 
 # Linux - Copy ALL files from temp/linux
