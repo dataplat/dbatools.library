@@ -149,6 +149,27 @@ $null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/runtimes") -F
 $null = New-Item -ItemType Directory (Join-Path $tempPath "bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $tempdir "nuget") -Force
 
+Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
+
+$ProgressPreference = "SilentlyContinue"
+
+# Install Microsoft.Identity.Client NuGet package
+$parms = @{
+    Provider         = "Nuget"
+    Destination      = "$tempdir\nuget"
+    Source           = "nugetRepository"
+    Scope            = "CurrentUser"
+    Force            = $true
+    SkipDependencies = $true
+}
+
+$parms.Name = "Microsoft.Identity.Client"
+$parms.RequiredVersion = "4.61.3.0"
+$null = Install-Package @parms
+
+# Copy DLLs to appropriate lib directories
+Copy-Item "$tempdir\nuget\Microsoft.Identity.Client.4.61.3\lib\net462\Microsoft.Identity.Client.dll" -Destination (Join-Path $libPath "desktop/lib/") -Force
+
 # Download all required packages
 Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile (Join-Path $tempPath "DacFramework.msi")
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile (Join-Path $tempPath "bogus.zip")
