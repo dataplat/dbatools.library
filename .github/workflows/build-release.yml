@@ -343,13 +343,16 @@ jobs:
         Write-Host "Importing dbatools..."
         Import-Module dbatools -Force
 
-        Write-Host "Testing Get-DbaManagementObject..."
+        Write-Host "Testing Connect-DbaInstance..."
         try {
-            $result = Get-DbaManagementObject
-            Write-Host "Test passed: Get-DbaManagementObject ran without fail"
+            $result = Connect-DbaInstance -SqlInstance localhost
         } catch {
-            Write-Error "Test failed with exception: $_"
-            exit 1
+            if ($PSItem.Exception.Message -notmatch "not accessible" {
+              Write-Error "Test failed with exception: $_"
+              exit 1
+            } else {
+              Write-Host "Test failed successfully (lol) with inaccessible instance message: $($PSItem.Exception.Message)" -ForegroundColor Green
+            }
         }
 
   create-preview-release:

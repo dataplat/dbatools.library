@@ -80,6 +80,8 @@ $null = New-Item -ItemType Directory -Path (Join-Path $libPath "core/lib") -Forc
 Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $libPath "core/lib") -Recurse -Force
 
 if ($CoreOnly) {
+    Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.5.1.6\runtimes\unix\lib\net6.0\Microsoft.Data.SqlClient.dll" -Destination (Join-Path $libPath "core/lib/") -Force
+
     Write-Host "CoreOnly specified - returning after core build"
     return
 }
