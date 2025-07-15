@@ -79,25 +79,6 @@ Write-Host "Copying .NET 8 output with preserved structure..."
 $null = New-Item -ItemType Directory -Path (Join-Path $libPath "core/lib") -Force
 Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $libPath "core/lib") -Recurse -Force
 
-if ($CoreOnly) {
-    Copy-Item "$tempdir\nuget\Microsoft.Data.SqlClient.5.1.6\runtimes\unix\lib\net6.0\Microsoft.Data.SqlClient.dll" -Destination (Join-Path $libPath "core/lib/") -Force
-
-    Write-Host "CoreOnly specified - returning after core build"
-    return
-}
-
-# Handle legacy lib/release output directory if it exists (for backward compatibility)
-$legacyReleaseDir = Join-Path $root "lib\release"
-if (Test-Path $legacyReleaseDir) {
-    Write-Host "Found legacy lib/release directory, copying to artifacts/release" -ForegroundColor Yellow
-    $artifactsReleaseDir = Join-Path $artifactsDir "release"
-    $null = New-Item -ItemType Directory -Path $artifactsReleaseDir -Force
-    Copy-Item -Path "$legacyReleaseDir\*" -Destination $artifactsReleaseDir -Recurse -Force
-
-    # Inform about the change
-    Write-Host "NOTE: The lib directory in the root is deprecated. Please use artifacts/release instead." -ForegroundColor Yellow
-}
-
 # Verify core runtime dependencies
 Write-Host "Verifying .NET 8 runtime dependencies..."
 $sniPath = Join-Path $libPath "core\lib\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"
@@ -123,7 +104,6 @@ if (Test-Path $sniPath) {
             Write-Warning "Missing: $sniPath"
         }
     }
-
 } else {
     Write-Host "ERROR: SNI DLL not found at expected location: $sniPath" -ForegroundColor Red
     # Check if runtimes folder exists at all
@@ -135,6 +115,12 @@ if (Test-Path $sniPath) {
     }
 }
 
+Copy-Item (Join-Path $libPath "core\lib\runtimes\unix\lib\net6.0\Microsoft.Data.SqlClient.dll") -Destination (Join-Path $libPath "core/lib/") -Force
+
+if ($CoreOnly) {
+    Write-Host "CoreOnly specified - returning after core build"
+    return
+}
 # Run tests specifically for dbatools.Tests
 # dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
 Pop-Location
