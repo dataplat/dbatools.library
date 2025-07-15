@@ -21,12 +21,42 @@ on:
         required: false
 
 jobs:
+  linux-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          6.0.x
+
+    - name: Build core/lib
+      shell: pwsh
+      run: |
+        ./build/build.ps1 -CoreOnly
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: core-lib-linux
+        path: artifacts/dbatools.library/core/lib/
+
   build-windows:
     runs-on: windows-latest
+    needs: linux-build
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: core-lib-linux
+        path: artifacts/dbatools.library/core/lib/
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -46,6 +76,11 @@ jobs:
       run: |
         # Run the build script
         .\build\build.ps1
+
+    - name: Copy Linux core/lib files
+      shell: pwsh
+      run: |
+        Copy-Item -Path artifacts/core-lib-linux/* -Destination artifacts/dbatools.library/core/lib/ -Recurse -Force
 
     - name: Verify critical files and directories
       shell: pwsh
@@ -319,7 +354,7 @@ jobs:
         }
 
   create-preview-release:
-    needs: [build-windows, test-sqlpackage]
+    needs: [linux-build, build-windows, test-sqlpackage]
     runs-on: windows-latest
     # Create release if manually triggered OR if version contains "preview"
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
