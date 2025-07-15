@@ -56,7 +56,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: core-lib-linux
-        path: artifacts/dbatools.library/core/lib/
+        path: artifacts/core-lib-linux/
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
