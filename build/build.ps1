@@ -157,6 +157,8 @@ $null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/runtimes") -F
 $null = New-Item -ItemType Directory (Join-Path $tempPath "bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $tempdir "nuget") -Force
 
+Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
+
 $ProgressPreference = "SilentlyContinue"
 
 # Install Microsoft.Identity.Client NuGet package
