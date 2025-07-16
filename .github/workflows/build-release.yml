@@ -144,7 +144,7 @@ jobs:
         path: artifacts/dbatools.library.zip
 
   test-sqlpackage:
-    name: Test SqlPackage on ${{ matrix.os }}
+    name: Test sqlpackage on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build-windows
     strategy:
@@ -178,7 +178,7 @@ jobs:
           exit 1
         }
 
-    - name: Test SqlPackage
+    - name: Test sqlpackage
       shell: pwsh
       run: |
         # Import the built module
@@ -192,71 +192,71 @@ jobs:
         Write-Host "Module loaded successfully with version: $($module.Version)"
         Write-Host "Module path: $($module.ModuleBase)"
 
-        # Determine SqlPackage path based on OS
+        # Determine sqlpackage path based on OS
         $modulePath = $module.ModuleBase
         if ($IsWindows -or $PSVersionTable.PSVersion.Major -eq 5) {
-            Write-Host "Testing Windows SqlPackage..."
+            Write-Host "Testing Windows sqlpackage..."
             $dacPath = Join-Path $modulePath "core/lib/dac/windows"
-            $sqlPackageName = "SqlPackage.exe"
+            $sqlPackageName = "sqlpackage.exe"
         } elseif ($IsLinux) {
-            Write-Host "Testing Linux SqlPackage..."
+            Write-Host "Testing Linux sqlpackage..."
             $dacPath = Join-Path $modulePath "core/lib/dac/linux"
-            $sqlPackageName = "SqlPackage"
+            $sqlPackageName = "sqlpackage"
         } elseif ($IsMacOS) {
-            Write-Host "Testing macOS SqlPackage..."
+            Write-Host "Testing macOS sqlpackage..."
             $dacPath = Join-Path $modulePath "core/lib/dac/mac"
-            $sqlPackageName = "SqlPackage"
+            $sqlPackageName = "sqlpackage"
         } else {
             Write-Error "Unknown operating system"
             exit 1
         }
 
-        # Check if SqlPackage directory exists
+        # Check if sqlpackage directory exists
         if (-not (Test-Path $dacPath)) {
-            Write-Error "SqlPackage directory not found: $dacPath"
+            Write-Error "sqlpackage directory not found: $dacPath"
             Write-Host "Available directories in core/lib:"
             Get-ChildItem (Join-Path $modulePath "core/lib") -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
             exit 1
         }
 
-        # Check if SqlPackage executable exists
+        # Check if sqlpackage executable exists
         $sqlPackagePath = Join-Path $dacPath $sqlPackageName
         if (-not (Test-Path $sqlPackagePath)) {
-            Write-Error "SqlPackage executable not found: $sqlPackagePath"
+            Write-Error "sqlpackage executable not found: $sqlPackagePath"
             Write-Host "Files in $dacPath :"
             Get-ChildItem $dacPath | ForEach-Object { Write-Host "  - $($_.Name)" }
             exit 1
         }
 
-        Write-Host "SqlPackage found at: $sqlPackagePath"
+        Write-Host "sqlpackage found at: $sqlPackagePath"
 
-        # Make SqlPackage executable on non-Windows platforms
+        # Make sqlpackage executable on non-Windows platforms
         if ($IsLinux -or $IsMacOS) {
             chmod +x $sqlPackagePath
         }
 
-        # Test SqlPackage execution
+        # Test sqlpackage execution
         try {
-            Write-Host "Testing SqlPackage execution..."
+            Write-Host "Testing sqlpackage execution..."
             $versionOutput = & $sqlPackagePath /Version 2>&1
-            Write-Host "SqlPackage version: $versionOutput"
+            Write-Host "sqlpackage version: $versionOutput"
 
             # Basic functionality test - show help
-            Write-Host "`nTesting SqlPackage help command..."
+            Write-Host "`nTesting sqlpackage help command..."
             $helpOutput = & $sqlPackagePath /? 2>&1 | Select-Object -First 10
             $helpOutput | ForEach-Object { Write-Host $_ }
             Write-Host "... (output truncated)"
 
             # Verify expected output from help
             $helpString = $helpOutput -join "`n"
-            if ($helpString -match "Specifies a name value pair" -or $helpString -match "SqlPackage" -or $helpString -match "Command") {
-                Write-Host "`nSqlPackage test completed successfully!"
+            if ($helpString -match "Specifies a name value pair" -or $helpString -match "sqlpackage" -or $helpString -match "Command") {
+                Write-Host "`nsqlpackage test completed successfully!"
             } else {
-                Write-Error "SqlPackage help output does not contain expected content"
+                Write-Error "sqlpackage help output does not contain expected content"
                 exit 1
             }
         } catch {
-            Write-Error "Failed to execute SqlPackage: $_"
+            Write-Error "Failed to execute sqlpackage: $_"
             exit 1
         }
 

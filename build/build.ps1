@@ -305,17 +305,12 @@ if (Test-Path (Join-Path $tempPath "linux")) {
     Copy-Item (Join-Path $tempPath "linux/*") -Destination (Join-Path $libPath "core/lib/dac/linux/") -Recurse -Force
     # Ensure SqlPackage is renamed to sqlpackage (Linux is case-sensitive)
     $linSqlPackage = Join-Path $libPath "core/lib/dac/linux/SqlPackage"
-    $linSqlPackageLower = Join-Path $libPath "core/lib/dac/linux/sqlpackage"
-    if (Test-Path $linSqlPackageLower) {
-        # Correct casing already present – clean up any stray 'SqlPackage'
-        if (Test-Path $linSqlPackage) {
-            Remove-Item $linSqlPackage -Force
-        }
-    } elseif (Test-Path $linSqlPackage) {
-        # Only uppercase present – rename to lowercase
-        Rename-Item $linSqlPackage $linSqlPackageLower
-    } else {
-        Write-Warning "Neither 'sqlpackage' nor 'SqlPackage' found in $($libPath)core/lib/dac/linux/. Please check the Linux sqlpackage release archive."
+    $finalname = Join-Path $libPath "core/lib/dac/linux/sqlpackage"
+    $tempname = Join-Path $libPath "core/lib/dac/linux/sqlpackage-temp"
+
+    if (Test-Path $linSqlPackage) {
+        Rename-Item $linSqlPackage $tempname
+        Rename-Item $tempname $finalname
     }
 } else {
     Write-Warning "Linux sqlpackage path not found: $(Join-Path $tempPath "linux")"
@@ -326,18 +321,13 @@ if (Test-Path (Join-Path $tempPath "mac")) {
     Write-Host "Copying ALL sqlpackage files for macOS..." -ForegroundColor Green
     Copy-Item (Join-Path $tempPath "mac/*") -Destination (Join-Path $libPath "core/lib/dac/mac/") -Recurse -Force
     # Ensure SqlPackage is renamed to sqlpackage (macOS case-sensitive too)
-    $macSqlPackage = Join-Path $libPath "core/lib/dac/mac/SqlPackage"
-    $macSqlPackageLower = Join-Path $libPath "core/lib/dac/mac/sqlpackage"
-    if (Test-Path $macSqlPackageLower) {
-        # Correct casing already present – clean up any stray 'SqlPackage'
-        if (Test-Path $macSqlPackage) {
-            Remove-Item $macSqlPackage -Force
-        }
-    } elseif (Test-Path $macSqlPackage) {
-        # Only uppercase present – rename to lowercase
-        Rename-Item $macSqlPackage $macSqlPackageLower
-    } else {
-        Write-Warning "Neither 'sqlpackage' nor 'SqlPackage' found in $($libPath)core/lib/dac/mac/. Please check the macOS sqlpackage release archive."
+    $linSqlPackage = Join-Path $libPath "core/lib/dac/mac/SqlPackage"
+    $finalname = Join-Path $libPath "core/lib/dac/mac/sqlpackage"
+    $tempname = Join-Path $libPath "core/lib/dac/mac/sqlpackage-temp"
+
+    if (Test-Path $linSqlPackage) {
+        Rename-Item $linSqlPackage $tempname
+        Rename-Item $tempname $finalname
     }
 } else {
     Write-Warning "macOS sqlpackage path not found: $(Join-Path $tempPath "mac")"

@@ -91,7 +91,7 @@ Get-DbatoolsLoadedAssembly
 1. **Clean**: Removes previous build artifacts
 2. **Compile**: Builds C# projects for both target frameworks
 3. **Package Dependencies**: Downloads and extracts:
-   - SQL Server DacFramework (SqlPackage)
+   - SQL Server DacFramework (sqlpackage)
    - Third-party NuGet packages (Bogus, LumenWorks CSV)
    - XESmartTarget for Extended Events
 4. **Platform Distribution**: Copies assemblies to appropriate platform directories
