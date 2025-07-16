@@ -194,6 +194,16 @@ public class Redirector
                 if (info.Name == "Microsoft.Data.SqlClient" && info.Version > name.Version) {
                     return assembly;
                 }
+                // For Identity DLLs, allow newer versions to satisfy older version requests
+                if (info.Name == "Microsoft.Identity.Client" && info.Version > name.Version) {
+                    return assembly;
+                }
+                if (info.Name == "Azure.Identity" && info.Version > name.Version) {
+                    return assembly;
+                }
+                if (info.Name == "Azure.Core" && info.Version > name.Version) {
+                    return assembly;
+                }
                 // For exact version matches
                 if (info.FullName == e.Name) {
                     return assembly;
