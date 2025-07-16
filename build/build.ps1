@@ -303,6 +303,17 @@ if (Test-Path (Join-Path $tempPath "windows")) {
 if (Test-Path (Join-Path $tempPath "linux")) {
     Write-Host "Copying ALL sqlpackage files for Linux..." -ForegroundColor Green
     Copy-Item (Join-Path $tempPath "linux/*") -Destination (Join-Path $libPath "core/lib/dac/linux/") -Recurse -Force
+    # Ensure SqlPackage is renamed to sqlpackage (Linux is case-sensitive)
+    $linSqlPackage = Join-Path $libPath "core/lib/dac/linux/SqlPackage"
+    $linSqlPackageLower = Join-Path $libPath "core/lib/dac/linux/sqlpackage"
+    if (Test-Path $linSqlPackage) {
+        if (Test-Path $linSqlPackageLower) {
+            Remove-Item $linSqlPackageLower -Force
+        }
+        $tmpName = Join-Path $libPath "core/lib/dac/linux/sqlpackage-tmp"
+        Rename-Item $linSqlPackage $tmpName
+        Rename-Item $tmpName $linSqlPackageLower
+    }
 } else {
     Write-Warning "Linux sqlpackage path not found: $(Join-Path $tempPath "linux")"
 }
@@ -311,6 +322,17 @@ if (Test-Path (Join-Path $tempPath "linux")) {
 if (Test-Path (Join-Path $tempPath "mac")) {
     Write-Host "Copying ALL sqlpackage files for macOS..." -ForegroundColor Green
     Copy-Item (Join-Path $tempPath "mac/*") -Destination (Join-Path $libPath "core/lib/dac/mac/") -Recurse -Force
+    # Ensure SqlPackage is renamed to sqlpackage (macOS case-sensitive too)
+    $macSqlPackage = Join-Path $libPath "core/lib/dac/mac/SqlPackage"
+    $macSqlPackageLower = Join-Path $libPath "core/lib/dac/mac/sqlpackage"
+    if (Test-Path $macSqlPackage) {
+        if (Test-Path $macSqlPackageLower) {
+            Remove-Item $macSqlPackageLower -Force
+        }
+        $tmpName = Join-Path $libPath "core/lib/dac/mac/sqlpackage-tmp"
+        Rename-Item $macSqlPackage $tmpName
+        Rename-Item $tmpName $macSqlPackageLower
+    }
 } else {
     Write-Warning "macOS sqlpackage path not found: $(Join-Path $tempPath "mac")"
 }
