@@ -69,7 +69,7 @@ jobs:
       shell: pwsh
       run: |
         # Run the build script
-        .\build\build.ps1
+        .\build\build.ps1 -BuildZip
 
     - name: Download Linux artifacts
       uses: actions/download-artifact@v4

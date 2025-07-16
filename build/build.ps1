@@ -1,5 +1,5 @@
 param(
-    [switch]$NoZip,
+    [switch]$BuildZip,
     [switch]$CoreOnly
 )
 $PSDefaultParameterValues["*:Force"] = $true
@@ -144,8 +144,14 @@ if ($CoreOnly) {
 # dotnet test dbatools.Tests/dbatools.Tests.csproj --framework net472 --verbosity normal --no-restore --nologo | Out-String -OutVariable test
 Pop-Location
 
-Remove-Item -Path (Join-Path $libPath "desktop/net472") -Recurse -ErrorAction SilentlyContinue
-Remove-Item -Path (Join-Path $libPath "core/net8.0") -Recurse -ErrorAction SilentlyContinue
+$targetDesktop = (Join-Path $libPath "desktop/net472")
+if (Test-Path $targetDesktop) {
+    Remove-Item -Path $targetDesktop -Recurse -ErrorAction SilentlyContinue
+}
+$targetCore = (Join-Path $libPath "core/net8.0")
+if (Test-Path $targetCore) {
+    Remove-Item -Path $targetCore -Recurse -ErrorAction SilentlyContinue
+}
 
 $tempdir = Join-Path ([System.IO.Path]::GetTempPath()) "dbatools-build"
 
@@ -273,8 +279,8 @@ if (-not $bogusCoreCopied) {
 Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "desktop/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
 Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "core/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
 
-# Copy ALL SqlPackage files for each platform
-Write-Host "Copying SqlPackage files for all platforms..." -ForegroundColor Green
+# Copy ALL sqlpackage files for each platform
+Write-Host "Copying sqlpackage files for all platforms..." -ForegroundColor Green
 
 # Windows - Copy ALL files from DAC bin directory to desktop/lib/dac (dacfx-msi)
 $dacPath = Join-Path (Join-Path $tempPath "dacfull") "Microsoft SQL Server\170\DAC\bin"
@@ -285,36 +291,28 @@ if (Test-Path $dacPath) {
     Write-Warning "Windows DAC path not found: $dacPath"
 }
 
-# Windows Core - Copy ALL files from SqlPackage Windows download to core/lib/dac/windows
+# Windows Core - Copy ALL files from sqlpackage Windows download to core/lib/dac/windows
 if (Test-Path (Join-Path $tempPath "windows")) {
-    Write-Host "Copying SqlPackage Windows files to core/lib/dac/windows..." -ForegroundColor Green
+    Write-Host "Copying sqlpackage Windows files to core/lib/dac/windows..." -ForegroundColor Green
     Copy-Item (Join-Path $tempPath "windows/*") -Destination (Join-Path $libPath "core/lib/dac/windows/") -Recurse -Force
 } else {
-    Write-Warning "Windows SqlPackage path not found: $(Join-Path $tempPath "windows")"
+    Write-Warning "Windows sqlpackage path not found: $(Join-Path $tempPath "windows")"
 }
 
 # Linux - Copy ALL files from temp/linux
 if (Test-Path (Join-Path $tempPath "linux")) {
-    Write-Host "Copying ALL SqlPackage files for Linux..." -ForegroundColor Green
+    Write-Host "Copying ALL sqlpackage files for Linux..." -ForegroundColor Green
     Copy-Item (Join-Path $tempPath "linux/*") -Destination (Join-Path $libPath "core/lib/dac/linux/") -Recurse -Force
-
-    # Fix SqlPackage naming for Linux - rename lowercase to uppercase if it exists
-    $linuxSqlPackageLowerCase = Join-Path $libPath "core/lib/dac/linux/sqlpackage"
-    $linuxSqlPackageUpperCase = Join-Path $libPath "core/lib/dac/linux/SqlPackage"
-    if (Test-Path $linuxSqlPackageLowerCase) {
-        Write-Host "Renaming lowercase 'sqlpackage' to 'SqlPackage' for Linux compatibility"
-        Move-Item $linuxSqlPackageLowerCase $linuxSqlPackageUpperCase -Force
-    }
 } else {
-    Write-Warning "Linux SqlPackage path not found: $(Join-Path $tempPath "linux")"
+    Write-Warning "Linux sqlpackage path not found: $(Join-Path $tempPath "linux")"
 }
 
 # macOS - Copy ALL files from temp/mac
 if (Test-Path (Join-Path $tempPath "mac")) {
-    Write-Host "Copying ALL SqlPackage files for macOS..." -ForegroundColor Green
+    Write-Host "Copying ALL sqlpackage files for macOS..." -ForegroundColor Green
     Copy-Item (Join-Path $tempPath "mac/*") -Destination (Join-Path $libPath "core/lib/dac/mac/") -Recurse -Force
 } else {
-    Write-Warning "macOS SqlPackage path not found: $(Join-Path $tempPath "mac")"
+    Write-Warning "macOS sqlpackage path not found: $(Join-Path $tempPath "mac")"
 }
 
 # Core files are already in place from dotnet publish
@@ -339,10 +337,7 @@ Get-ChildItem -Path (Join-Path $libPath "*") -Recurse -Include "*.pdf","*.xml" |
 $null = New-Item -ItemType Directory -Path "./private" -Force -ErrorAction SilentlyContinue
 
 # Copy assembly loading scripts to private directory
-if (Test-Path (Join-Path $root "private")) {
-    Copy-Item -Path (Join-Path $root "private\*") -Destination "./private/" -Force -ErrorAction SilentlyContinue
-    Write-Host "Copied assembly loading scripts to private directory"
-}
+# (copy to ./private block removed: redundant in standard build context)
 
 # Create directory structure for different versions of System.Runtime.CompilerServices.Unsafe.dll
 $null = New-Item -ItemType Directory -Path (Join-Path $libPath "desktop/v4") -Force
@@ -390,7 +385,9 @@ if (Test-Path (Join-Path $root "var/third-party-licenses")) {
 # Create zip file for testing (release format)
 Write-Host "Creating dbatools.library.zip for testing..."
 $zipPath = Join-Path $artifactsDir "dbatools.library.zip"
-Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
+if (Test-Path $zipPath) {
+    Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
+}
 
 # Copy third-party-licenses
 if (Test-Path (Join-Path $root "var\third-party-licenses")) {
@@ -403,7 +400,7 @@ Write-Host "All build artifacts are centralized in: $artifactsDir" -ForegroundCo
 
 # Create the zip file directly from the artifacts/dbatools.library directory
 Push-Location $artifactsDir
-if (-not $NoZip) {
+if ($BuildZip) {
     Compress-Archive -Path "dbatools.library" -DestinationPath $zipPath -CompressionLevel Optimal -Force
 }
 Pop-Location
