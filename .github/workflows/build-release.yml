@@ -38,12 +38,6 @@ jobs:
       run: |
         ./build/build.ps1 -CoreOnly
 
-    - name: Ensure sqlpackage is executable
-      shell: pwsh
-      run: |
-        chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage
-        chmod +x ./artifacts/dbatools.library/core/lib/dac/mac/sqlpackage
-
     - name: Upload Linux artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -86,6 +80,12 @@ jobs:
     - name: Extract core-lib-linux artifact and copy to core/lib
       shell: pwsh
       run: Copy-Item -Path "artifacts/core-lib-linux/*" -Destination "artifacts/dbatools.library/core/lib" -Recurse -Force
+
+    - name: Ensure sqlpackage is executable
+      shell: pwsh
+      run: |
+        chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage
+        chmod +x ./artifacts/dbatools.library/core/lib/dac/mac/sqlpackage
 
     - name: Verify critical files and directories
       shell: pwsh
