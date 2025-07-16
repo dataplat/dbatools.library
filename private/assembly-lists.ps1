@@ -279,8 +279,7 @@ $script:PlatformAssemblies = @{
 
 if ($PSVersionTable.PSEdition -ne 'Core') {
     # Change the path for Windows PowerShell (5.1) to use the desktop version
-    # But preserve the DAC path
-    $dacPath = $script:PlatformAssemblies['Windows']['DAC']
+    # Set DAC path to desktop DAC location for Windows PowerShell
     $script:PlatformAssemblies['Windows'] = @{
         'x64' = @{
             'Path' = Join-Path $script:libraryroot "desktop/lib"
@@ -300,6 +299,6 @@ if ($PSVersionTable.PSEdition -ne 'Core') {
                 'LumenWorks.Framework.IO' = Join-Path $script:libraryroot "desktop/third-party/LumenWorks"
             }
         }
-        'DAC' = $dacPath
+        'DAC' = Join-Path $script:libraryroot "desktop/lib/dac"
     }
 }

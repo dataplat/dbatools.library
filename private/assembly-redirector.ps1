@@ -107,7 +107,9 @@ public class Redirector
         string[] sqlDlls = {
             "Microsoft.Data.SqlClient",
             "Microsoft.SqlServer.Smo",
-            "Microsoft.SqlServer.Management.Sdk.Sfc"
+            "Microsoft.SqlServer.Management.Sdk.Sfc",
+            "Microsoft.SqlServer.Dac",
+            "Microsoft.SqlServer.TransactSql.ScriptDom"
         };
 
         var name = new AssemblyName(e.Name);
@@ -156,28 +158,50 @@ public class Redirector
         // Handle SQL assemblies last
         if (sqlDlls.Contains(assemblyName))
         {
-            // Try desktop folder first for Windows PowerShell
-            string filelocation = "$dir" + "desktop\\" + assemblyName + ".dll";
-            if (System.IO.File.Exists(filelocation))
+            // Special handling for DAC assemblies in Windows PowerShell
+            if (assemblyName == "Microsoft.SqlServer.Dac" || assemblyName == "Microsoft.Data.Tools.Schema.Sql")
             {
-                var asm = Assembly.LoadFrom(filelocation);
-                return asm;
-            }
+                // Try desktop DAC folder first for Windows PowerShell
+                string filelocation = "$dir" + "desktop\\lib\\dac\\" + assemblyName + ".dll";
+                if (System.IO.File.Exists(filelocation))
+                {
+                    var asm = Assembly.LoadFrom(filelocation);
+                    return asm;
+                }
 
-            // Try core folder as fallback
-            filelocation = "$dir" + "core\\" + assemblyName + ".dll";
-            if (System.IO.File.Exists(filelocation))
-            {
-                var asm = Assembly.LoadFrom(filelocation);
-                return asm;
+                // Fallback to core DAC folder
+                filelocation = "$dir" + "core\\lib\\dac\\windows\\" + assemblyName + ".dll";
+                if (System.IO.File.Exists(filelocation))
+                {
+                    var asm = Assembly.LoadFrom(filelocation);
+                    return asm;
+                }
             }
-
-            // Try root lib folder as last resort
-            filelocation = "$dir" + assemblyName + ".dll";
-            if (System.IO.File.Exists(filelocation))
+            else
             {
-                var asm = Assembly.LoadFrom(filelocation);
-                return asm;
+                // Try desktop folder first for Windows PowerShell (non-DAC SQL assemblies)
+                string filelocation = "$dir" + "desktop\\lib\\" + assemblyName + ".dll";
+                if (System.IO.File.Exists(filelocation))
+                {
+                    var asm = Assembly.LoadFrom(filelocation);
+                    return asm;
+                }
+
+                // Try core folder as fallback
+                filelocation = "$dir" + "core\\lib\\" + assemblyName + ".dll";
+                if (System.IO.File.Exists(filelocation))
+                {
+                    var asm = Assembly.LoadFrom(filelocation);
+                    return asm;
+                }
+
+                // Try root lib folder as last resort
+                filelocation = "$dir" + assemblyName + ".dll";
+                if (System.IO.File.Exists(filelocation))
+                {
+                    var asm = Assembly.LoadFrom(filelocation);
+                    return asm;
+                }
             }
         }
 
@@ -188,6 +212,10 @@ public class Redirector
             if (info.Name == name.Name) {
                 // For System.Memory, allow newer versions to satisfy older version requests
                 if (info.Name == "System.Memory" && info.Version > name.Version) {
+                    return assembly;
+                }
+                // For System.Runtime.CompilerServices.Unsafe, allow newer versions to satisfy older version requests
+                if (info.Name == "System.Runtime.CompilerServices.Unsafe" && info.Version > name.Version) {
                     return assembly;
                 }
                 // For Microsoft.Data.SqlClient, allow newer versions to satisfy older version requests
@@ -202,6 +230,13 @@ public class Redirector
                     return assembly;
                 }
                 if (info.Name == "Azure.Core" && info.Version > name.Version) {
+                    return assembly;
+                }
+                // For DAC DLLs, allow newer versions to satisfy older version requests
+                if (info.Name == "Microsoft.SqlServer.Dac" && info.Version > name.Version) {
+                    return assembly;
+                }
+                if (info.Name == "Microsoft.SqlServer.TransactSql.ScriptDom" && info.Version > name.Version) {
                     return assembly;
                 }
                 // For exact version matches

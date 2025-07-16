@@ -85,11 +85,28 @@ function Get-DbatoolsAssemblyPath {
         if (-not $script:PlatformAssemblies[$Platform]) {
             throw "Invalid platform: $Platform"
         }
-        $basePath = $script:PlatformAssemblies[$Platform]['DAC']
-        if (-not $basePath) {
-            throw "DAC path not found for platform: $Platform"
+
+        # Special handling for Windows PowerShell 5.1 - use desktop DAC path
+        if ($Platform -eq 'Windows' -and $Runtime -eq 'desktop') {
+            $basePath = Join-Path $libraryBase "desktop/lib/dac"
+            $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
+
+            # If not found in desktop DAC, fallback to core DAC
+            if (-not (Test-Path $assemblyPath)) {
+                $basePath = $script:PlatformAssemblies[$Platform]['DAC']
+                if (-not $basePath) {
+                    throw "DAC path not found for platform: $Platform"
+                }
+                $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
+            }
+        } else {
+            # For other platforms/runtimes, use standard DAC path
+            $basePath = $script:PlatformAssemblies[$Platform]['DAC']
+            if (-not $basePath) {
+                throw "DAC path not found for platform: $Platform"
+            }
+            $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
         }
-        $assemblyPath = Join-Path $basePath "$AssemblyName.dll"
     }
     elseif ($isSqlClient) {
         if ($Platform -eq 'Windows' -and $Runtime -eq 'desktop') {
