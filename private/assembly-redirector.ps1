@@ -190,6 +190,10 @@ public class Redirector
                 if (info.Name == "System.Memory" && info.Version > name.Version) {
                     return assembly;
                 }
+                // For Microsoft.Data.SqlClient, allow newer versions to satisfy older version requests
+                if (info.Name == "Microsoft.Data.SqlClient" && info.Version > name.Version) {
+                    return assembly;
+                }
                 // For exact version matches
                 if (info.FullName == e.Name) {
                     return assembly;
