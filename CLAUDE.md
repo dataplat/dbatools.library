@@ -159,17 +159,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Testing
+
+> **Note:** The following test commands reference Appveyor and Windows PowerShell scripts. For modern Linux/macOS/PowerShell Core setups or non-Appveyor CI, substitute with appropriate Pester/Invoke-Pester commands, and paths using forward slashes as needed.
+
 ```powershell
-# Run all tests
+# Run all tests (legacy, Windows/Appveyor)
 .\tests\appveyor.pester.ps1
 
-# Run tests with code coverage
+# Run tests with code coverage (Windows/Appveyor)
 .\tests\appveyor.pester.ps1 -IncludeCoverage
 
-# Run specific test file
+# Run specific test file (cross-platform)
 Invoke-Pester ./tests/Get-DbaDatabase.Tests.ps1
 
-# Finalize test results
+# Finalize test results (Windows/Appveyor)
 .\tests\appveyor.pester.ps1 -Finalize
 ```
 
