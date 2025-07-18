@@ -12,7 +12,8 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>
         /// List of all registered connections.
         /// </summary>
-        public static Dictionary<string, ManagementConnection> Connections = new Dictionary<string, ManagementConnection>();
+        public static readonly Lazy<Dictionary<string, ManagementConnection>> Connections =
+            new(() => new Dictionary<string, ManagementConnection>(), true);
 
         #region Configuration Computer Management
         /// <summary>
@@ -82,7 +83,8 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>
         /// List of all session containers used to maintain a cache
         /// </summary>
-        public static Dictionary<Guid, PSSessionContainer> PSSessions = new Dictionary<Guid, PSSessionContainer>();
+        public static readonly Lazy<Dictionary<Guid, PSSessionContainer>> PSSessions =
+            new(() => new Dictionary<Guid, PSSessionContainer>(), true);
 
         #region Public operations
         /// <summary>
@@ -93,10 +95,10 @@ namespace Dataplat.Dbatools.Connection
         /// <returns></returns>
         public static PSSession PSSessionGet(Guid Runspace, string ComputerName)
         {
-            if (!PSSessions.ContainsKey(Runspace))
+            if (!PSSessions.Value.ContainsKey(Runspace))
                 return null;
 
-            return PSSessions[Runspace].Get(ComputerName.ToLower());
+            return PSSessions.Value[Runspace].Get(ComputerName.ToLower());
         }
 
         /// <summary>
@@ -110,10 +112,10 @@ namespace Dataplat.Dbatools.Connection
             if (!PSSessionCacheEnabled)
                 return;
 
-            if (!PSSessions.ContainsKey(Runspace))
-                PSSessions[Runspace] = new PSSessionContainer(Runspace);
+            if (!PSSessions.Value.ContainsKey(Runspace))
+                PSSessions.Value[Runspace] = new PSSessionContainer(Runspace);
 
-            PSSessions[Runspace].Set(ComputerName.ToLower(), Session);
+            PSSessions.Value[Runspace].Set(ComputerName.ToLower(), Session);
         }
 
         /// <summary>
@@ -122,7 +124,7 @@ namespace Dataplat.Dbatools.Connection
         /// <returns>The session purged that then needs to be closed</returns>
         public static PSSession PSSessionPurgeExpired()
         {
-            foreach (PSSessionContainer container in PSSessions.Values)
+            foreach (PSSessionContainer container in PSSessions.Value.Values)
                 if (container.CountExpired > 0)
                     return container.PurgeExpiredSession();
 
@@ -130,7 +132,7 @@ namespace Dataplat.Dbatools.Connection
         }
 
         /// <summary>
-        /// The number of expired sessions 
+        /// The number of expired sessions
         /// </summary>
         public static int PSSessionCountExpired
         {
@@ -138,10 +140,14 @@ namespace Dataplat.Dbatools.Connection
             {
                 int num = 0;
 
-                foreach (PSSessionContainer container in PSSessions.Values)
+                foreach (PSSessionContainer container in PSSessions.Value.Values)
                     num += container.CountExpired;
 
                 return num;
+                // Explicit empty static constructor to prevent re-entrance issues
+                static ConnectionHost()
+                {
+                }
             }
         }
         #endregion Public operations
