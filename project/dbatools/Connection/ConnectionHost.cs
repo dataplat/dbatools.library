@@ -38,6 +38,11 @@ namespace Dataplat.Dbatools.Connection
 
         /// <summary>
         /// Enabling this will force the use of the last credentials known to work, rather than even trying explicit credentials.
+
+        // Explicit empty static constructor to prevent re-entrance issues
+        static ConnectionHost()
+        {
+        }
         /// </summary>
         public static bool OverrideExplicitCredential = false;
 
@@ -144,10 +149,6 @@ namespace Dataplat.Dbatools.Connection
                     num += container.CountExpired;
 
                 return num;
-                // Explicit empty static constructor to prevent re-entrance issues
-                static ConnectionHost()
-                {
-                }
             }
         }
         #endregion Public operations
