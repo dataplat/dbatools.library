@@ -12,26 +12,7 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>
         /// List of all registered connections.
         /// </summary>
-        private static Dictionary<string, ManagementConnection> _connections;
-        private static readonly object _connectionsLock = new object();
-
-        public static Dictionary<string, ManagementConnection> Connections
-        {
-            get
-            {
-                if (_connections == null)
-                {
-                    lock (_connectionsLock)
-                    {
-                        if (_connections == null)
-                        {
-                            _connections = new Dictionary<string, ManagementConnection>();
-                        }
-                    }
-                }
-                return _connections;
-            }
-        }
+        public static Dictionary<string, ManagementConnection> Connections = new Dictionary<string, ManagementConnection>();
 
         #region Configuration Computer Management
         /// <summary>
@@ -101,26 +82,7 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>
         /// List of all session containers used to maintain a cache
         /// </summary>
-        private static Dictionary<Guid, PSSessionContainer> _psSessions;
-        private static readonly object _psSessionsLock = new object();
-
-        public static Dictionary<Guid, PSSessionContainer> PSSessions
-        {
-            get
-            {
-                if (_psSessions == null)
-                {
-                    lock (_psSessionsLock)
-                    {
-                        if (_psSessions == null)
-                        {
-                            _psSessions = new Dictionary<Guid, PSSessionContainer>();
-                        }
-                    }
-                }
-                return _psSessions;
-            }
-        }
+        public static Dictionary<Guid, PSSessionContainer> PSSessions = new Dictionary<Guid, PSSessionContainer>();
 
         #region Public operations
         /// <summary>
@@ -168,7 +130,7 @@ namespace Dataplat.Dbatools.Connection
         }
 
         /// <summary>
-        /// The number of expired sessions
+        /// The number of expired sessions 
         /// </summary>
         public static int PSSessionCountExpired
         {
