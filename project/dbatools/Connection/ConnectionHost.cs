@@ -75,7 +75,9 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>
         /// The number of seconds before a sql connection attempt times out
         /// </summary>
-        public static int SqlConnectionTimeout = 15;
+        // Use lazy initialization to avoid static initialization order issues in CI/Pester
+        private static readonly Lazy<int> _sqlConnectionTimeout = new Lazy<int>(() => 15);
+        public static int SqlConnectionTimeout => _sqlConnectionTimeout.Value;
         #endregion Configuration Sql Connection
 
         #region PowerShell remoting sessions
@@ -130,7 +132,7 @@ namespace Dataplat.Dbatools.Connection
         }
 
         /// <summary>
-        /// The number of expired sessions 
+        /// The number of expired sessions
         /// </summary>
         public static int PSSessionCountExpired
         {
