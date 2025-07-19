@@ -76,4 +76,9 @@
       <SpecificVersion>False</SpecificVersion>
     </Reference>
   </ItemGroup>
+
+  <!-- Linux/non-Windows PowerShell SDK reference for net472 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472' AND '$(OS)' != 'Windows_NT'">
+    <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" />
+  </ItemGroup>
 </Project>
