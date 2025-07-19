@@ -87,11 +87,8 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     }
 }
 
-if ($IsWindows -and $PSVersionTable.PSEdition -eq "Core") {
-    $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "win-sqlclient", "Microsoft.Data.SqlClient.dll")
-} else {
-    $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Data.SqlClient.dll")
-}
+# REMOVED win-sqlclient logic - SqlClient is now directly in lib
+$sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Data.SqlClient.dll")
 
 try {
     Import-Module $sqlclient
@@ -116,7 +113,6 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.SqlServer.Management.XEvent',
         'Microsoft.SqlServer.Management.XEventDbScoped',
         'Microsoft.SqlServer.XEvent.XELite',
-        '../third-party/LumenWorks/LumenWorks.Framework.IO'
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions'
@@ -137,8 +133,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
-        'Microsoft.Data.SqlClient',
-        '../third-party/LumenWorks/LumenWorks.Framework.IO'
+        'Microsoft.Data.SqlClient'
     )
 }
 
@@ -160,18 +155,20 @@ if ($PSVersionTable.OS -match "ARM64") {
 $assemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
 
 try {
-    $null = Import-Module ([IO.Path]::Combine($script:libraryroot, "third-party", "bogus", "bogus.dll"))
+    $null = Import-Module ([IO.Path]::Combine($script:libraryroot, "third-party", "bogus", "Bogus.dll"))
 } catch {
     Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
 }
 
+try {
+    $null = Import-Module ([IO.Path]::Combine($script:libraryroot, "third-party", "LumenWorks", "LumenWorks.Framework.IO.dll"))
+} catch {
+    Write-Error "Could not import LumenWorks.Framework.IO.dll : $($_ | Out-String)"
+}
+
 foreach ($name in $names) {
-    if ($name.StartsWith("win-sqlclient\") -and ($isLinux -or $IsMacOS)) {
-        $name = $name.Replace("win-sqlclient\", "")
-        if ($IsMacOS -and $name -in "Azure.Core", "Azure.Identity", "System.Security.SecureString") {
-            $name = "mac\$name"
-        }
-    }
+    # REMOVED win-sqlclient handling and mac-specific logic since files are in standard lib folder
+
     $x64only = 'Microsoft.SqlServer.Replication', 'Microsoft.SqlServer.XEvent.Linq', 'Microsoft.SqlServer.BatchParser', 'Microsoft.SqlServer.Rmo', 'Microsoft.SqlServer.BatchParserClient'
 
     if ($name -in $x64only -and $env:PROCESSOR_ARCHITECTURE -eq "x86") {
@@ -181,7 +178,7 @@ foreach ($name in $names) {
 
     $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", "$name.dll")
     $assemblyfullname = $assemblies.FullName | Out-String
-    if (-not ($assemblyfullname.Contains("$name,".Replace("win-sqlclient\", "")))) {
+    if (-not ($assemblyfullname.Contains("$name,"))) {
         $null = try {
             $null = Import-Module $assemblyPath
         } catch {
