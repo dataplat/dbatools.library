@@ -48,7 +48,9 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                         "Microsoft.SqlServer.Management.IntegrationServices",
                         "Microsoft.SqlServer.Replication",
                         "Microsoft.SqlServer.Rmo",
-                        "System.Private.CoreLib"
+                        "System.Private.CoreLib",
+                        "Azure.Core",
+                        "Azure.Identity"
                     };
 
                     var name = new AssemblyName(e.Name);
