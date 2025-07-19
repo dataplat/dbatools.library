@@ -1,42 +1,129 @@
 name: Build and test library
-on: [push]
+on:
+  workflow_dispatch:
 defaults:
   run:
     shell: pwsh
 jobs:
-  linux-tests:
+  linux-build:
     runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          6.0.x
+
+    - name: Build core/lib
+      shell: pwsh
+      run: |
+        ./build/build.ps1 -CoreOnly
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: core-lib-linux
+        path: artifacts/dbatools.library/core/lib/
+
+  windows-tests:
+    runs-on: windows-latest
+    needs: linux-build
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+    
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: core-lib-linux
+        path: artifacts/dbatools.library/core/lib/
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          6.0.x
+
+    - name: Install .NET Framework targeting packs
+      shell: pwsh
+      run: |
+        # Install .NET Framework developer packs for building
+        choco install netfx-4.7.2-devpack -y --no-progress
 
     - name: Build the library
       shell: pwsh
       run: |
-        sudo apt-get install msitools -y
-        ./build/build-core.ps1
+        ./build/build.ps1
 
-    - name: Execute sqlpackage
+    - name: Copy Linux core/lib files
       shell: pwsh
       run: |
-        return
-        Import-Module ./dbatools.library.psd1 -Force
-        
-        $libpath = Split-Path -Path (Get-Module dbatools*library).Path
+        Copy-Item -Path artifacts/core-lib-linux/* -Destination artifacts/dbatools.library/core/lib/ -Recurse -Force
 
-        if ($IsWindows) {
-          $sqlpackage = "./lib/sqlpackage/windows/sqlpackage.exe"
-        }
-        if ($IsMacOS) {
-          $sqlpackage = "./lib/sqlpackage/mac/sqlpackage"
-        }
-        if ($IsLinux) {
-          $sqlpackage = "./lib/net6.0/sqlpackage"
+    - name: Verify critical files and directories
+      shell: pwsh
+      run: |
+        Write-Host "Verifying critical files and directories before upload..." -ForegroundColor Cyan
+
+        $artifactsDir = "./artifacts/dbatools.library"
+        $criticalPaths = @(
+          "desktop\lib",
+          "desktop\lib\runtimes\win-x64\native",
+          "desktop\third-party",
+          "core\lib",
+          "core\lib\runtimes\win-x64\native",
+          "core\lib\dac\windows",
+          "core\lib\dac\linux",
+          "core\lib\dac\mac",
+          "core\third-party",
+          "private"
+        )
+
+        $missingPaths = @()
+
+        foreach ($path in $criticalPaths) {
+          $fullPath = Join-Path $artifactsDir $path
+          if (Test-Path $fullPath) {
+            Write-Host "✅ Found: $path" -ForegroundColor Green
+          } else {
+            Write-Host "❌ Missing: $path" -ForegroundColor Red
+            $missingPaths += $path
+          }
         }
 
-        . $sqlpackage | Select-String "Specifies a name value pair" | Should -Not -BeNullorEmpty
+        if ($missingPaths.Count -gt 0) {
+          Write-Host "Critical paths are missing! Build may be incomplete." -ForegroundColor Red
+          Write-Host "Missing paths:"
+          $missingPaths | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
 
-    - uses: actions/upload-artifact@v3
+          # List what was actually built
+          Write-Host "`nActual directory structure:" -ForegroundColor Yellow
+          Get-ChildItem -Path $artifactsDir -Recurse -Directory |
+            Select-Object -ExpandProperty FullName |
+            ForEach-Object { $_.Replace("$artifactsDir\", "") } |
+            Sort-Object |
+            ForEach-Object { Write-Host "  $_" }
+
+          exit 1
+        } else {
+          Write-Host "All critical paths verified successfully!" -ForegroundColor Green
+        }
+
+    - name: Test module import
+      shell: pwsh
+      run: |
+        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
+        $module = Get-Module dbatools.library
+        Write-Host "Loaded dbatools.library version: $($module.Version)"
+        Write-Host "Module path: $($module.Path)"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
       with:
-        name: library
-        path: lib
+        name: dbatools-library
+        path: |
+          artifacts/dbatools.library/
