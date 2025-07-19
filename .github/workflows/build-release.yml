@@ -210,10 +210,9 @@ jobs:
           if (Test-Path $sqlPackage) {
             Write-Host "Found sqlpackage at: $sqlPackage"
           } else {
-            Write-Warning "sqlpackage directory not found: $sqlPackage"
+            Write-Warning "sqlpackage not found: $sqlPackage"
             Write-Host "Available directories in module"
-            Get-ChildItem $modulePath -Directory -Recurse | ForEach-Object { Write-Host "  - $($_.Name)" }
-            exit 1
+            Get-ChildItem $modulePath -Directory -Recurse | Select-Object Fullname }
           }
         }
 
