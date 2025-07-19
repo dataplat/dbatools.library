@@ -70,6 +70,7 @@ public class Redirector
 
     public readonly ResolveEventHandler EventHandler;
 
+    [ThreadStatic]
     private static bool isResolving = false;
 
     protected Assembly AssemblyResolve(object sender, ResolveEventArgs e)
@@ -87,164 +88,153 @@ public class Redirector
         }
 
         isResolving = true;
+        bool hasFallbackAttempted = false;
         try
         {
-        // Only track essential system dependencies
-        string[] systemDlls = {
-            "System.Memory",
-            "System.Runtime.CompilerServices.Unsafe"
-        };
+            // Only track essential system dependencies
+            string[] systemDlls = {
+                "System.Memory",
+                "System.Runtime.CompilerServices.Unsafe"
+            };
 
-        // Only track core Azure dependencies
-        string[] azureDlls = {
-            "Azure.Core",
-            "Azure.Identity",
-            "Microsoft.Identity.Client",
-            "Microsoft.IdentityModel.Abstractions"
-        };
+            // Only track core Azure dependencies
+            string[] azureDlls = {
+                "Azure.Core",
+                "Azure.Identity",
+                "Microsoft.Identity.Client",
+                "Microsoft.IdentityModel.Abstractions"
+            };
 
-        // Only track essential SQL dependencies
-        string[] sqlDlls = {
-            "Microsoft.Data.SqlClient",
-            "Microsoft.SqlServer.Smo",
-            "Microsoft.SqlServer.Management.Sdk.Sfc",
-            "Microsoft.SqlServer.Dac",
-            "Microsoft.SqlServer.TransactSql.ScriptDom"
-        };
+            // Only track essential SQL dependencies
+            string[] sqlDlls = {
+                "Microsoft.Data.SqlClient",
+                "Microsoft.SqlServer.Smo",
+                "Microsoft.SqlServer.Management.Sdk.Sfc",
+                "Microsoft.SqlServer.Dac",
+                "Microsoft.SqlServer.TransactSql.ScriptDom"
+            };
 
-        var name = new AssemblyName(e.Name);
-        var assemblyName = name.Name.ToString();
+            var name = new AssemblyName(e.Name);
+            var assemblyName = name.Name.ToString();
 
-        // Handle System dependencies first
-        if (systemDlls.Contains(assemblyName))
-        {
-            // Try desktop folder first for Windows PowerShell
-            string filelocation = "$dir" + "desktop\\" + assemblyName + ".dll";
-            if (System.IO.File.Exists(filelocation))
+            // Helper for safe load
+            Func<string, Assembly> safeLoad = (filelocation) =>
             {
-                var asm = Assembly.LoadFrom(filelocation);
-                return asm;
-            }
-
-            // Try core folder as fallback
-            filelocation = "$dir" + "core\\" + assemblyName + ".dll";
-            if (System.IO.File.Exists(filelocation))
-            {
-                var asm = Assembly.LoadFrom(filelocation);
-                return asm;
-            }
-        }
-
-        // Handle Azure dependencies next
-        if (azureDlls.Contains(assemblyName))
-        {
-            // Try desktop folder first for Windows PowerShell
-            string filelocation = "$dir" + "desktop\\" + assemblyName + ".dll";
-            if (System.IO.File.Exists(filelocation))
-            {
-                var asm = Assembly.LoadFrom(filelocation);
-                return asm;
-            }
-
-            // Try core folder as fallback
-            filelocation = "$dir" + "core\\" + assemblyName + ".dll";
-            if (System.IO.File.Exists(filelocation))
-            {
-                var asm = Assembly.LoadFrom(filelocation);
-                return asm;
-            }
-        }
-
-        // Handle SQL assemblies last
-        if (sqlDlls.Contains(assemblyName))
-        {
-            // Special handling for DAC assemblies in Windows PowerShell
-            if (assemblyName == "Microsoft.SqlServer.Dac" || assemblyName == "Microsoft.Data.Tools.Schema.Sql")
-            {
-                // Try desktop DAC folder first for Windows PowerShell
-                string filelocation = "$dir" + "desktop\\lib\\dac\\" + assemblyName + ".dll";
-                if (System.IO.File.Exists(filelocation))
+                if (!System.IO.File.Exists(filelocation))
+                    return null;
+                try
                 {
-                    var asm = Assembly.LoadFrom(filelocation);
-                    return asm;
+                    return Assembly.LoadFrom(filelocation);
                 }
-
-                // Fallback to core DAC folder
-                filelocation = "$dir" + "core\\lib\\dac\\windows\\" + assemblyName + ".dll";
-                if (System.IO.File.Exists(filelocation))
+                catch
                 {
-                    var asm = Assembly.LoadFrom(filelocation);
-                    return asm;
+                    return null;
                 }
-            }
-            else
+            };
+
+            // Handle System dependencies first
+            if (systemDlls.Contains(assemblyName))
             {
-                // Try desktop folder first for Windows PowerShell (non-DAC SQL assemblies)
-                string filelocation = "$dir" + "desktop\\lib\\" + assemblyName + ".dll";
-                if (System.IO.File.Exists(filelocation))
-                {
-                    var asm = Assembly.LoadFrom(filelocation);
-                    return asm;
-                }
+                string filelocation = "$dir" + "desktop\\" + assemblyName + ".dll";
+                var asm = safeLoad(filelocation);
+                if (asm != null) return asm;
 
-                // Try core folder as fallback
-                filelocation = "$dir" + "core\\lib\\" + assemblyName + ".dll";
-                if (System.IO.File.Exists(filelocation))
+                if (!hasFallbackAttempted)
                 {
-                    var asm = Assembly.LoadFrom(filelocation);
-                    return asm;
-                }
-
-                // Try root lib folder as last resort
-                filelocation = "$dir" + assemblyName + ".dll";
-                if (System.IO.File.Exists(filelocation))
-                {
-                    var asm = Assembly.LoadFrom(filelocation);
-                    return asm;
+                    hasFallbackAttempted = true;
+                    filelocation = "$dir" + "core\\" + assemblyName + ".dll";
+                    asm = safeLoad(filelocation);
+                    if (asm != null) return asm;
                 }
             }
-        }
 
-        // Handle version binding redirects
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var info = assembly.GetName();
-            if (info.Name == name.Name) {
-                // For System.Memory, allow newer versions to satisfy older version requests
-                if (info.Name == "System.Memory" && info.Version > name.Version) {
-                    return assembly;
-                }
-                // For System.Runtime.CompilerServices.Unsafe, allow newer versions to satisfy older version requests
-                if (info.Name == "System.Runtime.CompilerServices.Unsafe" && info.Version > name.Version) {
-                    return assembly;
-                }
-                // For Microsoft.Data.SqlClient, allow newer versions to satisfy older version requests
-                if (info.Name == "Microsoft.Data.SqlClient" && info.Version > name.Version) {
-                    return assembly;
-                }
-                // For Identity DLLs, allow newer versions to satisfy older version requests
-                if (info.Name == "Microsoft.Identity.Client" && info.Version > name.Version) {
-                    return assembly;
-                }
-                if (info.Name == "Azure.Identity" && info.Version > name.Version) {
-                    return assembly;
-                }
-                if (info.Name == "Azure.Core" && info.Version > name.Version) {
-                    return assembly;
-                }
-                // For DAC DLLs, allow newer versions to satisfy older version requests
-                if (info.Name == "Microsoft.SqlServer.Dac" && info.Version > name.Version) {
-                    return assembly;
-                }
-                if (info.Name == "Microsoft.SqlServer.TransactSql.ScriptDom" && info.Version > name.Version) {
-                    return assembly;
-                }
-                // For exact version matches
-                if (info.FullName == e.Name) {
-                    return assembly;
+            // Handle Azure dependencies next
+            if (azureDlls.Contains(assemblyName))
+            {
+                string filelocation = "$dir" + "desktop\\" + assemblyName + ".dll";
+                var asm = safeLoad(filelocation);
+                if (asm != null) return asm;
+
+                if (!hasFallbackAttempted)
+                {
+                    hasFallbackAttempted = true;
+                    filelocation = "$dir" + "core\\" + assemblyName + ".dll";
+                    asm = safeLoad(filelocation);
+                    if (asm != null) return asm;
                 }
             }
-        }
+
+            // Handle SQL assemblies last
+            if (sqlDlls.Contains(assemblyName))
+            {
+                if (assemblyName == "Microsoft.SqlServer.Dac" || assemblyName == "Microsoft.Data.Tools.Schema.Sql")
+                {
+                    string filelocation = "$dir" + "desktop\\lib\\dac\\" + assemblyName + ".dll";
+                    var asm = safeLoad(filelocation);
+                    if (asm != null) return asm;
+
+                    if (!hasFallbackAttempted)
+                    {
+                        hasFallbackAttempted = true;
+                        filelocation = "$dir" + "core\\lib\\dac\\windows\\" + assemblyName + ".dll";
+                        asm = safeLoad(filelocation);
+                        if (asm != null) return asm;
+                    }
+                }
+                else
+                {
+                    string filelocation = "$dir" + "desktop\\lib\\" + assemblyName + ".dll";
+                    var asm = safeLoad(filelocation);
+                    if (asm != null) return asm;
+
+                    if (!hasFallbackAttempted)
+                    {
+                        hasFallbackAttempted = true;
+                        filelocation = "$dir" + "core\\lib\\" + assemblyName + ".dll";
+                        asm = safeLoad(filelocation);
+                        if (asm != null) return asm;
+
+                        filelocation = "$dir" + assemblyName + ".dll";
+                        asm = safeLoad(filelocation);
+                        if (asm != null) return asm;
+                    }
+                }
+            }
+
+            // Handle version binding redirects
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var info = assembly.GetName();
+                if (info.Name == name.Name) {
+                    if (info.Name == "System.Memory" && info.Version > name.Version) {
+                        return assembly;
+                    }
+                    if (info.Name == "System.Runtime.CompilerServices.Unsafe" && info.Version > name.Version) {
+                        return assembly;
+                    }
+                    if (info.Name == "Microsoft.Data.SqlClient" && info.Version > name.Version) {
+                        return assembly;
+                    }
+                    if (info.Name == "Microsoft.Identity.Client" && info.Version > name.Version) {
+                        return assembly;
+                    }
+                    if (info.Name == "Azure.Identity" && info.Version > name.Version) {
+                        return assembly;
+                    }
+                    if (info.Name == "Azure.Core" && info.Version > name.Version) {
+                        return assembly;
+                    }
+                    if (info.Name == "Microsoft.SqlServer.Dac" && info.Version > name.Version) {
+                        return assembly;
+                    }
+                    if (info.Name == "Microsoft.SqlServer.TransactSql.ScriptDom" && info.Version > name.Version) {
+                        return assembly;
+                    }
+                    if (info.FullName == e.Name) {
+                        return assembly;
+                    }
+                }
+            }
             return null;
         }
         finally
