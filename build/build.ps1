@@ -351,12 +351,6 @@ Write-Host "Cleaning up temporary files..."
 # We don't remove the artifacts directory since it's our centralized build output
 Get-ChildItem -Path (Join-Path $libPath "*") -Recurse -Include "*.pdf","*.xml" | Remove-Item -Force
 
-# Create private directory for assembly loading scripts
-$null = New-Item -ItemType Directory -Path "./private" -Force -ErrorAction SilentlyContinue
-
-# Copy assembly loading scripts to private directory
-# (copy to ./private block removed: redundant in standard build context)
-
 # Create directory structure for different versions of System.Runtime.CompilerServices.Unsafe.dll
 $null = New-Item -ItemType Directory -Path (Join-Path $libPath "desktop/v4") -Force
 $null = New-Item -ItemType Directory -Path (Join-Path $libPath "desktop/lib/v6") -Force
@@ -381,12 +375,6 @@ Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $dbatools
 Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $dbatoolsLibraryDir -Force
 Copy-Item -Path (Join-Path $root "LICENSE") -Destination $dbatoolsLibraryDir -Force -ErrorAction SilentlyContinue
 Write-Host "Copied module files to artifacts/dbatools.library" -ForegroundColor Green
-
-# Copy private folder with assembly loading scripts
-if (Test-Path (Join-Path $root "private")) {
-    Copy-Item -Path (Join-Path $root "private") -Destination $dbatoolsLibraryDir -Recurse -Force
-    Write-Host "Included private folder in artifacts/dbatools.library" -ForegroundColor Green
-}
 
 # Copy third-party-licenses
 $licensePath = Join-Path $dbatoolsLibraryDir "third-party-licenses"

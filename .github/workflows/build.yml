@@ -81,8 +81,7 @@ jobs:
           "core\lib\runtimes\win-x64\native",
           "core\lib\dac\linux",
           "core\lib\dac\mac",
-          "core\third-party",
-          "private"
+          "core\third-party"
         )
 
         $missingPaths = @()
