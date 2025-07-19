@@ -212,7 +212,7 @@ jobs:
           } else {
             Write-Warning "sqlpackage not found: $sqlPackage"
             Write-Host "Available directories in module"
-            Get-ChildItem $modulePath -Directory -Recurse | Select-Object Fullname }
+            Get-ChildItem $modulePath -Recurse | Where-Object Name -match sqlpack | Select-Object Fullname
           }
         }
 
