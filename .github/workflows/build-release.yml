@@ -201,7 +201,7 @@ jobs:
         # Determine sqlpackage path based on OS
         $modulePath = $module.ModuleBase
         $sqlPackageName = @(
-          (Join-Path $modulePath "desktop/lib/dac/sqlpackage.exe"),
+          (Join-Path $modulePath "desktop/lib/dac/SqlPackage.exe"),
           (Join-Path $modulePath "core/lib/dac/linux/sqlpackage"),
           (Join-Path $modulePath "core/lib/dac/mac/sqlpackage")
         )
