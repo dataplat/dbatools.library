@@ -36,6 +36,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                         "System.Memory",
                         "System.Runtime.CompilerServices.Unsafe",
                         "Microsoft.Bcl.AsyncInterfaces",
+                        "System.Text.Json",
                         "System.Resources.Extensions",
                         "Microsoft.SqlServer.ConnectionInfo",
                         "Microsoft.SqlServer.Smo",
