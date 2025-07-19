@@ -202,6 +202,7 @@ jobs:
         $modulePath = $module.ModuleBase
         $sqlPackageName = @(
           (Join-Path $modulePath "desktop/lib/dac/SqlPackage.exe"),
+          (Join-Path $modulePath "core/lib/dac/windows/sqlpackage.exe"),
           (Join-Path $modulePath "core/lib/dac/linux/sqlpackage"),
           (Join-Path $modulePath "core/lib/dac/mac/sqlpackage")
         )
@@ -221,7 +222,13 @@ jobs:
         } elseif ($IsLinux) {
           Join-Path $modulePath "core/lib/dac/linux/sqlpackage"
         } else {
-          Join-Path $modulePath "desktop/lib/dac/sqlpackage.exe"
+          # if core then core
+          if ($PSVersionTable.PSEdition -eq 'Core') {
+            Join-Path $modulePath "core/lib/dac/windows/sqlpackage.exe"
+          } else {
+            # if desktop then desktop
+            Join-Path $modulePath "desktop/lib/dac/SqlPackage.exe"
+          }
         }
 
         Write-Host "Using sqlpackage at: $sqlPackagePath"

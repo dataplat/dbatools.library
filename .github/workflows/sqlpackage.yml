@@ -21,19 +21,18 @@ jobs:
     - name: Execute sqlpackage
       shell: pwsh
       run: |
-        return
         Import-Module ./dbatools.psd1 -ErrorAction Stop
         (Get-DbaManagementObject).LoadTemplate -ne $null
         $libpath = Split-Path -Path (Get-Module dbatools*library).Path
 
         if ($IsWindows) {
-          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath lib, win, sqlpackage.exe
+          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath core, lib, dac, windows, sqlpackage.exe
         }
         if ($IsMacOS) {
-          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath lib, mac, sqlpackage
+          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath core, lib, dac, mac, sqlpackage
         }
         if ($IsLinux) {
-          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath lib, sqlpackage
+          $sqlpackage = Join-DbaPath -Path $libpath -ChildPath core, lib, dac, linux, sqlpackage
         }
 
         . $sqlpackage | Select-String "Specifies a name value pair" | Should -Not -BeNullorEmpty
