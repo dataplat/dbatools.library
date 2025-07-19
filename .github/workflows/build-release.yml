@@ -200,41 +200,32 @@ jobs:
 
         # Determine sqlpackage path based on OS
         $modulePath = $module.ModuleBase
-        if ($IsWindows -or $PSVersionTable.PSVersion.Major -eq 5) {
-            Write-Host "Testing Windows sqlpackage..."
-            $dacPath = Join-Path $modulePath "core/lib/dac/windows"
-            $sqlPackageName = "sqlpackage.exe"
-        } elseif ($IsLinux) {
-            Write-Host "Testing Linux sqlpackage..."
-            $dacPath = Join-Path $modulePath "core/lib/dac/linux"
-            $sqlPackageName = "sqlpackage"
-        } elseif ($IsMacOS) {
-            Write-Host "Testing macOS sqlpackage..."
-            $dacPath = Join-Path $modulePath "core/lib/dac/mac"
-            $sqlPackageName = "sqlpackage"
-        } else {
-            Write-Error "Unknown operating system"
-            exit 1
-        }
+        $sqlPackageName = @(
+          (Join-Path $modulePath "desktop/lib/dac/sqlpackage.exe"),
+          (Join-Path $modulePath "core/lib/dac/linux/sqlpackage"),
+          (Join-Path $modulePath "core/lib/dac/mac/sqlpackage")
+        )
 
-        # Check if sqlpackage directory exists
-        if (-not (Test-Path $dacPath)) {
+        foreach ($sqlPackage in $sqlPackageName) {
+          if (Test-Path $sqlPackage) {
+            Write-Host "Found sqlpackage at: $sqlPackage"
+          } else {
             Write-Error "sqlpackage directory not found: $dacPath"
-            Write-Host "Available directories in core/lib:"
-            Get-ChildItem (Join-Path $modulePath "core/lib") -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
+            Write-Host "Available directories in module"
+            Get-ChildItem $modulePath -Directory -Recurse | ForEach-Object { Write-Host "  - $($_.Name)" }
             exit 1
+          }
         }
 
-        # Check if sqlpackage executable exists
-        $sqlPackagePath = Join-Path $dacPath $sqlPackageName
-        if (-not (Test-Path $sqlPackagePath)) {
-            Write-Error "sqlpackage executable not found: $sqlPackagePath"
-            Write-Host "Files in $dacPath :"
-            Get-ChildItem $dacPath | ForEach-Object { Write-Host "  - $($_.Name)" }
-            exit 1
+        $sqlPackagePath = if ($IsMacOS) {
+          Join-Path $modulePath "core/lib/dac/mac/sqlpackage"
+        } elseif ($IsLinux) {
+          Join-Path $modulePath "core/lib/dac/linux/sqlpackage"
+        } else {
+          Join-Path $modulePath "desktop/lib/dac/sqlpackage.exe"
         }
 
-        Write-Host "sqlpackage found at: $sqlPackagePath"
+        Write-Host "Using sqlpackage at: $sqlPackagePath"
 
         # Make sqlpackage executable on non-Windows platforms
         if ($IsLinux -or $IsMacOS) {
