@@ -103,6 +103,9 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 if ($PSVersionTable.PSEdition -eq "Core") {
     $names = @(
         'Microsoft.SqlServer.Server',
+        'Azure.Core',
+        'Azure.Identity',
+        'Microsoft.IdentityModel.Abstractions',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
@@ -112,13 +115,14 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.SqlServer.Management.Collector',
         'Microsoft.SqlServer.Management.XEvent',
         'Microsoft.SqlServer.Management.XEventDbScoped',
-        'Microsoft.SqlServer.XEvent.XELite',
-        'Azure.Core',
-        'Azure.Identity',
-        'Microsoft.IdentityModel.Abstractions'
+        'Microsoft.SqlServer.XEvent.XELite'
     )
 } else {
     $names = @(
+        'Azure.Core',
+        'Azure.Identity',
+        'Microsoft.IdentityModel.Abstractions',
+        'Microsoft.Data.SqlClient',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
@@ -129,11 +133,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.SqlServer.Management.Collector',
         'Microsoft.SqlServer.Management.XEvent',
         'Microsoft.SqlServer.Management.XEventDbScoped',
-        'Microsoft.SqlServer.XEvent.XELite',
-        'Azure.Core',
-        'Azure.Identity',
-        'Microsoft.IdentityModel.Abstractions',
-        'Microsoft.Data.SqlClient'
+        'Microsoft.SqlServer.XEvent.XELite'
     )
 }
 
