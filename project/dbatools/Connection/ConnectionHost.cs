@@ -12,15 +12,13 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>
         /// List of all registered connections.
         /// </summary>
-        private static readonly Lazy<Dictionary<string, ManagementConnection>> _connections = new Lazy<Dictionary<string, ManagementConnection>>(() => new Dictionary<string, ManagementConnection>());
-        public static Dictionary<string, ManagementConnection> Connections => _connections.Value;
+        public static Dictionary<string, ManagementConnection> Connections = new Dictionary<string, ManagementConnection>();
 
         #region Configuration Computer Management
         /// <summary>
         /// The time interval that must pass, before a connection using a known to not work connection protocol is reattempted
         /// </summary>
-        private static readonly Lazy<TimeSpan> _badConnectionTimeout = new Lazy<TimeSpan>(() => new TimeSpan(0, 15, 0));
-        public static TimeSpan BadConnectionTimeout => _badConnectionTimeout.Value;
+        public static TimeSpan BadConnectionTimeout = new TimeSpan(0, 15, 0);
 
         /// <summary>
         /// Globally disables all caching done by the Computer Management functions.
@@ -84,8 +82,7 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>
         /// List of all session containers used to maintain a cache
         /// </summary>
-        private static readonly Lazy<Dictionary<Guid, PSSessionContainer>> _psSessions = new Lazy<Dictionary<Guid, PSSessionContainer>>(() => new Dictionary<Guid, PSSessionContainer>());
-        public static Dictionary<Guid, PSSessionContainer> PSSessions => _psSessions.Value;
+        public static Dictionary<Guid, PSSessionContainer> PSSessions = new Dictionary<Guid, PSSessionContainer>();
 
         #region Public operations
         /// <summary>
@@ -153,8 +150,7 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>
         /// The time until established connections will be considered expired (if available)
         /// </summary>
-        private static readonly Lazy<TimeSpan> _psSessionTimeout = new Lazy<TimeSpan>(() => new TimeSpan(0, 5, 0));
-        public static TimeSpan PSSessionTimeout => _psSessionTimeout.Value;
+        public static TimeSpan PSSessionTimeout = new TimeSpan(0, 5, 0);
 
         /// <summary>
         /// Whether sessions should be cached at all
