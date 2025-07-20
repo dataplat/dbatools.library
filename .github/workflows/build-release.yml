@@ -288,7 +288,7 @@ jobs:
         }
 
         # Download dbatools from GitHub
-        $branch = "${{ github.event.inputs.dbatools_branch || 'newestver' }}"
+        $branch = "${{ github.event.inputs.dbatools_branch || 'development' }}"
         Write-Host "Downloading dbatools from GitHub (branch: $branch)..."
 
         $zipUrl = "https://github.com/dataplat/dbatools/archive/refs/heads/$branch.zip"
