@@ -5,13 +5,41 @@ defaults:
   run:
     shell: pwsh
 jobs:
-  # Linux tests are disabled - build-core.ps1 script not found
-  # Keeping Windows build test only for now
+  linux-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          6.0.x
+
+    - name: Build core/lib
+      shell: pwsh
+      run: |
+        ./build/build.ps1 -CoreOnly
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: core-lib-linux
+        path: artifacts/dbatools.library/core/lib/
+
   windows-tests:
     runs-on: windows-latest
+    needs: linux-build
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: core-lib-linux
+        path: artifacts/dbatools.library/core/lib/
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -31,6 +59,13 @@ jobs:
       run: |
         ./build/build.ps1
 
+    - name: Copy Linux core/lib files
+      shell: pwsh
+      run: |
+        Copy-Item -Path artifacts/core-lib-linux/* -Destination artifacts/dbatools.library/core/lib/ -Recurse -Force
+        # delete windows sqlpackage on core cuz its the same as desktop
+        Remove-Item -Path artifacts/dbatools.library/core/lib/dac/windows -Recurse -Force -ErrorAction Ignore
+
     - name: Verify critical files and directories
       shell: pwsh
       run: |
@@ -39,15 +74,14 @@ jobs:
         $artifactsDir = "./artifacts/dbatools.library"
         $criticalPaths = @(
           "desktop\lib",
+          "desktop\lib\dac",
           "desktop\lib\runtimes\win-x64\native",
           "desktop\third-party",
           "core\lib",
           "core\lib\runtimes\win-x64\native",
-          "core\lib\dac\windows",
           "core\lib\dac\linux",
           "core\lib\dac\mac",
-          "core\third-party",
-          "private"
+          "core\third-party"
         )
 
         $missingPaths = @()

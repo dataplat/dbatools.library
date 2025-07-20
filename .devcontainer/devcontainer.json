@@ -52,7 +52,9 @@
                     }
                 },
                 "terminal.integrated.shell.linux": "pwsh",
-                "terminal.integrated.defaultProfile.linux": "pwsh"
+                "terminal.integrated.defaultProfile.linux": "pwsh",
+                "powershell.developer.editorServicesLogLevel": "Error",
+                "powershell.integratedConsole.suppressStartupBanner": true
             },
             "extensions": [
                 "ms-vscode.powershell",

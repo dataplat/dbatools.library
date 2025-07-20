@@ -40,3 +40,4 @@ lib/
 .devcontainer/.env
 dbatools.library.zip
 /artifacts
+.roo/mcp.json

@@ -21,8 +21,32 @@ on:
         required: false
 
 jobs:
+  linux-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          6.0.x
+
+    - name: Build core/lib
+      shell: pwsh
+      run: |
+        ./build/build.ps1 -CoreOnly
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+          name: core-lib-linux
+          path: artifacts/dbatools.library/core/lib/
+
   build-windows:
     runs-on: windows-latest
+    needs: linux-build
 
     steps:
     - name: Checkout code
@@ -45,7 +69,23 @@ jobs:
       shell: pwsh
       run: |
         # Run the build script
-        .\build\build.ps1
+        .\build\build.ps1 -BuildZip
+
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: core-lib-linux
+        path: artifacts/core-lib-linux/
+
+    - name: Extract core-lib-linux artifact and copy to core/lib
+      shell: pwsh
+      run: Copy-Item -Path "artifacts/core-lib-linux/*" -Destination "artifacts/dbatools.library/core/lib" -Recurse -Force
+
+    - name: Ensure sqlpackage is executable
+      shell: pwsh
+      run: |
+        chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage
+        chmod +x ./artifacts/dbatools.library/core/lib/dac/mac/sqlpackage
 
     - name: Verify critical files and directories
       shell: pwsh
@@ -56,14 +96,13 @@ jobs:
         $criticalPaths = @(
           "desktop\lib",
           "desktop\lib\runtimes\win-x64\native",
+          "core\lib\dac\windows",
           "desktop\third-party",
           "core\lib",
           "core\lib\runtimes\win-x64\native",
-          "core\lib\dac\windows",
           "core\lib\dac\linux",
           "core\lib\dac\mac",
-          "core\third-party",
-          "private"
+          "core\third-party"
         )
 
         $missingPaths = @()
@@ -110,7 +149,7 @@ jobs:
         path: artifacts/dbatools.library.zip
 
   test-sqlpackage:
-    name: Test SqlPackage on ${{ matrix.os }}
+    name: Test sqlpackage on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build-windows
     strategy:
@@ -144,7 +183,7 @@ jobs:
           exit 1
         }
 
-    - name: Test SqlPackage
+    - name: Test sqlpackage
       shell: pwsh
       run: |
         # Import the built module
@@ -158,71 +197,68 @@ jobs:
         Write-Host "Module loaded successfully with version: $($module.Version)"
         Write-Host "Module path: $($module.ModuleBase)"
 
-        # Determine SqlPackage path based on OS
+        # Determine sqlpackage path based on OS
         $modulePath = $module.ModuleBase
-        if ($IsWindows -or $PSVersionTable.PSVersion.Major -eq 5) {
-            Write-Host "Testing Windows SqlPackage..."
-            $dacPath = Join-Path $modulePath "core/lib/dac/windows"
-            $sqlPackageName = "SqlPackage.exe"
+        $sqlPackageName = @(
+          (Join-Path $modulePath "desktop/lib/dac/SqlPackage.exe"),
+          (Join-Path $modulePath "core/lib/dac/windows/sqlpackage.exe"),
+          (Join-Path $modulePath "core/lib/dac/linux/sqlpackage"),
+          (Join-Path $modulePath "core/lib/dac/mac/sqlpackage")
+        )
+
+        foreach ($sqlPackage in $sqlPackageName) {
+          if (Test-Path $sqlPackage) {
+            Write-Host "Found sqlpackage at: $sqlPackage"
+          } else {
+            Write-Warning "sqlpackage not found: $sqlPackage"
+            Write-Host "Available directories in module"
+            Get-ChildItem $modulePath -Recurse | Where-Object Name -match sqlpack | Select-Object Fullname
+          }
+        }
+
+        $sqlPackagePath = if ($IsMacOS) {
+          Join-Path $modulePath "core/lib/dac/mac/sqlpackage"
         } elseif ($IsLinux) {
-            Write-Host "Testing Linux SqlPackage..."
-            $dacPath = Join-Path $modulePath "core/lib/dac/linux"
-            $sqlPackageName = "SqlPackage"
-        } elseif ($IsMacOS) {
-            Write-Host "Testing macOS SqlPackage..."
-            $dacPath = Join-Path $modulePath "core/lib/dac/mac"
-            $sqlPackageName = "SqlPackage"
+          Join-Path $modulePath "core/lib/dac/linux/sqlpackage"
         } else {
-            Write-Error "Unknown operating system"
-            exit 1
+          # if core then core
+          if ($PSVersionTable.PSEdition -eq 'Core') {
+            Join-Path $modulePath "core/lib/dac/windows/sqlpackage.exe"
+          } else {
+            # if desktop then desktop
+            Join-Path $modulePath "desktop/lib/dac/SqlPackage.exe"
+          }
         }
 
-        # Check if SqlPackage directory exists
-        if (-not (Test-Path $dacPath)) {
-            Write-Error "SqlPackage directory not found: $dacPath"
-            Write-Host "Available directories in core/lib:"
-            Get-ChildItem (Join-Path $modulePath "core/lib") -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
-            exit 1
-        }
+        Write-Host "Using sqlpackage at: $sqlPackagePath"
 
-        # Check if SqlPackage executable exists
-        $sqlPackagePath = Join-Path $dacPath $sqlPackageName
-        if (-not (Test-Path $sqlPackagePath)) {
-            Write-Error "SqlPackage executable not found: $sqlPackagePath"
-            Write-Host "Files in $dacPath :"
-            Get-ChildItem $dacPath | ForEach-Object { Write-Host "  - $($_.Name)" }
-            exit 1
-        }
-
-        Write-Host "SqlPackage found at: $sqlPackagePath"
-
-        # Make SqlPackage executable on non-Windows platforms
+        # Make sqlpackage executable on non-Windows platforms
         if ($IsLinux -or $IsMacOS) {
             chmod +x $sqlPackagePath
         }
 
-        # Test SqlPackage execution
+        # Test sqlpackage execution
         try {
-            Write-Host "Testing SqlPackage execution..."
+            Write-Host "Testing sqlpackage execution..."
             $versionOutput = & $sqlPackagePath /Version 2>&1
-            Write-Host "SqlPackage version: $versionOutput"
+            Write-Host "sqlpackage version: $versionOutput"
 
             # Basic functionality test - show help
-            Write-Host "`nTesting SqlPackage help command..."
+            Write-Host "`nTesting sqlpackage help command..."
             $helpOutput = & $sqlPackagePath /? 2>&1 | Select-Object -First 10
             $helpOutput | ForEach-Object { Write-Host $_ }
             Write-Host "... (output truncated)"
 
             # Verify expected output from help
             $helpString = $helpOutput -join "`n"
-            if ($helpString -match "Specifies a name value pair" -or $helpString -match "SqlPackage" -or $helpString -match "Command") {
-                Write-Host "`nSqlPackage test completed successfully!"
+            if ($helpString -match "Specifies a name value pair" -or $helpString -match "sqlpackage" -or $helpString -match "Command") {
+                Write-Host "`nsqlpackage test completed successfully!"
             } else {
-                Write-Error "SqlPackage help output does not contain expected content"
+                Write-Error "sqlpackage help output does not contain expected content"
                 exit 1
             }
         } catch {
-            Write-Error "Failed to execute SqlPackage: $_"
+            Write-Error "Failed to execute sqlpackage: $_"
             exit 1
         }
 
@@ -252,7 +288,7 @@ jobs:
         }
 
         # Download dbatools from GitHub
-        $branch = "${{ github.event.inputs.dbatools_branch || 'newver' }}"
+        $branch = "${{ github.event.inputs.dbatools_branch || 'newestver' }}"
         Write-Host "Downloading dbatools from GitHub (branch: $branch)..."
 
         $zipUrl = "https://github.com/dataplat/dbatools/archive/refs/heads/$branch.zip"
@@ -309,17 +345,20 @@ jobs:
         Write-Host "Importing dbatools..."
         Import-Module dbatools -Force
 
-        Write-Host "Testing Get-DbaManagementObject..."
+        Write-Host "Testing Connect-DbaInstance..."
         try {
-            $result = Get-DbaManagementObject
-            Write-Host "Test passed: Get-DbaManagementObject ran without fail"
+            $result = Connect-DbaInstance -SqlInstance localhost
         } catch {
-            Write-Error "Test failed with exception: $_"
-            exit 1
+            if ($PSItem.Exception.Message -notmatch "not accessible") {
+              Write-Error "Test failed with exception: $_"
+              exit 1
+            } else {
+              Write-Host "Test failed successfully (lol) with inaccessible instance message: $($PSItem.Exception.Message)" -ForegroundColor Green
+            }
         }
 
   create-preview-release:
-    needs: [build-windows, test-sqlpackage]
+    needs: [linux-build, build-windows, test-sqlpackage]
     runs-on: windows-latest
     # Create release if manually triggered OR if version contains "preview"
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
