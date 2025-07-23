@@ -357,8 +357,98 @@ jobs:
             }
         }
 
+  advanced-test:
+    name: Advanced Integration Tests
+    runs-on: ubuntu-latest
+    needs: test-sqlpackage
+    env:
+      SMODefaultModuleName: dbatools
+      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+    steps:
+    - name: Download dbatools.library artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: dbatools-library-zip
+
+    - name: Extract dbatools.library
+      shell: pwsh
+      run: |
+        # Create artifacts directory if it doesn't exist
+        New-Item -ItemType Directory -Path ./artifacts -Force | Out-Null
+
+        # Extract the zip file
+        Expand-Archive -Path ./dbatools.library.zip -DestinationPath ./artifacts -Force
+
+        # Verify extraction
+        if (Test-Path ./artifacts/dbatools.library/dbatools.library.psd1) {
+          Write-Host "✅ dbatools.library extracted successfully" -ForegroundColor Green
+        } else {
+          Write-Error "❌ Failed to extract dbatools.library properly"
+          Get-ChildItem ./artifacts -Recurse | Select-Object FullName
+          exit 1
+        }
+
+    - name: Checkout dbatools repo (development branch)
+      uses: actions/checkout@v4
+      with:
+        repository: dataplat/dbatools
+        ref: development
+        path: dbatools
+
+    - name: Ensure sqlpackage is executable
+      run: chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage || true
+
+    - name: Check file health and set encryption values
+      shell: pwsh
+      run: |
+        # Import the built dbatools.library from artifact
+        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
+        Get-Module dbatools.library | Select-Object -ExpandProperty Path -OutVariable lib | Write-Warning
+        $lib = Split-Path -Path $lib -Parent
+        Get-ChildItem (Join-Path $lib -ChildPath core/lib/dac/linux) | Write-Warning
+        Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Register
+        Set-DbatoolsConfig -FullName sql.connection.encrypt -Value $false -Register
+        Get-DbatoolsConfigValue -FullName sql.connection.encrypt | Write-Warning
+        mkdir /tmp/DbatoolsExport
+
+    - name: Setup docker images
+      run: |
+        # create a shared network
+        docker network create localnet
+        # Expose engine and endpoint then setup a shared path for migrations
+        docker run -p 1433:1433  --volume shared:/shared:z --name mssql1 --hostname mssql1 --network localnet -d dbatools/sqlinstance
+        # Expose second engine and endpoint on different port
+        docker run -p 14333:1433 --volume shared:/shared:z --name mssql2 --hostname mssql2 --network localnet -d dbatools/sqlinstance2
+
+    - name: Clone appveyor repo
+      working-directory: /tmp
+      run: |
+        gh repo clone dataplat/appveyor-lab
+
+    - name: Run advanced integration tests
+      shell: pwsh
+      env:
+        TENANTID: ${{secrets.TENANTID}}
+        CLIENTID: ${{secrets.CLIENTID}}
+        CLIENTSECRET: ${{secrets.CLIENTSECRET}}
+        CLIENT_GUID: ${{secrets.CLIENT_GUID}}
+        CLIENT_GUID_SECRET: ${{secrets.CLIENT_GUID_SECRET}}
+      run: |
+        # Import the built dbatools.library from artifact (ensure it's loaded first)
+        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
+
+        # Import dbatools from the development branch checkout
+        Import-Module ./dbatools/dbatools.psd1 -Force
+
+        Get-DbatoolsConfigValue -FullName sql.connection.trustcert | Write-Warning
+        Get-DbatoolsConfigValue -FullName sql.connection.encrypt | Write-Warning
+
+        # Run the integration tests using the script from the dbatools repo
+        $null = Invoke-Pester ./dbatools/.github/scripts/gh-actions.ps1 -Output Detailed -PassThru
+
   create-preview-release:
-    needs: [linux-build, build-windows, test-sqlpackage]
+    needs: [linux-build, build-windows, test-sqlpackage, advanced-test]
     runs-on: windows-latest
     # Create release if manually triggered OR if version contains "preview"
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
