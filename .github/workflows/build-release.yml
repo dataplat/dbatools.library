@@ -404,9 +404,8 @@ jobs:
       run: |
         # Import the built dbatools.library from artifact
         Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
-        Get-Module dbatools.library | Select-Object -ExpandProperty Path -OutVariable lib | Write-Warning
-        $lib = Split-Path -Path $lib -Parent
-        Get-ChildItem (Join-Path $lib -ChildPath core/lib/dac/linux) | Write-Warning
+        Import-Module ./dbatools/dbatools.psd1 -Force
+
         Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Register
         Set-DbatoolsConfig -FullName sql.connection.encrypt -Value $false -Register
         Get-DbatoolsConfigValue -FullName sql.connection.encrypt | Write-Warning
