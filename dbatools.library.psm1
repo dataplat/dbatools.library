@@ -34,6 +34,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                 {
                     string[] dlls = {
                         "System.Memory",
+                        "System.Management.Automation",
                         "System.Runtime.CompilerServices.Unsafe",
                         "Microsoft.Bcl.AsyncInterfaces",
                         "System.Text.Json",
