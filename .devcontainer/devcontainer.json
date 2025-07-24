@@ -6,8 +6,11 @@
     ],
     "service": "default",
     "portsAttributes": {
-        "1433": {
-            "label": "MSSQL"
+        "6333": {
+            "label": "Qdrant"
+        },
+        "6334": {
+            "label": "Qdrant Admin"
         }
     },
     "secrets": {
