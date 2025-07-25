@@ -48,32 +48,8 @@ jobs:
           name: appveyor-repo
           path: appveyor-lab
 
-  # Linux build job - builds core/lib components
-  linux-build:
-    runs-on: ubuntu-latest
-    needs: setup-dependencies
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.0.x
-            6.0.x
-
-      - name: Build core/lib
-        shell: pwsh
-        run: ./build/build.ps1 -CoreOnly
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: core-lib-linux
-          path: artifacts/dbatools.library/core/lib/
-
-  # Windows build job - builds desktop/framework components (runs in parallel with Linux)
-  windows-build:
+  # Windows build job - builds complete library with all components
+  build-library:
     runs-on: windows-latest
     needs: setup-dependencies
     steps:
@@ -91,46 +67,13 @@ jobs:
         shell: pwsh
         run: choco install netfx-4.7.2-devpack -y --no-progress
 
-      - name: Build library (Windows components only)
+      - name: Build complete library
         shell: pwsh
         run: .\build\build.ps1 -BuildZip
 
-      - name: Upload Windows build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dbatools-library-windows
-          path: artifacts/dbatools.library/
-
-  # Combine artifacts job - merges Linux and Windows builds
-  combine-artifacts:
-    runs-on: ubuntu-latest
-    needs: [linux-build, windows-build]
-    steps:
-      - name: Download Linux artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: core-lib-linux
-          path: linux-artifacts/
-
-      - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dbatools-library-windows
-          path: windows-artifacts/
-
-      - name: Merge artifacts
+      - name: Make sqlpackage executable
         shell: pwsh
         run: |
-          # Create final structure
-          New-Item -ItemType Directory -Path ./artifacts/dbatools.library/core/lib -Force | Out-Null
-
-          # Copy Windows build (base structure)
-          Copy-Item -Path "windows-artifacts/*" -Destination "./artifacts/" -Recurse -Force
-
-          # Overlay Linux core/lib components
-          Copy-Item -Path "linux-artifacts/*" -Destination "./artifacts/dbatools.library/core/lib/" -Recurse -Force
-
-          # Make sqlpackage executable
           chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage || true
           chmod +x ./artifacts/dbatools.library/core/lib/dac/mac/sqlpackage || true
 
@@ -168,12 +111,7 @@ jobs:
           }
           Write-Host "All critical paths verified!" -ForegroundColor Green
 
-      - name: Create release zip
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "./artifacts/dbatools.library" -DestinationPath "./dbatools.library.zip" -Force
-
-      - name: Upload combined library artifact
+      - name: Upload library artifact
         uses: actions/upload-artifact@v4
         with:
           name: dbatools-library
@@ -183,13 +121,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dbatools-library-zip
-          path: dbatools.library.zip
+          path: artifacts/dbatools.library.zip
 
   # Test matrix - tests on all platforms with proper dependencies and environment
   test-matrix:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    needs: combine-artifacts
+    needs: build-library
     strategy:
       fail-fast: false
       matrix:
