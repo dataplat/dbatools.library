@@ -63,20 +63,23 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                     {
                         if (assemblyName == dll)
                         {
-                            // Generalized handling for all known DLLs:
-                            // If an assembly with the same name is already loaded, return it (warn if version differs).
-                            var loaded = AppDomain.CurrentDomain.GetAssemblies()
-                                .FirstOrDefault(a => a.GetName().Name == assemblyName);
-                            if (loaded != null)
+                            // Windows PowerShell 5.1/.NET Framework: Only special-case System.Management.Automation
+                            if (assemblyName == "System.Management.Automation")
                             {
-                                var requestedVersion = name.Version;
-                                var loadedVersion = loaded.GetName().Version;
-                                if (requestedVersion != null && loadedVersion != null && requestedVersion != loadedVersion)
+                                var loaded = AppDomain.CurrentDomain.GetAssemblies()
+                                    .FirstOrDefault(a => a.GetName().Name == "System.Management.Automation");
+                                if (loaded != null)
                                 {
-                                    System.Diagnostics.Trace.TraceWarning(
-                                        $"[dbatools] Requested {assemblyName} version {requestedVersion}, but loaded version is {loadedVersion}. Using loaded version. This may cause compatibility issues if APIs differ.");
+                                    var requestedVersion = name.Version;
+                                    var loadedVersion = loaded.GetName().Version;
+                                    if (requestedVersion != null && loadedVersion != null && requestedVersion != loadedVersion)
+                                    {
+                                        System.Diagnostics.Trace.TraceWarning(
+                                            string.Format("[dbatools] Requested System.Management.Automation version {0}, but loaded version is {1}. Using loaded version.", requestedVersion, loadedVersion));
+                                    }
+                                    return loaded;
                                 }
-                                return loaded;
+                                // If not found, fall through to normal logic (should not happen in PowerShell host)
                             }
                             string filelocation = "$dir" + dll + ".dll";
                             //Console.WriteLine(filelocation);
