@@ -264,7 +264,7 @@ jobs:
           }
 
       - name: Run integration tests (PowerShell Core)
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         run: |
           Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
           Import-Module ./dbatools/dbatools.psd1 -Force
