@@ -63,6 +63,26 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                     {
                         if (assemblyName == dll)
                         {
+                            // Special handling for System.Management.Automation:
+                            // Always return the already loaded assembly, regardless of requested version.
+                            if (assemblyName == "System.Management.Automation")
+                            {
+                                var loaded = AppDomain.CurrentDomain.GetAssemblies()
+                                    .FirstOrDefault(a => a.GetName().Name == "System.Management.Automation");
+                                if (loaded != null)
+                                {
+                                    var requestedVersion = name.Version;
+                                    var loadedVersion = loaded.GetName().Version;
+                                    if (requestedVersion != null && loadedVersion != null && requestedVersion != loadedVersion)
+                                    {
+                                        // Log a warning if the requested version does not match the loaded version.
+                                        System.Diagnostics.Trace.TraceWarning(
+                                            $"[dbatools] Requested System.Management.Automation version {requestedVersion}, but loaded version is {loadedVersion}. Using loaded version.");
+                                    }
+                                    return loaded;
+                                }
+                                // If not found, fall through to normal logic (should not happen in PowerShell host)
+                            }
                             string filelocation = "$dir" + dll + ".dll";
                             //Console.WriteLine(filelocation);
                             return Assembly.LoadFrom(filelocation);
