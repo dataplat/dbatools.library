@@ -17,545 +17,350 @@ on:
     # Manual trigger for when module is not available on PowerShell Gallery
     inputs:
       dbatools_branch:
-        description: 'dbatools branch to use (default: newver)'
+        description: 'dbatools branch to use (default: development)'
         required: false
+        default: 'development'
 
 jobs:
-  linux-build:
+  # Setup job - downloads dependencies once for all other jobs
+  setup-dependencies:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout dbatools repo
+        uses: actions/checkout@v4
+        with:
+          repository: dataplat/dbatools
+          ref: ${{ github.event.inputs.dbatools_branch || 'development' }}
+          path: dbatools
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          8.0.x
-          6.0.x
+      - name: Clone appveyor repo
+        run: git clone https://github.com/dataplat/appveyor-lab.git appveyor-lab
 
-    - name: Build core/lib
-      shell: pwsh
-      run: |
-        ./build/build.ps1 -CoreOnly
+      - name: Upload dbatools repo artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbatools-repo
+          path: dbatools
 
-    - name: Upload Linux artifacts
-      uses: actions/upload-artifact@v4
-      with:
+      - name: Upload appveyor repo artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appveyor-repo
+          path: appveyor-lab
+
+  # Linux build job - builds core/lib components
+  linux-build:
+    runs-on: ubuntu-latest
+    needs: setup-dependencies
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            6.0.x
+
+      - name: Build core/lib
+        shell: pwsh
+        run: ./build/build.ps1 -CoreOnly
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
           name: core-lib-linux
           path: artifacts/dbatools.library/core/lib/
 
-  build-windows:
+  # Windows build job - builds desktop/framework components (runs in parallel with Linux)
+  windows-build:
     runs-on: windows-latest
-    needs: linux-build
-
+    needs: setup-dependencies
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          8.0.x
-          6.0.x
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            6.0.x
 
-    - name: Install .NET Framework targeting packs
-      shell: pwsh
-      run: |
-        # Install .NET Framework developer packs for building
-        choco install netfx-4.7.2-devpack -y --no-progress
+      - name: Install .NET Framework targeting packs
+        shell: pwsh
+        run: choco install netfx-4.7.2-devpack -y --no-progress
 
-    - name: Build library
-      shell: pwsh
-      run: |
-        # Run the build script
-        .\build\build.ps1 -BuildZip
+      - name: Build library (Windows components only)
+        shell: pwsh
+        run: .\build\build.ps1 -BuildZip
 
-    - name: Download Linux artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: core-lib-linux
-        path: artifacts/core-lib-linux/
+      - name: Upload Windows build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbatools-library-windows
+          path: artifacts/dbatools.library/
 
-    - name: Extract core-lib-linux artifact and copy to core/lib
-      shell: pwsh
-      run: Copy-Item -Path "artifacts/core-lib-linux/*" -Destination "artifacts/dbatools.library/core/lib" -Recurse -Force
+  # Combine artifacts job - merges Linux and Windows builds
+  combine-artifacts:
+    runs-on: ubuntu-latest
+    needs: [linux-build, windows-build]
+    steps:
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: core-lib-linux
+          path: linux-artifacts/
 
-    - name: Ensure sqlpackage is executable
-      shell: pwsh
-      run: |
-        chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage
-        chmod +x ./artifacts/dbatools.library/core/lib/dac/mac/sqlpackage
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dbatools-library-windows
+          path: windows-artifacts/
 
-    - name: Verify critical files and directories
-      shell: pwsh
-      run: |
-        Write-Host "Verifying critical files and directories before upload..." -ForegroundColor Cyan
+      - name: Merge artifacts
+        shell: pwsh
+        run: |
+          # Create final structure
+          New-Item -ItemType Directory -Path ./artifacts/dbatools.library/core/lib -Force | Out-Null
 
-        $artifactsDir = "./artifacts/dbatools.library"
-        $criticalPaths = @(
-          "desktop\lib",
-          "desktop\lib\runtimes\win-x64\native",
-          "core\lib\dac\windows",
-          "desktop\third-party",
-          "core\lib",
-          "core\lib\runtimes\win-x64\native",
-          "core\lib\dac\linux",
-          "core\lib\dac\mac",
-          "core\third-party"
-        )
+          # Copy Windows build (base structure)
+          Copy-Item -Path "windows-artifacts/*" -Destination "./artifacts/" -Recurse -Force
 
-        $missingPaths = @()
+          # Overlay Linux core/lib components
+          Copy-Item -Path "linux-artifacts/*" -Destination "./artifacts/dbatools.library/core/lib/" -Recurse -Force
 
-        foreach ($path in $criticalPaths) {
-          $fullPath = Join-Path $artifactsDir $path
-          if (Test-Path $fullPath) {
-            Write-Host "✅ Found: $path" -ForegroundColor Green
-          } else {
-            Write-Host "❌ Missing: $path" -ForegroundColor Red
-            $missingPaths += $path
+          # Make sqlpackage executable
+          chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage || true
+          chmod +x ./artifacts/dbatools.library/core/lib/dac/mac/sqlpackage || true
+
+      - name: Verify critical files
+        shell: pwsh
+        run: |
+          $artifactsDir = "./artifacts/dbatools.library"
+          $criticalPaths = @(
+            "desktop/lib",
+            "desktop/lib/runtimes/win-x64/native",
+            "core/lib/dac/windows",
+            "desktop/third-party",
+            "core/lib",
+            "core/lib/runtimes/win-x64/native",
+            "core/lib/dac/linux",
+            "core/lib/dac/mac",
+            "core/third-party"
+          )
+
+          $missingPaths = @()
+          foreach ($path in $criticalPaths) {
+            $fullPath = Join-Path $artifactsDir $path
+            if (Test-Path $fullPath) {
+              Write-Host "✅ Found: $path" -ForegroundColor Green
+            } else {
+              Write-Host "❌ Missing: $path" -ForegroundColor Red
+              $missingPaths += $path
+            }
           }
-        }
 
-        if ($missingPaths.Count -gt 0) {
-          Write-Host "Critical paths are missing! Build may be incomplete." -ForegroundColor Red
-          Write-Host "Missing paths:"
-          $missingPaths | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+          if ($missingPaths.Count -gt 0) {
+            Write-Host "Critical paths missing:" -ForegroundColor Red
+            $missingPaths | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+            exit 1
+          }
+          Write-Host "All critical paths verified!" -ForegroundColor Green
 
-          # List what was actually built
-          Write-Host "`nActual directory structure:" -ForegroundColor Yellow
-          Get-ChildItem -Path $artifactsDir -Recurse -Directory |
-            Select-Object -ExpandProperty FullName |
-            ForEach-Object { $_.Replace("$artifactsDir\", "") } |
-            Sort-Object |
-            ForEach-Object { Write-Host "  $_" }
+      - name: Create release zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "./artifacts/dbatools.library" -DestinationPath "./dbatools.library.zip" -Force
 
-          exit 1
-        } else {
-          Write-Host "All critical paths verified successfully!" -ForegroundColor Green
-        }
+      - name: Upload combined library artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbatools-library
+          path: artifacts/dbatools.library/
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dbatools-library
-        path: |
-          artifacts/dbatools.library/
+      - name: Upload release zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbatools-library-zip
+          path: dbatools.library.zip
 
-    - name: Upload release zip
-      uses: actions/upload-artifact@v4
-      with:
-        name: dbatools-library-zip
-        path: artifacts/dbatools.library.zip
-
-  test-sqlpackage:
-    name: Test sqlpackage on ${{ matrix.os }}
+  # Test matrix - tests on all platforms with proper dependencies and environment
+  test-matrix:
+    name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    needs: build-windows
+    needs: combine-artifacts
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        include:
+          - os: ubuntu-latest
+            script: .github/scripts/gh-actions.ps1
+            shell: pwsh
+          - os: macos-latest
+            script: .github/scripts/gh-macactions.ps1
+            shell: pwsh
+          - os: windows-latest
+            script: .github/scripts/gh-winactions.ps1
+            shell: pwsh
 
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Download library zip artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: dbatools-library-zip
-
-    - name: Extract library zip
-      shell: pwsh
-      run: |
-        # Create artifacts directory if it doesn't exist
-        New-Item -ItemType Directory -Path ./artifacts -Force | Out-Null
-
-        # Extract the zip file
-        Expand-Archive -Path ./dbatools.library.zip -DestinationPath ./artifacts -Force
-
-        # Verify extraction
-        if (Test-Path ./artifacts/dbatools.library/dbatools.library.psd1) {
-          Write-Host "✅ Library extracted successfully" -ForegroundColor Green
-        } else {
-          Write-Error "❌ Failed to extract library properly"
-          Get-ChildItem ./artifacts -Recurse | Select-Object FullName
-          exit 1
-        }
-
-    - name: Test sqlpackage
-      shell: pwsh
-      run: |
-        # Import the built module
-        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force -ErrorAction Stop
-
-        # Get module info
-        $module = Get-Module dbatools.library
-        Write-Host "Loaded dbatools.library version: $($module.Version)"
-
-        # Display module version info
-        Write-Host "Module loaded successfully with version: $($module.Version)"
-        Write-Host "Module path: $($module.ModuleBase)"
-
-        # Determine sqlpackage path based on OS
-        $modulePath = $module.ModuleBase
-        $sqlPackageName = @(
-          (Join-Path $modulePath "desktop/lib/dac/SqlPackage.exe"),
-          (Join-Path $modulePath "core/lib/dac/windows/sqlpackage.exe"),
-          (Join-Path $modulePath "core/lib/dac/linux/sqlpackage"),
-          (Join-Path $modulePath "core/lib/dac/mac/sqlpackage")
-        )
-
-        foreach ($sqlPackage in $sqlPackageName) {
-          if (Test-Path $sqlPackage) {
-            Write-Host "Found sqlpackage at: $sqlPackage"
-          } else {
-            Write-Warning "sqlpackage not found: $sqlPackage"
-            Write-Host "Available directories in module"
-            Get-ChildItem $modulePath -Recurse | Where-Object Name -match sqlpack | Select-Object Fullname
-          }
-        }
-
-        $sqlPackagePath = if ($IsMacOS) {
-          Join-Path $modulePath "core/lib/dac/mac/sqlpackage"
-        } elseif ($IsLinux) {
-          Join-Path $modulePath "core/lib/dac/linux/sqlpackage"
-        } else {
-          # if core then core
-          if ($PSVersionTable.PSEdition -eq 'Core') {
-            Join-Path $modulePath "core/lib/dac/windows/sqlpackage.exe"
-          } else {
-            # if desktop then desktop
-            Join-Path $modulePath "desktop/lib/dac/SqlPackage.exe"
-          }
-        }
-
-        Write-Host "Using sqlpackage at: $sqlPackagePath"
-
-        # Make sqlpackage executable on non-Windows platforms
-        if ($IsLinux -or $IsMacOS) {
-            chmod +x $sqlPackagePath
-        }
-
-        # Test sqlpackage execution
-        try {
-            Write-Host "Testing sqlpackage execution..."
-            $versionOutput = & $sqlPackagePath /Version 2>&1
-            Write-Host "sqlpackage version: $versionOutput"
-
-            # Basic functionality test - show help
-            Write-Host "`nTesting sqlpackage help command..."
-            $helpOutput = & $sqlPackagePath /? 2>&1 | Select-Object -First 10
-            $helpOutput | ForEach-Object { Write-Host $_ }
-            Write-Host "... (output truncated)"
-
-            # Verify expected output from help
-            $helpString = $helpOutput -join "`n"
-            if ($helpString -match "Specifies a name value pair" -or $helpString -match "sqlpackage" -or $helpString -match "Command") {
-                Write-Host "`nsqlpackage test completed successfully!"
-            } else {
-                Write-Error "sqlpackage help output does not contain expected content"
-                exit 1
-            }
-        } catch {
-            Write-Error "Failed to execute sqlpackage: $_"
-            exit 1
-        }
-
-    - name: Install dbatools from GitHub
-      shell: pwsh
-      run: |
-        # Ensure TEMP environment variable is set
-        if (-not $Env:TEMP) {
-            $Env:TEMP = [System.IO.Path]::GetTempPath()
-        }
-
-        # Determine module path based on OS and PowerShell edition
-        $modulePath = if ($IsWindows -or $PSVersionTable.PSVersion.Major -eq 5) {
-          if ($PSVersionTable.PSEdition -eq 'Core') {
-            Join-Path $HOME "Documents/PowerShell/Modules"
-          } else {
-            Join-Path $HOME "Documents/WindowsPowerShell/Modules"
-          }
-        } else {
-          # Linux/macOS
-          Join-Path $HOME ".local/share/powershell/Modules"
-        }
-
-        # Create module directory if it doesn't exist
-        if (-not (Test-Path $modulePath)) {
-          New-Item -ItemType Directory -Path $modulePath -Force | Out-Null
-        }
-
-        # Download dbatools from GitHub
-        $branch = "${{ github.event.inputs.dbatools_branch || 'development' }}"
-        Write-Host "Downloading dbatools from GitHub (branch: $branch)..."
-
-        $zipUrl = "https://github.com/dataplat/dbatools/archive/refs/heads/$branch.zip"
-        $tempZip = Join-Path $Env:TEMP "dbatools-$branch.zip"
-        $tempExtract = Join-Path $Env:TEMP "dbatools-extract"
-
-        # Download the zip file
-        Invoke-WebRequest -Uri $zipUrl -OutFile $tempZip -UseBasicParsing
-
-        # Extract the zip file
-        if (Test-Path $tempExtract) {
-          Remove-Item -Path $tempExtract -Recurse -Force
-        }
-        Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
-
-        # Find the extracted folder (it will be named dbatools-{branch})
-        $extractedFolder = Get-ChildItem -Path $tempExtract -Directory | Select-Object -First 1
-
-        # Move to the correct location in modules directory
-        $dbatoolsPath = Join-Path $modulePath "dbatools"
-        if (Test-Path $dbatoolsPath) {
-          Remove-Item -Path $dbatoolsPath -Recurse -Force
-        }
-        Move-Item -Path $extractedFolder.FullName -Destination $dbatoolsPath -Force
-
-        # Clean up temporary files
-        Remove-Item -Path $tempZip -Force
-        Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
-
-        # Verify installation
-        if (Test-Path (Join-Path $dbatoolsPath "dbatools.psd1")) {
-          Write-Host "dbatools installed successfully to: $dbatoolsPath"
-          $moduleInfo = Test-ModuleManifest -Path (Join-Path $dbatoolsPath "dbatools.psd1") -ErrorAction SilentlyContinue
-          if ($moduleInfo) {
-            Write-Host "dbatools version: $($moduleInfo.Version)"
-          }
-        } else {
-          throw "dbatools installation failed - module manifest not found"
-        }
-
-    - name: Import modules and run test
-      shell: pwsh
-      run: |
-        Write-Host "Importing dbatools.library..."
-        # Verify module path exists before importing
-        $modulePath = "./artifacts/dbatools.library/dbatools.library.psd1"
-        if (-not (Test-Path $modulePath)) {
-            Write-Error "Module path not found: $modulePath"
-            Get-ChildItem ./artifacts -Recurse | Select-Object FullName
-            exit 1
-        }
-        Import-Module $modulePath -Force
-
-        Write-Host "Importing dbatools..."
-        Import-Module dbatools -Force
-
-        Write-Host "Testing Connect-DbaInstance..."
-        try {
-            $result = Connect-DbaInstance -SqlInstance localhost
-        } catch {
-            if ($PSItem.Exception.Message -notmatch "not accessible") {
-              Write-Error "Test failed with exception: $_"
-              exit 1
-            } else {
-              Write-Host "Test failed successfully (lol) with inaccessible instance message: $($PSItem.Exception.Message)" -ForegroundColor Green
-            }
-        }
-
-  advanced-test:
-    name: Advanced Integration Tests
-    runs-on: ubuntu-latest
-    needs: test-sqlpackage
     env:
+      TENANTID: ${{ secrets.TENANTID }}
+      CLIENTID: ${{ secrets.CLIENTID }}
+      CLIENTSECRET: ${{ secrets.CLIENTSECRET }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SMODefaultModuleName: dbatools
-      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
     steps:
-    - name: Download dbatools.library artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: dbatools-library-zip
+      - uses: actions/checkout@v4
 
-    - name: Extract dbatools.library
-      shell: pwsh
-      run: |
-        # Create artifacts directory if it doesn't exist
-        New-Item -ItemType Directory -Path ./artifacts -Force | Out-Null
+      - name: Install local SQL engine via mssqlsuite
+        uses: potatoqualitee/mssqlsuite@v1.8
+        with:
+          install: sqlengine
+          sa-password: dbatools.I0
 
-        # Extract the zip file
-        Expand-Archive -Path ./dbatools.library.zip -DestinationPath ./artifacts -Force
+      - name: Download dbatools.library artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dbatools-library-zip
 
-        # Verify extraction
-        if (Test-Path ./artifacts/dbatools.library/dbatools.library.psd1) {
-          Write-Host "✅ dbatools.library extracted successfully" -ForegroundColor Green
-        } else {
-          Write-Error "❌ Failed to extract dbatools.library properly"
-          Get-ChildItem ./artifacts -Recurse | Select-Object FullName
-          exit 1
-        }
+      - name: Download dbatools repo artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dbatools-repo
+          path: dbatools
 
-    - name: Checkout dbatools repo (development branch)
-      uses: actions/checkout@v4
-      with:
-        repository: dataplat/dbatools
-        ref: development
-        path: dbatools
+      - name: Download appveyor repo artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: appveyor-repo
+          path: appveyor-lab
 
-    - name: Ensure sqlpackage is executable
-      run: chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage || true
+      - name: Extract library
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path ./artifacts -Force | Out-Null
+          Expand-Archive -Path ./dbatools.library.zip -DestinationPath ./artifacts -Force
 
-    - name: Check file health and set encryption values
-      shell: pwsh
-      run: |
-        # Import the built dbatools.library from artifact
-        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
-        Import-Module ./dbatools/dbatools.psd1 -Force
+          if (Test-Path ./artifacts/dbatools.library/dbatools.library.psd1) {
+            Write-Host "✅ Library extracted successfully" -ForegroundColor Green
+          } else {
+            Write-Error "❌ Failed to extract library"
+            exit 1
+          }
 
-        Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Register
-        Set-DbatoolsConfig -FullName sql.connection.encrypt -Value $false -Register
-        Get-DbatoolsConfigValue -FullName sql.connection.encrypt | Write-Warning
-        mkdir /tmp/DbatoolsExport
+      - name: Configure dbatools
+        shell: pwsh
+        run: |
+          Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
+          Import-Module ./dbatools/dbatools.psd1 -Force
 
-    - name: Setup docker images
-      run: |
-        # create a shared network
-        docker network create localnet
-        # Expose engine and endpoint then setup a shared path for migrations
-        docker run -p 1433:1433  --volume shared:/shared:z --name mssql1 --hostname mssql1 --network localnet -d dbatools/sqlinstance
-        # Expose second engine and endpoint on different port
-        docker run -p 14333:1433 --volume shared:/shared:z --name mssql2 --hostname mssql2 --network localnet -d dbatools/sqlinstance2
+          Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Register
+          Set-DbatoolsConfig -FullName sql.connection.encrypt -Value $false -Register
 
-    - name: Clone appveyor repo
-      working-directory: /tmp
-      run: |
-        gh repo clone dataplat/appveyor-lab
+          if ($IsLinux) {
+            New-Item -ItemType Directory -Path /tmp/DbatoolsExport -Force | Out-Null
+          }
 
-    - name: Run advanced integration tests
-      shell: pwsh
-      env:
-        TENANTID: ${{secrets.TENANTID}}
-        CLIENTID: ${{secrets.CLIENTID}}
-        CLIENTSECRET: ${{secrets.CLIENTSECRET}}
-        CLIENT_GUID: ${{secrets.CLIENT_GUID}}
-        CLIENT_GUID_SECRET: ${{secrets.CLIENT_GUID_SECRET}}
-      run: |
-        # Import the built dbatools.library from artifact (ensure it's loaded first)
-        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
+      - name: Run integration tests (PowerShell Core)
+        shell: ${{ matrix.shell }}
+        run: |
+          Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
+          Import-Module ./dbatools/dbatools.psd1 -Force
+          $ErrorActionPreference = "Stop"
+          Write-Host "Running integration tests with ${{ matrix.script }}"
+          $null = Invoke-Pester ${{ matrix.script }} -Output Detailed -PassThru
 
-        # Import dbatools from the development branch checkout
-        Import-Module ./dbatools/dbatools.psd1 -Force
+      - name: Run integration tests (Windows PowerShell)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
+          Import-Module ./dbatools/dbatools.psd1 -Force
+          $ErrorActionPreference = "Stop"
+          Write-Host "Running integration tests with ${{ matrix.script }} (Windows PowerShell)"
+          $null = Invoke-Pester ${{ matrix.script }} -Output Detailed -PassThru
 
-        Get-DbatoolsConfigValue -FullName sql.connection.trustcert | Write-Warning
-        Get-DbatoolsConfigValue -FullName sql.connection.encrypt | Write-Warning
-
-        # Run the integration tests using the script from the dbatools repo
-        $null = Invoke-Pester ./dbatools/.github/scripts/gh-actions.ps1 -Output Detailed -PassThru
-
+  # Release job - creates GitHub release
   create-preview-release:
-    needs: [linux-build, build-windows, test-sqlpackage, advanced-test]
+    needs: test-matrix
     runs-on: windows-latest
-    # Create release if manually triggered OR if version contains "preview"
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Download release zip
-      uses: actions/download-artifact@v4
-      with:
-        name: dbatools-library-zip
+      - name: Download release zip
+        uses: actions/download-artifact@v4
+        with:
+          name: dbatools-library-zip
 
-    - name: Extract library zip
-      shell: pwsh
-      run: |
-        # Create artifacts directory if it doesn't exist
-        New-Item -ItemType Directory -Path ./artifacts -Force | Out-Null
+      - name: Extract library for version info
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path ./artifacts -Force | Out-Null
+          Expand-Archive -Path ./dbatools.library.zip -DestinationPath ./artifacts -Force
 
-        # Extract the zip file
-        Expand-Archive -Path ./dbatools.library.zip -DestinationPath ./artifacts -Force
+      - name: Generate preview version and update manifest
+        id: get_version
+        shell: pwsh
+        run: |
+          $date = Get-Date -Format "yyyy.M.d"
+          $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+          $branch = "${{ github.ref_name }}" -replace '[^A-Za-z0-9]', ''
 
-        # Verify extraction
-        if (Test-Path ./artifacts/dbatools.library/dbatools.library.psd1) {
-          Write-Host "✅ Library extracted successfully" -ForegroundColor Green
-        } else {
-          Write-Error "❌ Failed to extract library properly"
-          Get-ChildItem ./artifacts -Recurse | Select-Object FullName
-          exit 1
-        }
-
-    - name: Generate preview version and update manifest
-      id: get_version
-      shell: pwsh
-      run: |
-        # Generate preview version in expected format
-        $date = Get-Date -Format "yyyy.M.d"
-        $timestamp = Get-Date -Format "yyyyMMddHHmmss"
-        $branch = "${{ github.ref_name }}"
-        $branch = ($branch -replace '[^A-Za-z0-9]', '')
-
-        # Check if this is a manually triggered release or version-based release
-        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-          # For manual triggers, always create preview version
-          $previewVersion = "$date-preview-$branch-$timestamp"
-        } else {
-          # For version-based releases, check if version already contains preview
-          $manifestPath = "./artifacts/dbatools.library/dbatools.library.psd1"
-          if (-not (Test-Path $manifestPath)) {
-            Write-Error "Module manifest not found at: $manifestPath"
-            Get-ChildItem ./artifacts -Recurse | Select-Object FullName
-            exit 1
-          }
-          $manifest = Import-PowerShellDataFile $manifestPath
-          $currentVersion = $manifest.ModuleVersion
-          if ($currentVersion -like "*preview*") {
-            # Use existing preview version and enhance it with branch and timestamp
-            $previewVersion = "$currentVersion-$branch-$timestamp"
-          } else {
-            # Create new preview version
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $previewVersion = "$date-preview-$branch-$timestamp"
+          } else {
+            $manifestPath = "./artifacts/dbatools.library/dbatools.library.psd1"
+            $manifest = Import-PowerShellDataFile $manifestPath
+            $currentVersion = $manifest.ModuleVersion
+            if ($currentVersion -like "*preview*") {
+              $previewVersion = "$currentVersion-$branch-$timestamp"
+            } else {
+              $previewVersion = "$date-preview-$branch-$timestamp"
+            }
           }
-        }
 
-        Write-Host "Preview version: $previewVersion"
-        Write-Host "Branch: $branch"
+          Write-Host "Preview version: $previewVersion"
+          $psd1Version = if ($previewVersion -match '^(.*?-preview)') { $matches[1] } else { $previewVersion }
 
-        # Update module manifest with preview version (strip everything after -preview for psd1)
-        $psd1Version = if ($previewVersion -match '^(.*?-preview)') { $matches[1] } else { $previewVersion }
-        $manifestPath = "./artifacts/dbatools.library/dbatools.library.psd1"
-        $content = Get-Content $manifestPath -Raw
-        $content = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$psd1Version'"
-        Set-Content $manifestPath $content
+          $manifestPath = "./artifacts/dbatools.library/dbatools.library.psd1"
+          $content = Get-Content $manifestPath -Raw
+          $content = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$psd1Version'"
+          Set-Content $manifestPath $content
 
-        Write-Host "Updated module manifest with version: $psd1Version (full preview version: $previewVersion)"
+          "version=$previewVersion" >> $env:GITHUB_OUTPUT
+          "branch=$branch" >> $env:GITHUB_OUTPUT
 
-        "version=$previewVersion" >> $env:GITHUB_OUTPUT
-        "branch=$branch" >> $env:GITHUB_OUTPUT
+      - name: Create Preview Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: Preview Release v${{ steps.get_version.outputs.version }}
+          body: |
+            This is an automated preview release.
 
-    - name: Create Preview Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ steps.get_version.outputs.version }}
-        name: Preview Release v${{ steps.get_version.outputs.version }}
-        body: |
-          This is an automated preview release.
+            **Trigger Reason:** ${{ github.event_name == 'workflow_dispatch' && 'Manual workflow dispatch' || 'Version contains preview' }}
+            **Module Version:** ${{ steps.get_version.outputs.version }}
+            **Branch:** ${{ steps.get_version.outputs.branch }}
+            **Commit:** ${{ github.sha }}
+            **Build Date:** ${{ github.event.head_commit.timestamp }}
 
-          **Trigger Reason:** ${{ github.event_name == 'workflow_dispatch' && 'Manual workflow dispatch' || 'Version contains preview' }}
+            ## Installation
 
-          **Module Version:** ${{ steps.get_version.outputs.version }}
-          **Branch:** ${{ steps.get_version.outputs.branch }}
-          **Commit:** ${{ github.sha }}
-          **Commit Message:** ${{ github.event.head_commit.message }}
-          **Build Date:** ${{ github.event.head_commit.timestamp }}
+            ```powershell
+            # Download and extract the zip file
+            Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/v${{ steps.get_version.outputs.version }}/dbatools.library.zip" -OutFile dbatools.library.zip
+            Expand-Archive -Path dbatools.library.zip -DestinationPath . -Force
 
-          ## Installation
+            # Import the module
+            Import-Module ./dbatools.library.psd1
+            ```
 
-          ```powershell
-          # Download and extract the zip file
-          Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/v${{ steps.get_version.outputs.version }}/dbatools.library.zip" -OutFile dbatools.library.zip
-          Expand-Archive -Path dbatools.library.zip -DestinationPath . -Force
-
-          # Import the module
-          Import-Module ./dbatools.library.psd1
-          ```
-
-          ⚠️ **Note:** This is a preview release and should not be used in production.
-        draft: false
-        prerelease: true
-        files: |
-          ./dbatools.library.zip
+            ⚠️ **Note:** This is a preview release and should not be used in production.
+          draft: false
+          prerelease: true
+          files: ./dbatools.library.zip
