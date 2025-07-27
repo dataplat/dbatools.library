@@ -201,17 +201,8 @@ jobs:
             New-Item -ItemType Directory -Path /tmp/DbatoolsExport -Force | Out-Null
           }
 
-      - name: Debug working directory
-        shell: pwsh
-        run: |
-          Write-Host "Current working directory: $(Get-Location)"
-          Write-Host "Repository workspace: ${{ github.workspace }}"
-          Write-Host "Script path to execute: ${{ matrix.script }}"
-          Write-Host "Full script path: ${{ github.workspace }}/${{ matrix.script }}"
-
       - name: Run integration tests (PowerShell Core)
         shell: pwsh
-        working-directory: ${{ github.workspace }}
         run: |
           Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
           Import-Module ./dbatools/dbatools.psd1 -Force
@@ -222,7 +213,6 @@ jobs:
       - name: Run integration tests (Windows PowerShell)
         if: matrix.os == 'windows-latest'
         shell: powershell
-        working-directory: ${{ github.workspace }}
         run: |
           Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
           Import-Module ./dbatools/dbatools.psd1 -Force
