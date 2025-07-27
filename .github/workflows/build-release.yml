@@ -133,13 +133,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            script: .github/scripts/gh-actions.ps1
+            script: dbatools/.github/scripts/gh-actions.ps1
             shell: pwsh
           - os: macos-latest
-            script: .github/scripts/gh-macactions.ps1
+            script: dbatools/.github/scripts/gh-macactions.ps1
             shell: pwsh
           - os: windows-latest
-            script: .github/scripts/gh-winactions.ps1
+            script: dbatools/.github/scripts/gh-winactions.ps1
             shell: pwsh
 
     env:
