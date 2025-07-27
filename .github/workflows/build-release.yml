@@ -133,15 +133,15 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            script: dbatools/dbatools/.github/scripts/gh-actions.ps1
+            script: ./dbatools/.github/scripts/gh-actions.ps1
             shell: pwsh
             working-directory: ${{ github.workspace }}
           - os: macos-latest
-            script: dbatools/dbatools/.github/scripts/gh-macactions.ps1
+            script: ./dbatools/.github/scripts/gh-macactions.ps1
             shell: pwsh
             working-directory: ${{ github.workspace }}
           - os: windows-latest
-            script: dbatools/dbatools/.github/scripts/gh-winactions.ps1
+            script: ./dbatools/.github/scripts/gh-winactions.ps1
             shell: pwsh
             working-directory: ${{ github.workspace }}
 
