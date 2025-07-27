@@ -36,11 +36,17 @@ jobs:
       - name: Clone appveyor repo
         run: git clone https://github.com/dataplat/appveyor-lab.git appveyor-lab
 
+      - name: Create tar archive with dot files
+        run: |
+          cd dbatools
+          tar -czf ../dbatools-repo.tar.gz --exclude='.git' .
+          cd ..
+
       - name: Upload dbatools repo artifact
         uses: actions/upload-artifact@v4
         with:
           name: dbatools-repo
-          path: dbatools
+          path: dbatools-repo.tar.gz
 
       - name: Upload appveyor repo artifact
         uses: actions/upload-artifact@v4
@@ -170,7 +176,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dbatools-repo
-          path: dbatools
+
+      - name: Extract dbatools repo
+        run: |
+          mkdir -p dbatools
+          tar -xzf dbatools-repo.tar.gz -C dbatools
 
       - name: Download appveyor repo artifact
         uses: actions/download-artifact@v4
