@@ -129,7 +129,8 @@ jobs:
           name: dbatools-library-zip
           path: artifacts/dbatools.library.zip
 
-  # Test matrix - tests on all platforms with proper dependencies and environment
+  # Test matrix - tests on Linux and Windows platforms with proper dependencies and environment
+  # Note: macOS testing was removed due to reliability issues
   test-matrix:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -142,10 +143,7 @@ jobs:
             script: ./dbatools/.github/scripts/gh-actions.ps1
             shell: pwsh
             working-directory: ${{ github.workspace }}
-          - os: macos-latest
-            script: ./dbatools/.github/scripts/gh-macactions.ps1
-            shell: pwsh
-            working-directory: ${{ github.workspace }}
+          # macOS testing disabled due to reliability issues, even gets stuck at Describing Integration Tests
           - os: windows-latest
             script: ./dbatools/.github/scripts/gh-winactions.ps1
             shell: pwsh
