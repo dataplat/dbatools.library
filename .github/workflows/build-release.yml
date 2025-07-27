@@ -211,6 +211,12 @@ jobs:
           Write-Host "Repository workspace: ${{ github.workspace }}"
           Write-Host "Script path to execute: ${{ matrix.script }}"
           Write-Host "Full script path: ${{ github.workspace }}/${{ matrix.script }}"
+          Write-Host "Directory tree from workspace root:"
+          Get-ChildItem -Recurse | ForEach-Object { Write-Host $_.FullName }
+          Write-Host "Results of find for gh-actions.ps1:"
+          find . -name "gh-actions.ps1"
+          Write-Host "Results of find for gh-winactions.ps1:"
+          find . -name "gh-winactions.ps1"
 
       - name: Run integration tests (PowerShell Core)
         shell: pwsh
