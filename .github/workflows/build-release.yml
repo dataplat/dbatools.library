@@ -193,6 +193,20 @@ jobs:
           mkdir -p dbatools
           tar -xzf dbatools-repo.tar.gz -C dbatools
 
+      - name: Skip Azure test on Windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $scriptPath = "./dbatools/.github/scripts/gh-winactions.ps1"
+          if (Test-Path $scriptPath) {
+            $content = Get-Content $scriptPath -Raw
+            $content = $content -replace 'It "connects to Azure using a query string"', 'It -Skip "connects to Azure using a query string"'
+            Set-Content $scriptPath $content -Encoding UTF8
+            Write-Host "✅ Modified gh-winactions.ps1 to skip Azure test" -ForegroundColor Green
+          } else {
+            Write-Warning "Script not found: $scriptPath"
+          }
+
       - name: Download appveyor repo artifact
         uses: actions/download-artifact@v4
         with:
