@@ -156,6 +156,8 @@ jobs:
       CLIENTID: ${{ secrets.CLIENTID }}
       CLIENTSECRET: ${{ secrets.CLIENTSECRET }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CLIENT_GUID_SECRET: ${{ secrets.CLIENT_GUID_SECRET }}
+      CLIENT_GUID: ${{ secrets.CLIENT_GUID }}
       SMODefaultModuleName: dbatools
 
     steps:
