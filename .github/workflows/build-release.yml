@@ -1,28 +1,25 @@
 name: Build and Publish Preview Release
 
-# This workflow builds the module and creates a preview release on GitHub
-# It triggers automatically when:
-# - The module version contains "preview" (checked on every push)
-# - Manually triggered via workflow_dispatch (useful when module is not found on PowerShell Gallery)
-#
-# To trigger a preview release:
-# 1. Set ModuleVersion in dbatools.library.psd1 to include "preview" (e.g., '2025.7.11-preview')
-# 2. OR manually trigger the workflow from GitHub Actions tab
-
 on:
   push:
-    # Runs on any branch, checks module version for "preview"
   pull_request:
   workflow_dispatch:
-    # Manual trigger for when module is not available on PowerShell Gallery
     inputs:
       dbatools_branch:
         description: 'dbatools branch to use (default: development)'
         required: false
         default: 'development'
 
+env:
+  TENANTID: ${{ secrets.TENANTID }}
+  CLIENTID: ${{ secrets.CLIENTID }}
+  CLIENTSECRET: ${{ secrets.CLIENTSECRET }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CLIENT_GUID_SECRET: ${{ secrets.CLIENT_GUID_SECRET }}
+  CLIENT_GUID: ${{ secrets.CLIENT_GUID }}
+  SMODefaultModuleName: dbatools
+
 jobs:
-  # Setup job - downloads dependencies once for all other jobs
   setup-dependencies:
     runs-on: ubuntu-latest
     steps:
@@ -54,7 +51,6 @@ jobs:
           name: appveyor-repo
           path: appveyor-lab
 
-  # Windows build job - builds complete library with all components
   build-library:
     runs-on: windows-latest
     needs: setup-dependencies
@@ -78,6 +74,7 @@ jobs:
         run: .\build\build.ps1 -BuildZip
 
       - name: Make sqlpackage executable
+        if: runner.os != 'Windows'
         shell: pwsh
         run: |
           chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage || true
@@ -129,7 +126,6 @@ jobs:
           name: dbatools-library-zip
           path: artifacts/dbatools.library.zip
 
-  # Test matrix - tests on all platforms with proper dependencies and environment
   test-matrix:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -151,26 +147,14 @@ jobs:
             shell: pwsh
             working-directory: ${{ github.workspace }}
 
-    env:
-      TENANTID: ${{ secrets.TENANTID }}
-      CLIENTID: ${{ secrets.CLIENTID }}
-      CLIENTSECRET: ${{ secrets.CLIENTSECRET }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      CLIENT_GUID_SECRET: ${{ secrets.CLIENT_GUID_SECRET }}
-      CLIENT_GUID: ${{ secrets.CLIENT_GUID }}
-      SMODefaultModuleName: dbatools
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup docker images (Linux only)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          # create a shared network
           docker network create localnet
-          # Expose engine and endpoint then setup a shared path for migrations
           docker run -p 1433:1433  --volume shared:/shared:z --name mssql1 --hostname mssql1 --network localnet -d dbatools/sqlinstance
-          # Expose second engine and endpoint on different port
           docker run -p 14333:1433 --volume shared:/shared:z --name mssql2 --hostname mssql2 --network localnet -d dbatools/sqlinstance2
 
       - name: Install local SQL engine via mssqlsuite (Windows only)
@@ -258,12 +242,10 @@ jobs:
           Write-Host "Running integration tests with ${{ matrix.script }} (Windows PowerShell)"
           $null = Invoke-Pester ${{ matrix.script }} -Output Detailed -PassThru
 
-  # Release job - creates GitHub release
   create-preview-release:
     needs: test-matrix
     runs-on: windows-latest
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -312,7 +294,7 @@ jobs:
           "branch=$branch" >> $env:GITHUB_OUTPUT
 
       - name: Create Preview Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.get_version.outputs.version }}
           name: Preview Release v${{ steps.get_version.outputs.version }}
