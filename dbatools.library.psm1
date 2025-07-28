@@ -63,24 +63,6 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                     {
                         if (assemblyName == dll)
                         {
-                            // Windows PowerShell 5.1/.NET Framework: Only special-case System.Management.Automation
-                            if (assemblyName == "System.Management.Automation")
-                            {
-                                var loaded = AppDomain.CurrentDomain.GetAssemblies()
-                                    .FirstOrDefault(a => a.GetName().Name == "System.Management.Automation");
-                                if (loaded != null)
-                                {
-                                    var requestedVersion = name.Version;
-                                    var loadedVersion = loaded.GetName().Version;
-                                    if (requestedVersion != null && loadedVersion != null && requestedVersion != loadedVersion)
-                                    {
-                                        System.Diagnostics.Trace.TraceWarning(
-                                            string.Format("[dbatools] Requested System.Management.Automation version {0}, but loaded version is {1}. Using loaded version.", requestedVersion, loadedVersion));
-                                    }
-                                    return loaded;
-                                }
-                                // If not found, fall through to normal logic (should not happen in PowerShell host)
-                            }
                             string filelocation = "$dir" + dll + ".dll";
                             //Console.WriteLine(filelocation);
                             return Assembly.LoadFrom(filelocation);
