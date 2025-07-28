@@ -173,8 +173,8 @@ jobs:
           # Expose second engine and endpoint on different port
           docker run -p 14333:1433 --volume shared:/shared:z --name mssql2 --hostname mssql2 --network localnet -d dbatools/sqlinstance2
 
-      - name: Install local SQL engine via mssqlsuite (macOS/Windows only)
-        if: matrix.os != 'ubuntu-latest'
+      - name: Install local SQL engine via mssqlsuite (Windows only)
+        if: matrix.os == 'windows-latest'
         uses: potatoqualitee/mssqlsuite@v1.9
         with:
           install: sqlengine
