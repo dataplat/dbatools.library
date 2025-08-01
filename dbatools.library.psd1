@@ -7,7 +7,7 @@
 #
 @{
     # Version number of this module.
-    ModuleVersion          = '2025.7.20'
+    ModuleVersion          = '2025.8.1'
 
     # ID used to uniquely identify this module
     GUID                   = '00b61a37-6c36-40d8-8865-ac0180288c84'
@@ -19,7 +19,7 @@
     CompanyName            = 'dbatools.io'
 
     # Copyright statement for this module
-    Copyright              = 'Copyright (c) 2024 by dbatools, licensed under MIT'
+    Copyright              = 'Copyright (c) 2025 by dbatools, licensed under MIT'
 
     # Description of the functionality provided by this module
     Description            = 'The library that powers dbatools, the community module for SQL Server Pros'
