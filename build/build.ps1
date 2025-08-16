@@ -157,20 +157,10 @@ $tempdir = Join-Path ([System.IO.Path]::GetTempPath()) "dbatools-build"
 
 # Create all required directories
 $null = New-Item -ItemType Directory $tempdir -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory (Join-Path $tempPath "dacfull") -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory (Join-Path $tempPath "xe") -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory (Join-Path $tempPath "linux") -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory (Join-Path $tempPath "mac") -Force -ErrorAction Ignore
-$null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/XESmartTarget") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/LumenWorks") -Force
-$null = New-Item -ItemType Directory (Join-Path $libPath "desktop/lib/dac") -Force
-$null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/dac/windows") -Force
-$null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/XESmartTarget") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/LumenWorks") -Force
-$null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/dac/mac") -Force
-$null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/dac/linux") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/runtimes") -Force
 $null = New-Item -ItemType Directory (Join-Path $tempPath "bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $tempdir "nuget") -Force
@@ -178,69 +168,15 @@ $null = New-Item -ItemType Directory (Join-Path $tempdir "nuget") -Force
 Register-PackageSource -provider NuGet -name nugetRepository -Location https://www.nuget.org/api/v2 -Trusted -ErrorAction Ignore
 
 # Download all required packages
-Invoke-WebRequest -Uri https://aka.ms/dacfx-msi -OutFile (Join-Path $tempPath "DacFramework.msi")
-Invoke-WebRequest -Uri https://aka.ms/sqlpackage-windows -OutFile (Join-Path $tempPath "sqlpackage-windows.zip")
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile (Join-Path $tempPath "bogus.zip")
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile (Join-Path $tempPath "LumenWorksCsvReader.zip")
-Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/v1.5.7/XESmartTarget_x64.msi -OutFile (Join-Path $tempPath "XESmartTarget_x64.msi")
-Invoke-WebRequest -Uri https://github.com/spaghettidba/XESmartTarget/releases/download/2.0.4.0/XESmartTarget-linux-2.0.4.0.zip -OutFile (Join-Path $tempPath "XESmartTarget-linux.zip")
-Invoke-WebRequest -Uri https://aka.ms/sqlpackage-linux -OutFile (Join-Path $tempPath "sqlpackage-linux.zip")
-Invoke-WebRequest -Uri https://aka.ms/sqlpackage-macos -OutFile (Join-Path $tempPath "sqlpackage-macos.zip")
 
 $ProgressPreference = "Continue"
 
 # Extract all packages
 7z x (Join-Path $tempPath "LumenWorksCsvReader.zip") "-o$(Join-Path $tempPath "LumenWorksCsvReader")" -y
 7z x (Join-Path $tempPath "bogus.zip") "-o$(Join-Path $tempPath "bogus")" -y
-7z x (Join-Path $tempPath "XESmartTarget-linux.zip") "-o$(Join-Path $tempPath "xe-linux")" -y
-7z x (Join-Path $tempPath "sqlpackage-windows.zip") "-o$(Join-Path $tempPath "windows")" -y
-7z x (Join-Path $tempPath "sqlpackage-linux.zip") "-o$(Join-Path $tempPath "linux")" -y
-7z x (Join-Path $tempPath "sqlpackage-macos.zip") "-o$(Join-Path $tempPath "mac")" -y
 
-# Install DacFramework MSI with proper waiting
-Write-Host "Installing DacFramework MSI..."
-$dacMsiPath = Resolve-Path (Join-Path $tempPath "DacFramework.msi")
-$dacTargetDir = Resolve-Path (Join-Path $tempPath "dacfull")
-$dacProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/a", "`"$dacMsiPath`"", "/qb", "TARGETDIR=`"$dacTargetDir`"" -PassThru -Wait
-$dacExitCode = $dacProcess.ExitCode
-Write-Host "DacFramework MSI installation completed with exit code: $dacExitCode"
-if ($dacExitCode -ne 0) {
-    Write-Warning "DacFramework MSI installation may have failed with exit code: $dacExitCode"
-}
-
-# Small delay to ensure resources are released
-Start-Sleep -Seconds 2
-
-# Install XESmartTarget MSI with proper waiting
-Write-Host "Installing XESmartTarget MSI..."
-$xeTargetDir = Resolve-Path (Join-Path $tempPath "xe")
-$xeMsiPath = Resolve-Path (Join-Path $tempPath "XESmartTarget_x64.msi")
-$xeProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/a", "`"$xeMsiPath`"", "/qb", "TARGETDIR=`"$xeTargetDir`"" -PassThru -Wait
-$xeExitCode = $xeProcess.ExitCode
-Write-Host "XESmartTarget MSI installation completed with exit code: $xeExitCode"
-if ($xeExitCode -ne 0) {
-    Write-Warning "XESmartTarget MSI installation may have failed with exit code: $xeExitCode"
-}
-
-# Copy XESmartTarget preserving structure
-robocopy (Join-Path $tempPath "xe/XESmartTarget") (Join-Path $libPath "desktop/third-party/XESmartTarget") /E /NFL /NDL /NJH /NJS /nc /ns /np
-robocopy (Join-Path $tempPath "xe/XESmartTarget") (Join-Path $libPath "core/third-party/XESmartTarget") /E /NFL /NDL /NJH /NJS /nc /ns /np
-$robocopyExitCode = $LASTEXITCODE
-Write-Host "Robocopy exit code: $robocopyExitCode"
-if ($robocopyExitCode -ge 8) {
-    Write-Host "Robocopy failed with exit code $robocopyExitCode" -ForegroundColor Red
-    exit $robocopyExitCode
-} elseif ($robocopyExitCode -eq 0) {
-    Write-Host "Robocopy: No files were copied (source and destination are in sync)" -ForegroundColor Yellow
-} else {
-    Write-Host "Robocopy completed successfully (exit code $robocopyExitCode means files were copied)" -ForegroundColor Green
-}
-# Reset exit code to 0 for successful robocopy operations
-$LASTEXITCODE = 0
-
-# Copy Linux XESmartTarget
-Copy-Item (Join-Path $tempPath "xe-linux/*") -Destination (Join-Path $libPath "desktop/third-party/XESmartTarget/") -Recurse -Force
-Copy-Item (Join-Path $tempPath "xe-linux/*") -Destination (Join-Path $libPath "core/third-party/XESmartTarget/") -Recurse -Force
 
 # Copy Bogus files for both frameworks
 Write-Host "Copying Bogus.dll..." -ForegroundColor Green
@@ -279,59 +215,6 @@ if (-not $bogusCoreCopied) {
 Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "desktop/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
 Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "core/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
 
-# Copy ALL sqlpackage files for each platform
-Write-Host "Copying sqlpackage files for all platforms..." -ForegroundColor Green
-
-# Windows - Copy ALL files from DAC bin directory to desktop/lib/dac (dacfx-msi)
-$dacPath = Join-Path (Join-Path $tempPath "dacfull") "Microsoft SQL Server\170\DAC\bin"
-if (Test-Path $dacPath) {
-    Write-Host "Copying dacfx-msi files to desktop/lib/dac..." -ForegroundColor Green
-    Copy-Item (Join-Path $dacPath "*") -Destination (Join-Path $libPath "desktop/lib/dac/") -Recurse -Force
-} else {
-    Write-Warning "Windows DAC path not found: $dacPath"
-}
-
-# Windows Core - Copy ALL files from sqlpackage Windows download to core/lib/dac/windows
-if (Test-Path (Join-Path $tempPath "windows")) {
-    Write-Host "Copying sqlpackage Windows files to core/lib/dac/windows..." -ForegroundColor Green
-    Copy-Item (Join-Path $tempPath "windows/*") -Destination (Join-Path $libPath "core/lib/dac/windows/") -Recurse -Force
-} else {
-    Write-Warning "Windows sqlpackage path not found: $(Join-Path $tempPath "windows")"
-}
-
-# Linux - Copy ALL files from temp/linux
-if (Test-Path (Join-Path $tempPath "linux")) {
-    Write-Host "Copying ALL sqlpackage files for Linux..." -ForegroundColor Green
-    Copy-Item (Join-Path $tempPath "linux/*") -Destination (Join-Path $libPath "core/lib/dac/linux/") -Recurse -Force
-    # Ensure SqlPackage is renamed to sqlpackage (Linux is case-sensitive)
-    $linSqlPackage = Join-Path $libPath "core/lib/dac/linux/SqlPackage"
-    $finalname = Join-Path $libPath "core/lib/dac/linux/sqlpackage"
-    $tempname = Join-Path $libPath "core/lib/dac/linux/sqlpackage-temp"
-
-    if (Test-Path $linSqlPackage) {
-        Rename-Item $linSqlPackage $tempname
-        Rename-Item $tempname $finalname
-    }
-} else {
-    Write-Warning "Linux sqlpackage path not found: $(Join-Path $tempPath "linux")"
-}
-
-# macOS - Copy ALL files from temp/mac
-if (Test-Path (Join-Path $tempPath "mac")) {
-    Write-Host "Copying ALL sqlpackage files for macOS..." -ForegroundColor Green
-    Copy-Item (Join-Path $tempPath "mac/*") -Destination (Join-Path $libPath "core/lib/dac/mac/") -Recurse -Force
-    # Ensure SqlPackage is renamed to sqlpackage (macOS case-sensitive too)
-    $linSqlPackage = Join-Path $libPath "core/lib/dac/mac/SqlPackage"
-    $finalname = Join-Path $libPath "core/lib/dac/mac/sqlpackage"
-    $tempname = Join-Path $libPath "core/lib/dac/mac/sqlpackage-temp"
-
-    if (Test-Path $linSqlPackage) {
-        Rename-Item $linSqlPackage $tempname
-        Rename-Item $tempname $finalname
-    }
-} else {
-    Write-Warning "macOS sqlpackage path not found: $(Join-Path $tempPath "mac")"
-}
 
 # Core files are already in place from dotnet publish
 

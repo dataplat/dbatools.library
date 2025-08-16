@@ -73,13 +73,6 @@ jobs:
         shell: pwsh
         run: .\build\build.ps1 -BuildZip
 
-      - name: Make sqlpackage executable
-        if: runner.os != 'Windows'
-        shell: pwsh
-        run: |
-          chmod +x ./artifacts/dbatools.library/core/lib/dac/linux/sqlpackage || true
-          chmod +x ./artifacts/dbatools.library/core/lib/dac/mac/sqlpackage || true
-
       - name: Verify critical files
         shell: pwsh
         run: |
@@ -87,12 +80,9 @@ jobs:
           $criticalPaths = @(
             "desktop/lib",
             "desktop/lib/runtimes/win-x64/native",
-            "core/lib/dac/windows",
             "desktop/third-party",
             "core/lib",
             "core/lib/runtimes/win-x64/native",
-            "core/lib/dac/linux",
-            "core/lib/dac/mac",
             "core/third-party"
           )
 
