@@ -202,6 +202,7 @@ jobs:
           }
 
       - name: Install SqlPackage and XESmartTarget for DAC tests
+        shell: pwsh
         run: |
           Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
           Import-Module ./dbatools/dbatools.psd1 -Force
