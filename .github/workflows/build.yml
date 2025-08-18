@@ -63,8 +63,6 @@ jobs:
       shell: pwsh
       run: |
         Copy-Item -Path artifacts/core-lib-linux/* -Destination artifacts/dbatools.library/core/lib/ -Recurse -Force
-        # delete windows sqlpackage on core cuz its the same as desktop
-        Remove-Item -Path artifacts/dbatools.library/core/lib/dac/windows -Recurse -Force -ErrorAction Ignore
 
     - name: Verify critical files and directories
       shell: pwsh
@@ -74,13 +72,10 @@ jobs:
         $artifactsDir = "./artifacts/dbatools.library"
         $criticalPaths = @(
           "desktop\lib",
-          "desktop\lib\dac",
           "desktop\lib\runtimes\win-x64\native",
           "desktop\third-party",
           "core\lib",
           "core\lib\runtimes\win-x64\native",
-          "core\lib\dac\linux",
-          "core\lib\dac\mac",
           "core\third-party"
         )
 
