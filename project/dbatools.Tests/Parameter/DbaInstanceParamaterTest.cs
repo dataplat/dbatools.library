@@ -202,5 +202,41 @@ namespace Dataplat.Dbatools.Parameter
             Assert.AreEqual(SqlConnectionProtocol.Any, dbaInstanceParamater.NetworkProtocol);
             Assert.IsTrue(dbaInstanceParamater.IsLocalHost);
         }
+
+        /// <summary>
+        /// Checks that instance names with dashes are properly parsed
+        /// </summary>
+        [TestMethod]
+        public void TestInstanceNameWithDash()
+        {
+            var dbaInstanceParamater = new DbaInstanceParameter("My-Instance.domain.local\\My-TestInstance");
+
+            Assert.AreEqual("My-Instance.domain.local", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual("My-TestInstance", dbaInstanceParamater.InstanceName);
+            Assert.AreEqual("My-Instance.domain.local\\My-TestInstance", dbaInstanceParamater.FullName);
+            Assert.AreEqual("My-Instance.domain.local\\My-TestInstance", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual("[My-Instance.domain.local]", dbaInstanceParamater.SqlComputerName);
+            Assert.AreEqual("[My-TestInstance]", dbaInstanceParamater.SqlInstanceName);
+            Assert.AreEqual("[My-Instance.domain.local\\My-TestInstance]", dbaInstanceParamater.SqlFullName);
+            Assert.IsFalse(dbaInstanceParamater.IsConnectionString);
+        }
+
+        /// <summary>
+        /// Checks that server names with dashes work correctly (regression test)
+        /// </summary>
+        [TestMethod]
+        public void TestServerNameWithDash()
+        {
+            var dbaInstanceParamater = new DbaInstanceParameter("My-Instance.domain.local\\MyTestInstance");
+
+            Assert.AreEqual("My-Instance.domain.local", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual("MyTestInstance", dbaInstanceParamater.InstanceName);
+            Assert.AreEqual("My-Instance.domain.local\\MyTestInstance", dbaInstanceParamater.FullName);
+            Assert.AreEqual("My-Instance.domain.local\\MyTestInstance", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual("[My-Instance.domain.local]", dbaInstanceParamater.SqlComputerName);
+            Assert.AreEqual("[MyTestInstance]", dbaInstanceParamater.SqlInstanceName);
+            Assert.AreEqual("[My-Instance.domain.local\\MyTestInstance]", dbaInstanceParamater.SqlFullName);
+            Assert.IsFalse(dbaInstanceParamater.IsConnectionString);
+        }
     }
 }
