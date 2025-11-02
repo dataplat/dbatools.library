@@ -420,7 +420,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
                     if (!String.IsNullOrEmpty(Once))
                     {
                         string onceName = String.Format("MessageOnce.{0}.{1}", FunctionName, Once).ToLower();
-                        if (!(Configuration.ConfigurationHost.Configurations.ContainsKey(onceName) && (bool)Configuration.ConfigurationHost.Configurations[onceName].Value))
+                        if (!(Configuration.ConfigurationHost.Configurations.TryGetValue(onceName, out var existingConfig) && (bool)existingConfig.Value))
                         {
                             WriteWarning(_MessageStreams);
                             channels = channels | LogEntryType.Warning;
@@ -454,7 +454,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
                     if (!String.IsNullOrEmpty(Once))
                     {
                         string onceName = String.Format("MessageOnce.{0}.{1}", FunctionName, Once).ToLower();
-                        if (!(Configuration.ConfigurationHost.Configurations.ContainsKey(onceName) && (bool)Configuration.ConfigurationHost.Configurations[onceName].Value))
+                        if (!(Configuration.ConfigurationHost.Configurations.TryGetValue(onceName, out var existingConfig) && (bool)existingConfig.Value))
                         {
                             InvokeCommand.InvokeScript(false, ScriptBlock.Create(_writeHostScript), null, _MessageHost);
                             channels = channels | LogEntryType.Information;

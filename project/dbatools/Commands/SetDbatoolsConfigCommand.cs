@@ -258,9 +258,7 @@ namespace Dataplat.Dbatools.Commands
             }
             #endregion Name Interpretation
 
-            _Exists = ConfigurationHost.Configurations.ContainsKey(_NameFull);
-            if (_Exists)
-                _Config = ConfigurationHost.Configurations[_NameFull];
+            _Exists = ConfigurationHost.Configurations.TryGetValue(_NameFull, out _Config);
             _Initialize = Initialize;
             _Persisted = !String.IsNullOrEmpty(PersistedValue);
             _PolicyEnforced = (_Exists && _Config.PolicyEnforced);

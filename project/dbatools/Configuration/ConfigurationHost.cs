@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Management.Automation;
 
@@ -13,12 +14,12 @@ namespace Dataplat.Dbatools.Configuration
         /// <summary>
         /// Hashtable containing all the configuration entries
         /// </summary>
-        public static Dictionary<string, Config> Configurations = new Dictionary<string, Config>(StringComparer.InvariantCultureIgnoreCase);
+        public static ConcurrentDictionary<string, Config> Configurations = new ConcurrentDictionary<string, Config>(StringComparer.InvariantCultureIgnoreCase);
 
         /// <summary>
         /// Hashtable containing all the registered validations
         /// </summary>
-        public static Dictionary<string, string> Validation = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
+        public static ConcurrentDictionary<string, string> Validation = new ConcurrentDictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
 
         /// <summary>
         /// Whether the import from registry has been completed. Prevents multiple imports and overwrites when importing the module multiple times.
