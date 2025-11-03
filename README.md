@@ -204,7 +204,6 @@ Contributions are welcome! This library is primarily maintained by the dbatools 
 - **dbatools Documentation**: https://docs.dbatools.io
 - **dbatools Repository**: https://github.com/dataplat/dbatools
 - **Community Slack**: https://dbatools.io/slack
-- **Twitter**: [@psdbatools](https://twitter.com/psdbatools)
 
 ## License
 
