@@ -273,6 +273,48 @@ namespace Dataplat.Dbatools.Parameter
             var regular = new DbaInstanceParameter("server\\instance");
             Assert.AreEqual("server_instance", regular.FileNameFriendly);
             Assert.IsFalse(regular.FileNameFriendly.Contains("\\"));
+
+            // Test that all results contain no invalid filename characters
+            var invalidChars = System.IO.Path.GetInvalidFileNameChars();
+            Assert.IsFalse(npDot.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
+            Assert.IsFalse(npDotInstance.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
+            Assert.IsFalse(tcpInstance.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
+            Assert.IsFalse(withPort.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
+            Assert.IsFalse(regular.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
+        }
+
+        /// <summary>
+        /// Tests that FileNameFriendly handles edge cases including IPv6 addresses
+        /// </summary>
+        [TestMethod]
+        public void TestFileNameFriendlyEdgeCases()
+        {
+            // Test with IPv6 address (contains colons and brackets)
+            var ipv6 = new DbaInstanceParameter("::1");
+            var invalidChars = System.IO.Path.GetInvalidFileNameChars();
+            Assert.IsFalse(ipv6.FileNameFriendly.IndexOfAny(invalidChars) >= 0,
+                "IPv6 address FileNameFriendly should not contain invalid filename characters");
+
+            // Test with IPv6 address and port
+            var ipv6Port = new DbaInstanceParameter("[::1]:1433");
+            Assert.IsFalse(ipv6Port.FileNameFriendly.IndexOfAny(invalidChars) >= 0,
+                "IPv6 with port FileNameFriendly should not contain invalid filename characters");
+
+            // Test with regular IPv6 address
+            var ipv6Full = new DbaInstanceParameter("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+            Assert.IsFalse(ipv6Full.FileNameFriendly.IndexOfAny(invalidChars) >= 0,
+                "Full IPv6 address FileNameFriendly should not contain invalid filename characters");
+
+            // Test with IPv4 address and port (contains colon)
+            var ipv4Port = new DbaInstanceParameter("192.168.1.1:1433");
+            Assert.IsFalse(ipv4Port.FileNameFriendly.IndexOfAny(invalidChars) >= 0,
+                "IPv4 with port FileNameFriendly should not contain invalid filename characters");
+
+            // Test that the results are not empty
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ipv6.FileNameFriendly));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ipv6Port.FileNameFriendly));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ipv6Full.FileNameFriendly));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ipv4Port.FileNameFriendly));
         }
     }
 }
