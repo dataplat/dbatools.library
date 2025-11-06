@@ -119,6 +119,24 @@ namespace Dataplat.Dbatools.Parameter
         }
 
         /// <summary>
+        /// Full name of the instance sanitized for use in file names, replacing invalid characters
+        /// </summary>
+        [ParameterContract(ParameterContractType.Field, ParameterContractBehavior.Mandatory)]
+        public string FileNameFriendly
+        {
+            get
+            {
+                string temp = _ComputerName;
+                if (_NetworkProtocol == SqlConnectionProtocol.NP) { temp = "NP_" + temp; }
+                if (_NetworkProtocol == SqlConnectionProtocol.TCP) { temp = "TCP_" + temp; }
+                if (!String.IsNullOrEmpty(_InstanceName) && _Port > 0) { return String.Format(@"{0}_{1}_{2}", temp, _InstanceName, _Port); }
+                if (_Port > 0) { return temp + "_" + _Port; }
+                if (!String.IsNullOrEmpty(_InstanceName)) { return temp + "_" + _InstanceName; }
+                return temp;
+            }
+        }
+
+        /// <summary>
         /// Name of the computer as used in an SQL Statement
         /// </summary>
         [ParameterContract(ParameterContractType.Field, ParameterContractBehavior.Mandatory)]

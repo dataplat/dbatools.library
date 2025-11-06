@@ -94,6 +94,7 @@ namespace Dataplat.Dbatools.Parameter
             Assert.AreEqual(".", dbaInstanceParamater.FullName);
             Assert.IsTrue(dbaInstanceParamater.IsLocalHost);
             Assert.AreEqual("NP:.", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual("NP_.", dbaInstanceParamater.FileNameFriendly);
             Assert.AreEqual(@"MSSQLSERVER", dbaInstanceParamater.InstanceName);
             Assert.AreEqual(@"[MSSQLSERVER]", dbaInstanceParamater.SqlInstanceName);
             Assert.AreEqual(@"[.]", dbaInstanceParamater.SqlFullName);
@@ -115,6 +116,7 @@ namespace Dataplat.Dbatools.Parameter
             Assert.AreEqual(@".\instancename", dbaInstanceParamater.FullName);
             Assert.IsTrue(dbaInstanceParamater.IsLocalHost);
             Assert.AreEqual(@"NP:.\instancename", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual(@"NP_._instancename", dbaInstanceParamater.FileNameFriendly);
             Assert.AreEqual(@"instancename", dbaInstanceParamater.InstanceName);
             Assert.AreEqual(@"[instancename]", dbaInstanceParamater.SqlInstanceName);
             Assert.AreEqual(@"[.\instancename]", dbaInstanceParamater.SqlFullName);
@@ -237,6 +239,40 @@ namespace Dataplat.Dbatools.Parameter
             Assert.AreEqual("[MyTestInstance]", dbaInstanceParamater.SqlInstanceName);
             Assert.AreEqual("[My-Instance.domain.local\\MyTestInstance]", dbaInstanceParamater.SqlFullName);
             Assert.IsFalse(dbaInstanceParamater.IsConnectionString);
+        }
+
+        /// <summary>
+        /// Tests that FileNameFriendly returns valid filenames for various connection types
+        /// </summary>
+        [TestMethod]
+        public void TestFileNameFriendly()
+        {
+            // Test with named pipes using dot notation
+            var npDot = new DbaInstanceParameter(".");
+            Assert.AreEqual("NP_.", npDot.FileNameFriendly);
+            Assert.IsFalse(npDot.FileNameFriendly.Contains(":"));
+
+            // Test with named pipes using dot notation with instance
+            var npDotInstance = new DbaInstanceParameter(@".\SQLSERVER");
+            Assert.AreEqual("NP_._SQLSERVER", npDotInstance.FileNameFriendly);
+            Assert.IsFalse(npDotInstance.FileNameFriendly.Contains(":"));
+            Assert.IsFalse(npDotInstance.FileNameFriendly.Contains("\\"));
+
+            // Test with TCP protocol
+            var tcpInstance = new DbaInstanceParameter("TCP:server\\instance");
+            Assert.AreEqual("TCP_server_instance", tcpInstance.FileNameFriendly);
+            Assert.IsFalse(tcpInstance.FileNameFriendly.Contains(":"));
+            Assert.IsFalse(tcpInstance.FileNameFriendly.Contains("\\"));
+
+            // Test with port number
+            var withPort = new DbaInstanceParameter("server,1433");
+            Assert.AreEqual("server_1433", withPort.FileNameFriendly);
+            Assert.IsFalse(withPort.FileNameFriendly.Contains(","));
+
+            // Test with regular instance name (no protocol)
+            var regular = new DbaInstanceParameter("server\\instance");
+            Assert.AreEqual("server_instance", regular.FileNameFriendly);
+            Assert.IsFalse(regular.FileNameFriendly.Contains("\\"));
         }
     }
 }
