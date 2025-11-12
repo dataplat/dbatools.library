@@ -1,4 +1,6 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
 using System.Management.Automation;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -115,6 +117,49 @@ namespace Dataplat.Dbatools.Parameter
                 if (_Port > 0) { return temp + "," + _Port; }
                 if (!String.IsNullOrEmpty(_InstanceName)) { return temp + "\\" + _InstanceName; }
                 return temp;
+            }
+        }
+
+        /// <summary>
+        /// Full name of the instance sanitized for use in file names.
+        /// Replaces all Windows invalid filename characters (including : \ / | ? * " &lt; &gt;) with underscores.
+        /// Safe to use as part of a filename or path component.
+        /// </summary>
+        [ParameterContract(ParameterContractType.Field, ParameterContractBehavior.Mandatory)]
+        public string FileNameFriendly
+        {
+            get
+            {
+                string temp = _ComputerName;
+                if (_NetworkProtocol == SqlConnectionProtocol.NP) { temp = "NP_" + temp; }
+                if (_NetworkProtocol == SqlConnectionProtocol.TCP) { temp = "TCP_" + temp; }
+
+                string result;
+                if (!String.IsNullOrEmpty(_InstanceName) && _Port > 0)
+                {
+                    result = String.Format(@"{0}_{1}_{2}", temp, _InstanceName, _Port);
+                }
+                else if (_Port > 0)
+                {
+                    result = temp + "_" + _Port;
+                }
+                else if (!String.IsNullOrEmpty(_InstanceName))
+                {
+                    result = temp + "_" + _InstanceName;
+                }
+                else
+                {
+                    result = temp;
+                }
+
+                // Sanitize any remaining invalid filename characters
+                char[] invalidChars = Path.GetInvalidFileNameChars();
+                foreach (char c in invalidChars)
+                {
+                    result = result.Replace(c, '_');
+                }
+
+                return result;
             }
         }
 
