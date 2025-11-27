@@ -1214,49 +1214,92 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         #region Smart Quote Normalization
 
+        // Threshold for stackalloc vs ArrayPool - 512 chars = 1KB on stack
+        private const int StackAllocThreshold = 512;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static string NormalizeSmartQuotes(string input)
         {
             if (input == null)
                 return null;
 
+            ReadOnlySpan<char> inputSpan = input.AsSpan();
+
             // Fast path: check if any smart quotes exist
-            bool hasSmartQuotes = false;
-            for (int i = 0; i < input.Length; i++)
+            int firstSmartQuoteIndex = -1;
+            for (int i = 0; i < inputSpan.Length; i++)
             {
-                char c = input[i];
+                char c = inputSpan[i];
                 if (c == LeftSingleQuote || c == RightSingleQuote ||
                     c == LeftDoubleQuote || c == RightDoubleQuote)
                 {
-                    hasSmartQuotes = true;
+                    firstSmartQuoteIndex = i;
                     break;
                 }
             }
 
-            if (!hasSmartQuotes)
+            if (firstSmartQuoteIndex < 0)
                 return input;
 
-            // Slow path: replace smart quotes
-            var sb = new StringBuilder(input.Length);
-            for (int i = 0; i < input.Length; i++)
+            // Slow path: replace smart quotes using Span
+            return inputSpan.Length <= StackAllocThreshold
+                ? NormalizeSmartQuotesStackAlloc(inputSpan, firstSmartQuoteIndex)
+                : NormalizeSmartQuotesPooled(inputSpan, firstSmartQuoteIndex);
+        }
+
+        private static string NormalizeSmartQuotesStackAlloc(ReadOnlySpan<char> input, int firstSmartQuoteIndex)
+        {
+            Span<char> buffer = stackalloc char[input.Length];
+
+            // Copy prefix that has no smart quotes
+            input.Slice(0, firstSmartQuoteIndex).CopyTo(buffer);
+
+            // Process remainder
+            int writePos = firstSmartQuoteIndex;
+            for (int i = firstSmartQuoteIndex; i < input.Length; i++)
             {
                 char c = input[i];
-                switch (c)
-                {
-                    case LeftSingleQuote:
-                    case RightSingleQuote:
-                        sb.Append('\'');
-                        break;
-                    case LeftDoubleQuote:
-                    case RightDoubleQuote:
-                        sb.Append('"');
-                        break;
-                    default:
-                        sb.Append(c);
-                        break;
-                }
+                buffer[writePos++] = NormalizeSmartQuoteChar(c);
             }
-            return sb.ToString();
+
+            // Use char array constructor for .NET Framework compatibility
+            return buffer.Slice(0, writePos).ToString();
+        }
+
+        private static string NormalizeSmartQuotesPooled(ReadOnlySpan<char> input, int firstSmartQuoteIndex)
+        {
+            char[] buffer = ArrayPool<char>.Shared.Rent(input.Length);
+            try
+            {
+                Span<char> bufferSpan = buffer.AsSpan(0, input.Length);
+
+                // Copy prefix that has no smart quotes
+                input.Slice(0, firstSmartQuoteIndex).CopyTo(bufferSpan);
+
+                // Process remainder
+                int writePos = firstSmartQuoteIndex;
+                for (int i = firstSmartQuoteIndex; i < input.Length; i++)
+                {
+                    char c = input[i];
+                    bufferSpan[writePos++] = NormalizeSmartQuoteChar(c);
+                }
+
+                return bufferSpan.Slice(0, writePos).ToString();
+            }
+            finally
+            {
+                ArrayPool<char>.Shared.Return(buffer);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static char NormalizeSmartQuoteChar(char c)
+        {
+            if (c == LeftSingleQuote || c == RightSingleQuote)
+                return '\'';
+            if (c == LeftDoubleQuote || c == RightDoubleQuote)
+                return '"';
+            return c;
         }
 
         #endregion
