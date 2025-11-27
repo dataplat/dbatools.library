@@ -276,6 +276,21 @@ namespace Dataplat.Dbatools.Csv.Reader
         public bool NormalizeQuotes { get; set; }
 
         /// <summary>
+        /// Gets or sets whether to intern commonly occurring string values to reduce memory allocations.
+        /// When enabled, frequently occurring values like empty strings and common markers are interned.
+        /// This can significantly reduce GC pressure for large files with many repeated values.
+        /// Default is false.
+        /// </summary>
+        public bool InternStrings { get; set; }
+
+        /// <summary>
+        /// Gets or sets custom string values to intern when InternStrings is enabled.
+        /// These are in addition to the built-in set (empty string, "NULL", "null", "N/A", etc.).
+        /// Set to null to use only the built-in intern values.
+        /// </summary>
+        public HashSet<string> CustomInternStrings { get; set; }
+
+        /// <summary>
         /// Creates a default options instance.
         /// </summary>
         public static CsvReaderOptions Default => new CsvReaderOptions();
@@ -333,7 +348,9 @@ namespace Dataplat.Dbatools.Csv.Reader
                 Culture = Culture,
                 QuoteMode = QuoteMode,
                 MismatchedFieldAction = MismatchedFieldAction,
-                NormalizeQuotes = NormalizeQuotes
+                NormalizeQuotes = NormalizeQuotes,
+                InternStrings = InternStrings,
+                CustomInternStrings = CustomInternStrings != null ? new HashSet<string>(CustomInternStrings) : null
             };
         }
     }

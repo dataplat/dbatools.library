@@ -37,6 +37,12 @@ namespace Dataplat.Dbatools.Csv.Reader
         public ITypeConverter Converter { get; set; }
 
         /// <summary>
+        /// Gets or sets the cached converter for this column (resolved from Converter or registry).
+        /// This is set internally during initialization to avoid per-row registry lookups.
+        /// </summary>
+        internal ITypeConverter CachedConverter { get; set; }
+
+        /// <summary>
         /// Gets or sets whether this column allows null values.
         /// </summary>
         public bool AllowNull { get; set; } = true;

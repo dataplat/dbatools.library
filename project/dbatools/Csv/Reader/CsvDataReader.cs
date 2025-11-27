@@ -61,6 +61,9 @@ namespace Dataplat.Dbatools.Csv.Reader
         // Reusable StringBuilder for quoted field parsing to reduce allocations
         private StringBuilder _quotedFieldBuilder;
 
+        // String interning for common values to reduce allocations
+        private HashSet<string> _internedStrings;
+
         // Smart quote characters for normalization
         private const char LeftSingleQuote = '\u2018';  // '
         private const char RightSingleQuote = '\u2019'; // '
@@ -169,6 +172,76 @@ namespace Dataplat.Dbatools.Csv.Reader
             _lineBuilder = new StringBuilder(512);
             _fieldsBuffer = new List<FieldInfo>(64);
             _quotedFieldBuilder = new StringBuilder(256);
+
+            // Initialize string interning if enabled
+            if (_options.InternStrings)
+            {
+                InitializeStringInterning();
+            }
+        }
+
+        private void InitializeStringInterning()
+        {
+            // Start with common values that frequently appear in CSV files
+            _internedStrings = new HashSet<string>(StringComparer.Ordinal)
+            {
+                string.Empty,
+                "NULL",
+                "null",
+                "Null",
+                "N/A",
+                "n/a",
+                "NA",
+                "na",
+                "-",
+                "0",
+                "1",
+                "true",
+                "True",
+                "TRUE",
+                "false",
+                "False",
+                "FALSE",
+                "Yes",
+                "yes",
+                "YES",
+                "No",
+                "no",
+                "NO",
+                "Y",
+                "N",
+                "y",
+                "n"
+            };
+
+            // Add custom intern strings if specified
+            if (_options.CustomInternStrings != null)
+            {
+                foreach (var s in _options.CustomInternStrings)
+                {
+                    _internedStrings.Add(s);
+                }
+            }
+
+            // Intern the null value if configured
+            if (_options.NullValue != null)
+            {
+                _internedStrings.Add(_options.NullValue);
+            }
+        }
+
+        /// <summary>
+        /// Returns the interned version of the string if it matches a known value,
+        /// otherwise returns the original string.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private string TryInternString(string value)
+        {
+            if (_internedStrings != null && _internedStrings.TryGetValue(value, out string interned))
+            {
+                return interned;
+            }
+            return value;
         }
 
         #endregion
@@ -216,8 +289,24 @@ namespace Dataplat.Dbatools.Csv.Reader
                 InitializeColumnsFromFirstDataRow();
             }
 
+            // Cache converters for each column to avoid per-row registry lookups
+            CacheColumnConverters();
+
             // Prepare converted values array
             _convertedValues = new object[_columns.Count + _staticColumns.Count];
+        }
+
+        private void CacheColumnConverters()
+        {
+            foreach (var column in _columns)
+            {
+                // Skip string columns - they don't need conversion
+                if (column.DataType == typeof(string))
+                    continue;
+
+                // Use custom converter if specified, otherwise look up from registry
+                column.CachedConverter = column.Converter ?? _options.TypeConverterRegistry?.GetConverter(column.DataType);
+            }
         }
 
         private void InitializeColumnsFromFirstDataRow()
@@ -662,8 +751,8 @@ namespace Dataplat.Dbatools.Csv.Reader
                 return value;
             }
 
-            // Use custom converter if specified
-            ITypeConverter converter = column.Converter ?? _options.TypeConverterRegistry?.GetConverter(column.DataType);
+            // Use cached converter (resolved during initialization) to avoid per-row registry lookups
+            ITypeConverter converter = column.CachedConverter;
 
             if (converter != null)
             {
@@ -1090,78 +1179,101 @@ namespace Dataplat.Dbatools.Csv.Reader
             {
                 if (lenient)
                 {
-                    // In lenient mode, verify there's a properly closing quote
-                    if (!HasMatchingClosingQuote(line, start, quote, escape, delimiter, lenient))
+                    // In lenient mode, try to parse as quoted field with inline validation
+                    // This combines the validation and parsing into a single pass
+                    var result = TryParseQuotedFieldLenient(line, start, delimiter, quote, escape);
+                    if (result.wasValidQuoted)
                     {
-                        // No matching close quote - treat as unquoted field
-                        return ParseUnquotedField(line, start, delimiter);
+                        return (result.value, true, result.newPosition);
                     }
+                    // No valid closing quote found - treat as unquoted field
+                    return ParseUnquotedField(line, start, delimiter);
                 }
-                return ParseQuotedField(line, start, delimiter, quote, escape, lenient);
+                return ParseQuotedField(line, start, delimiter, quote, escape);
             }
 
             return ParseUnquotedField(line, start, delimiter);
         }
 
-        private bool HasMatchingClosingQuote(ReadOnlySpan<char> line, int start, char quote, char escape, string delimiter, bool lenient)
+        /// <summary>
+        /// Attempts to parse a quoted field in lenient mode, validating the closing quote in a single pass.
+        /// Returns wasValidQuoted=false if no valid closing quote is found.
+        /// </summary>
+        private (string value, bool wasValidQuoted, int newPosition) TryParseQuotedFieldLenient(
+            ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape)
         {
-            // Start after opening quote
-            int i = start + 1;
+            _quotedFieldBuilder.Clear();
+            int i = start + 1; // Skip opening quote
 
             while (i < line.Length)
             {
-                // Check for RFC 4180 escaped quote (doubled quote)
-                if (line[i] == escape && i + 1 < line.Length && line[i + 1] == quote)
+                char c = line[i];
+
+                // Check for escaped quote (RFC 4180: "" or custom escape like \")
+                if (c == escape && i + 1 < line.Length && line[i + 1] == quote)
                 {
-                    // Escaped quote, skip both
+                    _quotedFieldBuilder.Append(quote);
                     i += 2;
                 }
-                // In lenient mode, also check for backslash escaped quote
-                else if (lenient && line[i] == '\\' && i + 1 < line.Length && line[i + 1] == quote)
+                // In lenient mode, also handle backslash escape
+                else if (c == '\\' && i + 1 < line.Length && line[i + 1] == quote)
                 {
-                    // Backslash-escaped quote, skip both
+                    _quotedFieldBuilder.Append(quote);
                     i += 2;
                 }
-                else if (line[i] == quote)
+                else if (c == quote)
                 {
                     // Found a quote - check if it's a valid closing quote
-                    // (must be at end of line or followed by delimiter or whitespace before delimiter)
                     int afterQuote = i + 1;
+
+                    // Check if at end of line - valid closing
                     if (afterQuote >= line.Length)
                     {
-                        // Quote at end of line - valid closing
-                        return true;
+                        string value = TryInternString(_quotedFieldBuilder.ToString());
+                        return (value, true, line.Length + delimiter.Length);
                     }
 
                     // Check for delimiter immediately after quote
                     if (MatchesDelimiter(line, afterQuote, delimiter))
                     {
-                        return true;
+                        string value = TryInternString(_quotedFieldBuilder.ToString());
+                        return (value, true, afterQuote + delimiter.Length);
                     }
 
                     // Check for whitespace then delimiter or end
                     int checkPos = afterQuote;
                     while (checkPos < line.Length && char.IsWhiteSpace(line[checkPos]))
                         checkPos++;
-                    if (checkPos >= line.Length || MatchesDelimiter(line, checkPos, delimiter))
+
+                    if (checkPos >= line.Length)
                     {
-                        return true;
+                        string value = TryInternString(_quotedFieldBuilder.ToString());
+                        return (value, true, line.Length + delimiter.Length);
                     }
 
-                    // Quote is not at a valid position - keep looking
+                    if (MatchesDelimiter(line, checkPos, delimiter))
+                    {
+                        string value = TryInternString(_quotedFieldBuilder.ToString());
+                        return (value, true, checkPos + delimiter.Length);
+                    }
+
+                    // Quote is not at a valid position - include it in content and continue looking
+                    _quotedFieldBuilder.Append(c);
                     i++;
                 }
                 else
                 {
+                    _quotedFieldBuilder.Append(c);
                     i++;
                 }
             }
 
-            return false;
+            // No valid closing quote found - return invalid
+            return (null, false, 0);
         }
 
         private (string value, bool wasQuoted, int newPosition) ParseQuotedField(
-            ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape, bool lenient)
+            ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape)
         {
             // Reuse pooled StringBuilder to reduce allocations
             _quotedFieldBuilder.Clear();
@@ -1178,12 +1290,6 @@ namespace Dataplat.Dbatools.Csv.Reader
                     _quotedFieldBuilder.Append(quote);
                     i += 2;
                 }
-                // In lenient mode, also handle backslash escape
-                else if (lenient && c == '\\' && i + 1 < line.Length && line[i + 1] == quote)
-                {
-                    _quotedFieldBuilder.Append(quote);
-                    i += 2;
-                }
                 else if (c == quote)
                 {
                     // End of quoted field
@@ -1196,14 +1302,6 @@ namespace Dataplat.Dbatools.Csv.Reader
                         {
                             i += delimiter.Length;
                         }
-                        else if (lenient)
-                        {
-                            // In lenient mode, there might be trailing spaces before delimiter
-                            while (i < line.Length && char.IsWhiteSpace(line[i]))
-                                i++;
-                            if (MatchesDelimiter(line, i, delimiter))
-                                i += delimiter.Length;
-                        }
                     }
                     else
                     {
@@ -1211,7 +1309,8 @@ namespace Dataplat.Dbatools.Csv.Reader
                         i += delimiter.Length;
                     }
 
-                    return (_quotedFieldBuilder.ToString(), wasQuoted, i);
+                    string value = TryInternString(_quotedFieldBuilder.ToString());
+                    return (value, wasQuoted, i);
                 }
                 else
                 {
@@ -1221,42 +1320,66 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
 
             // Unclosed quote - return position past end to signal no more fields
-            return (_quotedFieldBuilder.ToString(), wasQuoted, line.Length + delimiter.Length);
+            string finalValue = TryInternString(_quotedFieldBuilder.ToString());
+            return (finalValue, wasQuoted, line.Length + delimiter.Length);
         }
 
         private (string value, bool wasQuoted, int newPosition) ParseUnquotedField(
             ReadOnlySpan<char> line, int start, string delimiter)
         {
             int delimiterLength = delimiter.Length;
+            ReadOnlySpan<char> remaining = line.Slice(start);
 
             // Use Span for fast delimiter search when delimiter is single character
             if (delimiterLength == 1)
             {
                 char delimChar = delimiter[0];
-                int delimIndex = line.Slice(start).IndexOf(delimChar);
+                int delimIndex = remaining.IndexOf(delimChar);
 
                 if (delimIndex < 0)
                 {
                     // No more delimiters - rest of line is the field
-                    return (line.Slice(start).ToString(), false, line.Length + delimiterLength);
+                    string value = TryInternString(remaining.ToString());
+                    return (value, false, line.Length + delimiterLength);
                 }
 
-                string value = line.Slice(start, delimIndex).ToString();
-                return (value, false, start + delimIndex + delimiterLength);
+                string fieldValue = TryInternString(remaining.Slice(0, delimIndex).ToString());
+                return (fieldValue, false, start + delimIndex + delimiterLength);
             }
 
-            // Multi-character delimiter - scan character by character
-            for (int i = start; i < line.Length; i++)
+            // Multi-character delimiter - use optimized Span.IndexOf for the first char, then verify
+            ReadOnlySpan<char> delimSpan = delimiter.AsSpan();
+            char firstDelimChar = delimiter[0];
+            int searchStart = 0;
+
+            while (searchStart < remaining.Length)
             {
-                if (MatchesDelimiter(line, i, delimiter))
+                // Find next occurrence of first delimiter character
+                int firstCharIndex = remaining.Slice(searchStart).IndexOf(firstDelimChar);
+                if (firstCharIndex < 0)
                 {
-                    string value = line.Slice(start, i - start).ToString();
-                    return (value, false, i + delimiterLength);
+                    // No more potential delimiters - rest of line is the field
+                    string value = TryInternString(remaining.ToString());
+                    return (value, false, line.Length + delimiterLength);
                 }
+
+                int candidatePos = searchStart + firstCharIndex;
+
+                // Check if full delimiter matches at this position
+                if (candidatePos + delimiterLength <= remaining.Length &&
+                    remaining.Slice(candidatePos, delimiterLength).SequenceEqual(delimSpan))
+                {
+                    string value = TryInternString(remaining.Slice(0, candidatePos).ToString());
+                    return (value, false, start + candidatePos + delimiterLength);
+                }
+
+                // Not a match, continue searching after this position
+                searchStart = candidatePos + 1;
             }
 
             // No delimiter found - rest of line is the field
-            return (line.Slice(start).ToString(), false, line.Length + delimiterLength);
+            string finalValue = TryInternString(remaining.ToString());
+            return (finalValue, false, line.Length + delimiterLength);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1455,6 +1578,15 @@ namespace Dataplat.Dbatools.Csv.Reader
                 if (string.Equals(_columns[i].Name, columnName, StringComparison.OrdinalIgnoreCase))
                 {
                     _columns[i].DataType = type;
+                    // Re-cache the converter for this column
+                    if (type != typeof(string))
+                    {
+                        _columns[i].CachedConverter = _columns[i].Converter ?? _options.TypeConverterRegistry?.GetConverter(type);
+                    }
+                    else
+                    {
+                        _columns[i].CachedConverter = null;
+                    }
                     return;
                 }
             }

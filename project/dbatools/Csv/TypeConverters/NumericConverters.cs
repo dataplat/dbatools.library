@@ -18,6 +18,11 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out short result)
             => short.TryParse(value, styles, provider, out result);
+
+#if NET8_0_OR_GREATER
+        protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out short result)
+            => short.TryParse(value, styles, provider, out result);
+#endif
     }
 
     /// <summary>
@@ -35,6 +40,11 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out int result)
             => int.TryParse(value, styles, provider, out result);
+
+#if NET8_0_OR_GREATER
+        protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out int result)
+            => int.TryParse(value, styles, provider, out result);
+#endif
     }
 
     /// <summary>
@@ -52,6 +62,11 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out long result)
             => long.TryParse(value, styles, provider, out result);
+
+#if NET8_0_OR_GREATER
+        protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out long result)
+            => long.TryParse(value, styles, provider, out result);
+#endif
     }
 
     /// <summary>
@@ -69,6 +84,11 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out float result)
             => float.TryParse(value, styles, provider, out result);
+
+#if NET8_0_OR_GREATER
+        protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out float result)
+            => float.TryParse(value, styles, provider, out result);
+#endif
     }
 
     /// <summary>
@@ -86,6 +106,11 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out double result)
             => double.TryParse(value, styles, provider, out result);
+
+#if NET8_0_OR_GREATER
+        protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out double result)
+            => double.TryParse(value, styles, provider, out result);
+#endif
     }
 
     /// <summary>
@@ -104,6 +129,11 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out decimal result)
             => decimal.TryParse(value, styles, provider, out result);
+
+#if NET8_0_OR_GREATER
+        protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out decimal result)
+            => decimal.TryParse(value, styles, provider, out result);
+#endif
     }
 
     /// <summary>
@@ -121,5 +151,10 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out byte result)
             => byte.TryParse(value, styles, provider, out result);
+
+#if NET8_0_OR_GREATER
+        protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out byte result)
+            => byte.TryParse(value, styles, provider, out result);
+#endif
     }
 }

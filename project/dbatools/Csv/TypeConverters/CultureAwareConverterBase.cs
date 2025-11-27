@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace Dataplat.Dbatools.Csv.TypeConverters
 {
@@ -32,7 +33,14 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
                 result = default;
                 return false;
             }
-            return TryParseCore(value.Trim(), NumberStyles, FormatProvider, out result);
+#if NET8_0_OR_GREATER
+            // Use Span-based parsing to avoid Trim() allocation
+            return TryParseSpan(value.AsSpan().Trim(), NumberStyles, FormatProvider, out result);
+#else
+            // Avoid allocation when string is already trimmed
+            string trimmed = GetTrimmedValue(value);
+            return TryParseCore(trimmed, NumberStyles, FormatProvider, out result);
+#endif
         }
 
         /// <summary>
@@ -45,14 +53,47 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
                 result = default(T);
                 return false;
             }
-            if (TryParseCore(value.Trim(), NumberStyles, culture ?? FormatProvider, out T parsed))
+#if NET8_0_OR_GREATER
+            // Use Span-based parsing to avoid Trim() allocation
+            if (TryParseSpan(value.AsSpan().Trim(), NumberStyles, culture ?? FormatProvider, out T parsed))
             {
                 result = parsed;
                 return true;
             }
+#else
+            // Avoid allocation when string is already trimmed
+            string trimmed = GetTrimmedValue(value);
+            if (TryParseCore(trimmed, NumberStyles, culture ?? FormatProvider, out T parsed))
+            {
+                result = parsed;
+                return true;
+            }
+#endif
             result = default(T);
             return false;
         }
+
+        /// <summary>
+        /// Gets the trimmed value, avoiding allocation when the string is already trimmed.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static string GetTrimmedValue(string value)
+        {
+            // Fast path: check if trimming is actually needed
+            if (value.Length > 0 && !char.IsWhiteSpace(value[0]) && !char.IsWhiteSpace(value[value.Length - 1]))
+            {
+                return value;
+            }
+            return value.Trim();
+        }
+
+#if NET8_0_OR_GREATER
+        /// <summary>
+        /// Span-based parsing implementation for .NET 8+. Override this in derived classes
+        /// to provide type-specific parsing using the Span-based TryParse overloads.
+        /// </summary>
+        protected abstract bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out T result);
+#endif
 
         /// <summary>
         /// Core parsing implementation. Override this in derived classes to provide
