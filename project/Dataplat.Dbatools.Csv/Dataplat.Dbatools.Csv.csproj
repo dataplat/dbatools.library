@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net472;net8.0</TargetFrameworks>
+    <RootNamespace>Dataplat.Dbatools.Csv</RootNamespace>
+    <AssemblyName>Dataplat.Dbatools.Csv</AssemblyName>
+    <LangVersion>7.3</LangVersion>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>Dataplat.Dbatools.Csv</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>dbatools team</Authors>
+    <Company>Dataplat</Company>
+    <Product>Dataplat.Dbatools.Csv</Product>
+    <Description>High-performance CSV reader and writer for .NET. Features include streaming IDataReader implementation, automatic compression/decompression (GZip, Deflate, Brotli), culture-aware type conversion, multi-character delimiters, and robust error handling. From the trusted dbatools project.</Description>
+    <Copyright>Copyright (c) dbatools team</Copyright>
+    <PackageTags>csv;parser;reader;writer;datareader;idatareader;compression;gzip;brotli;dbatools</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/dataplat/dbatools.library</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dataplat/dbatools.library</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Build settings -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>CS1591</NoWarn>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- Link to CSV source files from main dbatools project -->
+  <ItemGroup>
+    <Compile Include="..\dbatools\Csv\**\*.cs" Link="%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Polyfill packages needed for net472 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <PackageReference Include="System.Buffers" Version="4.5.1" />
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+  </ItemGroup>
+
+  <!-- Package README -->
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
