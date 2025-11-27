@@ -53,6 +53,65 @@ namespace Dataplat.Dbatools.Csv.Tests
         }
 
         [TestMethod]
+        public void TestNoHeaderRowSetColumnTypeBeforeRead()
+        {
+            // This tests the fix for the NoHeaderRow issue where SetColumnType
+            // was failing because columns weren't created until Read() was called.
+            string csv = "John,30,New York\nJane,25,Boston";
+            var options = new CsvReaderOptions { HasHeaderRow = false };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                // SetColumnType should work BEFORE Read() is called
+                // This requires columns to be initialized during Initialize()
+                reader.SetColumnType("Column0", typeof(string));
+                reader.SetColumnType("Column1", typeof(int));
+                reader.SetColumnType("Column2", typeof(string));
+
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual(3, reader.FieldCount);
+                Assert.AreEqual("Column0", reader.GetName(0));
+                Assert.AreEqual("John", reader.GetString(0));
+                Assert.AreEqual(30, reader.GetInt32(1));  // Converted to int
+                Assert.AreEqual("New York", reader.GetString(2));
+
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("Jane", reader.GetString(0));
+                Assert.AreEqual(25, reader.GetInt32(1));  // Converted to int
+                Assert.AreEqual("Boston", reader.GetString(2));
+
+                Assert.IsFalse(reader.Read());
+            }
+        }
+
+        [TestMethod]
+        public void TestNoHeaderRowHasColumnBeforeRead()
+        {
+            // Test that HasColumn works before Read() when HasHeaderRow = false
+            string csv = "John,30,New York\nJane,25,Boston";
+            var options = new CsvReaderOptions { HasHeaderRow = false };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                // HasColumn should work BEFORE Read() is called
+                Assert.IsTrue(reader.HasColumn("Column0"));
+                Assert.IsTrue(reader.HasColumn("Column1"));
+                Assert.IsTrue(reader.HasColumn("Column2"));
+                Assert.IsFalse(reader.HasColumn("Column3"));
+
+                // FieldCount should also work
+                Assert.AreEqual(3, reader.FieldCount);
+
+                // GetFieldHeaders should work
+                var headers = reader.GetFieldHeaders();
+                Assert.AreEqual(3, headers.Length);
+                Assert.AreEqual("Column0", headers[0]);
+                Assert.AreEqual("Column1", headers[1]);
+                Assert.AreEqual("Column2", headers[2]);
+            }
+        }
+
+        [TestMethod]
         public void TestEmptyFile()
         {
             string csv = "";

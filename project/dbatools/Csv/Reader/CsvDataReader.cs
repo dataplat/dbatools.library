@@ -37,6 +37,10 @@ namespace Dataplat.Dbatools.Csv.Reader
         private long _currentRecordIndex = -1;
         private long _currentLineNumber;
 
+        // Buffer for first data row when no header row (needed to create columns during Initialize)
+        private string _bufferedFirstLine;
+        private bool _hasBufferedFirstLine;
+
         // Buffer for efficient reading - using ArrayPool
         private char[] _buffer;
         private bool _bufferFromPool;
@@ -205,9 +209,69 @@ namespace Dataplat.Dbatools.Csv.Reader
                     ProcessHeaders();
                 }
             }
+            else
+            {
+                // No header row - peek at first data row to create columns
+                // This allows SetColumnType to be called before Read()
+                InitializeColumnsFromFirstDataRow();
+            }
 
             // Prepare converted values array
             _convertedValues = new object[_columns.Count + _staticColumns.Count];
+        }
+
+        private void InitializeColumnsFromFirstDataRow()
+        {
+            // Read the first data row to determine column count
+            // Buffer it so it can be returned on the first Read() call
+            while (true)
+            {
+                if (!ReadLine(out string line))
+                {
+                    // No data rows - leave columns empty
+                    return;
+                }
+
+                _currentLineNumber++;
+
+                // Skip empty lines if configured
+                if (string.IsNullOrEmpty(line) && _options.SkipEmptyLines)
+                {
+                    continue;
+                }
+
+                // Skip comment lines
+                if (line != null && line.Length > 0 && line[0] == _options.Comment)
+                {
+                    continue;
+                }
+
+                // Normalize smart quotes if enabled
+                if (_options.NormalizeQuotes && line != null)
+                {
+                    line = NormalizeSmartQuotes(line);
+                }
+
+                // Parse the line to get field count
+                ParseLine(line);
+
+                // Create columns based on field count
+                for (int i = 0; i < _fieldsBuffer.Count; i++)
+                {
+                    var col = new CsvColumn($"Column{i}", _columns.Count, typeof(string));
+                    col.SourceIndex = i;
+                    _columns.Add(col);
+                }
+
+                // Cache max source index
+                _maxSourceIndex = _fieldsBuffer.Count - 1;
+
+                // Buffer this line so it's returned on the first Read()
+                _bufferedFirstLine = line;
+                _hasBufferedFirstLine = true;
+
+                break;
+            }
         }
 
         private void ProcessHeaders()
@@ -358,51 +422,50 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             while (true)
             {
-                if (!ReadLine(out string line))
+                string line;
+
+                // Check if we have a buffered first line from no-header initialization
+                if (_hasBufferedFirstLine)
                 {
-                    _currentRecord = null;
-                    return false;
+                    line = _bufferedFirstLine;
+                    _hasBufferedFirstLine = false;
+                    _bufferedFirstLine = null;
+                    // Line number was already incremented during initialization
+                    // Don't increment again, but we don't skip processing
                 }
-
-                _currentLineNumber++;
-
-                // Skip empty lines if configured
-                if (string.IsNullOrEmpty(line) && _options.SkipEmptyLines)
+                else
                 {
-                    continue;
-                }
+                    if (!ReadLine(out line))
+                    {
+                        _currentRecord = null;
+                        return false;
+                    }
 
-                // Skip comment lines
-                if (line != null && line.Length > 0 && line[0] == _options.Comment)
-                {
-                    continue;
-                }
+                    _currentLineNumber++;
 
-                // Normalize smart quotes if enabled
-                if (_options.NormalizeQuotes && line != null)
-                {
-                    line = NormalizeSmartQuotes(line);
+                    // Skip empty lines if configured
+                    if (string.IsNullOrEmpty(line) && _options.SkipEmptyLines)
+                    {
+                        continue;
+                    }
+
+                    // Skip comment lines
+                    if (line != null && line.Length > 0 && line[0] == _options.Comment)
+                    {
+                        continue;
+                    }
+
+                    // Normalize smart quotes if enabled
+                    if (_options.NormalizeQuotes && line != null)
+                    {
+                        line = NormalizeSmartQuotes(line);
+                    }
                 }
 
                 try
                 {
                     ParseLine(line);
                     _currentRecordIndex++;
-
-                    // Store fields
-                    if (!_options.HasHeaderRow && _columns.Count == 0)
-                    {
-                        // First data row defines columns when no header
-                        for (int i = 0; i < _fieldsBuffer.Count; i++)
-                        {
-                            var col = new CsvColumn($"Column{i}", _columns.Count, typeof(string));
-                            col.SourceIndex = i;
-                            _columns.Add(col);
-                        }
-                        // Cache max source index for no-header case
-                        _maxSourceIndex = _fieldsBuffer.Count - 1;
-                        _convertedValues = new object[_columns.Count + _staticColumns.Count];
-                    }
 
                     // Handle field count mismatch
                     // Use cached max source index to avoid LINQ overhead per row
