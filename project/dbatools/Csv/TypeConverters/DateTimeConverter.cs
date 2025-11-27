@@ -5,9 +5,10 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 {
     /// <summary>
     /// Converts string values to DateTime values with customizable format support.
+    /// Supports culture-aware parsing.
     /// Addresses issue #9694: Import-DbaCsv date format specification.
     /// </summary>
-    public sealed class DateTimeConverter : TypeConverterBase<DateTime>
+    public sealed class DateTimeConverter : TypeConverterBase<DateTime>, ICultureAwareConverter
     {
         /// <summary>
         /// Gets the default instance using invariant culture and standard formats.
@@ -99,6 +100,54 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
             // Fall back to general parsing
             return DateTime.TryParse(trimmed, Culture, styles, out result);
+        }
+
+        /// <summary>
+        /// Attempts to convert the string value to a DateTime using the specified culture.
+        /// </summary>
+        public bool TryConvert(string value, CultureInfo culture, out object result)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                result = default(DateTime);
+                return false;
+            }
+
+            string trimmed = value.Trim();
+            DateTimeStyles styles = Styles;
+            if (AssumeUtc)
+            {
+                styles |= DateTimeStyles.AssumeUniversal;
+            }
+
+            CultureInfo effectiveCulture = culture ?? Culture;
+
+            // Try custom formats first
+            if (CustomFormats != null && CustomFormats.Length > 0)
+            {
+                if (DateTime.TryParseExact(trimmed, CustomFormats, effectiveCulture, styles, out DateTime parsed))
+                {
+                    result = parsed;
+                    return true;
+                }
+            }
+
+            // Try standard formats
+            if (DateTime.TryParseExact(trimmed, StandardFormats, effectiveCulture, styles, out DateTime stdParsed))
+            {
+                result = stdParsed;
+                return true;
+            }
+
+            // Fall back to general parsing
+            if (DateTime.TryParse(trimmed, effectiveCulture, styles, out DateTime generalParsed))
+            {
+                result = generalParsed;
+                return true;
+            }
+
+            result = default(DateTime);
+            return false;
         }
 
         /// <summary>

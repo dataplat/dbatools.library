@@ -14,9 +14,15 @@ namespace Dataplat.Dbatools.Csv.Reader
         public string Name { get; set; }
 
         /// <summary>
-        /// Gets the zero-based ordinal index of the column.
+        /// Gets the zero-based ordinal index of the column in the output.
         /// </summary>
         public int Ordinal { get; internal set; }
+
+        /// <summary>
+        /// Gets the zero-based index of the source field in the CSV file.
+        /// Used for mapping when columns are filtered or duplicates are handled.
+        /// </summary>
+        public int SourceIndex { get; internal set; }
 
         /// <summary>
         /// Gets or sets the target .NET type for this column.

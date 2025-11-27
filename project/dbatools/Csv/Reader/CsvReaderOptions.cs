@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Dataplat.Dbatools.Csv.Compression;
 using Dataplat.Dbatools.Csv.TypeConverters;
@@ -218,6 +219,50 @@ namespace Dataplat.Dbatools.Csv.Reader
         public HashSet<string> ExcludeColumns { get; set; }
 
         /// <summary>
+        /// Gets or sets whether to distinguish between null (missing) and empty string values.
+        /// When true: ,, becomes null, ,"", becomes empty string.
+        /// When false (default): both become empty string.
+        /// Addresses LumenWorks issue #68.
+        /// </summary>
+        public bool DistinguishEmptyFromNull { get; set; }
+
+        /// <summary>
+        /// Gets or sets how to handle duplicate column headers.
+        /// Default is ThrowException.
+        /// Addresses LumenWorks issue #39.
+        /// </summary>
+        public DuplicateHeaderBehavior DuplicateHeaderBehavior { get; set; } = DuplicateHeaderBehavior.ThrowException;
+
+        /// <summary>
+        /// Gets or sets the culture to use for parsing numbers and dates.
+        /// Default is InvariantCulture.
+        /// Addresses LumenWorks issue #66.
+        /// </summary>
+        public CultureInfo Culture { get; set; } = CultureInfo.InvariantCulture;
+
+        /// <summary>
+        /// Gets or sets the quote parsing mode.
+        /// Strict follows RFC 4180, Lenient handles common malformed data.
+        /// Default is Strict.
+        /// Addresses LumenWorks issues #47 and #56.
+        /// </summary>
+        public QuoteMode QuoteMode { get; set; } = QuoteMode.Strict;
+
+        /// <summary>
+        /// Gets or sets how to handle rows with mismatched field counts.
+        /// Default is ThrowException.
+        /// </summary>
+        public MismatchedFieldAction MismatchedFieldAction { get; set; } = MismatchedFieldAction.ThrowException;
+
+        /// <summary>
+        /// Gets or sets whether to normalize smart/curly quotes to standard ASCII quotes.
+        /// Converts ' ' to ' and " " to ".
+        /// Useful for data exported from Word or Excel.
+        /// Addresses LumenWorks issue #25.
+        /// </summary>
+        public bool NormalizeQuotes { get; set; }
+
+        /// <summary>
         /// Creates a default options instance.
         /// </summary>
         public static CsvReaderOptions Default => new CsvReaderOptions();
@@ -269,7 +314,13 @@ namespace Dataplat.Dbatools.Csv.Reader
                 CollectParseErrors = CollectParseErrors,
                 MaxParseErrors = MaxParseErrors,
                 IncludeColumns = IncludeColumns != null ? new HashSet<string>(IncludeColumns) : null,
-                ExcludeColumns = ExcludeColumns != null ? new HashSet<string>(ExcludeColumns) : null
+                ExcludeColumns = ExcludeColumns != null ? new HashSet<string>(ExcludeColumns) : null,
+                DistinguishEmptyFromNull = DistinguishEmptyFromNull,
+                DuplicateHeaderBehavior = DuplicateHeaderBehavior,
+                Culture = Culture,
+                QuoteMode = QuoteMode,
+                MismatchedFieldAction = MismatchedFieldAction,
+                NormalizeQuotes = NormalizeQuotes
             };
         }
     }

@@ -1,7 +1,11 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Dataplat.Dbatools.Csv.Compression;
 using Dataplat.Dbatools.Csv.TypeConverters;
@@ -11,6 +15,7 @@ namespace Dataplat.Dbatools.Csv.Reader
     /// <summary>
     /// High-performance CSV reader that implements IDataReader for SqlBulkCopy compatibility.
     /// Supports multi-character delimiters, type conversion, compression, error tracking, and static columns.
+    /// Uses Span-based parsing and ArrayPool for maximum performance.
     /// </summary>
     public sealed class CsvDataReader : IDataReader
     {
@@ -24,23 +29,53 @@ namespace Dataplat.Dbatools.Csv.Reader
         private readonly List<CsvParseError> _parseErrors;
 
         private string[] _currentRecord;
-        private string[] _recordBuffer;  // Reusable buffer to reduce array allocations
+        private bool[] _currentRecordWasQuoted;  // Track which fields were quoted for null vs empty
+        private string[] _recordBuffer;
+        private bool[] _quotedBuffer;
         private object[] _convertedValues;
         private bool _isInitialized;
         private bool _isClosed;
         private long _currentRecordIndex = -1;
         private long _currentLineNumber;
 
-        // Buffer for efficient reading
-        private readonly char[] _buffer;
+        // Buffer for efficient reading - using ArrayPool
+        private char[] _buffer;
+        private bool _bufferFromPool;
         private int _bufferLength;
         private int _bufferPosition;
         private bool _endOfStream;
 
         // Field parsing state
-        private readonly StringBuilder _fieldBuilder;
-        private readonly StringBuilder _parseFieldBuilder;
-        private readonly List<string> _fieldsBuffer;
+        private StringBuilder _lineBuilder;
+        private List<FieldInfo> _fieldsBuffer;
+
+        // Header name tracking for duplicate detection
+        private readonly Dictionary<string, int> _headerNameCounts;
+
+        // Smart quote characters for normalization
+        private const char LeftSingleQuote = '\u2018';  // '
+        private const char RightSingleQuote = '\u2019'; // '
+        private const char LeftDoubleQuote = '\u201C';  // "
+        private const char RightDoubleQuote = '\u201D'; // "
+
+        #endregion
+
+        #region Field Info Structure
+
+        /// <summary>
+        /// Holds information about a parsed field including its value and whether it was quoted.
+        /// </summary>
+        private struct FieldInfo
+        {
+            public string Value;
+            public bool WasQuoted;
+
+            public FieldInfo(string value, bool wasQuoted)
+            {
+                Value = value;
+                WasQuoted = wasQuoted;
+            }
+        }
 
         #endregion
 
@@ -68,13 +103,11 @@ namespace Dataplat.Dbatools.Csv.Reader
                 bufferSize: _options.BufferSize);
             _ownsReader = true;
 
-            _buffer = new char[_options.BufferSize];
-            _fieldBuilder = new StringBuilder(256);
-            _parseFieldBuilder = new StringBuilder(256);
-            _fieldsBuffer = new List<string>(64);
+            InitializeBuffers();
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
             _parseErrors = _options.CollectParseErrors ? new List<CsvParseError>() : null;
+            _headerNameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -86,13 +119,11 @@ namespace Dataplat.Dbatools.Csv.Reader
             _options = options ?? new CsvReaderOptions();
             _ownsReader = false;
 
-            _buffer = new char[_options.BufferSize];
-            _fieldBuilder = new StringBuilder(256);
-            _parseFieldBuilder = new StringBuilder(256);
-            _fieldsBuffer = new List<string>(64);
+            InitializeBuffers();
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
             _parseErrors = _options.CollectParseErrors ? new List<CsvParseError>() : null;
+            _headerNameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -114,13 +145,20 @@ namespace Dataplat.Dbatools.Csv.Reader
                 bufferSize: _options.BufferSize);
             _ownsReader = true;
 
-            _buffer = new char[_options.BufferSize];
-            _fieldBuilder = new StringBuilder(256);
-            _parseFieldBuilder = new StringBuilder(256);
-            _fieldsBuffer = new List<string>(64);
+            InitializeBuffers();
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
             _parseErrors = _options.CollectParseErrors ? new List<CsvParseError>() : null;
+            _headerNameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private void InitializeBuffers()
+        {
+            // Use ArrayPool for the main read buffer
+            _buffer = ArrayPool<char>.Shared.Rent(_options.BufferSize);
+            _bufferFromPool = true;
+            _lineBuilder = new StringBuilder(512);
+            _fieldsBuffer = new List<FieldInfo>(64);
         }
 
         #endregion
@@ -148,28 +186,127 @@ namespace Dataplat.Dbatools.Csv.Reader
                 if (ReadLine(out string headerLine) && !string.IsNullOrEmpty(headerLine))
                 {
                     _currentLineNumber++;
+
+                    // Normalize smart quotes if enabled
+                    if (_options.NormalizeQuotes)
+                    {
+                        headerLine = NormalizeSmartQuotes(headerLine);
+                    }
+
                     ParseLine(headerLine);
 
-                    for (int i = 0; i < _fieldsBuffer.Count; i++)
-                    {
-                        string name = _fieldsBuffer[i];
-                        if (_options.TrimmingOptions != ValueTrimmingOptions.None)
-                        {
-                            name = name.Trim();
-                        }
-
-                        // Check include/exclude filters
-                        if (ShouldIncludeColumn(name))
-                        {
-                            var column = new CsvColumn(name, _columns.Count, GetColumnType(name));
-                            _columns.Add(column);
-                        }
-                    }
+                    // Process headers with duplicate handling
+                    ProcessHeaders();
                 }
             }
 
             // Prepare converted values array
             _convertedValues = new object[_columns.Count + _staticColumns.Count];
+        }
+
+        private void ProcessHeaders()
+        {
+            _headerNameCounts.Clear();
+            var headerIndicesToSkip = new HashSet<int>();
+
+            // First pass: count occurrences for UseLastOccurrence mode
+            if (_options.DuplicateHeaderBehavior == DuplicateHeaderBehavior.UseLastOccurrence)
+            {
+                var lastOccurrence = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < _fieldsBuffer.Count; i++)
+                {
+                    string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value);
+                    lastOccurrence[name] = i;
+                }
+
+                // Mark non-last occurrences for renaming
+                var tempCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < _fieldsBuffer.Count; i++)
+                {
+                    string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value);
+                    if (lastOccurrence[name] != i)
+                    {
+                        // This is not the last occurrence, will be renamed
+                        if (!tempCounts.ContainsKey(name))
+                            tempCounts[name] = 0;
+                        tempCounts[name]++;
+                    }
+                }
+            }
+
+            // Second pass: create columns
+            for (int i = 0; i < _fieldsBuffer.Count; i++)
+            {
+                string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value);
+
+                // Check include/exclude filters first
+                if (!ShouldIncludeColumn(name))
+                    continue;
+
+                // Handle duplicate headers
+                string finalName = HandleDuplicateHeader(name, i);
+                if (finalName == null)
+                {
+                    // Skip this column (UseFirstOccurrence mode, not the first)
+                    continue;
+                }
+
+                var column = new CsvColumn(finalName, _columns.Count, GetColumnType(name));
+                column.SourceIndex = i;  // Track original index for field mapping
+                _columns.Add(column);
+            }
+        }
+
+        private string GetTrimmedHeaderName(string name)
+        {
+            if (_options.TrimmingOptions != ValueTrimmingOptions.None && name != null)
+            {
+                return name.Trim();
+            }
+            return name ?? string.Empty;
+        }
+
+        private string HandleDuplicateHeader(string name, int fieldIndex)
+        {
+            if (!_headerNameCounts.TryGetValue(name, out int count))
+            {
+                // First occurrence
+                _headerNameCounts[name] = 1;
+                return name;
+            }
+
+            // Duplicate found
+            switch (_options.DuplicateHeaderBehavior)
+            {
+                case DuplicateHeaderBehavior.ThrowException:
+                    throw new CsvParseException($"Duplicate column header '{name}' found at index {fieldIndex}. " +
+                        "Use DuplicateHeaderBehavior option to handle duplicates.");
+
+                case DuplicateHeaderBehavior.Rename:
+                    _headerNameCounts[name] = count + 1;
+                    string newName = $"{name}_{count + 1}";
+                    // Ensure the new name is also unique
+                    while (_headerNameCounts.ContainsKey(newName))
+                    {
+                        count++;
+                        _headerNameCounts[name] = count + 1;
+                        newName = $"{name}_{count + 1}";
+                    }
+                    _headerNameCounts[newName] = 1;
+                    return newName;
+
+                case DuplicateHeaderBehavior.UseFirstOccurrence:
+                    // Skip this duplicate
+                    return null;
+
+                case DuplicateHeaderBehavior.UseLastOccurrence:
+                    // Rename earlier occurrences, keep this one
+                    _headerNameCounts[name] = count + 1;
+                    return name;
+
+                default:
+                    return name;
+            }
         }
 
         private bool ShouldIncludeColumn(string name)
@@ -226,9 +363,15 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
 
                 // Skip comment lines
-                if (line.Length > 0 && line[0] == _options.Comment)
+                if (line != null && line.Length > 0 && line[0] == _options.Comment)
                 {
                     continue;
+                }
+
+                // Normalize smart quotes if enabled
+                if (_options.NormalizeQuotes && line != null)
+                {
+                    line = NormalizeSmartQuotes(line);
                 }
 
                 try
@@ -242,33 +385,36 @@ namespace Dataplat.Dbatools.Csv.Reader
                         // First data row defines columns when no header
                         for (int i = 0; i < _fieldsBuffer.Count; i++)
                         {
-                            _columns.Add(new CsvColumn($"Column{i}", _columns.Count, typeof(string)));
+                            var col = new CsvColumn($"Column{i}", _columns.Count, typeof(string));
+                            col.SourceIndex = i;
+                            _columns.Add(col);
                         }
                         _convertedValues = new object[_columns.Count + _staticColumns.Count];
                     }
 
-                    // Validate field count matches expected columns (for error tracking)
-                    if (_columns.Count > 0 && _fieldsBuffer.Count != _columns.Count)
+                    // Handle field count mismatch
+                    int expectedCount = _columns.Count > 0 ? _columns.Max(c => c.SourceIndex) + 1 : _fieldsBuffer.Count;
+                    if (_fieldsBuffer.Count != expectedCount)
                     {
-                        throw new FormatException(
-                            $"Row has {_fieldsBuffer.Count} field(s) but expected {_columns.Count} based on header. " +
-                            $"Row content: '{line}'");
+                        HandleFieldCountMismatch(line, expectedCount);
                     }
 
-                    // Reuse buffer to reduce array allocations
+                    // Copy fields to record buffer
                     EnsureRecordBufferCapacity(_fieldsBuffer.Count);
                     for (int i = 0; i < _fieldsBuffer.Count; i++)
                     {
-                        _recordBuffer[i] = _fieldsBuffer[i];
+                        _recordBuffer[i] = _fieldsBuffer[i].Value;
+                        _quotedBuffer[i] = _fieldsBuffer[i].WasQuoted;
                     }
                     _currentRecord = _recordBuffer;
+                    _currentRecordWasQuoted = _quotedBuffer;
 
                     // Convert values to typed objects
                     ConvertCurrentRecord();
 
                     return true;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!(ex is CsvParseException parseEx && parseEx.IsMaxErrorsExceeded))
                 {
                     var error = new CsvParseError(
                         _currentRecordIndex + 1,
@@ -285,7 +431,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
                         if (_options.MaxParseErrors > 0 && _parseErrors.Count >= _options.MaxParseErrors)
                         {
-                            throw new CsvParseException($"Maximum parse errors ({_options.MaxParseErrors}) exceeded", error);
+                            throw new CsvParseException($"Maximum parse errors ({_options.MaxParseErrors}) exceeded", error) { IsMaxErrorsExceeded = true };
                         }
                     }
 
@@ -310,34 +456,114 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
         }
 
+        private void HandleFieldCountMismatch(string line, int expectedCount)
+        {
+            int actualCount = _fieldsBuffer.Count;
+
+            switch (_options.MismatchedFieldAction)
+            {
+                case MismatchedFieldAction.ThrowException:
+                    throw new FormatException(
+                        $"Row has {actualCount} field(s) but expected {expectedCount} based on header. " +
+                        $"Row content: '{line}'");
+
+                case MismatchedFieldAction.PadWithNulls:
+                    // Pad missing fields with empty values (will become null)
+                    while (_fieldsBuffer.Count < expectedCount)
+                    {
+                        _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                    }
+                    break;
+
+                case MismatchedFieldAction.TruncateExtra:
+                    // Remove extra fields
+                    while (_fieldsBuffer.Count > expectedCount)
+                    {
+                        _fieldsBuffer.RemoveAt(_fieldsBuffer.Count - 1);
+                    }
+                    break;
+
+                case MismatchedFieldAction.PadOrTruncate:
+                    // Both pad and truncate
+                    while (_fieldsBuffer.Count < expectedCount)
+                    {
+                        _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                    }
+                    while (_fieldsBuffer.Count > expectedCount)
+                    {
+                        _fieldsBuffer.RemoveAt(_fieldsBuffer.Count - 1);
+                    }
+                    break;
+            }
+        }
+
         private void ConvertCurrentRecord()
         {
-            int csvFieldCount = Math.Min(_currentRecord.Length, _columns.Count);
-
             for (int i = 0; i < _columns.Count; i++)
             {
                 var column = _columns[i];
-                string rawValue = i < _currentRecord.Length ? _currentRecord[i] : null;
+                int sourceIndex = column.SourceIndex;
+
+                string rawValue = sourceIndex < _currentRecord.Length ? _currentRecord[sourceIndex] : null;
+                bool wasQuoted = sourceIndex < _currentRecordWasQuoted.Length && _currentRecordWasQuoted[sourceIndex];
 
                 // Apply trimming
-                rawValue = ApplyTrimming(rawValue, false);
+                rawValue = ApplyTrimming(rawValue, wasQuoted);
 
-                // Check for null value
+                // Check for explicit null value
                 if (rawValue != null && _options.NullValue != null && rawValue == _options.NullValue)
                 {
                     rawValue = null;
+                    wasQuoted = false;  // Treat as unquoted null
                 }
 
-                // Handle null/empty values
+                // Handle null/empty values with distinction
                 if (string.IsNullOrEmpty(rawValue))
                 {
-                    if (column.UseDefaultForNull || _options.UseColumnDefaults)
+                    if (_options.DistinguishEmptyFromNull)
                     {
-                        _convertedValues[i] = column.DefaultValue;
+                        // If it was quoted (""), it's an explicit empty string
+                        // If it was unquoted (,,), it's null
+                        if (wasQuoted)
+                        {
+                            // Explicit empty string
+                            if (column.DataType == typeof(string))
+                            {
+                                _convertedValues[i] = string.Empty;
+                            }
+                            else if (column.UseDefaultForNull || _options.UseColumnDefaults)
+                            {
+                                _convertedValues[i] = column.DefaultValue;
+                            }
+                            else
+                            {
+                                _convertedValues[i] = DBNull.Value;
+                            }
+                        }
+                        else
+                        {
+                            // True null
+                            if (column.UseDefaultForNull || _options.UseColumnDefaults)
+                            {
+                                _convertedValues[i] = column.DefaultValue;
+                            }
+                            else
+                            {
+                                _convertedValues[i] = DBNull.Value;
+                            }
+                        }
                     }
                     else
                     {
-                        _convertedValues[i] = DBNull.Value;
+                        // Original behavior: treat both as DBNull
+                        if (column.UseDefaultForNull || _options.UseColumnDefaults)
+                        {
+                            _convertedValues[i] = column.DefaultValue;
+                        }
+                        else
+                        {
+                            _convertedValues[i] = DBNull.Value;
+                        }
                     }
                     continue;
                 }
@@ -365,15 +591,30 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             if (converter != null)
             {
-                if (converter.TryConvert(value, out object result))
+                // Pass culture to converter if it supports it
+                if (converter is ICultureAwareConverter cultureAware)
+                {
+                    if (cultureAware.TryConvert(value, _options.Culture, out object result))
+                    {
+                        return result;
+                    }
+                }
+                else if (converter.TryConvert(value, out object result))
                 {
                     return result;
                 }
                 throw new FormatException($"Cannot convert value '{value}' to type {column.DataType.Name} for column '{column.Name}'");
             }
 
-            // Fall back to Convert.ChangeType
-            return Convert.ChangeType(value, column.DataType);
+            // Fall back to Convert.ChangeType with culture
+            try
+            {
+                return Convert.ChangeType(value, column.DataType, _options.Culture);
+            }
+            catch (Exception ex)
+            {
+                throw new FormatException($"Cannot convert value '{value}' to type {column.DataType.Name} for column '{column.Name}'", ex);
+            }
         }
 
         private string ApplyTrimming(string value, bool isQuoted)
@@ -612,7 +853,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         #endregion
 
-        #region Line Parsing
+        #region Line Reading
 
         private bool ReadLine(out string line)
         {
@@ -622,7 +863,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 return false;
             }
 
-            _fieldBuilder.Clear();
+            _lineBuilder.Clear();
             bool inQuotes = false;
             int quotedFieldLength = 0;
 
@@ -636,9 +877,9 @@ namespace Dataplat.Dbatools.Csv.Reader
                     if (_bufferLength == 0)
                     {
                         _endOfStream = true;
-                        if (_fieldBuilder.Length > 0)
+                        if (_lineBuilder.Length > 0)
                         {
-                            line = _fieldBuilder.ToString();
+                            line = _lineBuilder.ToString();
                             return true;
                         }
                         line = null;
@@ -652,17 +893,15 @@ namespace Dataplat.Dbatools.Csv.Reader
                 {
                     if (inQuotes)
                     {
-                        // Ending quote
                         inQuotes = false;
                         quotedFieldLength = 0;
                     }
                     else
                     {
-                        // Starting quote
                         inQuotes = true;
                         quotedFieldLength = 0;
                     }
-                    _fieldBuilder.Append(c);
+                    _lineBuilder.Append(c);
                 }
                 else if (c == '\r')
                 {
@@ -683,12 +922,12 @@ namespace Dataplat.Dbatools.Csv.Reader
                                 _bufferPosition++;
                             }
                         }
-                        line = _fieldBuilder.ToString();
+                        line = _lineBuilder.ToString();
                         return true;
                     }
                     else
                     {
-                        _fieldBuilder.Append(c);
+                        _lineBuilder.Append(c);
                         quotedFieldLength++;
                         CheckQuotedFieldLength(quotedFieldLength);
                     }
@@ -697,19 +936,19 @@ namespace Dataplat.Dbatools.Csv.Reader
                 {
                     if (!inQuotes || !_options.AllowMultilineFields)
                     {
-                        line = _fieldBuilder.ToString();
+                        line = _lineBuilder.ToString();
                         return true;
                     }
                     else
                     {
-                        _fieldBuilder.Append(c);
+                        _lineBuilder.Append(c);
                         quotedFieldLength++;
                         CheckQuotedFieldLength(quotedFieldLength);
                     }
                 }
                 else
                 {
-                    _fieldBuilder.Append(c);
+                    _lineBuilder.Append(c);
                     if (inQuotes)
                     {
                         quotedFieldLength++;
@@ -719,6 +958,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void CheckQuotedFieldLength(int length)
         {
             if (_options.MaxQuotedFieldLength > 0 && length > _options.MaxQuotedFieldLength)
@@ -729,6 +969,10 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
         }
 
+        #endregion
+
+        #region Line Parsing (Span-Based)
+
         private void ParseLine(string line)
         {
             _fieldsBuffer.Clear();
@@ -736,67 +980,210 @@ namespace Dataplat.Dbatools.Csv.Reader
             if (string.IsNullOrEmpty(line))
                 return;
 
+            ReadOnlySpan<char> lineSpan = line.AsSpan();
             string delimiter = _options.Delimiter;
             char quote = _options.Quote;
             char escape = _options.Escape;
-            int delimLength = delimiter.Length;
+            bool lenient = _options.QuoteMode == QuoteMode.Lenient;
 
-            _parseFieldBuilder.Clear();
-            bool inQuotes = false;
-            int i = 0;
+            int position = 0;
+
+            while (position <= lineSpan.Length)
+            {
+                var (field, wasQuoted, newPosition) = ParseField(lineSpan, position, delimiter, quote, escape, lenient);
+                _fieldsBuffer.Add(new FieldInfo(field, wasQuoted));
+                position = newPosition;
+
+                if (position > lineSpan.Length)
+                    break;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private (string value, bool wasQuoted, int newPosition) ParseField(
+            ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape, bool lenient)
+        {
+            if (start >= line.Length)
+            {
+                // Empty field at end
+                return (string.Empty, false, start + delimiter.Length);
+            }
+
+            // Check for quoted field
+            if (line[start] == quote)
+            {
+                if (lenient)
+                {
+                    // In lenient mode, verify there's a properly closing quote
+                    if (!HasMatchingClosingQuote(line, start, quote, escape, delimiter, lenient))
+                    {
+                        // No matching close quote - treat as unquoted field
+                        return ParseUnquotedField(line, start, delimiter);
+                    }
+                }
+                return ParseQuotedField(line, start, delimiter, quote, escape, lenient);
+            }
+
+            return ParseUnquotedField(line, start, delimiter);
+        }
+
+        private bool HasMatchingClosingQuote(ReadOnlySpan<char> line, int start, char quote, char escape, string delimiter, bool lenient)
+        {
+            // Start after opening quote
+            int i = start + 1;
+
+            while (i < line.Length)
+            {
+                // Check for RFC 4180 escaped quote (doubled quote)
+                if (line[i] == escape && i + 1 < line.Length && line[i + 1] == quote)
+                {
+                    // Escaped quote, skip both
+                    i += 2;
+                }
+                // In lenient mode, also check for backslash escaped quote
+                else if (lenient && line[i] == '\\' && i + 1 < line.Length && line[i + 1] == quote)
+                {
+                    // Backslash-escaped quote, skip both
+                    i += 2;
+                }
+                else if (line[i] == quote)
+                {
+                    // Found a quote - check if it's a valid closing quote
+                    // (must be at end of line or followed by delimiter or whitespace before delimiter)
+                    int afterQuote = i + 1;
+                    if (afterQuote >= line.Length)
+                    {
+                        // Quote at end of line - valid closing
+                        return true;
+                    }
+
+                    // Check for delimiter immediately after quote
+                    if (MatchesDelimiter(line, afterQuote, delimiter))
+                    {
+                        return true;
+                    }
+
+                    // Check for whitespace then delimiter or end
+                    int checkPos = afterQuote;
+                    while (checkPos < line.Length && char.IsWhiteSpace(line[checkPos]))
+                        checkPos++;
+                    if (checkPos >= line.Length || MatchesDelimiter(line, checkPos, delimiter))
+                    {
+                        return true;
+                    }
+
+                    // Quote is not at a valid position - keep looking
+                    i++;
+                }
+                else
+                {
+                    i++;
+                }
+            }
+
+            return false;
+        }
+
+        private (string value, bool wasQuoted, int newPosition) ParseQuotedField(
+            ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape, bool lenient)
+        {
+            var sb = new StringBuilder(64);
+            int i = start + 1; // Skip opening quote
+            bool wasQuoted = true;
 
             while (i < line.Length)
             {
                 char c = line[i];
 
-                if (inQuotes)
+                // Check for escaped quote (RFC 4180: "" or custom escape like \")
+                if (c == escape && i + 1 < line.Length && line[i + 1] == quote)
                 {
-                    if (c == escape && i + 1 < line.Length && line[i + 1] == quote)
+                    sb.Append(quote);
+                    i += 2;
+                }
+                // In lenient mode, also handle backslash escape
+                else if (lenient && c == '\\' && i + 1 < line.Length && line[i + 1] == quote)
+                {
+                    sb.Append(quote);
+                    i += 2;
+                }
+                else if (c == quote)
+                {
+                    // End of quoted field
+                    i++;
+
+                    // Skip to delimiter or end
+                    if (i < line.Length)
                     {
-                        // Escaped quote
-                        _parseFieldBuilder.Append(quote);
-                        i += 2;
-                    }
-                    else if (c == quote)
-                    {
-                        // End of quoted field
-                        inQuotes = false;
-                        i++;
+                        if (MatchesDelimiter(line, i, delimiter))
+                        {
+                            i += delimiter.Length;
+                        }
+                        else if (lenient)
+                        {
+                            // In lenient mode, there might be trailing spaces before delimiter
+                            while (i < line.Length && char.IsWhiteSpace(line[i]))
+                                i++;
+                            if (MatchesDelimiter(line, i, delimiter))
+                                i += delimiter.Length;
+                        }
                     }
                     else
                     {
-                        _parseFieldBuilder.Append(c);
-                        i++;
+                        // At end of line with no trailing delimiter - add delimiter length to signal end
+                        i += delimiter.Length;
                     }
+
+                    return (sb.ToString(), wasQuoted, i);
                 }
                 else
                 {
-                    if (c == quote)
-                    {
-                        // Start of quoted field
-                        inQuotes = true;
-                        i++;
-                    }
-                    else if (MatchesDelimiter(line, i, delimiter))
-                    {
-                        // End of field
-                        _fieldsBuffer.Add(_parseFieldBuilder.ToString());
-                        _parseFieldBuilder.Clear();
-                        i += delimLength;
-                    }
-                    else
-                    {
-                        _parseFieldBuilder.Append(c);
-                        i++;
-                    }
+                    sb.Append(c);
+                    i++;
                 }
             }
 
-            // Add last field
-            _fieldsBuffer.Add(_parseFieldBuilder.ToString());
+            // Unclosed quote - return position past end to signal no more fields
+            return (sb.ToString(), wasQuoted, line.Length + delimiter.Length);
         }
 
-        private bool MatchesDelimiter(string line, int position, string delimiter)
+        private (string value, bool wasQuoted, int newPosition) ParseUnquotedField(
+            ReadOnlySpan<char> line, int start, string delimiter)
+        {
+            int delimiterLength = delimiter.Length;
+
+            // Use Span for fast delimiter search when delimiter is single character
+            if (delimiterLength == 1)
+            {
+                char delimChar = delimiter[0];
+                int delimIndex = line.Slice(start).IndexOf(delimChar);
+
+                if (delimIndex < 0)
+                {
+                    // No more delimiters - rest of line is the field
+                    return (line.Slice(start).ToString(), false, line.Length + delimiterLength);
+                }
+
+                string value = line.Slice(start, delimIndex).ToString();
+                return (value, false, start + delimIndex + delimiterLength);
+            }
+
+            // Multi-character delimiter - scan character by character
+            for (int i = start; i < line.Length; i++)
+            {
+                if (MatchesDelimiter(line, i, delimiter))
+                {
+                    string value = line.Slice(start, i - start).ToString();
+                    return (value, false, i + delimiterLength);
+                }
+            }
+
+            // No delimiter found - rest of line is the field
+            return (line.Slice(start).ToString(), false, line.Length + delimiterLength);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool MatchesDelimiter(ReadOnlySpan<char> line, int position, string delimiter)
         {
             if (position + delimiter.Length > line.Length)
                 return false;
@@ -807,6 +1194,55 @@ namespace Dataplat.Dbatools.Csv.Reader
                     return false;
             }
             return true;
+        }
+
+        #endregion
+
+        #region Smart Quote Normalization
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static string NormalizeSmartQuotes(string input)
+        {
+            if (input == null)
+                return null;
+
+            // Fast path: check if any smart quotes exist
+            bool hasSmartQuotes = false;
+            for (int i = 0; i < input.Length; i++)
+            {
+                char c = input[i];
+                if (c == LeftSingleQuote || c == RightSingleQuote ||
+                    c == LeftDoubleQuote || c == RightDoubleQuote)
+                {
+                    hasSmartQuotes = true;
+                    break;
+                }
+            }
+
+            if (!hasSmartQuotes)
+                return input;
+
+            // Slow path: replace smart quotes
+            var sb = new StringBuilder(input.Length);
+            for (int i = 0; i < input.Length; i++)
+            {
+                char c = input[i];
+                switch (c)
+                {
+                    case LeftSingleQuote:
+                    case RightSingleQuote:
+                        sb.Append('\'');
+                        break;
+                    case LeftDoubleQuote:
+                    case RightDoubleQuote:
+                        sb.Append('"');
+                        break;
+                    default:
+                        sb.Append(c);
+                        break;
+                }
+            }
+            return sb.ToString();
         }
 
         #endregion
@@ -950,6 +1386,13 @@ namespace Dataplat.Dbatools.Csv.Reader
                 {
                     _reader.Dispose();
                 }
+
+                // Return pooled buffer
+                if (_bufferFromPool && _buffer != null)
+                {
+                    ArrayPool<char>.Shared.Return(_buffer);
+                    _buffer = null;
+                }
             }
         }
 
@@ -978,13 +1421,13 @@ namespace Dataplat.Dbatools.Csv.Reader
         {
             if (_recordBuffer == null || _recordBuffer.Length < requiredCapacity)
             {
-                // Allocate with some extra space to avoid frequent reallocations
                 int newCapacity = Math.Max(requiredCapacity, 64);
                 if (_recordBuffer != null)
                 {
                     newCapacity = Math.Max(newCapacity, _recordBuffer.Length * 2);
                 }
                 _recordBuffer = new string[newCapacity];
+                _quotedBuffer = new bool[newCapacity];
             }
         }
 

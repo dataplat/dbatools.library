@@ -13,6 +13,11 @@ namespace Dataplat.Dbatools.Csv
         public CsvParseError ParseError { get; }
 
         /// <summary>
+        /// Gets or sets whether this exception was thrown because the maximum error count was exceeded.
+        /// </summary>
+        public bool IsMaxErrorsExceeded { get; set; }
+
+        /// <summary>
         /// Initializes a new instance of the CsvParseException class.
         /// </summary>
         public CsvParseException() : base("CSV parsing error")

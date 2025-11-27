@@ -510,6 +510,289 @@ namespace Dataplat.Dbatools.Csv.Tests
 
         #endregion
 
+        #region Null vs Empty Tests
+
+        [TestMethod]
+        public void TestDistinguishEmptyFromNull_WhenEnabled()
+        {
+            // Addresses LumenWorks issue #68
+            // Unquoted empty = null, quoted empty = empty string
+            string csv = "A,B,C\n1,,3\n4,\"\",6";
+            var options = new CsvReaderOptions { DistinguishEmptyFromNull = true };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                // Row 1: 1,,3 - middle field is unquoted empty -> should be DBNull
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("1", reader.GetString(0));
+                Assert.IsTrue(reader.IsDBNull(1), "Unquoted empty should be DBNull");
+                Assert.AreEqual("3", reader.GetString(2));
+
+                // Row 2: 4,"",6 - middle field is quoted empty -> should be empty string
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("4", reader.GetString(0));
+                Assert.IsFalse(reader.IsDBNull(1), "Quoted empty should NOT be DBNull");
+                Assert.AreEqual("", reader.GetValue(1));
+                Assert.AreEqual("6", reader.GetString(2));
+            }
+        }
+
+        [TestMethod]
+        public void TestDistinguishEmptyFromNull_WhenDisabled()
+        {
+            // Default behavior - both become DBNull
+            string csv = "A,B,C\n1,,3\n4,\"\",6";
+            var options = new CsvReaderOptions { DistinguishEmptyFromNull = false };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.IsTrue(reader.Read());
+                Assert.IsTrue(reader.IsDBNull(1), "Unquoted empty should be DBNull");
+
+                Assert.IsTrue(reader.Read());
+                Assert.IsTrue(reader.IsDBNull(1), "Quoted empty should also be DBNull when DistinguishEmptyFromNull is false");
+            }
+        }
+
+        #endregion
+
+        #region Duplicate Header Tests
+
+        [TestMethod]
+        public void TestDuplicateHeaders_ThrowException()
+        {
+            // Default behavior should throw
+            string csv = "Name,Age,Name\nJohn,30,Smith";
+            var options = new CsvReaderOptions { DuplicateHeaderBehavior = DuplicateHeaderBehavior.ThrowException };
+
+            Assert.ThrowsException<CsvParseException>(() =>
+            {
+                using (var reader = CreateReaderFromString(csv, options))
+                {
+                    // Accessing FieldCount triggers header reading
+                    var _ = reader.FieldCount;
+                }
+            });
+        }
+
+        [TestMethod]
+        public void TestDuplicateHeaders_Rename()
+        {
+            // Addresses LumenWorks issue #39
+            string csv = "Name,Age,Name,Name\nJohn,30,Smith,Jr";
+            var options = new CsvReaderOptions { DuplicateHeaderBehavior = DuplicateHeaderBehavior.Rename };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.AreEqual(4, reader.FieldCount);
+                Assert.AreEqual("Name", reader.GetName(0));
+                Assert.AreEqual("Age", reader.GetName(1));
+                Assert.AreEqual("Name_2", reader.GetName(2));
+                Assert.AreEqual("Name_3", reader.GetName(3));
+
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("John", reader.GetString(0));
+                Assert.AreEqual("Smith", reader.GetString(2));
+                Assert.AreEqual("Jr", reader.GetString(3));
+            }
+        }
+
+        [TestMethod]
+        public void TestDuplicateHeaders_UseFirstOccurrence()
+        {
+            string csv = "Name,Age,Name\nJohn,30,Smith";
+            var options = new CsvReaderOptions
+            {
+                DuplicateHeaderBehavior = DuplicateHeaderBehavior.UseFirstOccurrence,
+                MismatchedFieldAction = MismatchedFieldAction.TruncateExtra
+            };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.AreEqual(2, reader.FieldCount);
+                Assert.AreEqual("Name", reader.GetName(0));
+                Assert.AreEqual("Age", reader.GetName(1));
+
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("John", reader.GetString(0));
+                Assert.AreEqual("30", reader.GetString(1));
+            }
+        }
+
+        #endregion
+
+        #region Culture Support Tests
+
+        [TestMethod]
+        public void TestCultureInfo_GermanDecimals()
+        {
+            // Addresses LumenWorks issue #66
+            // German uses comma as decimal separator, semicolon as delimiter
+            string csv = "Name;Price\nApple;1,50\nBanana;2,75";
+            var germanCulture = new System.Globalization.CultureInfo("de-DE");
+            var options = new CsvReaderOptions
+            {
+                Delimiter = ";",
+                Culture = germanCulture,
+                ColumnTypes = new System.Collections.Generic.Dictionary<string, Type>
+                {
+                    { "Price", typeof(decimal) }
+                }
+            };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual(1.50m, reader.GetDecimal(1));
+
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual(2.75m, reader.GetDecimal(1));
+            }
+        }
+
+        #endregion
+
+        #region Lenient Quote Mode Tests
+
+        [TestMethod]
+        public void TestLenientQuoteMode_UnmatchedQuote()
+        {
+            // Addresses LumenWorks issues #47 and #56
+            // Quote at start but not enclosing the field
+            string csv = "ID;Name\n6224613;\"SINUS POLSKA\", MIEDZYRZECZ";
+            var options = new CsvReaderOptions
+            {
+                Delimiter = ";",
+                QuoteMode = QuoteMode.Lenient
+            };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("6224613", reader.GetString(0));
+                // In lenient mode, unmatched quote is treated as literal
+                Assert.AreEqual("\"SINUS POLSKA\", MIEDZYRZECZ", reader.GetString(1));
+            }
+        }
+
+        [TestMethod]
+        public void TestLenientQuoteMode_BackslashEscape()
+        {
+            // Lenient mode handles backslash escapes
+            string csv = "Name,Quote\nJohn,\"He said \\\"Hello\\\"\"";
+            var options = new CsvReaderOptions { QuoteMode = QuoteMode.Lenient };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("He said \"Hello\"", reader.GetString(1));
+            }
+        }
+
+        #endregion
+
+        #region Field Count Mismatch Tests
+
+        [TestMethod]
+        public void TestMismatchedFields_ThrowException()
+        {
+            string csv = "A,B,C\n1,2\n4,5,6";
+            var options = new CsvReaderOptions { MismatchedFieldAction = MismatchedFieldAction.ThrowException };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.ThrowsException<CsvParseException>(() => reader.Read());
+            }
+        }
+
+        [TestMethod]
+        public void TestMismatchedFields_PadWithNulls()
+        {
+            string csv = "A,B,C\n1,2\n4,5,6";
+            var options = new CsvReaderOptions { MismatchedFieldAction = MismatchedFieldAction.PadWithNulls };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                // First row has 2 fields but expects 3 - should pad with null
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("1", reader.GetString(0));
+                Assert.AreEqual("2", reader.GetString(1));
+                Assert.IsTrue(reader.IsDBNull(2), "Missing field should be padded with null");
+
+                // Second row is complete
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("4", reader.GetString(0));
+                Assert.AreEqual("5", reader.GetString(1));
+                Assert.AreEqual("6", reader.GetString(2));
+            }
+        }
+
+        [TestMethod]
+        public void TestMismatchedFields_TruncateExtra()
+        {
+            string csv = "A,B\n1,2,3,4\n5,6";
+            var options = new CsvReaderOptions { MismatchedFieldAction = MismatchedFieldAction.TruncateExtra };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.AreEqual(2, reader.FieldCount);
+
+                // First row has 4 fields but only 2 columns - should truncate
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("1", reader.GetString(0));
+                Assert.AreEqual("2", reader.GetString(1));
+
+                // Second row is normal
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("5", reader.GetString(0));
+                Assert.AreEqual("6", reader.GetString(1));
+            }
+        }
+
+        [TestMethod]
+        public void TestMismatchedFields_PadOrTruncate()
+        {
+            string csv = "A,B,C\n1,2\n4,5,6,7,8";
+            var options = new CsvReaderOptions { MismatchedFieldAction = MismatchedFieldAction.PadOrTruncate };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                // First row: too few fields - pad
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("1", reader.GetString(0));
+                Assert.AreEqual("2", reader.GetString(1));
+                Assert.IsTrue(reader.IsDBNull(2));
+
+                // Second row: too many fields - truncate
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("4", reader.GetString(0));
+                Assert.AreEqual("5", reader.GetString(1));
+                Assert.AreEqual("6", reader.GetString(2));
+            }
+        }
+
+        #endregion
+
+        #region Smart Quote Normalization Tests
+
+        [TestMethod]
+        public void TestNormalizeSmartQuotes()
+        {
+            // Addresses LumenWorks issue #25
+            // Smart/curly quotes from Word/Excel should be normalized to straight quotes
+            string csv = "Name,Description\nJohn,\u201CHello World\u201D";  // "Hello World" with curly quotes
+            var options = new CsvReaderOptions { NormalizeQuotes = true };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.IsTrue(reader.Read());
+                // The curly quotes should be normalized to straight quotes and treated as field delimiters
+                Assert.AreEqual("Hello World", reader.GetString(1));
+            }
+        }
+
+        #endregion
+
         #region Helper Methods
 
         private CsvDataReader CreateReaderFromString(string csv, CsvReaderOptions options = null)
