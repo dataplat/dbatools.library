@@ -245,12 +245,25 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// Strict follows RFC 4180, Lenient handles common malformed data.
         /// Default is Strict.
         /// Addresses LumenWorks issues #47 and #56.
+        /// <para>
+        /// <b>Security Note:</b> Use <see cref="Reader.QuoteMode.Lenient"/> only for known
+        /// malformed data sources. Lenient mode may parse data differently than expected
+        /// and has additional performance overhead. See <see cref="Reader.QuoteMode"/> for details.
+        /// </para>
         /// </summary>
         public QuoteMode QuoteMode { get; set; } = QuoteMode.Strict;
 
         /// <summary>
         /// Gets or sets how to handle rows with mismatched field counts.
         /// Default is ThrowException.
+        /// <para>
+        /// <b>Data Integrity Note:</b> Non-default values may mask data corruption or cause silent data loss:
+        /// <list type="bullet">
+        /// <item><see cref="Reader.MismatchedFieldAction.PadWithNulls"/> - Missing fields become null, potentially hiding truncated rows.</item>
+        /// <item><see cref="Reader.MismatchedFieldAction.TruncateExtra"/> - Extra fields are silently discarded.</item>
+        /// </list>
+        /// Use with caution and validate results when processing untrusted data.
+        /// </para>
         /// </summary>
         public MismatchedFieldAction MismatchedFieldAction { get; set; } = MismatchedFieldAction.ThrowException;
 

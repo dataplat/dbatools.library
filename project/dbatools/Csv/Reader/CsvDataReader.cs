@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Dataplat.Dbatools.Csv.Compression;
@@ -51,6 +50,12 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         // Header name tracking for duplicate detection
         private readonly Dictionary<string, int> _headerNameCounts;
+
+        // Cached max source index to avoid LINQ per-row
+        private int _maxSourceIndex = -1;
+
+        // Reusable StringBuilder for quoted field parsing to reduce allocations
+        private StringBuilder _quotedFieldBuilder;
 
         // Smart quote characters for normalization
         private const char LeftSingleQuote = '\u2018';  // '
@@ -159,6 +164,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             _bufferFromPool = true;
             _lineBuilder = new StringBuilder(512);
             _fieldsBuffer = new List<FieldInfo>(64);
+            _quotedFieldBuilder = new StringBuilder(256);
         }
 
         #endregion
@@ -254,6 +260,10 @@ namespace Dataplat.Dbatools.Csv.Reader
                 var column = new CsvColumn(finalName, _columns.Count, GetColumnType(name));
                 column.SourceIndex = i;  // Track original index for field mapping
                 _columns.Add(column);
+
+                // Update cached max source index
+                if (i > _maxSourceIndex)
+                    _maxSourceIndex = i;
             }
         }
 
@@ -389,11 +399,14 @@ namespace Dataplat.Dbatools.Csv.Reader
                             col.SourceIndex = i;
                             _columns.Add(col);
                         }
+                        // Cache max source index for no-header case
+                        _maxSourceIndex = _fieldsBuffer.Count - 1;
                         _convertedValues = new object[_columns.Count + _staticColumns.Count];
                     }
 
                     // Handle field count mismatch
-                    int expectedCount = _columns.Count > 0 ? _columns.Max(c => c.SourceIndex) + 1 : _fieldsBuffer.Count;
+                    // Use cached max source index to avoid LINQ overhead per row
+                    int expectedCount = _maxSourceIndex >= 0 ? _maxSourceIndex + 1 : _fieldsBuffer.Count;
                     if (_fieldsBuffer.Count != expectedCount)
                     {
                         HandleFieldCountMismatch(line, expectedCount);
@@ -1087,7 +1100,8 @@ namespace Dataplat.Dbatools.Csv.Reader
         private (string value, bool wasQuoted, int newPosition) ParseQuotedField(
             ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape, bool lenient)
         {
-            var sb = new StringBuilder(64);
+            // Reuse pooled StringBuilder to reduce allocations
+            _quotedFieldBuilder.Clear();
             int i = start + 1; // Skip opening quote
             bool wasQuoted = true;
 
@@ -1098,13 +1112,13 @@ namespace Dataplat.Dbatools.Csv.Reader
                 // Check for escaped quote (RFC 4180: "" or custom escape like \")
                 if (c == escape && i + 1 < line.Length && line[i + 1] == quote)
                 {
-                    sb.Append(quote);
+                    _quotedFieldBuilder.Append(quote);
                     i += 2;
                 }
                 // In lenient mode, also handle backslash escape
                 else if (lenient && c == '\\' && i + 1 < line.Length && line[i + 1] == quote)
                 {
-                    sb.Append(quote);
+                    _quotedFieldBuilder.Append(quote);
                     i += 2;
                 }
                 else if (c == quote)
@@ -1134,17 +1148,17 @@ namespace Dataplat.Dbatools.Csv.Reader
                         i += delimiter.Length;
                     }
 
-                    return (sb.ToString(), wasQuoted, i);
+                    return (_quotedFieldBuilder.ToString(), wasQuoted, i);
                 }
                 else
                 {
-                    sb.Append(c);
+                    _quotedFieldBuilder.Append(c);
                     i++;
                 }
             }
 
             // Unclosed quote - return position past end to signal no more fields
-            return (sb.ToString(), wasQuoted, line.Length + delimiter.Length);
+            return (_quotedFieldBuilder.ToString(), wasQuoted, line.Length + delimiter.Length);
         }
 
         private (string value, bool wasQuoted, int newPosition) ParseUnquotedField(
