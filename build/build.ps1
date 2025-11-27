@@ -158,9 +158,7 @@ $tempdir = Join-Path ([System.IO.Path]::GetTempPath()) "dbatools-build"
 # Create all required directories
 $null = New-Item -ItemType Directory $tempdir -Force -ErrorAction Ignore
 $null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/bogus") -Force
-$null = New-Item -ItemType Directory (Join-Path $libPath "desktop/third-party/LumenWorks") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/bogus") -Force
-$null = New-Item -ItemType Directory (Join-Path $libPath "core/third-party/LumenWorks") -Force
 $null = New-Item -ItemType Directory (Join-Path $libPath "core/lib/runtimes") -Force
 $null = New-Item -ItemType Directory (Join-Path $tempPath "bogus") -Force
 $null = New-Item -ItemType Directory (Join-Path $tempdir "nuget") -Force
@@ -169,12 +167,10 @@ Register-PackageSource -provider NuGet -name nugetRepository -Location https://w
 
 # Download all required packages
 Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile (Join-Path $tempPath "bogus.zip")
-Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/LumenWorksCsvReader -OutFile (Join-Path $tempPath "LumenWorksCsvReader.zip")
 
 $ProgressPreference = "Continue"
 
 # Extract all packages
-7z x (Join-Path $tempPath "LumenWorksCsvReader.zip") "-o$(Join-Path $tempPath "LumenWorksCsvReader")" -y
 7z x (Join-Path $tempPath "bogus.zip") "-o$(Join-Path $tempPath "bogus")" -y
 
 
@@ -210,11 +206,6 @@ if (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll")) {
 if (-not $bogusCoreCopied) {
     Write-Warning "Bogus.dll for .NET Core not found in expected locations"
 }
-
-# Copy LumenWorks files for both frameworks
-Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "desktop/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
-Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "core/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
-
 
 # Core files are already in place from dotnet publish
 
