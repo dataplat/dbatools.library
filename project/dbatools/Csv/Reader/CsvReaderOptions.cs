@@ -16,6 +16,9 @@ namespace Dataplat.Dbatools.Csv.Reader
         private int _bufferSize = 65536;
         private int _maxQuotedFieldLength;
         private int _maxParseErrors = 1000;
+        private int _maxDegreeOfParallelism;
+        private int _parallelBatchSize = 100;
+        private int _parallelQueueDepth = 10;
 
         /// <summary>
         /// Gets or sets whether the first row contains column headers.
@@ -290,6 +293,77 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// </summary>
         public HashSet<string> CustomInternStrings { get; set; }
 
+        #region Parallel Processing Options
+
+        /// <summary>
+        /// Gets or sets whether to enable parallel processing for improved performance on large files.
+        /// When enabled, line reading, parsing, and type conversion are performed in parallel using
+        /// a producer-consumer pipeline. This can provide 2-4x performance improvement on multi-core systems.
+        /// Default is false (sequential processing).
+        /// <para>
+        /// <b>Note:</b> Parallel processing is most beneficial for large files (>100K rows) with
+        /// complex type conversions. For small files, sequential processing may be faster due to
+        /// lower overhead.
+        /// </para>
+        /// </summary>
+        public bool EnableParallelProcessing { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum number of worker threads for parallel processing.
+        /// Default is 0, which uses Environment.ProcessorCount.
+        /// Set to 1 to effectively disable parallelism while still using the pipeline architecture.
+        /// Only used when EnableParallelProcessing is true.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when value is negative.</exception>
+        public int MaxDegreeOfParallelism
+        {
+            get => _maxDegreeOfParallelism;
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "MaxDegreeOfParallelism cannot be negative.");
+                _maxDegreeOfParallelism = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the number of records to batch before yielding to the consumer.
+        /// Larger batches reduce synchronization overhead but increase memory usage and latency.
+        /// Default is 100. Minimum is 1.
+        /// Only used when EnableParallelProcessing is true.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        public int ParallelBatchSize
+        {
+            get => _parallelBatchSize;
+            set
+            {
+                if (value < 1)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "ParallelBatchSize must be at least 1.");
+                _parallelBatchSize = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the maximum number of batches to queue before applying backpressure.
+        /// This limits memory usage when production outpaces consumption.
+        /// Default is 10. Minimum is 1.
+        /// Only used when EnableParallelProcessing is true.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        public int ParallelQueueDepth
+        {
+            get => _parallelQueueDepth;
+            set
+            {
+                if (value < 1)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "ParallelQueueDepth must be at least 1.");
+                _parallelQueueDepth = value;
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Creates a default options instance.
         /// </summary>
@@ -350,7 +424,11 @@ namespace Dataplat.Dbatools.Csv.Reader
                 MismatchedFieldAction = MismatchedFieldAction,
                 NormalizeQuotes = NormalizeQuotes,
                 InternStrings = InternStrings,
-                CustomInternStrings = CustomInternStrings != null ? new HashSet<string>(CustomInternStrings) : null
+                CustomInternStrings = CustomInternStrings != null ? new HashSet<string>(CustomInternStrings) : null,
+                EnableParallelProcessing = EnableParallelProcessing,
+                MaxDegreeOfParallelism = MaxDegreeOfParallelism,
+                ParallelBatchSize = ParallelBatchSize,
+                ParallelQueueDepth = ParallelQueueDepth
             };
         }
     }

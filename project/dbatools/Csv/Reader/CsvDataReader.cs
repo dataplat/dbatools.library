@@ -1,11 +1,14 @@
 using System;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Dataplat.Dbatools.Csv.Compression;
 using Dataplat.Dbatools.Csv.TypeConverters;
 
@@ -88,6 +91,77 @@ namespace Dataplat.Dbatools.Csv.Reader
                 WasQuoted = wasQuoted;
             }
         }
+
+        #endregion
+
+        #region Parallel Processing Structures
+
+        /// <summary>
+        /// Represents a line read from the input with its metadata.
+        /// </summary>
+        private struct LineData
+        {
+            public string Line;
+            public long LineNumber;
+            public long RecordIndex;
+
+            public LineData(string line, long lineNumber, long recordIndex)
+            {
+                Line = line;
+                LineNumber = lineNumber;
+                RecordIndex = recordIndex;
+            }
+        }
+
+        /// <summary>
+        /// Represents a fully parsed and converted record ready for consumption.
+        /// </summary>
+        private sealed class ParsedRecord
+        {
+            public object[] Values;
+            public long RecordIndex;
+            public long LineNumber;
+            public CsvParseError Error;
+
+            public ParsedRecord(object[] values, long recordIndex, long lineNumber)
+            {
+                Values = values;
+                RecordIndex = recordIndex;
+                LineNumber = lineNumber;
+                Error = null;
+            }
+
+            public ParsedRecord(CsvParseError error, long recordIndex, long lineNumber)
+            {
+                Values = null;
+                RecordIndex = recordIndex;
+                LineNumber = lineNumber;
+                Error = error;
+            }
+        }
+
+        #endregion
+
+        #region Parallel Processing Fields
+
+        // Parallel processing state
+        private bool _useParallelProcessing;
+        private BlockingCollection<LineData> _lineQueue;
+        private BlockingCollection<ParsedRecord> _resultQueue;
+        private Thread _producerThread;
+        private Thread[] _workerThreads;
+        private CancellationTokenSource _cancellationSource;
+        private volatile Exception _pipelineException;
+        private int _activeWorkers;
+
+        // Thread-safe error collection for parallel mode
+        private ConcurrentQueue<CsvParseError> _parallelParseErrors;
+
+        // Result queue for ordered delivery
+        private readonly object _resultLock = new object();
+        private long _nextExpectedRecordIndex;
+        private readonly SortedDictionary<long, ParsedRecord> _pendingResults = new SortedDictionary<long, ParsedRecord>();
+        private ParsedRecord _currentParsedRecord;
 
         #endregion
 
@@ -294,6 +368,12 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             // Prepare converted values array
             _convertedValues = new object[_columns.Count + _staticColumns.Count];
+
+            // Start parallel processing pipeline if enabled
+            if (_options.EnableParallelProcessing)
+            {
+                StartParallelPipeline();
+            }
         }
 
         private void CacheColumnConverters()
@@ -499,6 +579,709 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         #endregion
 
+        #region Parallel Processing Pipeline
+
+        private void StartParallelPipeline()
+        {
+            _useParallelProcessing = true;
+            _cancellationSource = new CancellationTokenSource();
+
+            int workerCount = _options.MaxDegreeOfParallelism > 0
+                ? _options.MaxDegreeOfParallelism
+                : Environment.ProcessorCount;
+
+            int queueCapacity = _options.ParallelQueueDepth * _options.ParallelBatchSize;
+
+            // Create bounded blocking collections for backpressure
+            _lineQueue = new BlockingCollection<LineData>(new ConcurrentQueue<LineData>(), queueCapacity);
+            _resultQueue = new BlockingCollection<ParsedRecord>(new ConcurrentQueue<ParsedRecord>(), queueCapacity);
+
+            // Initialize thread-safe error collection
+            if (_options.CollectParseErrors)
+            {
+                _parallelParseErrors = new ConcurrentQueue<CsvParseError>();
+            }
+
+            _nextExpectedRecordIndex = 0;
+            _activeWorkers = workerCount;
+
+            // Start producer thread (line reader)
+            _producerThread = new Thread(ProducerLoop)
+            {
+                Name = "CsvReader-Producer",
+                IsBackground = true
+            };
+            _producerThread.Start();
+
+            // Start worker threads (parsers)
+            _workerThreads = new Thread[workerCount];
+            for (int i = 0; i < workerCount; i++)
+            {
+                _workerThreads[i] = new Thread(WorkerLoop)
+                {
+                    Name = $"CsvReader-Worker-{i}",
+                    IsBackground = true
+                };
+                _workerThreads[i].Start();
+            }
+        }
+
+        private void ProducerLoop()
+        {
+            try
+            {
+                long recordIndex = 0;
+                var ct = _cancellationSource.Token;
+
+                while (!ct.IsCancellationRequested)
+                {
+                    string line;
+
+                    // Check for buffered first line (no-header mode)
+                    if (_hasBufferedFirstLine)
+                    {
+                        line = _bufferedFirstLine;
+                        _hasBufferedFirstLine = false;
+                        _bufferedFirstLine = null;
+                        // Line number was already incremented during initialization
+                    }
+                    else
+                    {
+                        if (!ReadLine(out line))
+                        {
+                            break;
+                        }
+
+                        Interlocked.Increment(ref _currentLineNumber);
+
+                        // Skip empty lines if configured
+                        if (string.IsNullOrEmpty(line) && _options.SkipEmptyLines)
+                        {
+                            continue;
+                        }
+
+                        // Skip comment lines
+                        if (line != null && line.Length > 0 && line[0] == _options.Comment)
+                        {
+                            continue;
+                        }
+                    }
+
+                    // Normalize smart quotes if enabled (must be done in producer for consistency)
+                    if (_options.NormalizeQuotes && line != null)
+                    {
+                        line = NormalizeSmartQuotes(line);
+                    }
+
+                    var lineData = new LineData(line, Interlocked.Read(ref _currentLineNumber), recordIndex++);
+
+                    // Add to queue with cancellation support
+                    try
+                    {
+                        _lineQueue.Add(lineData, ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _pipelineException = ex;
+            }
+            finally
+            {
+                _lineQueue.CompleteAdding();
+            }
+        }
+
+        private void WorkerLoop()
+        {
+            // Thread-local parsing state
+            var fieldsBuffer = new List<FieldInfo>(64);
+            var quotedFieldBuilder = new StringBuilder(256);
+            var ct = _cancellationSource.Token;
+
+            try
+            {
+                foreach (var lineData in _lineQueue.GetConsumingEnumerable(ct))
+                {
+                    if (ct.IsCancellationRequested)
+                        break;
+
+                    ParsedRecord result;
+                    try
+                    {
+                        // Parse line
+                        ParseLineThreadSafe(lineData.Line, fieldsBuffer, quotedFieldBuilder);
+
+                        // Handle field count mismatch
+                        int expectedCount = _maxSourceIndex >= 0 ? _maxSourceIndex + 1 : fieldsBuffer.Count;
+                        if (fieldsBuffer.Count != expectedCount)
+                        {
+                            HandleFieldCountMismatchThreadSafe(fieldsBuffer, lineData.Line, expectedCount);
+                        }
+
+                        // Convert to typed values
+                        object[] values = ConvertRecordThreadSafe(fieldsBuffer, lineData.RecordIndex);
+
+                        result = new ParsedRecord(values, lineData.RecordIndex, lineData.LineNumber);
+                    }
+                    catch (Exception ex)
+                    {
+                        var error = new CsvParseError(
+                            lineData.RecordIndex + 1,
+                            -1,
+                            lineData.Line,
+                            ex.Message,
+                            ex,
+                            lineData.LineNumber,
+                            0);
+
+                        if (_parallelParseErrors != null)
+                        {
+                            _parallelParseErrors.Enqueue(error);
+
+                            if (_options.MaxParseErrors > 0 && _parallelParseErrors.Count >= _options.MaxParseErrors)
+                            {
+                                _pipelineException = new CsvParseException($"Maximum parse errors ({_options.MaxParseErrors}) exceeded", error) { IsMaxErrorsExceeded = true };
+                                _cancellationSource.Cancel();
+                                return;
+                            }
+                        }
+
+                        if (_options.ParseErrorAction == CsvParseErrorAction.ThrowException)
+                        {
+                            _pipelineException = new CsvParseException("CSV parse error", error);
+                            _cancellationSource.Cancel();
+                            return;
+                        }
+
+                        // For AdvanceToNextLine, create error record
+                        result = new ParsedRecord(error, lineData.RecordIndex, lineData.LineNumber);
+                    }
+
+                    try
+                    {
+                        _resultQueue.Add(result, ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal cancellation
+            }
+            catch (InvalidOperationException)
+            {
+                // Collection completed, normal completion
+            }
+            catch (Exception ex)
+            {
+                _pipelineException = ex;
+                _cancellationSource.Cancel();
+            }
+            finally
+            {
+                // Signal completion when all workers are done
+                if (Interlocked.Decrement(ref _activeWorkers) == 0)
+                {
+                    _resultQueue.CompleteAdding();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Thread-safe line parsing that uses provided buffers instead of instance fields.
+        /// </summary>
+        private void ParseLineThreadSafe(string line, List<FieldInfo> fieldsBuffer, StringBuilder quotedFieldBuilder)
+        {
+            fieldsBuffer.Clear();
+
+            if (string.IsNullOrEmpty(line))
+                return;
+
+            ReadOnlySpan<char> lineSpan = line.AsSpan();
+            string delimiter = _options.Delimiter;
+            char quote = _options.Quote;
+            char escape = _options.Escape;
+            bool lenient = _options.QuoteMode == QuoteMode.Lenient;
+
+            int position = 0;
+
+            while (position <= lineSpan.Length)
+            {
+                var (field, wasQuoted, newPosition) = ParseFieldThreadSafe(lineSpan, position, delimiter, quote, escape, lenient, quotedFieldBuilder);
+                fieldsBuffer.Add(new FieldInfo(field, wasQuoted));
+                position = newPosition;
+
+                if (position > lineSpan.Length)
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Thread-safe field parsing that uses provided StringBuilder.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private (string value, bool wasQuoted, int newPosition) ParseFieldThreadSafe(
+            ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape, bool lenient, StringBuilder quotedFieldBuilder)
+        {
+            if (start >= line.Length)
+            {
+                return (string.Empty, false, start + delimiter.Length);
+            }
+
+            if (line[start] == quote)
+            {
+                if (lenient)
+                {
+                    var result = TryParseQuotedFieldLenientThreadSafe(line, start, delimiter, quote, escape, quotedFieldBuilder);
+                    if (result.wasValidQuoted)
+                    {
+                        return (result.value, true, result.newPosition);
+                    }
+                    return ParseUnquotedField(line, start, delimiter);
+                }
+                return ParseQuotedFieldThreadSafe(line, start, delimiter, quote, escape, quotedFieldBuilder);
+            }
+
+            return ParseUnquotedField(line, start, delimiter);
+        }
+
+        private (string value, bool wasValidQuoted, int newPosition) TryParseQuotedFieldLenientThreadSafe(
+            ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape, StringBuilder quotedFieldBuilder)
+        {
+            quotedFieldBuilder.Clear();
+            int i = start + 1;
+
+            while (i < line.Length)
+            {
+                char c = line[i];
+
+                if (c == escape && i + 1 < line.Length && line[i + 1] == quote)
+                {
+                    quotedFieldBuilder.Append(quote);
+                    i += 2;
+                }
+                else if (c == '\\' && i + 1 < line.Length && line[i + 1] == quote)
+                {
+                    quotedFieldBuilder.Append(quote);
+                    i += 2;
+                }
+                else if (c == quote)
+                {
+                    int afterQuote = i + 1;
+
+                    if (afterQuote >= line.Length)
+                    {
+                        string value = TryInternString(quotedFieldBuilder.ToString());
+                        return (value, true, line.Length + delimiter.Length);
+                    }
+
+                    if (MatchesDelimiter(line, afterQuote, delimiter))
+                    {
+                        string value = TryInternString(quotedFieldBuilder.ToString());
+                        return (value, true, afterQuote + delimiter.Length);
+                    }
+
+                    int checkPos = afterQuote;
+                    while (checkPos < line.Length && char.IsWhiteSpace(line[checkPos]))
+                        checkPos++;
+
+                    if (checkPos >= line.Length)
+                    {
+                        string value = TryInternString(quotedFieldBuilder.ToString());
+                        return (value, true, line.Length + delimiter.Length);
+                    }
+
+                    if (MatchesDelimiter(line, checkPos, delimiter))
+                    {
+                        string value = TryInternString(quotedFieldBuilder.ToString());
+                        return (value, true, checkPos + delimiter.Length);
+                    }
+
+                    quotedFieldBuilder.Append(c);
+                    i++;
+                }
+                else
+                {
+                    quotedFieldBuilder.Append(c);
+                    i++;
+                }
+            }
+
+            return (null, false, 0);
+        }
+
+        private (string value, bool wasQuoted, int newPosition) ParseQuotedFieldThreadSafe(
+            ReadOnlySpan<char> line, int start, string delimiter, char quote, char escape, StringBuilder quotedFieldBuilder)
+        {
+            quotedFieldBuilder.Clear();
+            int i = start + 1;
+            bool wasQuoted = true;
+
+            while (i < line.Length)
+            {
+                char c = line[i];
+
+                if (c == escape && i + 1 < line.Length && line[i + 1] == quote)
+                {
+                    quotedFieldBuilder.Append(quote);
+                    i += 2;
+                }
+                else if (c == quote)
+                {
+                    i++;
+
+                    if (i < line.Length)
+                    {
+                        if (MatchesDelimiter(line, i, delimiter))
+                        {
+                            i += delimiter.Length;
+                        }
+                    }
+                    else
+                    {
+                        i += delimiter.Length;
+                    }
+
+                    string value = TryInternString(quotedFieldBuilder.ToString());
+                    return (value, wasQuoted, i);
+                }
+                else
+                {
+                    quotedFieldBuilder.Append(c);
+                    i++;
+                }
+            }
+
+            string finalValue = TryInternString(quotedFieldBuilder.ToString());
+            return (finalValue, wasQuoted, line.Length + delimiter.Length);
+        }
+
+        private void HandleFieldCountMismatchThreadSafe(List<FieldInfo> fieldsBuffer, string line, int expectedCount)
+        {
+            int actualCount = fieldsBuffer.Count;
+
+            switch (_options.MismatchedFieldAction)
+            {
+                case MismatchedFieldAction.ThrowException:
+                    throw new FormatException(
+                        $"Row has {actualCount} field(s) but expected {expectedCount} based on header. " +
+                        $"Row content: '{line}'");
+
+                case MismatchedFieldAction.PadWithNulls:
+                    while (fieldsBuffer.Count < expectedCount)
+                    {
+                        fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                    }
+                    break;
+
+                case MismatchedFieldAction.TruncateExtra:
+                    while (fieldsBuffer.Count > expectedCount)
+                    {
+                        fieldsBuffer.RemoveAt(fieldsBuffer.Count - 1);
+                    }
+                    break;
+
+                case MismatchedFieldAction.PadOrTruncate:
+                    while (fieldsBuffer.Count < expectedCount)
+                    {
+                        fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                    }
+                    while (fieldsBuffer.Count > expectedCount)
+                    {
+                        fieldsBuffer.RemoveAt(fieldsBuffer.Count - 1);
+                    }
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Thread-safe record conversion that creates a new values array.
+        /// </summary>
+        private object[] ConvertRecordThreadSafe(List<FieldInfo> fieldsBuffer, long recordIndex)
+        {
+            var values = new object[_columns.Count + _staticColumns.Count];
+
+            for (int i = 0; i < _columns.Count; i++)
+            {
+                var column = _columns[i];
+                int sourceIndex = column.SourceIndex;
+
+                string rawValue = sourceIndex < fieldsBuffer.Count ? fieldsBuffer[sourceIndex].Value : null;
+                bool wasQuoted = sourceIndex < fieldsBuffer.Count && fieldsBuffer[sourceIndex].WasQuoted;
+
+                // Apply trimming
+                rawValue = ApplyTrimming(rawValue, wasQuoted);
+
+                // Check for explicit null value
+                if (rawValue != null && _options.NullValue != null && rawValue == _options.NullValue)
+                {
+                    rawValue = null;
+                    wasQuoted = false;
+                }
+
+                // Handle null/empty values
+                if (string.IsNullOrEmpty(rawValue))
+                {
+                    if (_options.DistinguishEmptyFromNull)
+                    {
+                        if (wasQuoted)
+                        {
+                            if (column.DataType == typeof(string))
+                            {
+                                values[i] = string.Empty;
+                            }
+                            else if (column.UseDefaultForNull || _options.UseColumnDefaults)
+                            {
+                                values[i] = column.DefaultValue;
+                            }
+                            else
+                            {
+                                values[i] = DBNull.Value;
+                            }
+                        }
+                        else
+                        {
+                            if (column.UseDefaultForNull || _options.UseColumnDefaults)
+                            {
+                                values[i] = column.DefaultValue;
+                            }
+                            else
+                            {
+                                values[i] = DBNull.Value;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (column.UseDefaultForNull || _options.UseColumnDefaults)
+                        {
+                            values[i] = column.DefaultValue;
+                        }
+                        else
+                        {
+                            values[i] = DBNull.Value;
+                        }
+                    }
+                    continue;
+                }
+
+                // Convert to target type
+                values[i] = ConvertValue(rawValue, column);
+            }
+
+            // Add static column values
+            for (int i = 0; i < _staticColumns.Count; i++)
+            {
+                values[_columns.Count + i] = _staticColumns[i].GetValue(recordIndex);
+            }
+
+            return values;
+        }
+
+        /// <summary>
+        /// Reads the next record from the parallel pipeline.
+        /// </summary>
+        private bool ReadParallel()
+        {
+            // Check for pipeline errors
+            if (_pipelineException != null)
+            {
+                throw _pipelineException;
+            }
+
+            while (true)
+            {
+                // Check if we have a result ready in the pending buffer
+                lock (_resultLock)
+                {
+                    if (_pendingResults.TryGetValue(_nextExpectedRecordIndex, out var record))
+                    {
+                        _pendingResults.Remove(_nextExpectedRecordIndex);
+                        _nextExpectedRecordIndex++;
+
+                        // Skip error records in AdvanceToNextLine mode
+                        if (record.Error != null)
+                        {
+                            if (_options.ParseErrorAction == CsvParseErrorAction.RaiseEvent)
+                            {
+                                var args = new CsvParseErrorEventArgs(record.Error, CsvParseErrorAction.AdvanceToNextLine);
+                                ParseError?.Invoke(this, args);
+                                if (args.Action == CsvParseErrorAction.ThrowException)
+                                {
+                                    throw new CsvParseException("CSV parse error", record.Error);
+                                }
+                            }
+                            continue;
+                        }
+
+                        _currentParsedRecord = record;
+                        _currentRecordIndex = record.RecordIndex;
+                        Array.Copy(record.Values, _convertedValues, record.Values.Length);
+                        return true;
+                    }
+                }
+
+                // Try to read from result queue
+                ParsedRecord result;
+                try
+                {
+                    if (!_resultQueue.TryTake(out result, 100))
+                    {
+                        // Check if completed
+                        if (_resultQueue.IsCompleted)
+                        {
+                            // Check for any remaining buffered results
+                            lock (_resultLock)
+                            {
+                                if (_pendingResults.Count > 0 && _pendingResults.TryGetValue(_nextExpectedRecordIndex, out var lastRecord))
+                                {
+                                    _pendingResults.Remove(_nextExpectedRecordIndex);
+                                    _nextExpectedRecordIndex++;
+
+                                    if (lastRecord.Error != null)
+                                    {
+                                        continue;
+                                    }
+
+                                    _currentParsedRecord = lastRecord;
+                                    _currentRecordIndex = lastRecord.RecordIndex;
+                                    Array.Copy(lastRecord.Values, _convertedValues, lastRecord.Values.Length);
+                                    return true;
+                                }
+                            }
+
+                            // Check for pipeline errors one more time
+                            if (_pipelineException != null)
+                            {
+                                throw _pipelineException;
+                            }
+
+                            _currentRecord = null;
+                            return false;
+                        }
+
+                        // Check for pipeline errors
+                        if (_pipelineException != null)
+                        {
+                            throw _pipelineException;
+                        }
+
+                        continue;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // Collection completed
+                    if (_pipelineException != null)
+                    {
+                        throw _pipelineException;
+                    }
+
+                    _currentRecord = null;
+                    return false;
+                }
+
+                // Check for pipeline errors after reading
+                if (_pipelineException != null)
+                {
+                    throw _pipelineException;
+                }
+
+                // If this is the next expected record, use it directly
+                if (result.RecordIndex == _nextExpectedRecordIndex)
+                {
+                    _nextExpectedRecordIndex++;
+
+                    // Skip error records
+                    if (result.Error != null)
+                    {
+                        if (_options.ParseErrorAction == CsvParseErrorAction.RaiseEvent)
+                        {
+                            var args = new CsvParseErrorEventArgs(result.Error, CsvParseErrorAction.AdvanceToNextLine);
+                            ParseError?.Invoke(this, args);
+                            if (args.Action == CsvParseErrorAction.ThrowException)
+                            {
+                                throw new CsvParseException("CSV parse error", result.Error);
+                            }
+                        }
+                        continue;
+                    }
+
+                    _currentParsedRecord = result;
+                    _currentRecordIndex = result.RecordIndex;
+                    Array.Copy(result.Values, _convertedValues, result.Values.Length);
+                    return true;
+                }
+
+                // Out of order - buffer it
+                lock (_resultLock)
+                {
+                    _pendingResults[result.RecordIndex] = result;
+                }
+            }
+        }
+
+        private void StopParallelPipeline()
+        {
+            if (!_useParallelProcessing)
+                return;
+
+            _cancellationSource?.Cancel();
+
+            try
+            {
+                // Wait for producer thread to complete
+                if (_producerThread != null && _producerThread.IsAlive)
+                {
+                    _producerThread.Join(TimeSpan.FromSeconds(5));
+                }
+
+                // Wait for worker threads to complete
+                if (_workerThreads != null)
+                {
+                    foreach (var thread in _workerThreads)
+                    {
+                        if (thread != null && thread.IsAlive)
+                        {
+                            thread.Join(TimeSpan.FromSeconds(5));
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _cancellationSource?.Dispose();
+                _cancellationSource = null;
+
+                _lineQueue?.Dispose();
+                _lineQueue = null;
+
+                _resultQueue?.Dispose();
+                _resultQueue = null;
+
+                _useParallelProcessing = false;
+            }
+
+            // Transfer parallel errors to main error list
+            if (_parallelParseErrors != null && _parseErrors != null)
+            {
+                while (_parallelParseErrors.TryDequeue(out var error))
+                {
+                    _parseErrors.Add(error);
+                }
+            }
+        }
+
+        #endregion
+
         #region IDataReader Implementation
 
         /// <summary>
@@ -508,6 +1291,12 @@ namespace Dataplat.Dbatools.Csv.Reader
         {
             ThrowIfClosed();
             Initialize();
+
+            // Use parallel pipeline if enabled
+            if (_useParallelProcessing)
+            {
+                return ReadParallel();
+            }
 
             while (true)
             {
@@ -1634,6 +2423,10 @@ namespace Dataplat.Dbatools.Csv.Reader
             if (!_isClosed)
             {
                 _isClosed = true;
+
+                // Stop parallel pipeline first
+                StopParallelPipeline();
+
                 if (_ownsReader)
                 {
                     _reader.Dispose();
