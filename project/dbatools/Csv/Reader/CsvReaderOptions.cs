@@ -11,6 +11,11 @@ namespace Dataplat.Dbatools.Csv.Reader
     /// </summary>
     public sealed class CsvReaderOptions
     {
+        private int _skipRows;
+        private int _bufferSize = 65536;
+        private int _maxQuotedFieldLength;
+        private int _maxParseErrors = 1000;
+
         /// <summary>
         /// Gets or sets whether the first row contains column headers.
         /// Default is true.
@@ -21,7 +26,17 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// Gets or sets the number of rows to skip at the beginning of the file
         /// before reading headers or data. Addresses issue #7173 (FirstRow feature).
         /// </summary>
-        public int SkipRows { get; set; }
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when value is negative.</exception>
+        public int SkipRows
+        {
+            get => _skipRows;
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "SkipRows cannot be negative.");
+                _skipRows = value;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the field delimiter. Can be multiple characters.
@@ -56,8 +71,19 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// <summary>
         /// Gets or sets the internal buffer size in bytes.
         /// Default is 65536 (64KB) for better performance than LumenWorks' 4KB.
+        /// Minimum value is 128 bytes.
         /// </summary>
-        public int BufferSize { get; set; } = 65536;
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when value is less than 128.</exception>
+        public int BufferSize
+        {
+            get => _bufferSize;
+            set
+            {
+                if (value < 128)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "BufferSize must be at least 128 bytes.");
+                _bufferSize = value;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the file encoding.
@@ -91,10 +117,20 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         /// <summary>
         /// Gets or sets the maximum length of a quoted field in characters.
-        /// Used to prevent memory issues with malformed data.
-        /// Default is 0 (no limit).
+        /// Used to prevent memory issues with malformed data or denial-of-service attacks.
+        /// Default is 0 (no limit). Set to a positive value to enforce a limit.
         /// </summary>
-        public int MaxQuotedFieldLength { get; set; }
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when value is negative.</exception>
+        public int MaxQuotedFieldLength
+        {
+            get => _maxQuotedFieldLength;
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "MaxQuotedFieldLength cannot be negative.");
+                _maxQuotedFieldLength = value;
+            }
+        }
 
         /// <summary>
         /// Gets or sets whether to detect the compression type automatically.
@@ -107,6 +143,14 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// Only used when AutoDetectCompression is false.
         /// </summary>
         public CompressionType CompressionType { get; set; } = CompressionType.None;
+
+        /// <summary>
+        /// Gets or sets the maximum decompressed size in bytes for compressed files.
+        /// Used to prevent decompression bomb attacks.
+        /// Default is 10GB. Set to 0 for unlimited.
+        /// Only applies to compressed files (GZip, Deflate, Brotli, ZLib).
+        /// </summary>
+        public long MaxDecompressedSize { get; set; } = CompressionHelper.DefaultMaxDecompressedSize;
 
         /// <summary>
         /// Gets or sets the type converter registry to use for automatic type conversion.
@@ -149,7 +193,17 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// Gets or sets the maximum number of parse errors to collect before stopping.
         /// Default is 1000. Set to 0 for unlimited.
         /// </summary>
-        public int MaxParseErrors { get; set; } = 1000;
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when value is negative.</exception>
+        public int MaxParseErrors
+        {
+            get => _maxParseErrors;
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "MaxParseErrors cannot be negative.");
+                _maxParseErrors = value;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the column names to include (filter).
@@ -206,6 +260,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 MaxQuotedFieldLength = MaxQuotedFieldLength,
                 AutoDetectCompression = AutoDetectCompression,
                 CompressionType = CompressionType,
+                MaxDecompressedSize = MaxDecompressedSize,
                 TypeConverterRegistry = TypeConverterRegistry,
                 UseColumnDefaults = UseColumnDefaults,
                 StaticColumns = StaticColumns != null ? new List<StaticColumn>(StaticColumns) : null,

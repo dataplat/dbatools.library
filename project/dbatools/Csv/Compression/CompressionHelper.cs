@@ -10,6 +10,12 @@ namespace Dataplat.Dbatools.Csv.Compression
     /// </summary>
     public static class CompressionHelper
     {
+        /// <summary>
+        /// Default maximum decompressed size (10 GB) to prevent decompression bombs.
+        /// Large enough for most legitimate files, small enough to catch obvious bombs.
+        /// </summary>
+        public const long DefaultMaxDecompressedSize = 10L * 1024 * 1024 * 1024;
+
         // Magic bytes for compression detection
         private static readonly byte[] GZipMagic = new byte[] { 0x1F, 0x8B };
         private static readonly byte[] DeflateZlibMagic = new byte[] { 0x78 }; // 0x78 0x01, 0x78 0x5E, 0x78 0x9C, 0x78 0xDA
@@ -92,33 +98,60 @@ namespace Dataplat.Dbatools.Csv.Compression
 
         /// <summary>
         /// Wraps a stream with the appropriate decompression stream.
+        /// Uses DefaultMaxDecompressedSize (10GB) limit by default.
         /// </summary>
         public static Stream WrapForDecompression(Stream stream, CompressionType compressionType)
+        {
+            return WrapForDecompression(stream, compressionType, DefaultMaxDecompressedSize);
+        }
+
+        /// <summary>
+        /// Wraps a stream with the appropriate decompression stream with size limit protection.
+        /// </summary>
+        /// <param name="stream">The compressed stream to wrap.</param>
+        /// <param name="compressionType">The type of compression used.</param>
+        /// <param name="maxDecompressedSize">Maximum allowed decompressed size in bytes. Use 0 for unlimited.</param>
+        /// <returns>A decompression stream, optionally wrapped with size limiting.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when decompressed data exceeds the size limit.</exception>
+        public static Stream WrapForDecompression(Stream stream, CompressionType compressionType, long maxDecompressedSize)
         {
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
+            Stream decompressedStream;
             switch (compressionType)
             {
                 case CompressionType.None:
                     return stream;
 
                 case CompressionType.GZip:
-                    return new GZipStream(stream, CompressionMode.Decompress, leaveOpen: false);
+                    decompressedStream = new GZipStream(stream, CompressionMode.Decompress, leaveOpen: false);
+                    break;
 
                 case CompressionType.Deflate:
-                    return new DeflateStream(stream, CompressionMode.Decompress, leaveOpen: false);
+                    decompressedStream = new DeflateStream(stream, CompressionMode.Decompress, leaveOpen: false);
+                    break;
 
 #if NET8_0_OR_GREATER
                 case CompressionType.Brotli:
-                    return new BrotliStream(stream, CompressionMode.Decompress, leaveOpen: false);
+                    decompressedStream = new BrotliStream(stream, CompressionMode.Decompress, leaveOpen: false);
+                    break;
 
                 case CompressionType.ZLib:
-                    return new ZLibStream(stream, CompressionMode.Decompress, leaveOpen: false);
+                    decompressedStream = new ZLibStream(stream, CompressionMode.Decompress, leaveOpen: false);
+                    break;
 #endif
                 default:
                     throw new ArgumentException($"Unknown compression type: {compressionType}", nameof(compressionType));
             }
+
+            // Wrap with size-limiting stream if a limit is specified
+            if (maxDecompressedSize > 0)
+            {
+                return new LimitedReadStream(decompressedStream, maxDecompressedSize);
+            }
+
+            return decompressedStream;
         }
 
         /// <summary>
@@ -178,8 +211,20 @@ namespace Dataplat.Dbatools.Csv.Compression
 
         /// <summary>
         /// Opens a file stream with automatic decompression detection.
+        /// Uses DefaultMaxDecompressedSize (10GB) limit by default.
         /// </summary>
         public static Stream OpenFileForReading(string filePath, bool autoDetect = true)
+        {
+            return OpenFileForReading(filePath, autoDetect, DefaultMaxDecompressedSize);
+        }
+
+        /// <summary>
+        /// Opens a file stream with automatic decompression detection and optional size limit.
+        /// </summary>
+        /// <param name="filePath">The path to the file to open.</param>
+        /// <param name="autoDetect">Whether to auto-detect compression from magic bytes.</param>
+        /// <param name="maxDecompressedSize">Maximum decompressed size in bytes. Use 0 for unlimited.</param>
+        public static Stream OpenFileForReading(string filePath, bool autoDetect, long maxDecompressedSize)
         {
             if (string.IsNullOrEmpty(filePath))
                 throw new ArgumentNullException(nameof(filePath));
@@ -205,7 +250,7 @@ namespace Dataplat.Dbatools.Csv.Compression
                 compressionType = DetectFromExtension(filePath);
             }
 
-            return WrapForDecompression(fileStream, compressionType);
+            return WrapForDecompression(fileStream, compressionType, maxDecompressedSize);
         }
 
         /// <summary>
@@ -220,6 +265,62 @@ namespace Dataplat.Dbatools.Csv.Compression
                 bufferSize: 65536, FileOptions.SequentialScan);
 
             return WrapForCompression(fileStream, compressionType, level);
+        }
+    }
+
+    /// <summary>
+    /// A stream wrapper that limits the total number of bytes that can be read.
+    /// Used to prevent decompression bomb attacks.
+    /// </summary>
+    internal sealed class LimitedReadStream : Stream
+    {
+        private readonly Stream _innerStream;
+        private readonly long _maxBytes;
+        private long _totalBytesRead;
+
+        public LimitedReadStream(Stream innerStream, long maxBytes)
+        {
+            _innerStream = innerStream ?? throw new ArgumentNullException(nameof(innerStream));
+            _maxBytes = maxBytes;
+        }
+
+        public override bool CanRead => _innerStream.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => _totalBytesRead;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int bytesRead = _innerStream.Read(buffer, offset, count);
+            _totalBytesRead += bytesRead;
+
+            if (_totalBytesRead > _maxBytes)
+            {
+                throw new InvalidOperationException(
+                    $"Decompressed data exceeded maximum allowed size of {_maxBytes:N0} bytes. " +
+                    "This may indicate a decompression bomb attack or corrupted data.");
+            }
+
+            return bytesRead;
+        }
+
+        public override void Flush() => _innerStream.Flush();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _innerStream.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 }

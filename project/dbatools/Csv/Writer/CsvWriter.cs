@@ -19,6 +19,7 @@ namespace Dataplat.Dbatools.Csv.Writer
         private readonly TextWriter _writer;
         private readonly CsvWriterOptions _options;
         private readonly bool _ownsWriter;
+        private readonly StringBuilder _rowBuilder;
         private bool _isDisposed;
         private bool _headerWritten;
         private string[] _columnNames;
@@ -52,6 +53,7 @@ namespace Dataplat.Dbatools.Csv.Writer
 
             _writer = new StreamWriter(stream, _options.Encoding, _options.BufferSize);
             _ownsWriter = true;
+            _rowBuilder = new StringBuilder(256);
         }
 
         /// <summary>
@@ -62,6 +64,7 @@ namespace Dataplat.Dbatools.Csv.Writer
             _writer = writer ?? throw new ArgumentNullException(nameof(writer));
             _options = options ?? new CsvWriterOptions();
             _ownsWriter = false;
+            _rowBuilder = new StringBuilder(256);
         }
 
         /// <summary>
@@ -81,6 +84,7 @@ namespace Dataplat.Dbatools.Csv.Writer
 
             _writer = new StreamWriter(compressedStream, _options.Encoding, _options.BufferSize);
             _ownsWriter = true;
+            _rowBuilder = new StringBuilder(256);
         }
 
         #endregion
@@ -119,19 +123,19 @@ namespace Dataplat.Dbatools.Csv.Writer
             if (values == null)
                 throw new ArgumentNullException(nameof(values));
 
-            StringBuilder sb = new StringBuilder();
+            _rowBuilder.Clear();
             string delimiter = _options.Delimiter;
 
             for (int i = 0; i < values.Length; i++)
             {
                 if (i > 0)
-                    sb.Append(delimiter);
+                    _rowBuilder.Append(delimiter);
 
                 string formatted = FormatValue(values[i]);
-                sb.Append(QuoteIfNeeded(formatted, values[i]));
+                _rowBuilder.Append(QuoteIfNeeded(formatted, values[i]));
             }
 
-            _writer.Write(sb.ToString());
+            _writer.Write(_rowBuilder.ToString());
             _writer.Write(_options.NewLine);
             _rowsWritten++;
 
@@ -351,15 +355,38 @@ namespace Dataplat.Dbatools.Csv.Writer
 
         private bool NeedsQuoting(string value)
         {
-            // Check if value contains delimiter, quote, or newline
-            if (value.IndexOf(_options.Delimiter, StringComparison.Ordinal) >= 0)
-                return true;
+            // Single pass check for delimiter, quote, or newline
+            string delimiter = _options.Delimiter;
+            char quote = _options.Quote;
+            int delimiterLength = delimiter.Length;
 
-            if (value.IndexOf(_options.Quote) >= 0)
-                return true;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
 
-            if (value.IndexOf('\r') >= 0 || value.IndexOf('\n') >= 0)
-                return true;
+                // Check for quote or newline characters
+                if (c == quote || c == '\r' || c == '\n')
+                    return true;
+
+                // Check for delimiter match (supports multi-character delimiters)
+                if (c == delimiter[0] && delimiterLength == 1)
+                    return true;
+
+                if (c == delimiter[0] && i + delimiterLength <= value.Length)
+                {
+                    bool match = true;
+                    for (int j = 1; j < delimiterLength; j++)
+                    {
+                        if (value[i + j] != delimiter[j])
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match)
+                        return true;
+                }
+            }
 
             return false;
         }

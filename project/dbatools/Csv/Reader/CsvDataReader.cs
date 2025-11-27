@@ -24,6 +24,7 @@ namespace Dataplat.Dbatools.Csv.Reader
         private readonly List<CsvParseError> _parseErrors;
 
         private string[] _currentRecord;
+        private string[] _recordBuffer;  // Reusable buffer to reduce array allocations
         private object[] _convertedValues;
         private bool _isInitialized;
         private bool _isClosed;
@@ -38,6 +39,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         // Field parsing state
         private readonly StringBuilder _fieldBuilder;
+        private readonly StringBuilder _parseFieldBuilder;
         private readonly List<string> _fieldsBuffer;
 
         #endregion
@@ -61,13 +63,14 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             _options = options ?? new CsvReaderOptions();
 
-            Stream stream = CompressionHelper.OpenFileForReading(filePath, _options.AutoDetectCompression);
+            Stream stream = CompressionHelper.OpenFileForReading(filePath, _options.AutoDetectCompression, _options.MaxDecompressedSize);
             _reader = new StreamReader(stream, _options.Encoding, detectEncodingFromByteOrderMarks: true,
                 bufferSize: _options.BufferSize);
             _ownsReader = true;
 
             _buffer = new char[_options.BufferSize];
             _fieldBuilder = new StringBuilder(256);
+            _parseFieldBuilder = new StringBuilder(256);
             _fieldsBuffer = new List<string>(64);
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
@@ -85,6 +88,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             _buffer = new char[_options.BufferSize];
             _fieldBuilder = new StringBuilder(256);
+            _parseFieldBuilder = new StringBuilder(256);
             _fieldsBuffer = new List<string>(64);
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
@@ -105,13 +109,14 @@ namespace Dataplat.Dbatools.Csv.Reader
                 ? CompressionHelper.DetectFromStream(stream)
                 : _options.CompressionType;
 
-            Stream decompressedStream = CompressionHelper.WrapForDecompression(stream, compressionType);
+            Stream decompressedStream = CompressionHelper.WrapForDecompression(stream, compressionType, _options.MaxDecompressedSize);
             _reader = new StreamReader(decompressedStream, _options.Encoding, detectEncodingFromByteOrderMarks: true,
                 bufferSize: _options.BufferSize);
             _ownsReader = true;
 
             _buffer = new char[_options.BufferSize];
             _fieldBuilder = new StringBuilder(256);
+            _parseFieldBuilder = new StringBuilder(256);
             _fieldsBuffer = new List<string>(64);
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
@@ -161,12 +166,6 @@ namespace Dataplat.Dbatools.Csv.Reader
                         }
                     }
                 }
-            }
-
-            // Add static columns
-            foreach (var staticCol in _staticColumns)
-            {
-                // Static columns don't have a CSV ordinal, they're appended at the end
             }
 
             // Prepare converted values array
@@ -248,7 +247,21 @@ namespace Dataplat.Dbatools.Csv.Reader
                         _convertedValues = new object[_columns.Count + _staticColumns.Count];
                     }
 
-                    _currentRecord = _fieldsBuffer.ToArray();
+                    // Validate field count matches expected columns (for error tracking)
+                    if (_columns.Count > 0 && _fieldsBuffer.Count != _columns.Count)
+                    {
+                        throw new FormatException(
+                            $"Row has {_fieldsBuffer.Count} field(s) but expected {_columns.Count} based on header. " +
+                            $"Row content: '{line}'");
+                    }
+
+                    // Reuse buffer to reduce array allocations
+                    EnsureRecordBufferCapacity(_fieldsBuffer.Count);
+                    for (int i = 0; i < _fieldsBuffer.Count; i++)
+                    {
+                        _recordBuffer[i] = _fieldsBuffer[i];
+                    }
+                    _currentRecord = _recordBuffer;
 
                     // Convert values to typed objects
                     ConvertCurrentRecord();
@@ -611,6 +624,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             _fieldBuilder.Clear();
             bool inQuotes = false;
+            int quotedFieldLength = 0;
 
             while (true)
             {
@@ -636,7 +650,18 @@ namespace Dataplat.Dbatools.Csv.Reader
 
                 if (c == _options.Quote)
                 {
-                    inQuotes = !inQuotes;
+                    if (inQuotes)
+                    {
+                        // Ending quote
+                        inQuotes = false;
+                        quotedFieldLength = 0;
+                    }
+                    else
+                    {
+                        // Starting quote
+                        inQuotes = true;
+                        quotedFieldLength = 0;
+                    }
                     _fieldBuilder.Append(c);
                 }
                 else if (c == '\r')
@@ -664,6 +689,8 @@ namespace Dataplat.Dbatools.Csv.Reader
                     else
                     {
                         _fieldBuilder.Append(c);
+                        quotedFieldLength++;
+                        CheckQuotedFieldLength(quotedFieldLength);
                     }
                 }
                 else if (c == '\n')
@@ -676,12 +703,29 @@ namespace Dataplat.Dbatools.Csv.Reader
                     else
                     {
                         _fieldBuilder.Append(c);
+                        quotedFieldLength++;
+                        CheckQuotedFieldLength(quotedFieldLength);
                     }
                 }
                 else
                 {
                     _fieldBuilder.Append(c);
+                    if (inQuotes)
+                    {
+                        quotedFieldLength++;
+                        CheckQuotedFieldLength(quotedFieldLength);
+                    }
                 }
+            }
+        }
+
+        private void CheckQuotedFieldLength(int length)
+        {
+            if (_options.MaxQuotedFieldLength > 0 && length > _options.MaxQuotedFieldLength)
+            {
+                throw new CsvParseException(
+                    $"Quoted field exceeded maximum length of {_options.MaxQuotedFieldLength:N0} characters at line {_currentLineNumber + 1}. " +
+                    "This may indicate malformed data or a denial-of-service attack.");
             }
         }
 
@@ -697,7 +741,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             char escape = _options.Escape;
             int delimLength = delimiter.Length;
 
-            StringBuilder field = new StringBuilder();
+            _parseFieldBuilder.Clear();
             bool inQuotes = false;
             int i = 0;
 
@@ -710,7 +754,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                     if (c == escape && i + 1 < line.Length && line[i + 1] == quote)
                     {
                         // Escaped quote
-                        field.Append(quote);
+                        _parseFieldBuilder.Append(quote);
                         i += 2;
                     }
                     else if (c == quote)
@@ -721,7 +765,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                     }
                     else
                     {
-                        field.Append(c);
+                        _parseFieldBuilder.Append(c);
                         i++;
                     }
                 }
@@ -736,20 +780,20 @@ namespace Dataplat.Dbatools.Csv.Reader
                     else if (MatchesDelimiter(line, i, delimiter))
                     {
                         // End of field
-                        _fieldsBuffer.Add(field.ToString());
-                        field.Clear();
+                        _fieldsBuffer.Add(_parseFieldBuilder.ToString());
+                        _parseFieldBuilder.Clear();
                         i += delimLength;
                     }
                     else
                     {
-                        field.Append(c);
+                        _parseFieldBuilder.Append(c);
                         i++;
                     }
                 }
             }
 
             // Add last field
-            _fieldsBuffer.Add(field.ToString());
+            _fieldsBuffer.Add(_parseFieldBuilder.ToString());
         }
 
         private bool MatchesDelimiter(string line, int position, string delimiter)
@@ -826,15 +870,22 @@ namespace Dataplat.Dbatools.Csv.Reader
         public bool HasColumn(string name)
         {
             Initialize();
-            try
-            {
-                GetOrdinal(name);
-                return true;
-            }
-            catch
-            {
+            if (name == null)
                 return false;
+
+            for (int i = 0; i < _columns.Count; i++)
+            {
+                if (string.Equals(_columns[i].Name, name, StringComparison.OrdinalIgnoreCase))
+                    return true;
             }
+
+            for (int i = 0; i < _staticColumns.Count; i++)
+            {
+                if (string.Equals(_staticColumns[i].Name, name, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -921,6 +972,20 @@ namespace Dataplat.Dbatools.Csv.Reader
         {
             if (ordinal < 0 || ordinal >= _columns.Count + _staticColumns.Count)
                 throw new ArgumentOutOfRangeException(nameof(ordinal));
+        }
+
+        private void EnsureRecordBufferCapacity(int requiredCapacity)
+        {
+            if (_recordBuffer == null || _recordBuffer.Length < requiredCapacity)
+            {
+                // Allocate with some extra space to avoid frequent reallocations
+                int newCapacity = Math.Max(requiredCapacity, 64);
+                if (_recordBuffer != null)
+                {
+                    newCapacity = Math.Max(newCapacity, _recordBuffer.Length * 2);
+                }
+                _recordBuffer = new string[newCapacity];
+            }
         }
 
         #endregion
