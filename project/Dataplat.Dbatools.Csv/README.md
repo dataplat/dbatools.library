@@ -232,6 +232,22 @@ var options = new CsvReaderOptions
 
 MIT License - see the [LICENSE](https://github.com/dataplat/dbatools.library/blob/main/LICENSE) file for details.
 
+## Development
+
+This CSV library was created using [Claude Code](https://claude.com/claude-code) (Opus 4.5) with the following initial prompt:
+
+> the dbatools repo is at C:\github\dbatools and this repo is at C:\github\dbatools.library
+>
+> i would like to create a replacement for LumenWorks.Framework.IO.dll PLUS the additional functionality requested in dbatools issues on github which you can find using the `gh` command
+>
+> the source code for lumenworks is https://github.com/phatcher/CsvReader/tree/master/code/LumenWorks.Framework.IO
+>
+> This library was written over a decade ago. considering the advances in .NET and SqlClient etc, please add a CSV reader of better quality (more functionality often seen in paid systems, faster) using recent .NET and Microsoft Data best practices
+>
+> Please ultrathink about the best way to go about creating this new, extensive functionality within the dbatools library. if it should be a new project that is linked or whatever, do it in this repo.
+
+Additional refinements included a security review and feature additions based on [dbatools GitHub issues](https://github.com/dataplat/dbatools/issues).
+
 ## Authors
 
 Created and maintained by the [dbatools team](https://dbatools.io/team) and community contributors.
