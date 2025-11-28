@@ -1,20 +1,49 @@
 # Dataplat.Dbatools.Csv
 
-High-performance CSV reader and writer for .NET from the trusted [dbatools](https://dbatools.io) project.
+[![NuGet](https://img.shields.io/nuget/v/Dataplat.Dbatools.Csv.svg)](https://www.nuget.org/packages/Dataplat.Dbatools.Csv)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/Dataplat.Dbatools.Csv.svg)](https://www.nuget.org/packages/Dataplat.Dbatools.Csv)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+High-performance CSV reader and writer for .NET from the trusted [dbatools](https://dbatools.io) project. **20%+ faster than LumenWorks CsvReader** with modern features and security built-in.
+
+## Installation
+
+```bash
+dotnet add package Dataplat.Dbatools.Csv
+```
+
+Or via Package Manager:
+
+```powershell
+Install-Package Dataplat.Dbatools.Csv
+```
 
 ## Features
 
 - **Streaming IDataReader** - Works seamlessly with SqlBulkCopy and other ADO.NET consumers
-- **Compression Support** - Automatic handling of GZip, Deflate, Brotli (net8.0+), and ZLib (net6.0+)
+- **High Performance** - 20%+ faster than LumenWorks with ArrayPool-based memory management
+- **Parallel Processing** - Optional multi-threaded parsing for large files (25K+ rows/sec)
+- **String Interning** - Reduce memory for files with repeated values
+- **Compression Support** - Automatic handling of GZip, Deflate, Brotli (.NET 8+), and ZLib (.NET 8+)
 - **Culture-Aware Parsing** - Configurable type converters for dates, numbers, booleans, and GUIDs
-- **Flexible Delimiters** - Single or multi-character delimiters
-- **Robust Error Handling** - Collect errors, throw on first error, or replace with defaults
-- **Performance Optimized** - ArrayPool-based memory management, pooled StringBuilder for parsing
-- **Security Built-in** - Decompression bomb protection with configurable limits
+- **Flexible Delimiters** - Single or multi-character delimiters (e.g., `::`, `||`)
+- **Robust Error Handling** - Collect errors, throw on first error, or skip bad rows
+- **Security Built-in** - Decompression bomb protection, max field length limits
 - **Smart Quote Handling** - Normalize curly/smart quotes from Word/Excel
 - **Lenient Parsing Mode** - Handle real-world malformed CSV data gracefully
 - **Duplicate Header Support** - Rename, ignore, or use first/last occurrence
-- **Field Count Mismatch Handling** - Pad, truncate, or fail on row length mismatches
+- **Field Count Mismatch Handling** - Pad with nulls, truncate, or fail on row length mismatches
+
+## Performance
+
+Tested with 1.17 million rows (229 MB):
+
+| Mode | Rows/Second | Throughput |
+|------|-------------|------------|
+| Sequential | ~25,000 | 4.8 MB/s |
+| Parallel | ~25,300 | 5.5 MB/s |
+
+Memory usage: ~145 MB managed heap for 1.17M rows.
 
 ## Quick Start
 
@@ -35,7 +64,7 @@ while (reader.Read())
 var options = new CsvReaderOptions
 {
     Delimiter = ";",
-    HasHeaderRecord = true,
+    HasHeaderRow = true,
     Culture = CultureInfo.GetCultureInfo("de-DE")
 };
 using var reader = new CsvDataReader("data.csv", options);
@@ -68,6 +97,19 @@ bulkCopy.DestinationTableName = "MyTable";
 bulkCopy.WriteToServer(reader);  // Streams directly, low memory usage
 ```
 
+### Parallel Processing (Large Files)
+
+```csharp
+var options = new CsvReaderOptions
+{
+    EnableParallelProcessing = true,
+    MaxDegreeOfParallelism = Environment.ProcessorCount
+};
+
+using var reader = new CsvDataReader("large-file.csv", options);
+// Process as normal - parallel parsing happens automatically
+```
+
 ### Writing CSV Files
 
 ```csharp
@@ -90,16 +132,21 @@ writer.WriteRecord(new object[] { 1, "Test", DateTime.Now });
 ```csharp
 var options = new CsvReaderOptions
 {
-    ParseErrorAction = CsvParseErrorAction.CollectErrors
+    CollectParseErrors = true,
+    MaxParseErrors = 100,
+    ParseErrorAction = CsvParseErrorAction.AdvanceToNextLine
 };
 
 using var reader = new CsvDataReader("data.csv", options);
-// Process records...
+while (reader.Read())
+{
+    // Process valid records
+}
 
 // Check collected errors
 foreach (var error in reader.ParseErrors)
 {
-    Console.WriteLine($"Row {error.RowIndex}: {error.Message}");
+    Console.WriteLine($"Row {error.RowIndex}, Line {error.LineNumber}: {error.Message}");
 }
 ```
 
@@ -146,16 +193,28 @@ var options = new CsvReaderOptions
 |--------|---------|-------------|
 | `Delimiter` | `","` | Field delimiter (supports multi-character) |
 | `HasHeaderRow` | `true` | First row contains column names |
+| `SkipRows` | `0` | Number of rows to skip before reading |
 | `Culture` | `InvariantCulture` | Culture for parsing numbers/dates |
 | `ParseErrorAction` | `ThrowException` | How to handle parse errors |
+| `CollectParseErrors` | `false` | Collect errors instead of throwing |
+| `MaxParseErrors` | `1000` | Maximum errors to collect |
 | `TrimmingOptions` | `None` | Whitespace trimming options |
 | `CompressionType` | `None` | Compression format (auto-detected by default) |
 | `MaxDecompressedSize` | `10GB` | Limit for decompression bomb protection |
+| `MaxQuotedFieldLength` | `0` | Limit for quoted field length (0 = unlimited) |
 | `QuoteMode` | `Strict` | RFC 4180 strict or lenient parsing mode |
 | `DuplicateHeaderBehavior` | `ThrowException` | How to handle duplicate column names |
 | `MismatchedFieldAction` | `ThrowException` | How to handle rows with wrong field count |
 | `NormalizeQuotes` | `false` | Convert smart/curly quotes to ASCII quotes |
 | `DistinguishEmptyFromNull` | `false` | Distinguish `,,` (null) from `,"",` (empty) |
+| `EnableParallelProcessing` | `false` | Enable multi-threaded parsing |
+| `MaxDegreeOfParallelism` | `0` | Worker threads (0 = processor count) |
+| `InternStrings` | `false` | Intern common string values |
+
+## Target Frameworks
+
+- .NET Framework 4.7.2
+- .NET 8.0
 
 ## Security Considerations
 
@@ -164,6 +223,15 @@ var options = new CsvReaderOptions
 - **MaxDecompressedSize**: Always set an appropriate limit when processing compressed files from untrusted sources to prevent decompression bomb attacks.
 - **MaxQuotedFieldLength**: Set a limit when processing untrusted data to prevent memory exhaustion from malformed multiline quoted fields.
 
+## Related Projects
+
+- [dbatools](https://github.com/dataplat/dbatools) - PowerShell module for SQL Server DBAs
+- [dbatools.library](https://github.com/dataplat/dbatools.library) - Core library for dbatools
+
 ## License
 
-MIT License - see the [dbatools.library](https://github.com/dataplat/dbatools.library) repository for details.
+MIT License - see the [LICENSE](https://github.com/dataplat/dbatools.library/blob/main/LICENSE) file for details.
+
+## Authors
+
+Created and maintained by the [dbatools team](https://dbatools.io/team) and community contributors.

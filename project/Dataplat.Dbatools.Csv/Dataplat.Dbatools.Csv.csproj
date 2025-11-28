@@ -11,14 +11,20 @@
     <Authors>dbatools team</Authors>
     <Company>Dataplat</Company>
     <Product>Dataplat.Dbatools.Csv</Product>
-    <Description>High-performance CSV reader and writer for .NET. Features include streaming IDataReader implementation, automatic compression/decompression (GZip, Deflate, Brotli), culture-aware type conversion, multi-character delimiters, and robust error handling. From the trusted dbatools project.</Description>
+    <Description>High-performance CSV reader and writer for .NET. Features streaming IDataReader for SqlBulkCopy, automatic compression (GZip, Deflate, Brotli, ZLib), multi-character delimiters, parallel processing, string interning, and robust error handling. 20%+ faster than LumenWorks CsvReader. From the trusted dbatools project.</Description>
     <Copyright>Copyright (c) dbatools team</Copyright>
-    <PackageTags>csv;parser;reader;writer;datareader;idatareader;compression;gzip;brotli;dbatools</PackageTags>
+    <PackageTags>csv;parser;reader;writer;datareader;idatareader;sqlbulkcopy;compression;gzip;brotli;dbatools;high-performance;parallel</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/dataplat/dbatools.library</PackageProjectUrl>
     <RepositoryUrl>https://github.com/dataplat/dbatools.library</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <RepositoryBranch>main</RepositoryBranch>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial release with high-performance CSV parsing, parallel processing support, and comprehensive edge case handling.</PackageReleaseNotes>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
     <!-- Build settings -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

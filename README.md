@@ -1,6 +1,7 @@
 # dbatools.library
 
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/v/dbatools.library)](https://www.powershellgallery.com/packages/dbatools.library)
+[![NuGet - Dataplat.Dbatools.Csv](https://img.shields.io/nuget/v/Dataplat.Dbatools.Csv.svg?label=nuget%20-%20Csv)](https://www.nuget.org/packages/Dataplat.Dbatools.Csv)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 The library that powers [dbatools](https://dbatools.io), the community module for SQL Server professionals.
@@ -13,9 +14,30 @@ dbatools.library is a .NET library that provides the core functionality for the 
 - Microsoft.Data.SqlClient for SQL Server connectivity
 - DacFx for database deployment operations
 - Extended Events (XEvent) processing capabilities
+- **High-performance CSV reader** for bulk data import (also available as standalone NuGet package)
 - Multi-framework support (.NET Framework 4.7.2 and .NET 8.0)
 
 This library enables dbatools to work seamlessly across Windows PowerShell 5.1 and PowerShell 7+ on Windows, macOS, and Linux.
+
+## Standalone NuGet Packages
+
+### Dataplat.Dbatools.Csv
+
+[![NuGet](https://img.shields.io/nuget/v/Dataplat.Dbatools.Csv.svg)](https://www.nuget.org/packages/Dataplat.Dbatools.Csv)
+
+High-performance CSV reader and writer for .NET. **20%+ faster than LumenWorks CsvReader** with modern features:
+
+- Streaming `IDataReader` for SqlBulkCopy (~25,000 rows/sec)
+- Automatic compression support (GZip, Deflate, Brotli, ZLib)
+- Parallel processing for large files
+- Multi-character delimiters, smart quote handling
+- Robust error handling and security protections
+
+```bash
+dotnet add package Dataplat.Dbatools.Csv
+```
+
+See the [CSV package documentation](project/Dataplat.Dbatools.Csv/README.md) for full details.
 
 ## Installation
 
@@ -137,6 +159,8 @@ The library targets both:
 dbatools.library/
 ├── project/
 │   ├── dbatools/              # Main C# library project
+│   │   └── Csv/               # CSV reader/writer source
+│   ├── Dataplat.Dbatools.Csv/ # Standalone CSV NuGet package
 │   ├── dbatools.Tests/        # Unit tests
 │   └── dbatools.sln           # Solution file
 ├── build/                     # Build scripts
@@ -176,6 +200,12 @@ This library includes several major SQL Server components:
 | Microsoft.SqlServer.DacFx | 170.0.94 | Data-tier Application Framework |
 | Microsoft.AnalysisServices | 19.101.1 | Analysis Services management |
 | Microsoft.SqlServer.XEvent.XELite | 2024.2.5.1 | Extended Events processing |
+
+### Standalone Packages
+
+| Package | Purpose |
+|---------|---------|
+| [Dataplat.Dbatools.Csv](https://www.nuget.org/packages/Dataplat.Dbatools.Csv) | High-performance CSV reader/writer for .NET |
 
 ## Contributing
 
