@@ -51,11 +51,54 @@ try {
 } catch { }
 Pop-Location
 
-# Build and pack
-Write-Host "Building and packing NuGet package..." -ForegroundColor Yellow
+# Build first (without packing) so we can sign the DLLs
+Write-Host "Building project..." -ForegroundColor Yellow
 Push-Location $csvProjectPath
 try {
-    dotnet pack -c Release --nologo -o $csvArtifacts
+    dotnet build -c Release --nologo
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet build failed with exit code $LASTEXITCODE"
+    }
+} finally {
+    Pop-Location
+}
+
+# Sign the DLLs BEFORE packing if requested
+if ($Sign) {
+    if (Get-Command Invoke-DbatoolsTrustedSigning -ErrorAction SilentlyContinue) {
+        Write-Host ""
+        Write-Host "=== Signing with Azure Trusted Signing ===" -ForegroundColor Cyan
+
+        # Find built DLLs in the bin/Release folders
+        $binPath = Join-Path $csvProjectPath "bin\Release"
+        $dllsToSign = Get-ChildItem -Path $binPath -Filter "*.dll" -Recurse |
+            Where-Object { $_.Name -like "*Dbatools*" -or $_.Name -like "*Dataplat*" }
+
+        if ($dllsToSign) {
+            Write-Host "Signing $($dllsToSign.Count) DLL(s)..." -ForegroundColor Yellow
+
+            foreach ($dll in $dllsToSign) {
+                Write-Host "  Signing: $($dll.Name)" -ForegroundColor Gray
+                $result = $dll.FullName | Invoke-DbatoolsTrustedSigning
+                if ($result.Status -ne 'Valid') {
+                    Write-Warning "Signing failed for $($dll.Name): $($result.Status)"
+                } else {
+                    Write-Host "    Signed (Thumbprint: $($result.Thumbprint))" -ForegroundColor Green
+                }
+            }
+        } else {
+            Write-Host "No DLLs found to sign" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Warning "Invoke-DbatoolsTrustedSigning not found - skipping signing"
+    }
+}
+
+# Now pack (will include the signed DLLs)
+Write-Host "Packing NuGet package..." -ForegroundColor Yellow
+Push-Location $csvProjectPath
+try {
+    dotnet pack -c Release --nologo --no-build -o $csvArtifacts
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet pack failed with exit code $LASTEXITCODE"
     }
@@ -74,55 +117,6 @@ if (-not $nupkg) {
 Write-Host "Package created: $($nupkg.Name)" -ForegroundColor Green
 if ($snupkg) {
     Write-Host "Symbols package: $($snupkg.Name)" -ForegroundColor Green
-}
-
-# Sign the DLLs if requested and Invoke-DbatoolsTrustedSigning exists
-if ($Sign) {
-    if (Get-Command Invoke-DbatoolsTrustedSigning -ErrorAction SilentlyContinue) {
-        Write-Host ""
-        Write-Host "=== Signing with Azure Trusted Signing ===" -ForegroundColor Cyan
-
-        $tempExtract = Join-Path ([System.IO.Path]::GetTempPath()) "csv-sign-$(Get-Random)"
-        $null = New-Item -ItemType Directory -Path $tempExtract -Force
-
-        try {
-            # Extract the package
-            Write-Host "Extracting package for signing..." -ForegroundColor Yellow
-            Expand-Archive -Path $nupkg.FullName -DestinationPath $tempExtract -Force
-
-            # Find DLLs to sign
-            $dllsToSign = Get-ChildItem -Path $tempExtract -Filter "*.dll" -Recurse |
-                Where-Object { $_.Name -like "*Dbatools*" -or $_.Name -like "*Dataplat*" }
-
-            if ($dllsToSign) {
-                Write-Host "Signing $($dllsToSign.Count) DLL(s)..." -ForegroundColor Yellow
-
-                foreach ($dll in $dllsToSign) {
-                    Write-Host "  Signing: $($dll.Name)" -ForegroundColor Gray
-                    $result = $dll.FullName | Invoke-DbatoolsTrustedSigning
-                    if ($result.Status -ne 'Valid') {
-                        Write-Warning "Signing failed for $($dll.Name): $($result.Status)"
-                    } else {
-                        Write-Host "    Signed (Thumbprint: $($result.Thumbprint))" -ForegroundColor Green
-                    }
-                }
-
-                # Repack the signed package
-                Write-Host "Repacking signed package..." -ForegroundColor Yellow
-                Remove-Item $nupkg.FullName -Force
-                Push-Location $tempExtract
-                Compress-Archive -Path "*" -DestinationPath $nupkg.FullName -Force
-                Pop-Location
-                Write-Host "Repacked: $($nupkg.Name)" -ForegroundColor Green
-            }
-        } finally {
-            if (Test-Path $tempExtract) {
-                Remove-Item $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
-            }
-        }
-    } else {
-        Write-Warning "Invoke-DbatoolsTrustedSigning not found - skipping signing"
-    }
 }
 
 # Publish to NuGet if requested
