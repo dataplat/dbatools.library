@@ -142,7 +142,7 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
                 result = Convert.ChangeType(value, underlyingType ?? targetType);
                 return true;
             }
-            catch
+            catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is OverflowException)
             {
                 result = null;
                 return false;
