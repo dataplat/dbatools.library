@@ -177,13 +177,72 @@ var options = new CsvReaderOptions
     NormalizeQuotes = true
 };
 
-// Distinguish between null and empty string
-// ,, = null, ,"", = empty string
+// Distinguish between null and empty string (see examples below)
 var options = new CsvReaderOptions
 {
     DistinguishEmptyFromNull = true
 };
 ```
+
+### Null vs Empty String Handling
+
+CSV files can represent missing data in two ways: an empty field (`,,`) or an explicitly quoted empty string (`,"",...`). The `DistinguishEmptyFromNull` option controls how these are interpreted.
+
+**Example CSV:**
+```csv
+Name,Description,Notes
+Alice,,""
+Bob,"",
+Charlie,"Has value","Also has value"
+```
+
+**Default behavior (`DistinguishEmptyFromNull = false`):**
+
+Both empty fields and quoted empty strings become empty string (`""`):
+
+```csharp
+var options = new CsvReaderOptions { DistinguishEmptyFromNull = false }; // default
+using var reader = new CsvDataReader("data.csv", options);
+
+reader.Read(); // Alice row
+reader.IsDBNull(1);  // false - Description is ""
+reader.IsDBNull(2);  // false - Notes is ""
+reader.GetString(1); // ""
+reader.GetString(2); // ""
+```
+
+**With `DistinguishEmptyFromNull = true`:**
+
+Empty fields become `null`, quoted empty strings remain empty string:
+
+```csharp
+var options = new CsvReaderOptions { DistinguishEmptyFromNull = true };
+using var reader = new CsvDataReader("data.csv", options);
+
+reader.Read(); // Alice row
+reader.IsDBNull(1);  // true  - Description (,,) is NULL
+reader.IsDBNull(2);  // false - Notes ("") is empty string
+reader.GetString(1); // throws InvalidCastException (value is null)
+reader.GetValue(1);  // DBNull.Value
+reader.GetString(2); // ""
+```
+
+**When to use this option:**
+
+| Use Case | Recommendation |
+|----------|----------------|
+| SQL bulk import where NULL matters | Enable (`true`) |
+| Database columns with NOT NULL constraints | Disable (`false`) - default |
+| Preserving exact semantics from source system | Enable (`true`) |
+| Simple data processing | Disable (`false`) - default |
+
+**Quick reference:**
+
+| CSV Input | `DistinguishEmptyFromNull = false` | `DistinguishEmptyFromNull = true` |
+|-----------|-----------------------------------|----------------------------------|
+| `,,` (empty field) | `""` (empty string) | `null` (DBNull.Value) |
+| `,"",` (quoted empty) | `""` (empty string) | `""` (empty string) |
+| `,value,` | `"value"` | `"value"` |
 
 ## Configuration Options
 
