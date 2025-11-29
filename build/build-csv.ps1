@@ -22,19 +22,17 @@ $csvArtifacts = Join-Path $artifactsDir "csv"
 Write-Host "=== Dataplat.Dbatools.Csv Build Script ===" -ForegroundColor Cyan
 Write-Host ""
 
-# Update version if specified
+# Update or read version using XML parsing (safer than regex)
+[xml]$csproj = Get-Content $csvCsproj
+$propertyGroup = $csproj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1
+
 if ($Version) {
     Write-Host "Updating version to: $Version" -ForegroundColor Yellow
-    $csprojContent = Get-Content $csvCsproj -Raw
-    $csprojContent = $csprojContent -replace '<Version>[\d\.]+</Version>', "<Version>$Version</Version>"
-    Set-Content -Path $csvCsproj -Value $csprojContent -NoNewline
+    $propertyGroup.Version = $Version
+    $csproj.Save($csvCsproj)
 } else {
-    # Read current version
-    $csprojContent = Get-Content $csvCsproj -Raw
-    if ($csprojContent -match '<Version>([\d\.]+)</Version>') {
-        $Version = $matches[1]
-        Write-Host "Building version: $Version" -ForegroundColor Yellow
-    }
+    $Version = $propertyGroup.Version
+    Write-Host "Building version: $Version" -ForegroundColor Yellow
 }
 
 # Clean and create artifacts directory
