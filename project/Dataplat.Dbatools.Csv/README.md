@@ -211,6 +211,47 @@ var options = new CsvReaderOptions
 | `MaxDegreeOfParallelism` | `0` | Worker threads (0 = processor count) |
 | `InternStrings` | `false` | Intern common string values |
 
+## Thread Safety
+
+When **parallel processing is enabled**, `CsvDataReader` provides the following thread-safety guarantees:
+
+| Method/Property | Thread-Safe | Notes |
+|-----------------|-------------|-------|
+| `GetValue()` | Yes | Returns consistent snapshot of current record |
+| `GetValues()` | Yes | Atomic copy of all values in current record |
+| `CurrentRecordIndex` | Yes | No torn reads on 64-bit values |
+| `Close()` / `Dispose()` | Yes | Safely stops parallel pipeline from any thread |
+| `Read()` | No | Only one thread should call Read() |
+
+### Usage Pattern
+
+```csharp
+var options = new CsvReaderOptions
+{
+    EnableParallelProcessing = true,
+    MaxDegreeOfParallelism = 4
+};
+
+using var reader = new CsvDataReader("large-file.csv", options);
+
+while (reader.Read())  // Main thread only
+{
+    // Safe to read values from multiple threads concurrently
+    Parallel.For(0, 4, _ =>
+    {
+        var values = new object[reader.FieldCount];
+        reader.GetValues(values);  // Thread-safe
+        ProcessValues(values);
+    });
+}
+```
+
+### Important Notes
+
+- **Sequential mode** (parallel processing disabled): The reader is **not thread-safe**. All access should be from a single thread.
+- **Snapshot semantics**: Values returned by `GetValue()`/`GetValues()` represent a snapshot that may change after the next `Read()` call.
+- **Single reader thread**: Only one thread should call `Read()` at a time. Concurrent `Read()` calls are not supported.
+
 ## Target Frameworks
 
 - .NET Framework 4.7.2

@@ -19,6 +19,36 @@ namespace Dataplat.Dbatools.Csv.Reader
     /// Supports multi-character delimiters, type conversion, compression, error tracking, and static columns.
     /// Uses Span-based parsing and ArrayPool for maximum performance.
     /// </summary>
+    /// <remarks>
+    /// <para><b>Thread-Safety Guarantees:</b></para>
+    /// <para>
+    /// When parallel processing is enabled (<see cref="CsvReaderOptions.EnableParallelProcessing"/>),
+    /// this class provides the following thread-safety guarantees:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>
+    /// <see cref="GetValue"/> and <see cref="GetValues"/> are thread-safe and can be called
+    /// from multiple threads concurrently while <see cref="Read"/> is executing on another thread.
+    /// These methods return consistent snapshots of the current record's data.
+    /// </description></item>
+    /// <item><description>
+    /// <see cref="CurrentRecordIndex"/> is safe to read from any thread without torn reads.
+    /// </description></item>
+    /// <item><description>
+    /// <see cref="Close"/> and <see cref="Dispose"/> can be called from any thread and will
+    /// safely stop the parallel processing pipeline.
+    /// </description></item>
+    /// </list>
+    /// <para>
+    /// <b>Important:</b> While the above methods are thread-safe for concurrent reads,
+    /// the values returned represent a snapshot that may change after the next <see cref="Read"/> call.
+    /// Only one thread should call <see cref="Read"/> at a time.
+    /// </para>
+    /// <para>
+    /// In sequential mode (parallel processing disabled), the class is not thread-safe.
+    /// All access should be from a single thread.
+    /// </para>
+    /// </remarks>
     public sealed class CsvDataReader : IDataReader
     {
         #region Fields
@@ -30,13 +60,16 @@ namespace Dataplat.Dbatools.Csv.Reader
         private readonly List<StaticColumn> _staticColumns;
         private readonly List<CsvParseError> _parseErrors;
 
-        private string[] _currentRecord;
-        private bool[] _currentRecordWasQuoted;  // Track which fields were quoted for null vs empty
+        // Thread-safety note: These fields are accessed from the main thread during Read() and from
+        // user threads via GetValue()/GetValues(). We use volatile for reference visibility and
+        // lock (_resultLock) for atomic operations involving _convertedValues.
+        private volatile string[] _currentRecord;
+        private volatile bool[] _currentRecordWasQuoted;  // Track which fields were quoted for null vs empty
         private string[] _recordBuffer;
         private bool[] _quotedBuffer;
-        private object[] _convertedValues;
+        private volatile object[] _convertedValues;
         private bool _isInitialized;
-        private bool _isClosed;
+        private volatile bool _isClosed;
         private long _currentRecordIndex = -1;
         private long _currentLineNumber;
 
@@ -58,8 +91,8 @@ namespace Dataplat.Dbatools.Csv.Reader
         // Header name tracking for duplicate detection
         private readonly Dictionary<string, int> _headerNameCounts;
 
-        // Cached max source index to avoid LINQ per-row
-        private int _maxSourceIndex = -1;
+        // Cached max source index to avoid LINQ per-row (volatile for thread visibility in parallel mode)
+        private volatile int _maxSourceIndex = -1;
 
         // Reusable StringBuilder for quoted field parsing to reduce allocations
         private StringBuilder _quotedFieldBuilder;
@@ -155,8 +188,8 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         #region Parallel Processing Fields
 
-        // Parallel processing state
-        private bool _useParallelProcessing;
+        // Parallel processing state (volatile for thread visibility across main/worker threads)
+        private volatile bool _useParallelProcessing;
         private BlockingCollection<LineData> _lineQueue;
         private BlockingCollection<ParsedRecord> _resultQueue;
         private Thread _producerThread;
@@ -1153,7 +1186,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                         }
 
                         _currentParsedRecord = record;
-                        _currentRecordIndex = record.RecordIndex;
+                        Interlocked.Exchange(ref _currentRecordIndex, record.RecordIndex);
                         Array.Copy(record.Values, _convertedValues, record.Values.Length);
                         return true;
                     }
@@ -1182,7 +1215,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                                     }
 
                                     _currentParsedRecord = lastRecord;
-                                    _currentRecordIndex = lastRecord.RecordIndex;
+                                    Interlocked.Exchange(ref _currentRecordIndex, lastRecord.RecordIndex);
                                     Array.Copy(lastRecord.Values, _convertedValues, lastRecord.Values.Length);
                                     return true;
                                 }
@@ -1245,9 +1278,13 @@ namespace Dataplat.Dbatools.Csv.Reader
                         continue;
                     }
 
-                    _currentParsedRecord = result;
-                    _currentRecordIndex = result.RecordIndex;
-                    Array.Copy(result.Values, _convertedValues, result.Values.Length);
+                    // Synchronize to prevent GetValue/GetValues from reading during Array.Copy
+                    lock (_resultLock)
+                    {
+                        _currentParsedRecord = result;
+                        Interlocked.Exchange(ref _currentRecordIndex, result.RecordIndex);
+                        Array.Copy(result.Values, _convertedValues, result.Values.Length);
+                    }
                     return true;
                 }
 
@@ -1725,25 +1762,55 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// <summary>
         /// Gets the value at the specified column index.
         /// </summary>
+        /// <remarks>
+        /// Thread-safety: In parallel mode, this method is thread-safe and can be called
+        /// from any thread while Read() is being called from another thread. However,
+        /// the value returned represents a snapshot and may change after the next Read() call.
+        /// </remarks>
         public object GetValue(int ordinal)
         {
             ThrowIfClosed();
             ValidateOrdinal(ordinal);
+
+            // In parallel mode, synchronize access to prevent torn reads during Array.Copy
+            if (_useParallelProcessing)
+            {
+                lock (_resultLock)
+                {
+                    return _convertedValues[ordinal];
+                }
+            }
             return _convertedValues[ordinal];
         }
 
         /// <summary>
         /// Gets all values in the current record.
         /// </summary>
+        /// <remarks>
+        /// Thread-safety: In parallel mode, this method is thread-safe and can be called
+        /// from any thread while Read() is being called from another thread. However,
+        /// the values returned represent a snapshot and may change after the next Read() call.
+        /// </remarks>
         public int GetValues(object[] values)
         {
             ThrowIfClosed();
             if (values == null)
                 throw new ArgumentNullException(nameof(values));
 
-            int count = Math.Min(values.Length, _convertedValues.Length);
-            Array.Copy(_convertedValues, values, count);
-            return count;
+            // In parallel mode, synchronize access to prevent torn reads during Array.Copy
+            if (_useParallelProcessing)
+            {
+                lock (_resultLock)
+                {
+                    int count = Math.Min(values.Length, _convertedValues.Length);
+                    Array.Copy(_convertedValues, values, count);
+                    return count;
+                }
+            }
+
+            int seqCount = Math.Min(values.Length, _convertedValues.Length);
+            Array.Copy(_convertedValues, values, seqCount);
+            return seqCount;
         }
 
         /// <summary>
@@ -3352,7 +3419,10 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// <summary>
         /// Gets the current record index (zero-based).
         /// </summary>
-        public long CurrentRecordIndex => _currentRecordIndex;
+        /// <remarks>
+        /// Thread-safety: Uses atomic read to prevent torn reads on 64-bit values.
+        /// </remarks>
+        public long CurrentRecordIndex => Interlocked.Read(ref _currentRecordIndex);
 
         /// <summary>
         /// Gets the current line number in the file (one-based).
