@@ -2783,15 +2783,13 @@ namespace Dataplat.Dbatools.Csv.Reader
         private bool MatchesDelimiterAt(int position)
         {
             string delimiter = _options.Delimiter;
-            if (position + delimiter.Length > _bufferLength)
+            int delimLength = delimiter.Length;
+            if (position + delimLength > _bufferLength)
                 return false;
 
-            for (int i = 0; i < delimiter.Length; i++)
-            {
-                if (_buffer[position + i] != delimiter[i])
-                    return false;
-            }
-            return true;
+            // Use Span.SequenceEqual for vectorized comparison on multi-char delimiters
+            ReadOnlySpan<char> bufferSlice = _buffer.AsSpan(position, delimLength);
+            return bufferSlice.SequenceEqual(delimiter.AsSpan());
         }
 
         /// <summary>
@@ -2949,15 +2947,13 @@ namespace Dataplat.Dbatools.Csv.Reader
         private bool MatchesDelimiterAtPosition()
         {
             string delimiter = _options.Delimiter;
-            if (_bufferPosition + delimiter.Length > _bufferLength)
+            int delimLength = delimiter.Length;
+            if (_bufferPosition + delimLength > _bufferLength)
                 return false;
 
-            for (int i = 0; i < delimiter.Length; i++)
-            {
-                if (_buffer[_bufferPosition + i] != delimiter[i])
-                    return false;
-            }
-            return true;
+            // Use Span.SequenceEqual for vectorized comparison on multi-char delimiters
+            ReadOnlySpan<char> bufferSlice = _buffer.AsSpan(_bufferPosition, delimLength);
+            return bufferSlice.SequenceEqual(delimiter.AsSpan());
         }
 
         /// <summary>
