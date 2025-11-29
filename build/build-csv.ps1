@@ -81,10 +81,9 @@ if ($Sign) {
                 Write-Host "  Signing: $($dll.Name)" -ForegroundColor Gray
                 $result = $dll.FullName | Invoke-DbatoolsTrustedSigning
                 if ($result.Status -ne 'Valid') {
-                    Write-Warning "Signing failed for $($dll.Name): $($result.Status)"
-                } else {
-                    Write-Host "    Signed (Thumbprint: $($result.Thumbprint))" -ForegroundColor Green
+                    throw "Signing failed for $($dll.Name): Status '$($result.Status)'. Cannot continue with unsigned DLLs."
                 }
+                Write-Host "    Signed (Thumbprint: $($result.Thumbprint))" -ForegroundColor Green
             }
         } else {
             Write-Host "No DLLs found to sign" -ForegroundColor Yellow
