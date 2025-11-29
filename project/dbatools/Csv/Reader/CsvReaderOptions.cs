@@ -47,11 +47,26 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
         }
 
+        private string _delimiter = ",";
+
         /// <summary>
         /// Gets or sets the field delimiter. Can be multiple characters.
         /// Default is comma. Addresses issue #6488 (multi-character delimiters).
         /// </summary>
-        public string Delimiter { get; set; } = ",";
+        /// <exception cref="ArgumentNullException">Thrown when value is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when value is empty.</exception>
+        public string Delimiter
+        {
+            get => _delimiter;
+            set
+            {
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value), "Delimiter cannot be null.");
+                if (value.Length == 0)
+                    throw new ArgumentException("Delimiter cannot be empty.", nameof(value));
+                _delimiter = value;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the quote character used to enclose fields.
