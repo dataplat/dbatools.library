@@ -3528,6 +3528,17 @@ namespace Dataplat.Dbatools.Csv.Reader
                     return;
                 }
             }
+
+            // Also check static columns - they already have a type set, but allow changing it
+            for (int i = 0; i < _staticColumns.Count; i++)
+            {
+                if (string.Equals(_staticColumns[i].Name, columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    _staticColumns[i].DataType = type;
+                    return;
+                }
+            }
+
             throw new ArgumentException($"Column '{columnName}' not found", nameof(columnName));
         }
 
