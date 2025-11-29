@@ -215,7 +215,6 @@ if (-not $bogusCoreCopied) {
 Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/net461/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "desktop/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
 Copy-Item (Join-Path $tempPath "LumenWorksCsvReader/lib/netstandard2.0/LumenWorks.Framework.IO.dll") -Destination (Join-Path $libPath "core/third-party/LumenWorks/LumenWorks.Framework.IO.dll") -Force
 
-
 # Core files are already in place from dotnet publish
 
 # Copy var/misc files to appropriate locations

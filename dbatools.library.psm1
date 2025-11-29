@@ -166,12 +166,6 @@ try {
     Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
 }
 
-try {
-    $null = Import-Module ([IO.Path]::Combine($script:libraryroot, "third-party", "LumenWorks", "LumenWorks.Framework.IO.dll"))
-} catch {
-    Write-Error "Could not import LumenWorks.Framework.IO.dll : $($_ | Out-String)"
-}
-
 foreach ($name in $names) {
     # REMOVED win-sqlclient handling and mac-specific logic since files are in standard lib folder
 
