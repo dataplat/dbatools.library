@@ -9,17 +9,21 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// </summary>
     public sealed class Int16Converter : CultureAwareConverterBase<short>
     {
+        /// <summary>Gets the default instance of the converter.</summary>
         public static Int16Converter Default { get; } = new Int16Converter();
 
+        /// <summary>Initializes a new instance of the <see cref="Int16Converter"/> class.</summary>
         public Int16Converter()
         {
             NumberStyles = NumberStyles.Integer;
         }
 
+        /// <inheritdoc />
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out short result)
             => short.TryParse(value, styles, provider, out result);
 
 #if NET8_0_OR_GREATER
+        /// <inheritdoc />
         protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out short result)
             => short.TryParse(value, styles, provider, out result);
 #endif
@@ -31,17 +35,21 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// </summary>
     public sealed class Int32Converter : CultureAwareConverterBase<int>
     {
+        /// <summary>Gets the default instance of the converter.</summary>
         public static Int32Converter Default { get; } = new Int32Converter();
 
+        /// <summary>Initializes a new instance of the <see cref="Int32Converter"/> class.</summary>
         public Int32Converter()
         {
             NumberStyles = NumberStyles.Integer;
         }
 
+        /// <inheritdoc />
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out int result)
             => int.TryParse(value, styles, provider, out result);
 
 #if NET8_0_OR_GREATER
+        /// <inheritdoc />
         protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out int result)
             => int.TryParse(value, styles, provider, out result);
 #endif
@@ -53,17 +61,21 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// </summary>
     public sealed class Int64Converter : CultureAwareConverterBase<long>
     {
+        /// <summary>Gets the default instance of the converter.</summary>
         public static Int64Converter Default { get; } = new Int64Converter();
 
+        /// <summary>Initializes a new instance of the <see cref="Int64Converter"/> class.</summary>
         public Int64Converter()
         {
             NumberStyles = NumberStyles.Integer;
         }
 
+        /// <inheritdoc />
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out long result)
             => long.TryParse(value, styles, provider, out result);
 
 #if NET8_0_OR_GREATER
+        /// <inheritdoc />
         protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out long result)
             => long.TryParse(value, styles, provider, out result);
 #endif
@@ -75,17 +87,21 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// </summary>
     public sealed class SingleConverter : CultureAwareConverterBase<float>
     {
+        /// <summary>Gets the default instance of the converter.</summary>
         public static SingleConverter Default { get; } = new SingleConverter();
 
+        /// <summary>Initializes a new instance of the <see cref="SingleConverter"/> class.</summary>
         public SingleConverter()
         {
             NumberStyles = NumberStyles.Float | NumberStyles.AllowThousands;
         }
 
+        /// <inheritdoc />
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out float result)
             => float.TryParse(value, styles, provider, out result);
 
 #if NET8_0_OR_GREATER
+        /// <inheritdoc />
         protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out float result)
             => float.TryParse(value, styles, provider, out result);
 #endif
@@ -97,17 +113,21 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// </summary>
     public sealed class DoubleConverter : CultureAwareConverterBase<double>
     {
+        /// <summary>Gets the default instance of the converter.</summary>
         public static DoubleConverter Default { get; } = new DoubleConverter();
 
+        /// <summary>Initializes a new instance of the <see cref="DoubleConverter"/> class.</summary>
         public DoubleConverter()
         {
             NumberStyles = NumberStyles.Float | NumberStyles.AllowThousands;
         }
 
+        /// <inheritdoc />
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out double result)
             => double.TryParse(value, styles, provider, out result);
 
 #if NET8_0_OR_GREATER
+        /// <inheritdoc />
         protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out double result)
             => double.TryParse(value, styles, provider, out result);
 #endif
@@ -120,17 +140,21 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// </summary>
     public sealed class DecimalConverter : CultureAwareConverterBase<decimal>
     {
+        /// <summary>Gets the default instance of the converter.</summary>
         public static DecimalConverter Default { get; } = new DecimalConverter();
 
+        /// <summary>Initializes a new instance of the <see cref="DecimalConverter"/> class.</summary>
         public DecimalConverter()
         {
             NumberStyles = NumberStyles.Number;
         }
 
+        /// <inheritdoc />
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out decimal result)
             => decimal.TryParse(value, styles, provider, out result);
 
 #if NET8_0_OR_GREATER
+        /// <inheritdoc />
         protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out decimal result)
             => decimal.TryParse(value, styles, provider, out result);
 #endif
@@ -142,17 +166,21 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// </summary>
     public sealed class ByteConverter : CultureAwareConverterBase<byte>
     {
+        /// <summary>Gets the default instance of the converter.</summary>
         public static ByteConverter Default { get; } = new ByteConverter();
 
+        /// <summary>Initializes a new instance of the <see cref="ByteConverter"/> class.</summary>
         public ByteConverter()
         {
             NumberStyles = NumberStyles.Integer;
         }
 
+        /// <inheritdoc />
         protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out byte result)
             => byte.TryParse(value, styles, provider, out result);
 
 #if NET8_0_OR_GREATER
+        /// <inheritdoc />
         protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out byte result)
             => byte.TryParse(value, styles, provider, out result);
 #endif

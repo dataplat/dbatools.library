@@ -1887,24 +1887,38 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         #region Typed Accessors
 
+        /// <inheritdoc />
         public bool GetBoolean(int ordinal) => (bool)GetValue(ordinal);
+        /// <inheritdoc />
         public byte GetByte(int ordinal) => (byte)GetValue(ordinal);
+        /// <inheritdoc />
         public char GetChar(int ordinal) => (char)GetValue(ordinal);
+        /// <inheritdoc />
         public DateTime GetDateTime(int ordinal) => (DateTime)GetValue(ordinal);
+        /// <inheritdoc />
         public decimal GetDecimal(int ordinal) => (decimal)GetValue(ordinal);
+        /// <inheritdoc />
         public double GetDouble(int ordinal) => (double)GetValue(ordinal);
+        /// <inheritdoc />
         public float GetFloat(int ordinal) => (float)GetValue(ordinal);
+        /// <inheritdoc />
         public Guid GetGuid(int ordinal) => (Guid)GetValue(ordinal);
+        /// <inheritdoc />
         public short GetInt16(int ordinal) => (short)GetValue(ordinal);
+        /// <inheritdoc />
         public int GetInt32(int ordinal) => (int)GetValue(ordinal);
+        /// <inheritdoc />
         public long GetInt64(int ordinal) => (long)GetValue(ordinal);
+        /// <inheritdoc />
         public string GetString(int ordinal) => GetValue(ordinal)?.ToString();
 
+        /// <inheritdoc />
         public long GetBytes(int ordinal, long fieldOffset, byte[] buffer, int bufferOffset, int length)
         {
             throw new NotSupportedException("GetBytes is not supported for CSV data");
         }
 
+        /// <inheritdoc />
         public long GetChars(int ordinal, long fieldOffset, char[] buffer, int bufferOffset, int length)
         {
             string value = GetString(ordinal);
@@ -1916,6 +1930,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             return copyLength;
         }
 
+        /// <inheritdoc />
         public IDataReader GetData(int ordinal)
         {
             throw new NotSupportedException("Nested data readers are not supported for CSV data");
@@ -3526,10 +3541,12 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             _staticColumns.Add(column);
 
-            if (_convertedValues != null)
+            var convertedValues = _convertedValues;
+            if (convertedValues != null)
             {
                 // Resize converted values array
-                Array.Resize(ref _convertedValues, _columns.Count + _staticColumns.Count);
+                Array.Resize(ref convertedValues, _columns.Count + _staticColumns.Count);
+                _convertedValues = convertedValues;
             }
         }
 
@@ -3546,12 +3563,17 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         #region IDataReader Members
 
+        /// <inheritdoc />
         public int Depth => 0;
+        /// <inheritdoc />
         public bool IsClosed => _isClosed;
+        /// <inheritdoc />
         public int RecordsAffected => -1;
 
+        /// <inheritdoc />
         public bool NextResult() => false;
 
+        /// <inheritdoc />
         public void Close()
         {
             if (!_isClosed)
@@ -3575,6 +3597,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             Close();
