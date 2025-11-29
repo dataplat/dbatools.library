@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using Dataplat.Dbatools.Csv.Reader;
+using Dataplat.Dbatools.Csv.Writer;
 
 namespace Dataplat.Dbatools.Csv.Compression
 {
@@ -230,7 +232,7 @@ namespace Dataplat.Dbatools.Csv.Compression
                 throw new ArgumentNullException(nameof(filePath));
 
             Stream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read,
-                bufferSize: 65536, FileOptions.SequentialScan);
+                bufferSize: CsvReaderOptions.DefaultBufferSize, FileOptions.SequentialScan);
 
             CompressionType compressionType;
 
@@ -262,7 +264,7 @@ namespace Dataplat.Dbatools.Csv.Compression
                 throw new ArgumentNullException(nameof(filePath));
 
             Stream fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None,
-                bufferSize: 65536, FileOptions.SequentialScan);
+                bufferSize: CsvWriterOptions.DefaultBufferSize, FileOptions.SequentialScan);
 
             return WrapForCompression(fileStream, compressionType, level);
         }

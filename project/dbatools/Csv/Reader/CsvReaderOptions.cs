@@ -12,8 +12,13 @@ namespace Dataplat.Dbatools.Csv.Reader
     /// </summary>
     public sealed class CsvReaderOptions
     {
+        /// <summary>
+        /// Default buffer size in bytes (64KB).
+        /// </summary>
+        public const int DefaultBufferSize = 65536;
+
         private int _skipRows;
-        private int _bufferSize = 65536;
+        private int _bufferSize = DefaultBufferSize;
         private int _maxQuotedFieldLength;
         private int _maxParseErrors = 1000;
         private int _maxDegreeOfParallelism;
@@ -74,7 +79,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         /// <summary>
         /// Gets or sets the internal buffer size in bytes.
-        /// Default is 65536 (64KB) for better performance than LumenWorks' 4KB.
+        /// Default is <see cref="DefaultBufferSize"/> (64KB) for better performance than LumenWorks' 4KB.
         /// Minimum value is 128 bytes.
         /// </summary>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when value is less than 128.</exception>

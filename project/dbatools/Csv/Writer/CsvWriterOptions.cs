@@ -12,6 +12,11 @@ namespace Dataplat.Dbatools.Csv.Writer
     public sealed class CsvWriterOptions
     {
         /// <summary>
+        /// Default buffer size in bytes (64KB).
+        /// </summary>
+        public const int DefaultBufferSize = 65536;
+
+        /// <summary>
         /// Gets or sets whether to write a header row.
         /// Default is true.
         /// </summary>
@@ -67,9 +72,9 @@ namespace Dataplat.Dbatools.Csv.Writer
 
         /// <summary>
         /// Gets or sets the buffer size in bytes.
-        /// Default is 65536 (64KB).
+        /// Default is <see cref="DefaultBufferSize"/> (64KB).
         /// </summary>
-        public int BufferSize { get; set; } = 65536;
+        public int BufferSize { get; set; } = DefaultBufferSize;
 
         /// <summary>
         /// Gets or sets the date time format string for DateTime values.
