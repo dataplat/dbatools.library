@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\project\dbatools\dbatools.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="LumenWorks.Framework.IO">
+      <HintPath>..\..\artifacts\dbatools.library\core\third-party\LumenWorks\LumenWorks.Framework.IO.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
