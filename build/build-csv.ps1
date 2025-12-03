@@ -41,13 +41,12 @@ if (Test-Path $csvArtifacts) {
 }
 $null = New-Item -ItemType Directory -Path $csvArtifacts -Force
 
-# Clean previous builds
+# Clean previous builds (including obj folder to clear cached pack settings)
 Write-Host "Cleaning previous builds..." -ForegroundColor Yellow
-Push-Location $csvProjectPath
-try {
-    dotnet clean -c Release --nologo 2>$null
-} catch { }
-Pop-Location
+$cleanBinPath = Join-Path $csvProjectPath "bin"
+$cleanObjPath = Join-Path $csvProjectPath "obj"
+if (Test-Path $cleanBinPath) { Remove-Item $cleanBinPath -Recurse -Force }
+if (Test-Path $cleanObjPath) { Remove-Item $cleanObjPath -Recurse -Force }
 
 # Build first (without packing) so we can sign the DLLs
 Write-Host "Building project..." -ForegroundColor Yellow
@@ -103,18 +102,17 @@ try {
     Pop-Location
 }
 
-# Find the generated packages
+# Find the generated package (no snupkg - we use embedded PDBs)
 $nupkg = Get-ChildItem -Path $csvArtifacts -Filter "*.nupkg" | Select-Object -First 1
-$snupkg = Get-ChildItem -Path $csvArtifacts -Filter "*.snupkg" | Select-Object -First 1
 
 if (-not $nupkg) {
     throw "No .nupkg file found in $csvArtifacts"
 }
 
+# Remove any snupkg that might have been generated (shouldn't happen with current settings)
+Get-ChildItem -Path $csvArtifacts -Filter "*.snupkg" | Remove-Item -Force
+
 Write-Host "Package created: $($nupkg.Name)" -ForegroundColor Green
-if ($snupkg) {
-    Write-Host "Symbols package: $($snupkg.Name)" -ForegroundColor Green
-}
 
 # Publish to NuGet if requested
 if ($Publish) {
@@ -129,10 +127,6 @@ if ($Publish) {
         Write-Host "=== Publishing to NuGet ===" -ForegroundColor Cyan
 
         dotnet nuget push $nupkg.FullName --api-key $NuGetApiKey --source https://api.nuget.org/v3/index.json --skip-duplicate
-
-        if ($snupkg) {
-            dotnet nuget push $snupkg.FullName --api-key $NuGetApiKey --source https://api.nuget.org/v3/index.json --skip-duplicate
-        }
 
         if ($LASTEXITCODE -eq 0) {
             Write-Host "Published to NuGet!" -ForegroundColor Green
