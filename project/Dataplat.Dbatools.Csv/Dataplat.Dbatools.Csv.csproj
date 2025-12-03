@@ -23,8 +23,7 @@
     <PackageReleaseNotes>Initial release with high-performance CSV parsing, parallel processing support, and comprehensive edge case handling.</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <IncludeSymbols>false</IncludeSymbols>
 
     <!-- Build settings -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -34,7 +33,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <DebugType>portable</DebugType>
+    <DebugType>embedded</DebugType>
     <Optimize>true</Optimize>
   </PropertyGroup>
 
