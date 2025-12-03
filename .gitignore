@@ -60,3 +60,6 @@ obj/
 packages/
 *.nupkg
 TestResults/
+
+# Local publish script with API key
+publish.ps1

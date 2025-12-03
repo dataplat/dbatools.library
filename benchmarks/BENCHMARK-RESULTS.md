@@ -6,22 +6,22 @@ Comprehensive benchmarks comparing **Dataplat.Dbatools.Csv** against **LumenWork
 
 | Scenario | Dataplat | LumenWorks | Speed Boost | Memory Savings |
 |----------|----------|------------|-------------|----------------|
-| **Small** (1K rows) | 1.06 ms | 4.00 ms | **3.8x faster** | **25x less** (668 KB vs 16.6 MB) |
-| **Medium** (100K rows) | 66.5 ms | 362.5 ms | **5.5x faster** | **41x less** (40 MB vs 1.6 GB) |
-| **Large** (1M rows) | 844 ms | 3,714 ms | **4.4x faster** | **40x less** (420 MB vs 16.7 GB) |
-| **Wide** (100K×50 cols) | 407 ms | 609 ms | **1.5x faster** | **7.3x less** (228 MB vs 1.6 GB) |
-| **Quoted** (100K rows) | 120 ms | 400 ms | **3.3x faster** | **41x less** (40 MB vs 1.6 GB) |
-| **AllValues** (100K rows) | 82.5 ms | 121 ms | **1.47x faster** | **4.5x less** (41 MB vs 183 MB) |
+| **Small** (1K rows) | 0.83 ms | 3.26 ms | **3.9x faster** | **25x less** (667 KB vs 16.6 MB) |
+| **Medium** (100K rows) | 65.3 ms | 364.5 ms | **5.6x faster** | **41x less** (40 MB vs 1.6 GB) |
+| **Large** (1M rows) | 559 ms | 3,435 ms | **6.1x faster** | **40x less** (420 MB vs 16.7 GB) |
+| **Wide** (100K×50 cols) | 277 ms | 493 ms | **1.8x faster** | **7.3x less** (228 MB vs 1.6 GB) |
+| **Quoted** (100K rows) | 89.2 ms | 340 ms | **3.8x faster** | **41x less** (40 MB vs 1.6 GB) |
+| **AllValues** (100K rows) | 54.5 ms | 118 ms | **2.2x faster** | **4.5x less** (41 MB vs 183 MB) |
 
 ## Key Findings
 
 ### 1. Large File Performance
 
 Processing 1 million rows (96 MB CSV file):
-- **Dataplat**: 0.84 seconds using 420 MB RAM
-- **LumenWorks**: 3.7 seconds using 16.7 GB RAM
+- **Dataplat**: 0.56 seconds using 420 MB RAM
+- **LumenWorks**: 3.4 seconds using 16.7 GB RAM
 
-This represents a **4.4x speed improvement** with **40x less memory allocation**.
+This represents a **6.1x speed improvement** with **40x less memory allocation**.
 
 ### 2. Memory Efficiency
 
@@ -70,20 +70,20 @@ BenchmarkDotNet v0.14.0, Windows 11 (10.0.26100.7171) (Hyper-V)
 ## Raw Benchmark Data
 
 ```
-| Method               | Mean         | Error      | StdDev     | Op/s     | Ratio     | Rank | Gen0        | Gen1       | Allocated      | Alloc Ratio |
-|--------------------- |-------------:|-----------:|-----------:|---------:|----------:|-----:|------------:|-----------:|---------------:|------------:|
-| Dataplat-Small       |     1.061 ms |  0.0150 ms |  0.0140 ms | 942.9113 |  baseline |    1 |     41.0156 |    41.0156 |      667.75 KB |             |
-| LumenWorks-Small     |     3.999 ms |  0.0597 ms |  0.0559 ms | 250.0789 |     +277% |    2 |    671.8750 |    62.5000 |    16618.66 KB |     +2,389% |
-| Dataplat-Medium      |    66.540 ms |  3.1298 ms |  9.2284 ms |  15.0285 |   +6,175% |    3 |   1555.5556 |   111.1111 |    40829.98 KB |     +6,015% |
-| Dataplat-AllValues   |    82.480 ms |  1.5495 ms |  1.3735 ms |  12.1241 |   +7,678% |    4 |   1500.0000 |   166.6667 |    40837.20 KB |     +6,016% |
-| Dataplat-Quoted      |   120.510 ms |  2.0014 ms |  1.7741 ms |   8.2981 |  +11,265% |    5 |   1600.0000 |   200.0000 |    40841.37 KB |     +6,016% |
-| LumenWorks-AllValues |   121.231 ms |  2.2611 ms |  2.7769 ms |   8.2487 |  +11,333% |    5 |   7250.0000 |          - |   182683.81 KB |    +27,258% |
-| LumenWorks-Medium    |   362.485 ms |  6.8274 ms |  7.8624 ms |   2.7587 |  +34,085% |    6 |  68000.0000 |  2000.0000 |  1672611.63 KB |   +250,385% |
-| LumenWorks-Quoted    |   399.673 ms |  7.9182 ms |  7.4067 ms |   2.5020 |  +37,592% |    7 |  68000.0000 |  2000.0000 |  1672535.01 KB |   +250,373% |
-| Dataplat-Wide        |   407.089 ms |  8.0846 ms | 12.8230 ms |   2.4565 |  +38,291% |    7 |   9000.0000 |          - |   228451.16 KB |    +34,112% |
-| LumenWorks-Wide      |   608.700 ms | 11.7271 ms | 10.9695 ms |   1.6428 |  +57,304% |    8 |  68000.0000 |  2000.0000 |  1672654.66 KB |   +250,391% |
-| Dataplat-Large       |   844.000 ms | 16.6531 ms | 23.3453 ms |   1.1848 |  +79,495% |    9 |  17000.0000 |          - |   419991.88 KB |    +62,797% |
-| LumenWorks-Large     | 3,713.854 ms | 58.6356 ms | 54.8478 ms |   0.2693 | +350,141% |   10 | 683000.0000 | 21000.0000 | 16740307.46 KB | +2,506,872% |
+| Method               | Mean           | Error        | StdDev       | Median         | Op/s       | Ratio     | RatioSD | Rank | Gen0        | Gen1       | Gen2    | Allocated      | Alloc Ratio |
+|--------------------- |---------------:|-------------:|-------------:|---------------:|-----------:|----------:|--------:|-----:|------------:|-----------:|--------:|---------------:|------------:|
+| Dataplat-Small       |       826.7 μs |     34.19 μs |     100.8 μs |       805.3 μs | 1,209.6657 |  baseline |         |    1 |     41.0156 |    41.0156 | 41.0156 |         667 KB |             |
+| LumenWorks-Small     |     3,264.2 μs |     90.60 μs |     267.1 μs |     3,243.7 μs |   306.3520 |     +300% |   14.1% |    2 |    675.7813 |    62.5000 |       - |    16618.51 KB |     +2,392% |
+| Dataplat-AllValues   |    54,471.7 μs |  1,875.87 μs |   5,382.2 μs |    53,452.1 μs |    18.3581 |   +6,582% |   15.2% |    3 |   1625.0000 |   125.0000 |       - |     40815.9 KB |     +6,019% |
+| Dataplat-Medium      |    65,298.3 μs |  4,726.69 μs |  13,936.8 μs |    65,426.9 μs |    15.3143 |   +7,910% |   24.3% |    3 |   1571.4286 |   142.8571 |       - |    40815.81 KB |     +6,019% |
+| Dataplat-Quoted      |    89,173.8 μs |  5,156.49 μs |  15,204.0 μs |    84,730.9 μs |    11.2141 |  +10,839% |   20.6% |    4 |   1600.0000 |   200.0000 |       - |    40815.83 KB |     +6,019% |
+| LumenWorks-AllValues |   118,358.4 μs |  3,027.61 μs |   8,927.0 μs |   121,694.9 μs |     8.4489 |  +14,419% |   13.8% |    5 |   7333.3333 |          - |       - |   182683.78 KB |    +27,289% |
+| Dataplat-Wide        |   277,455.6 μs |  9,615.03 μs |  27,741.6 μs |   268,695.0 μs |     3.6042 |  +33,936% |   15.3% |    6 |   9000.0000 |          - |       - |   228322.75 KB |    +34,131% |
+| LumenWorks-Quoted    |   340,368.8 μs | 12,949.31 μs |  38,181.3 μs |   339,707.2 μs |     2.9380 |  +41,654% |   16.1% |    7 |  68000.0000 |  2000.0000 |       - |  1672514.96 KB |   +250,652% |
+| LumenWorks-Medium    |   364,534.7 μs |  6,755.72 μs |   5,988.8 μs |   365,163.2 μs |     2.7432 |  +44,619% |   11.6% |    7 |  68000.0000 |  2000.0000 |       - |  1672594.25 KB |   +250,664% |
+| LumenWorks-Wide      |   493,391.5 μs | 13,125.53 μs |  38,287.8 μs |   487,848.1 μs |     2.0268 |  +60,426% |   13.9% |    8 |  68000.0000 |  2000.0000 |       - |  1672630.95 KB |   +250,669% |
+| Dataplat-Large       |   558,588.9 μs | 18,796.49 μs |  54,232.2 μs |   544,172.5 μs |     1.7902 |  +68,424% |   15.1% |    9 |  17000.0000 |          - |       - |   419863.79 KB |    +62,848% |
+| LumenWorks-Large     | 3,434,712.2 μs | 80,438.12 μs | 237,173.6 μs | 3,433,085.7 μs |     0.2911 | +421,248% |   13.4% |   10 | 683000.0000 | 21000.0000 |       - | 16740287.41 KB | +2,509,688% |
 ```
 
 ## Running the Benchmarks
@@ -99,7 +99,7 @@ dotnet run -c Release -- --quick
 
 ## Conclusion
 
-Dataplat.Dbatools.Csv is not just "faster" - it operates in a completely different performance class. The combination of **4-5x speed improvement** and **40x memory reduction** means:
+Dataplat.Dbatools.Csv is not just "faster" - it operates in a completely different performance class. The combination of **4-6x speed improvement** and **40x memory reduction** means:
 
 1. Files that would cause LumenWorks to crash with `OutOfMemoryException` process successfully
 2. Server resources are used more efficiently
@@ -110,4 +110,4 @@ The implementation is production-ready and highly optimized for real-world CSV p
 
 ---
 
-*Benchmarks run on 2025-12-01 using BenchmarkDotNet v0.14.0*
+*Benchmarks run on 2025-12-02 using BenchmarkDotNet v0.14.0*
