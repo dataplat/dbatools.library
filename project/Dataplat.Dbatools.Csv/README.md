@@ -4,7 +4,7 @@
 [![NuGet Downloads](https://img.shields.io/nuget/dt/Dataplat.Dbatools.Csv.svg)](https://www.nuget.org/packages/Dataplat.Dbatools.Csv)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**The performance-optimized CSV library built for database professionals.** High-performance CSV reader and writer for .NET from the trusted [dbatools](https://dbatools.io) project.
+**The performance-optimized CSV library built for SQL Server.** High-performance CSV reader and writer for .NET from the trusted [dbatools](https://dbatools.io) project.
 
 **What makes this library unique:**
 - **Native IDataReader** - Stream directly to SqlBulkCopy with zero intermediate allocations
