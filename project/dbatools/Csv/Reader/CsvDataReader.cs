@@ -118,6 +118,10 @@ namespace Dataplat.Dbatools.Csv.Reader
         private System.Buffers.SearchValues<char> _fieldTerminators;
 #endif
 
+        // Fast path optimization flags - determined during initialization
+        private bool _useFastConversion;               // True when simple string-only conversion can be used
+        private bool _useFastParsing;                  // True when ultra-fast inline parsing can be used
+
         #endregion
 
         #region Field Info Structure
@@ -466,6 +470,9 @@ namespace Dataplat.Dbatools.Csv.Reader
             // Cache converters for each column to avoid per-row registry lookups
             CacheColumnConverters();
 
+            // Determine if we can use fast path optimizations
+            InitializeFastPathOptimizations();
+
             // Prepare converted values array
             _convertedValues = new object[_columns.Count + _staticColumns.Count];
 
@@ -487,6 +494,56 @@ namespace Dataplat.Dbatools.Csv.Reader
                 // Use custom converter if specified, otherwise look up from registry
                 column.CachedConverter = column.Converter ?? _options.TypeConverterRegistry?.GetConverter(column.DataType);
             }
+        }
+
+        /// <summary>
+        /// Initializes fast path optimization flags based on options and column configuration.
+        /// </summary>
+        private void InitializeFastPathOptimizations()
+        {
+            // Check if all columns are strings (no type conversion needed)
+            bool hasNonStringColumns = false;
+            for (int i = 0; i < _columns.Count; i++)
+            {
+                if (_columns[i].DataType != typeof(string) || _columns[i].CachedConverter != null)
+                {
+                    hasNonStringColumns = true;
+                    break;
+                }
+            }
+
+            // Static columns always need conversion (they compute values)
+            if (_staticColumns.Count > 0)
+            {
+                hasNonStringColumns = true;
+            }
+
+            // Determine if we can use the fast conversion path:
+            // - No trimming options
+            // - No null value configured
+            // - No DistinguishEmptyFromNull
+            // - No UseColumnDefaults
+            // - No static columns
+            // - All columns are strings
+            _useFastConversion = !hasNonStringColumns
+                && _options.TrimmingOptions == ValueTrimmingOptions.None
+                && _options.NullValue == null
+                && !_options.DistinguishEmptyFromNull
+                && !_options.UseColumnDefaults
+                && _staticColumns.Count == 0;
+
+            // Determine if we can use the ultra-fast inline parsing path:
+            // - Single-character delimiter
+            // - No quote normalization
+            // - No comment character
+            // - No parallel processing
+            // All of the above plus fast conversion conditions
+            _useFastParsing = _useFastConversion
+                && _singleCharDelimiter
+                && !_options.NormalizeQuotes
+                && _options.Comment == '\0'
+                && !_options.EnableParallelProcessing
+                && _options.QuoteMode != QuoteMode.Lenient;
         }
 
         private void InitializeColumnsFromFirstDataRow()
@@ -1507,6 +1564,14 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// </summary>
         private bool ReadSequentialDirect()
         {
+#if NET8_0_OR_GREATER
+            // Ultra-fast path: inline parsing directly to _convertedValues for simple CSV
+            if (_useFastParsing && _isInitialized)
+            {
+                return ReadSequentialUltraFast();
+            }
+#endif
+
             while (true)
             {
                 try
@@ -1552,6 +1617,155 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
             }
         }
+
+#if NET8_0_OR_GREATER
+        /// <summary>
+        /// Ultra-fast inline parsing for simple CSV files (no quotes, no special options).
+        /// Writes directly to _convertedValues, skipping all intermediate buffers.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        private bool ReadSequentialUltraFast()
+        {
+            char delimChar = _delimiterFirstChar;
+            char quoteChar = _options.Quote;
+            int columnCount = _columns.Count;
+            var values = _convertedValues;
+
+            while (true)
+            {
+                // Ensure we have data
+                if (_bufferPosition >= _bufferLength)
+                {
+                    if (!RefillBuffer())
+                    {
+                        _currentRecord = null;
+                        return false;
+                    }
+                }
+
+                // Skip empty lines
+                while (_bufferPosition < _bufferLength)
+                {
+                    char c = _buffer[_bufferPosition];
+                    if (c == '\r')
+                    {
+                        _bufferPosition++;
+                        _currentLineNumber++;
+                        if (_bufferPosition < _bufferLength && _buffer[_bufferPosition] == '\n')
+                            _bufferPosition++;
+                        continue;
+                    }
+                    if (c == '\n')
+                    {
+                        _bufferPosition++;
+                        _currentLineNumber++;
+                        continue;
+                    }
+                    break; // Found start of record
+                }
+
+                if (_bufferPosition >= _bufferLength)
+                    continue; // Need more data
+
+                // Parse the record directly into _convertedValues
+                _currentRecordIndex++;
+                int fieldIndex = 0;
+
+                while (fieldIndex < columnCount)
+                {
+                    if (_bufferPosition >= _bufferLength)
+                    {
+                        // Buffer exhausted mid-record - fall back to standard path
+                        _currentRecordIndex--;
+                        _useFastParsing = false;
+                        return ReadSequentialDirect();
+                    }
+
+                    char c = _buffer[_bufferPosition];
+
+                    // Check for quoted field - fall back to standard path
+                    if (c == quoteChar)
+                    {
+                        _currentRecordIndex--;
+                        _useFastParsing = false;
+                        return ReadSequentialDirect();
+                    }
+
+                    int fieldStart = _bufferPosition;
+
+                    // Use SIMD to find delimiter or newline
+                    ReadOnlySpan<char> remaining = _buffer.AsSpan(_bufferPosition, _bufferLength - _bufferPosition);
+                    int idx = remaining.IndexOfAny(_fieldTerminators);
+
+                    if (idx < 0)
+                    {
+                        // No terminator found - fall back to standard path
+                        _currentRecordIndex--;
+                        _useFastParsing = false;
+                        return ReadSequentialDirect();
+                    }
+
+                    _bufferPosition += idx;
+                    c = _buffer[_bufferPosition];
+
+                    // Create field string
+                    int sourceIndex = _columns[fieldIndex].SourceIndex;
+                    if (sourceIndex == fieldIndex) // Common case: sequential columns
+                    {
+                        int length = _bufferPosition - fieldStart;
+                        if (length == 0)
+                        {
+                            values[fieldIndex] = DBNull.Value;
+                        }
+                        else
+                        {
+                            values[fieldIndex] = new string(_buffer, fieldStart, length);
+                        }
+                    }
+                    else
+                    {
+                        // Column mapping is non-trivial - fall back
+                        _currentRecordIndex--;
+                        _useFastParsing = false;
+                        return ReadSequentialDirect();
+                    }
+
+                    if (c == delimChar)
+                    {
+                        _bufferPosition++; // Skip delimiter
+                        fieldIndex++;
+                    }
+                    else // c == '\r' || c == '\n'
+                    {
+                        // End of record - skip newline
+                        if (c == '\r')
+                        {
+                            _bufferPosition++;
+                            if (_bufferPosition < _bufferLength && _buffer[_bufferPosition] == '\n')
+                                _bufferPosition++;
+                        }
+                        else
+                        {
+                            _bufferPosition++;
+                        }
+                        fieldIndex++;
+                        break;
+                    }
+                }
+
+                // Fill remaining columns with DBNull
+                while (fieldIndex < columnCount)
+                {
+                    values[fieldIndex] = DBNull.Value;
+                    fieldIndex++;
+                }
+
+                _currentRecord = _recordBuffer;
+                _currentLineNumber++;
+                return true;
+            }
+        }
+#endif
 
         /// <summary>
         /// Handles parse errors consistently for both parsing paths.
@@ -1681,6 +1895,14 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         private void ConvertCurrentRecord()
         {
+            // Fast path: all columns are strings with no special handling needed
+            if (_useFastConversion)
+            {
+                ConvertCurrentRecordFast();
+                return;
+            }
+
+            // Standard path with all options supported
             for (int i = 0; i < _columns.Count; i++)
             {
                 var column = _columns[i];
@@ -1758,6 +1980,35 @@ namespace Dataplat.Dbatools.Csv.Reader
             for (int i = 0; i < _staticColumns.Count; i++)
             {
                 _convertedValues[_columns.Count + i] = _staticColumns[i].GetValue(_currentRecordIndex);
+            }
+        }
+
+        /// <summary>
+        /// Fast conversion path for simple string-only columns with no special handling.
+        /// This avoids all the per-column checks and branching.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ConvertCurrentRecordFast()
+        {
+            int columnCount = _columns.Count;
+            var record = _currentRecord;
+            var values = _convertedValues;
+
+            // Direct copy of string values - no conversion, trimming, or null handling
+            for (int i = 0; i < columnCount; i++)
+            {
+                int sourceIndex = _columns[i].SourceIndex;
+                string rawValue = sourceIndex < record.Length ? record[sourceIndex] : null;
+
+                // Empty strings become DBNull for consistency with database behavior
+                if (string.IsNullOrEmpty(rawValue))
+                {
+                    values[i] = DBNull.Value;
+                }
+                else
+                {
+                    values[i] = rawValue;
+                }
             }
         }
 
@@ -3608,6 +3859,9 @@ namespace Dataplat.Dbatools.Csv.Reader
                     if (type != typeof(string))
                     {
                         _columns[i].CachedConverter = _columns[i].Converter ?? _options.TypeConverterRegistry?.GetConverter(type);
+                        // Invalidate fast path when non-string column type is set
+                        _useFastConversion = false;
+                        _useFastParsing = false;
                     }
                     else
                     {

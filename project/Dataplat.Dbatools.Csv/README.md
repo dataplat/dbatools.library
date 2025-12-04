@@ -49,21 +49,21 @@ Benchmark: 100,000 rows × 10 columns (.NET 8, AVX-512)
 
 | Library | Time (ms) | vs Dataplat |
 |---------|-----------|-------------|
-| Sep | 19 ms | 3.8x faster |
-| Sylvan | 29 ms | 2.5x faster |
-| **Dataplat** | **74 ms** | **baseline** |
-| CsvHelper | 76 ms | ~same |
-| LumenWorks | 433 ms | **5.9x slower** |
+| Sep | 18 ms | 3.7x faster |
+| Sylvan | 27 ms | 2.5x faster |
+| **Dataplat** | **67 ms** | **baseline** |
+| CsvHelper | 76 ms | 1.1x slower |
+| LumenWorks | 395 ms | **5.9x slower** |
 
 **All columns read (full row processing):**
 
 | Library | Time (ms) | vs Dataplat |
 |---------|-----------|-------------|
-| Sep | 35 ms | 2.1x faster |
-| Sylvan | 37 ms | 2.0x faster |
-| **Dataplat** | **73 ms** | **baseline** |
-| CsvHelper | 101 ms | 1.4x slower |
-| LumenWorks | 100 ms | 1.4x slower |
+| Sep | 30 ms | 1.8x faster |
+| Sylvan | 35 ms | 1.6x faster |
+| **Dataplat** | **55 ms** | **baseline** |
+| CsvHelper | 97 ms | 1.8x slower |
+| LumenWorks | 102 ms | 1.9x slower |
 
 ### Understanding the performance tradeoffs
 

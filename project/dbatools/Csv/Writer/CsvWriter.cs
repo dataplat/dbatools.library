@@ -123,6 +123,13 @@ namespace Dataplat.Dbatools.Csv.Writer
             if (values == null)
                 throw new ArgumentNullException(nameof(values));
 
+            // Fast path: write directly without StringBuilder for simple cases
+            if (_options.QuotingBehavior == CsvQuotingBehavior.AsNeeded && _options.Delimiter.Length == 1)
+            {
+                WriteRowFast(values);
+                return;
+            }
+
             _rowBuilder.Clear();
             string delimiter = _options.Delimiter;
 
@@ -137,6 +144,103 @@ namespace Dataplat.Dbatools.Csv.Writer
 
             _writer.Write(_rowBuilder.ToString());
             _writer.Write(_options.NewLine);
+            _rowsWritten++;
+
+            if (_options.FlushAfterEachRow)
+                _writer.Flush();
+        }
+
+        /// <summary>
+        /// Fast path for writing rows - writes directly to writer, skips StringBuilder for simple values.
+        /// </summary>
+        private void WriteRowFast(object[] values)
+        {
+            char delimChar = _options.Delimiter[0];
+            char quote = _options.Quote;
+            string newLine = _options.NewLine;
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (i > 0)
+                    _writer.Write(delimChar);
+
+                object value = values[i];
+
+                // Fast path for common types that never need quoting
+                if (value == null || value == DBNull.Value)
+                {
+                    _writer.Write(_options.NullValue);
+                    continue;
+                }
+
+                // Numeric types never need quoting - write directly
+                if (value is int intVal)
+                {
+                    _writer.Write(intVal);
+                    continue;
+                }
+                if (value is long longVal)
+                {
+                    _writer.Write(longVal);
+                    continue;
+                }
+                if (value is double doubleVal)
+                {
+                    _writer.Write(doubleVal);
+                    continue;
+                }
+                if (value is decimal decVal)
+                {
+                    _writer.Write(decVal);
+                    continue;
+                }
+                if (value is bool boolVal)
+                {
+                    _writer.Write(boolVal ? "true" : "false");
+                    continue;
+                }
+
+                // String and other types - check if quoting needed
+                string formatted = FormatValue(value);
+                if (string.IsNullOrEmpty(formatted))
+                {
+                    _writer.Write(formatted);
+                    continue;
+                }
+
+                // Quick scan for characters that need quoting
+                bool needsQuoting = false;
+                for (int j = 0; j < formatted.Length; j++)
+                {
+                    char c = formatted[j];
+                    if (c == delimChar || c == quote || c == '\r' || c == '\n')
+                    {
+                        needsQuoting = true;
+                        break;
+                    }
+                }
+
+                if (needsQuoting)
+                {
+                    _writer.Write(quote);
+                    // Check if we need to escape quotes
+                    if (formatted.IndexOf(quote) >= 0)
+                    {
+                        _writer.Write(formatted.Replace(quote.ToString(), new string(quote, 2)));
+                    }
+                    else
+                    {
+                        _writer.Write(formatted);
+                    }
+                    _writer.Write(quote);
+                }
+                else
+                {
+                    _writer.Write(formatted);
+                }
+            }
+
+            _writer.Write(newLine);
             _rowsWritten++;
 
             if (_options.FlushAfterEachRow)
