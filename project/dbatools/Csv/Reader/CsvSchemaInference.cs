@@ -375,7 +375,7 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// <param name="tableName">The name of the table to create.</param>
         /// <param name="schemaName">Optional schema name (default: dbo).</param>
         /// <returns>A CREATE TABLE SQL statement.</returns>
-        public static string GenerateCreateTableStatement(IEnumerable<InferredColumn> columns, string tableName, string schemaName = "dbo")
+        public static string GenerateCreateTableStatement(List<InferredColumn> columns, string tableName, string schemaName = "dbo")
         {
             if (columns == null)
                 throw new ArgumentNullException(nameof(columns));
@@ -409,7 +409,7 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// </summary>
         /// <param name="columns">The inferred column definitions.</param>
         /// <returns>A dictionary mapping column names to .NET types.</returns>
-        public static Dictionary<string, Type> ToColumnTypes(IEnumerable<InferredColumn> columns)
+        public static Dictionary<string, Type> ToColumnTypes(List<InferredColumn> columns)
         {
             if (columns == null)
                 throw new ArgumentNullException(nameof(columns));

@@ -30,6 +30,7 @@ Install-Package Dataplat.Dbatools.Csv
 
 - **Streaming IDataReader** - Works seamlessly with SqlBulkCopy and other ADO.NET consumers
 - **Schema Inference** - Analyze CSV data to determine optimal SQL Server column types
+- **Strongly Typed Columns** - Define column types for automatic conversion with built-in and custom converters
 - **High Performance** - ~1.5x faster than LumenWorks/CsvHelper with ArrayPool-based memory management
 - **Parallel Processing** - Optional multi-threaded parsing for large files (25K+ rows/sec)
 - **String Interning** - Reduce memory for files with repeated values
@@ -330,6 +331,72 @@ using var reader = new CsvDataReader("data.csv", options);
 | `Ordinal` | int | Column position (0-based) |
 | `TotalCount` | long | Total rows analyzed |
 | `NonNullCount` | long | Rows with non-null values |
+
+### Strongly Typed Columns
+
+Define column types explicitly for automatic conversion during reading:
+
+```csharp
+var options = new CsvReaderOptions
+{
+    ColumnTypes = new Dictionary<string, Type>
+    {
+        ["Id"] = typeof(int),
+        ["Price"] = typeof(decimal),
+        ["IsActive"] = typeof(bool),
+        ["Created"] = typeof(DateTime),
+        ["UniqueId"] = typeof(Guid)
+    }
+};
+
+using var reader = new CsvDataReader("data.csv", options);
+while (reader.Read())
+{
+    int id = reader.GetInt32(0);           // Already converted from string
+    decimal price = reader.GetDecimal(1);  // Culture-aware parsing
+    bool active = reader.GetBoolean(2);    // Handles true/false/yes/no/1/0
+    DateTime created = reader.GetDateTime(3);
+    Guid guid = reader.GetGuid(4);
+}
+```
+
+**Built-in type converters:** `Guid`, `bool`, `DateTime`, `short`, `int`, `long`, `float`, `double`, `decimal`, `byte`, `string`
+
+**Combine with schema inference:**
+
+```csharp
+// Infer types from CSV data, then use them for reading
+var columns = CsvSchemaInference.InferSchemaFromSample("data.csv");
+var typeMap = CsvSchemaInference.ToColumnTypes(columns);
+
+var options = new CsvReaderOptions { ColumnTypes = typeMap };
+using var reader = new CsvDataReader("data.csv", options);
+```
+
+**Custom type converters:**
+
+```csharp
+using Dataplat.Dbatools.Csv.TypeConverters;
+
+// Create a custom converter for enums or custom types
+public class StatusConverter : TypeConverterBase<OrderStatus>
+{
+    public override bool TryConvert(string value, out OrderStatus result)
+    {
+        return Enum.TryParse(value, true, out result);
+    }
+}
+
+// Register and use
+var registry = TypeConverterRegistry.Default;
+registry.Register(new StatusConverter());
+
+var options = new CsvReaderOptions
+{
+    TypeConverterRegistry = registry,
+    ColumnTypes = new Dictionary<string, Type> { ["Status"] = typeof(OrderStatus) }
+};
+```
 
 ### Null vs Empty String Handling
 
