@@ -347,7 +347,3 @@ This CSV library was created using [Claude Code](https://claude.com/claude-code)
 > Please ultrathink about the best way to go about creating this new, extensive functionality within the dbatools library. if it should be a new project that is linked or whatever, do it in this repo.
 
 Additional refinements included a security review and feature additions based on [dbatools GitHub issues](https://github.com/dataplat/dbatools/issues).
-
-## Authors
-
-Created and maintained by the [dbatools team](https://dbatools.io/team) and community contributors.

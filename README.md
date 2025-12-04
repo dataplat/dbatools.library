@@ -238,11 +238,3 @@ Contributions are welcome! This library is primarily maintained by the dbatools 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Authors
-
-Created and maintained by the [dbatools team](https://dbatools.io/team) and community contributors.
-
-Special thanks to:
-- Chrissy LeMaire ([@cl](https://github.com/potatoqualitee))
-- All [contributors](https://github.com/dataplat/dbatools.library/graphs/contributors)
