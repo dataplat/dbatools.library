@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using Dataplat.Dbatools.Csv.Compression;
 using Dataplat.Dbatools.Csv.TypeConverters;
 
@@ -384,6 +385,43 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         #endregion
 
+        #region Cancellation and Progress Options
+
+        /// <summary>
+        /// Gets or sets the cancellation token to monitor for cancellation requests.
+        /// When cancelled, the reader will throw an OperationCanceledException on the next Read() call.
+        /// Default is CancellationToken.None.
+        /// </summary>
+        public CancellationToken CancellationToken { get; set; } = CancellationToken.None;
+
+        private int _progressReportInterval = 10000;
+
+        /// <summary>
+        /// Gets or sets the interval (in records) at which to report progress.
+        /// Set to 0 to disable progress reporting. Default is 10000.
+        /// Progress is reported via the <see cref="ProgressCallback"/> delegate.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when value is negative.</exception>
+        public int ProgressReportInterval
+        {
+            get => _progressReportInterval;
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "ProgressReportInterval cannot be negative.");
+                _progressReportInterval = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the callback to invoke when progress is reported.
+        /// The callback receives a <see cref="CsvProgress"/> object with current progress information.
+        /// Called every <see cref="ProgressReportInterval"/> records.
+        /// </summary>
+        public Action<CsvProgress> ProgressCallback { get; set; }
+
+        #endregion
+
         /// <summary>
         /// Creates a default options instance.
         /// </summary>
@@ -448,8 +486,66 @@ namespace Dataplat.Dbatools.Csv.Reader
                 EnableParallelProcessing = EnableParallelProcessing,
                 MaxDegreeOfParallelism = MaxDegreeOfParallelism,
                 ParallelBatchSize = ParallelBatchSize,
-                ParallelQueueDepth = ParallelQueueDepth
+                ParallelQueueDepth = ParallelQueueDepth,
+                CancellationToken = CancellationToken,
+                ProgressReportInterval = ProgressReportInterval,
+                ProgressCallback = ProgressCallback
             };
+        }
+    }
+
+    /// <summary>
+    /// Provides progress information during CSV reading operations.
+    /// </summary>
+    public sealed class CsvProgress
+    {
+        /// <summary>
+        /// Gets the number of records read so far.
+        /// </summary>
+        public long RecordsRead { get; }
+
+        /// <summary>
+        /// Gets the current line number in the file.
+        /// </summary>
+        public long LineNumber { get; }
+
+        /// <summary>
+        /// Gets the number of bytes read from the source (if available).
+        /// Returns -1 if byte position is not available.
+        /// </summary>
+        public long BytesRead { get; }
+
+        /// <summary>
+        /// Gets the total size of the source in bytes (if available).
+        /// Returns -1 if total size is not available.
+        /// </summary>
+        public long TotalBytes { get; }
+
+        /// <summary>
+        /// Gets the percentage complete (0-100) if total size is known, otherwise -1.
+        /// </summary>
+        public double PercentComplete => TotalBytes > 0 ? (double)BytesRead / TotalBytes * 100.0 : -1;
+
+        /// <summary>
+        /// Gets the elapsed time since reading started.
+        /// </summary>
+        public TimeSpan Elapsed { get; }
+
+        /// <summary>
+        /// Gets the estimated rows per second based on current progress.
+        /// </summary>
+        public double RowsPerSecond => Elapsed.TotalSeconds > 0 ? RecordsRead / Elapsed.TotalSeconds : 0;
+
+        /// <summary>
+        /// Creates a new progress instance.
+        /// </summary>
+        public CsvProgress(long recordsRead, long lineNumber, long bytesRead, long totalBytes, TimeSpan elapsed)
+        {
+            RecordsRead = recordsRead;
+            LineNumber = lineNumber;
+            BytesRead = bytesRead;
+            TotalBytes = totalBytes;
+            Elapsed = elapsed;
         }
     }
 }

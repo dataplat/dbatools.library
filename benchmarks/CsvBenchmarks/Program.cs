@@ -8,7 +8,14 @@ using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Exporters;
 using System.Data;
 using System.Text;
+using System.Globalization;
 using Dataplat.Dbatools.Csv.Reader;
+using nietras.SeparatedValues;
+using CsvHelper;
+using CsvHelper.Configuration;
+
+// Alias to avoid ambiguity with Sylvan and CsvHelper
+using DataplatCsvReader = Dataplat.Dbatools.Csv.Reader.CsvDataReader;
 
 namespace CsvBenchmarks;
 
@@ -122,7 +129,7 @@ public class CsvReaderBenchmarks
     public int Dataplat_Small()
     {
         int count = 0;
-        using var reader = new CsvDataReader(_smallCsvPath);
+        using var reader = new DataplatCsvReader(_smallCsvPath);
         while (reader.Read())
         {
             count++;
@@ -153,7 +160,7 @@ public class CsvReaderBenchmarks
     public int Dataplat_Medium()
     {
         int count = 0;
-        using var reader = new CsvDataReader(_mediumCsvPath);
+        using var reader = new DataplatCsvReader(_mediumCsvPath);
         while (reader.Read())
         {
             count++;
@@ -184,7 +191,7 @@ public class CsvReaderBenchmarks
     public int Dataplat_Large()
     {
         int count = 0;
-        using var reader = new CsvDataReader(_largeCsvPath);
+        using var reader = new DataplatCsvReader(_largeCsvPath);
         while (reader.Read())
         {
             count++;
@@ -215,7 +222,7 @@ public class CsvReaderBenchmarks
     public int Dataplat_Wide()
     {
         int count = 0;
-        using var reader = new CsvDataReader(_wideCsvPath);
+        using var reader = new DataplatCsvReader(_wideCsvPath);
         while (reader.Read())
         {
             count++;
@@ -246,7 +253,7 @@ public class CsvReaderBenchmarks
     public int Dataplat_Quoted()
     {
         int count = 0;
-        using var reader = new CsvDataReader(_quotedCsvPath);
+        using var reader = new DataplatCsvReader(_quotedCsvPath);
         while (reader.Read())
         {
             count++;
@@ -270,6 +277,138 @@ public class CsvReaderBenchmarks
         return count;
     }
 
+    // ===================== Modern Library Comparisons (Medium) =====================
+
+    [Benchmark(Description = "Sep-Medium")]
+    [BenchmarkCategory("Modern")]
+    public int Sep_Medium()
+    {
+        int count = 0;
+        using var reader = Sep.Reader().FromFile(_mediumCsvPath);
+        foreach (var row in reader)
+        {
+            count++;
+            _ = row[0].ToString();
+        }
+        return count;
+    }
+
+    [Benchmark(Description = "Sylvan-Medium")]
+    [BenchmarkCategory("Modern")]
+    public int Sylvan_Medium()
+    {
+        int count = 0;
+        using var textReader = new StreamReader(_mediumCsvPath);
+        using var reader = Sylvan.Data.Csv.CsvDataReader.Create(textReader);
+        while (reader.Read())
+        {
+            count++;
+            _ = reader.GetString(0);
+        }
+        return count;
+    }
+
+    [Benchmark(Description = "CsvHelper-Medium")]
+    [BenchmarkCategory("Modern")]
+    public int CsvHelper_Medium()
+    {
+        int count = 0;
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true
+        };
+        using var textReader = new StreamReader(_mediumCsvPath);
+        using var csv = new CsvHelper.CsvReader(textReader, config);
+        csv.Read();
+        csv.ReadHeader();
+        while (csv.Read())
+        {
+            count++;
+            _ = csv.GetField(0);
+        }
+        return count;
+    }
+
+    [Benchmark(Description = "Dataplat-Medium-Modern")]
+    [BenchmarkCategory("Modern")]
+    public int Dataplat_Medium_Modern()
+    {
+        int count = 0;
+        using var reader = new Dataplat.Dbatools.Csv.Reader.CsvDataReader(_mediumCsvPath);
+        while (reader.Read())
+        {
+            count++;
+            _ = reader.GetValue(0);
+        }
+        return count;
+    }
+
+    // ===================== Modern Library Comparisons (Large) =====================
+
+    [Benchmark(Description = "Sep-Large")]
+    [BenchmarkCategory("ModernLarge")]
+    public int Sep_Large()
+    {
+        int count = 0;
+        using var reader = Sep.Reader().FromFile(_largeCsvPath);
+        foreach (var row in reader)
+        {
+            count++;
+            _ = row[0].ToString();
+        }
+        return count;
+    }
+
+    [Benchmark(Description = "Sylvan-Large")]
+    [BenchmarkCategory("ModernLarge")]
+    public int Sylvan_Large()
+    {
+        int count = 0;
+        using var textReader = new StreamReader(_largeCsvPath);
+        using var reader = Sylvan.Data.Csv.CsvDataReader.Create(textReader);
+        while (reader.Read())
+        {
+            count++;
+            _ = reader.GetString(0);
+        }
+        return count;
+    }
+
+    [Benchmark(Description = "CsvHelper-Large")]
+    [BenchmarkCategory("ModernLarge")]
+    public int CsvHelper_Large()
+    {
+        int count = 0;
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true
+        };
+        using var textReader = new StreamReader(_largeCsvPath);
+        using var csv = new CsvHelper.CsvReader(textReader, config);
+        csv.Read();
+        csv.ReadHeader();
+        while (csv.Read())
+        {
+            count++;
+            _ = csv.GetField(0);
+        }
+        return count;
+    }
+
+    [Benchmark(Description = "Dataplat-Large-Modern")]
+    [BenchmarkCategory("ModernLarge")]
+    public int Dataplat_Large_Modern()
+    {
+        int count = 0;
+        using var reader = new Dataplat.Dbatools.Csv.Reader.CsvDataReader(_largeCsvPath);
+        while (reader.Read())
+        {
+            count++;
+            _ = reader.GetValue(0);
+        }
+        return count;
+    }
+
     // ===================== All Values Access Benchmarks =====================
 
     [Benchmark(Description = "Dataplat-AllValues")]
@@ -278,7 +417,7 @@ public class CsvReaderBenchmarks
     {
         int count = 0;
         var options = new CsvReaderOptions { BufferSize = 65536 };
-        using var reader = new CsvDataReader(_mediumCsvPath, options);
+        using var reader = new DataplatCsvReader(_mediumCsvPath, options);
         object[] values = new object[reader.FieldCount];
         while (reader.Read())
         {

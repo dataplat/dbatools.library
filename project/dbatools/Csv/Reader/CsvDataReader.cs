@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -201,6 +202,12 @@ namespace Dataplat.Dbatools.Csv.Reader
         // Thread-safe error collection for parallel mode
         private ConcurrentQueue<CsvParseError> _parallelParseErrors;
 
+        // Progress tracking
+        private Stopwatch _progressStopwatch;
+        private long _totalFileSize = -1;
+        private long _lastProgressReport;
+        private Stream _underlyingStream;
+
         // Result queue for ordered delivery
         private readonly object _resultLock = new object();
         private long _nextExpectedRecordIndex;
@@ -228,12 +235,23 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             _options = options ?? new CsvReaderOptions();
 
+            // Get file size for progress reporting before opening
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.Exists)
+                    _totalFileSize = fileInfo.Length;
+            }
+            catch { /* Ignore file info errors */ }
+
             Stream stream = CompressionHelper.OpenFileForReading(filePath, _options.AutoDetectCompression, _options.MaxDecompressedSize);
+            _underlyingStream = stream;
             _reader = new StreamReader(stream, _options.Encoding, detectEncodingFromByteOrderMarks: true,
                 bufferSize: _options.BufferSize);
             _ownsReader = true;
 
             InitializeBuffers();
+            InitializeProgressTracking();
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
             _parseErrors = _options.CollectParseErrors ? new List<CsvParseError>() : null;
@@ -250,6 +268,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             _ownsReader = false;
 
             InitializeBuffers();
+            InitializeProgressTracking();
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
             _parseErrors = _options.CollectParseErrors ? new List<CsvParseError>() : null;
@@ -266,16 +285,25 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             _options = options ?? new CsvReaderOptions();
 
+            // Try to get stream length for progress reporting
+            if (stream.CanSeek)
+            {
+                try { _totalFileSize = stream.Length; }
+                catch { /* Ignore errors */ }
+            }
+
             CompressionType compressionType = _options.AutoDetectCompression
                 ? CompressionHelper.DetectFromStream(stream)
                 : _options.CompressionType;
 
             Stream decompressedStream = CompressionHelper.WrapForDecompression(stream, compressionType, _options.MaxDecompressedSize);
+            _underlyingStream = decompressedStream;
             _reader = new StreamReader(decompressedStream, _options.Encoding, detectEncodingFromByteOrderMarks: true,
                 bufferSize: _options.BufferSize);
             _ownsReader = true;
 
             InitializeBuffers();
+            InitializeProgressTracking();
             _columns = new List<CsvColumn>();
             _staticColumns = _options.StaticColumns != null ? new List<StaticColumn>(_options.StaticColumns) : new List<StaticColumn>();
             _parseErrors = _options.CollectParseErrors ? new List<CsvParseError>() : null;
@@ -360,6 +388,15 @@ namespace Dataplat.Dbatools.Csv.Reader
             if (_options.NullValue != null)
             {
                 _internedStrings.Add(_options.NullValue);
+            }
+        }
+
+        private void InitializeProgressTracking()
+        {
+            // Start stopwatch if progress reporting is enabled
+            if (_options.ProgressCallback != null && _options.ProgressReportInterval > 0)
+            {
+                _progressStopwatch = Stopwatch.StartNew();
             }
         }
 
@@ -1354,25 +1391,76 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// <summary>
         /// Reads the next record from the CSV file.
         /// </summary>
+        /// <exception cref="OperationCanceledException">Thrown when the <see cref="CsvReaderOptions.CancellationToken"/> is cancelled.</exception>
         public bool Read()
         {
             ThrowIfClosed();
+
+            // Check for cancellation
+            _options.CancellationToken.ThrowIfCancellationRequested();
+
             Initialize();
+
+            bool result;
 
             // Use parallel pipeline if enabled
             if (_useParallelProcessing)
             {
-                return ReadParallel();
+                result = ReadParallel();
             }
-
             // Handle buffered first line from no-header initialization (must use line-based parsing)
-            if (_hasBufferedFirstLine)
+            else if (_hasBufferedFirstLine)
             {
-                return ReadBufferedFirstLine();
+                result = ReadBufferedFirstLine();
+            }
+            else
+            {
+                // Use direct field-by-field parsing (high-performance path)
+                result = ReadSequentialDirect();
             }
 
-            // Use direct field-by-field parsing (high-performance path)
-            return ReadSequentialDirect();
+            // Report progress if enabled
+            if (result)
+            {
+                ReportProgressIfNeeded();
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Reports progress to the callback if configured and interval has been reached.
+        /// </summary>
+        private void ReportProgressIfNeeded()
+        {
+            var callback = _options.ProgressCallback;
+            int interval = _options.ProgressReportInterval;
+
+            if (callback == null || interval <= 0)
+                return;
+
+            long currentRecord = _currentRecordIndex;
+            if (currentRecord - _lastProgressReport >= interval)
+            {
+                _lastProgressReport = currentRecord;
+
+                long bytesRead = -1;
+                if (_underlyingStream != null && _underlyingStream.CanSeek)
+                {
+                    try { bytesRead = _underlyingStream.Position; }
+                    catch { /* Ignore seek errors */ }
+                }
+
+                var elapsed = _progressStopwatch?.Elapsed ?? TimeSpan.Zero;
+                var progress = new CsvProgress(
+                    currentRecord,
+                    _currentLineNumber,
+                    bytesRead,
+                    _totalFileSize,
+                    elapsed);
+
+                callback(progress);
+            }
         }
 
         /// <summary>

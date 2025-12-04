@@ -12,6 +12,10 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
+    <!-- Competitor CSV libraries for benchmarking -->
+    <PackageReference Include="Sep" Version="0.12.0" />
+    <PackageReference Include="Sylvan.Data.Csv" Version="1.4.0" />
+    <PackageReference Include="CsvHelper" Version="33.0.1" />
   </ItemGroup>
 
   <ItemGroup>

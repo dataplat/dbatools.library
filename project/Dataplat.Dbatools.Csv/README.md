@@ -4,7 +4,14 @@
 [![NuGet Downloads](https://img.shields.io/nuget/dt/Dataplat.Dbatools.Csv.svg)](https://www.nuget.org/packages/Dataplat.Dbatools.Csv)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-High-performance CSV reader and writer for .NET from the trusted [dbatools](https://dbatools.io) project. **20%+ faster than LumenWorks CsvReader** with modern features and security built-in.
+**The performance-optimized CSV library built for database professionals.** High-performance CSV reader and writer for .NET from the trusted [dbatools](https://dbatools.io) project.
+
+**What makes this library unique:**
+- **Native IDataReader** - Stream directly to SqlBulkCopy with zero intermediate allocations
+- **Built-in compression** - GZip, Brotli, Deflate, ZLib with decompression bomb protection
+- **Real-world data handling** - Lenient parsing, smart quotes, duplicate headers, field count mismatches
+- **Faster than LumenWorks & CsvHelper** - ~1.5x faster with modern .NET (Span<T>, ArrayPool)
+- **Cancellation & Progress** - CancellationToken support and progress callbacks for long imports
 
 ## Installation
 
@@ -21,7 +28,7 @@ Install-Package Dataplat.Dbatools.Csv
 ## Features
 
 - **Streaming IDataReader** - Works seamlessly with SqlBulkCopy and other ADO.NET consumers
-- **High Performance** - 20%+ faster than LumenWorks with ArrayPool-based memory management
+- **High Performance** - ~1.5x faster than LumenWorks/CsvHelper with ArrayPool-based memory management
 - **Parallel Processing** - Optional multi-threaded parsing for large files (25K+ rows/sec)
 - **String Interning** - Reduce memory for files with repeated values
 - **Compression Support** - Automatic handling of GZip, Deflate, Brotli (.NET 8+), and ZLib (.NET 8+)
@@ -36,14 +43,31 @@ Install-Package Dataplat.Dbatools.Csv
 
 ## Performance
 
-Tested with 1.17 million rows (229 MB):
+Benchmark: 100,000 rows × 10 columns (.NET 8, AVX-512)
 
-| Mode | Rows/Second | Throughput |
-|------|-------------|------------|
-| Sequential | ~25,000 | 4.8 MB/s |
-| Parallel | ~25,300 | 5.5 MB/s |
+**Single column read (typical SqlBulkCopy/IDataReader pattern):**
 
-Memory usage: ~145 MB managed heap for 1.17M rows.
+| Library | Time (ms) | vs Dataplat |
+|---------|-----------|-------------|
+| Sep | 19 ms | 3.8x faster |
+| Sylvan | 29 ms | 2.5x faster |
+| **Dataplat** | **74 ms** | **baseline** |
+| CsvHelper | 76 ms | ~same |
+| LumenWorks | 433 ms | **5.9x slower** |
+
+**All columns read (full row processing):**
+
+| Library | Time (ms) | vs Dataplat |
+|---------|-----------|-------------|
+| Sep | 35 ms | 2.1x faster |
+| Sylvan | 37 ms | 2.0x faster |
+| **Dataplat** | **73 ms** | **baseline** |
+| CsvHelper | 101 ms | 1.4x slower |
+| LumenWorks | 100 ms | 1.4x slower |
+
+**Why choose Dataplat?** Sep and Sylvan are faster for raw parsing, but Dataplat provides the complete database workflow: native IDataReader for SqlBulkCopy, built-in compression (no need to extract `.csv.gz` files), progress reporting, and lenient parsing for messy enterprise exports.
+
+For `file.csv.gz → SqlBulkCopy → SQL Server` workflows, the complete Dataplat pipeline may outperform combining Sep + manual decompression + custom IDataReader wrapper.
 
 ## Quick Start
 
@@ -184,6 +208,56 @@ var options = new CsvReaderOptions
 };
 ```
 
+### Cancellation Support
+
+```csharp
+using var cts = new CancellationTokenSource();
+
+var options = new CsvReaderOptions
+{
+    CancellationToken = cts.Token
+};
+
+// In another thread or after timeout
+cts.CancelAfter(TimeSpan.FromSeconds(30));
+
+try
+{
+    using var reader = new CsvDataReader("large-file.csv", options);
+    while (reader.Read())
+    {
+        // Process records - will throw OperationCanceledException when cancelled
+    }
+}
+catch (OperationCanceledException)
+{
+    Console.WriteLine("Import was cancelled");
+}
+```
+
+### Progress Reporting
+
+```csharp
+var options = new CsvReaderOptions
+{
+    ProgressReportInterval = 10000,  // Report every 10,000 records
+    ProgressCallback = progress =>
+    {
+        Console.WriteLine($"Processed {progress.RecordsRead:N0} records " +
+                          $"({progress.RowsPerSecond:N0} rows/sec)");
+
+        if (progress.PercentComplete >= 0)
+            Console.WriteLine($"Progress: {progress.PercentComplete:F1}%");
+    }
+};
+
+using var reader = new CsvDataReader("large-file.csv", options);
+while (reader.Read())
+{
+    // Process records
+}
+```
+
 ### Null vs Empty String Handling
 
 CSV files can represent missing data in two ways: an empty field (`,,`) or an explicitly quoted empty string (`,"",...`). The `DistinguishEmptyFromNull` option controls how these are interpreted.
@@ -269,6 +343,9 @@ reader.GetString(2); // ""
 | `EnableParallelProcessing` | `false` | Enable multi-threaded parsing |
 | `MaxDegreeOfParallelism` | `0` | Worker threads (0 = processor count) |
 | `InternStrings` | `false` | Intern common string values |
+| `CancellationToken` | `None` | Token to monitor for cancellation requests |
+| `ProgressReportInterval` | `10000` | Records between progress reports (0 = disabled) |
+| `ProgressCallback` | `null` | Callback receiving `CsvProgress` updates |
 
 ## Thread Safety
 
