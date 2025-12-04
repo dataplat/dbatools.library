@@ -65,9 +65,22 @@ Benchmark: 100,000 rows × 10 columns (.NET 8, AVX-512)
 | CsvHelper | 101 ms | 1.4x slower |
 | LumenWorks | 100 ms | 1.4x slower |
 
-**Why choose Dataplat?** Sep and Sylvan are faster for raw parsing, but Dataplat provides the complete database workflow: native IDataReader for SqlBulkCopy, built-in compression (no need to extract `.csv.gz` files), progress reporting, and lenient parsing for messy enterprise exports.
+### Understanding the performance tradeoffs
 
-For `file.csv.gz → SqlBulkCopy → SQL Server` workflows, the complete Dataplat pipeline may outperform combining Sep + manual decompression + custom IDataReader wrapper.
+Sep achieves 21 GB/s by using `Span<T>` and only materializing strings when explicitly requested. Sylvan uses similar techniques. Both avoid allocations until the last possible moment.
+
+**Why Dataplat can't match this:** The `IDataReader` interface requires `GetValue()` to return actual `object` instances. For string columns, this means creating real `string` objects—we can't return spans. This is a fundamental architectural tradeoff for SqlBulkCopy compatibility.
+
+**When each library shines:**
+
+| Scenario | Bottleneck | Winner |
+|----------|-----------|--------|
+| CSV → SqlBulkCopy → SQL Server | Network/disk I/O, not parsing | Dataplat (integrated) |
+| CSV.gz → SQL Server | Decompression overhead | Dataplat (built-in) |
+| Messy enterprise exports | Error handling complexity | Dataplat (lenient mode) |
+| Raw in-memory parsing benchmark | CPU/allocations | Sep/Sylvan |
+
+For database import workflows, the complete `file.csv.gz → SqlBulkCopy → SQL Server` pipeline with Dataplat is often comparable to combining Sep + manual decompression + custom IDataReader wrapper, while requiring less code.
 
 ## Quick Start
 
