@@ -14,7 +14,7 @@ dbatools.library is a .NET library that provides the core functionality for the 
 - Microsoft.Data.SqlClient for SQL Server connectivity
 - DacFx for database deployment operations
 - Extended Events (XEvent) processing capabilities
-- **High-performance CSV reader** for bulk data import (also available as standalone NuGet package)
+- **High-performance CSV library** built for database workflows (also available as [standalone NuGet package](https://dataplat.dbatools.io/csv))
 - Multi-framework support (.NET Framework 4.7.2 and .NET 8.0)
 
 This library enables dbatools to work seamlessly across Windows PowerShell 5.1 and PowerShell 7+ on Windows, macOS, and Linux.
@@ -25,19 +25,22 @@ This library enables dbatools to work seamlessly across Windows PowerShell 5.1 a
 
 [![NuGet](https://img.shields.io/nuget/v/Dataplat.Dbatools.Csv.svg)](https://www.nuget.org/packages/Dataplat.Dbatools.Csv)
 
-High-performance CSV reader and writer for .NET. **20%+ faster than LumenWorks CsvReader** with modern features:
+**The CSV library built for SQL Server.** High-performance CSV reader and writer optimized for database import workflows:
 
-- Streaming `IDataReader` for SqlBulkCopy (~25,000 rows/sec)
-- Automatic compression support (GZip, Deflate, Brotli, ZLib)
-- Parallel processing for large files
-- Multi-character delimiters, smart quote handling
-- Robust error handling and security protections
+- **Native IDataReader** - Stream directly to SqlBulkCopy with zero intermediate allocations
+- **6x faster than LumenWorks** for typical SqlBulkCopy patterns
+- **Built-in compression** - GZip, Deflate, Brotli, ZLib with decompression bomb protection
+- **Progress & cancellation** - Monitor large imports with callbacks, cancel with CancellationToken
+- **Real-world data handling** - Lenient parsing, smart quotes, duplicate headers, field mismatches
 
 ```bash
 dotnet add package Dataplat.Dbatools.Csv
 ```
 
-See the [CSV package documentation](project/Dataplat.Dbatools.Csv/README.md) for full details.
+**Resources:**
+- [Landing page](https://dataplat.dbatools.io/csv) - Quick overview and benchmarks
+- [Full documentation](project/Dataplat.Dbatools.Csv/README.md) - Complete API reference
+- [Migration guide](project/Dataplat.Dbatools.Csv/MIGRATING-FROM-LUMENWORKS.md) - For LumenWorks users
 
 ## Installation
 
@@ -205,7 +208,7 @@ This library includes several major SQL Server components:
 
 | Package | Purpose |
 |---------|---------|
-| [Dataplat.Dbatools.Csv](https://www.nuget.org/packages/Dataplat.Dbatools.Csv) | High-performance CSV reader/writer for .NET |
+| [Dataplat.Dbatools.Csv](https://dataplat.dbatools.io/csv) | High-performance CSV library for database workflows |
 
 ## Contributing
 
