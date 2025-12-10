@@ -106,6 +106,9 @@ $skipSqlClient = $false
 if ($AvoidConflicts) {
     $loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
     $skipSqlClient = $loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+    if ($skipSqlClient) {
+        Write-Verbose "Skipping Microsoft.Data.SqlClient.dll - already loaded"
+    }
 }
 
 if (-not $skipSqlClient) {
@@ -117,37 +120,31 @@ if (-not $skipSqlClient) {
 }
 
 if ($PSVersionTable.PSEdition -ne "Core") {
-    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($onAssemblyResolveEventHandler)
+    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
 }
 
 if ($PSVersionTable.PSEdition -eq "Core") {
-    if ($AvoidConflicts) {
-        # Skip loading assemblies that may conflict with already-loaded modules (e.g., SqlServer)
-        $names = @()
-    } else {
-        $names = @(
-            'Microsoft.SqlServer.Server',
-            'Azure.Core',
-            'Azure.Identity',
-            'Microsoft.IdentityModel.Abstractions',
-            'Microsoft.SqlServer.Dac',
-            'Microsoft.SqlServer.Smo',
-            'Microsoft.SqlServer.SmoExtended',
-            'Microsoft.SqlServer.SqlWmiManagement',
-            'Microsoft.SqlServer.WmiEnum',
-            'Microsoft.SqlServer.Management.RegisteredServers',
-            'Microsoft.SqlServer.Management.Collector',
-            'Microsoft.SqlServer.Management.XEvent',
-            'Microsoft.SqlServer.Management.XEventDbScoped',
-            'Microsoft.SqlServer.XEvent.XELite'
-        )
-    }
+    $names = @(
+        'Microsoft.SqlServer.Server',
+        'Azure.Core',
+        'Azure.Identity',
+        'Microsoft.IdentityModel.Abstractions',
+        'Microsoft.SqlServer.Dac',
+        'Microsoft.SqlServer.Smo',
+        'Microsoft.SqlServer.SmoExtended',
+        'Microsoft.SqlServer.SqlWmiManagement',
+        'Microsoft.SqlServer.WmiEnum',
+        'Microsoft.SqlServer.Management.RegisteredServers',
+        'Microsoft.SqlServer.Management.Collector',
+        'Microsoft.SqlServer.Management.XEvent',
+        'Microsoft.SqlServer.Management.XEventDbScoped',
+        'Microsoft.SqlServer.XEvent.XELite'
+    )
 } else {
     $names = @(
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
-        'Microsoft.Data.SqlClient',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
@@ -203,5 +200,7 @@ foreach ($name in $names) {
         } catch {
             Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
         }
+    } elseif ($AvoidConflicts) {
+        Write-Verbose "Skipping $name.dll - already loaded"
     }
 }
