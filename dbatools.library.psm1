@@ -12,21 +12,6 @@ param(
     [string[]]$SkipAssemblies = @()
 )
 
-# Support module-scoped variables for configuration
-# Users can set these before importing the module
-if (-not $SkipSqlClient -and $script:SkipSqlClient) {
-    $SkipSqlClient = $true
-}
-if (-not $SkipAzure -and $script:SkipAzure) {
-    $SkipAzure = $true
-}
-if (-not $SkipSmo -and $script:SkipSmo) {
-    $SkipSmo = $true
-}
-if (-not $SkipAssemblies -and $script:SkipAssemblies) {
-    $SkipAssemblies = $script:SkipAssemblies
-}
-
 function Get-DbatoolsLibraryPath {
     [CmdletBinding()]
     param()
@@ -135,10 +120,6 @@ if (-not $SkipSqlClient -and 'Microsoft.Data.SqlClient' -notin $SkipAssemblies) 
     Write-Verbose "Skipping Microsoft.Data.SqlClient.dll import as requested"
 }
 
-if ($PSVersionTable.PSEdition -ne "Core") {
-    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
-}
-
 if ($PSVersionTable.PSEdition -eq "Core") {
     $names = @(
         'Microsoft.SqlServer.Server',
@@ -159,7 +140,6 @@ if ($PSVersionTable.PSEdition -eq "Core") {
     )
 } else {
     $names = @(
-        'Microsoft.Bcl.AsyncInterfaces',
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
@@ -207,7 +187,7 @@ foreach ($name in $names) {
     $skipThisAssembly = $false
 
     # Check SkipAzure parameter
-    if ($SkipAzure -and $name -in @('Microsoft.Bcl.AsyncInterfaces', 'Azure.Core', 'Azure.Identity', 'Microsoft.IdentityModel.Abstractions', 'Microsoft.Identity.Client')) {
+    if ($SkipAzure -and $name -in @('Azure.Core', 'Azure.Identity', 'Microsoft.IdentityModel.Abstractions', 'Microsoft.Identity.Client')) {
         Write-Verbose "Skipping $name due to -SkipAzure parameter"
         $skipThisAssembly = $true
     }
@@ -244,4 +224,9 @@ foreach ($name in $names) {
             Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
         }
     }
+}
+
+# Remove the assembly resolver now that all imports are complete
+if ($PSVersionTable.PSEdition -ne "Core") {
+    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
 }

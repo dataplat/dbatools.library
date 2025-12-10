@@ -56,61 +56,55 @@ Install-Module dbatools.library -Scope CurrentUser
 
 ## Handling DLL Conflicts with SqlServer Module
 
-If you need to use both the SqlServer module and dbatools.library in the same session, you may encounter DLL version conflicts. dbatools.library provides flexible options to skip loading specific assemblies that conflict with the SqlServer module.
+If you need to use both the SqlServer module and dbatools.library in the same session, you may encounter DLL version conflicts. dbatools.library provides parameters to skip loading specific assemblies that conflict with the SqlServer module.
 
 ### Usage
 
-Set module-scoped variables before importing the module:
-
-```powershell
-# Import SqlServer module first
-Import-Module SqlServer
-
-# Configure dbatools.library to skip conflicting DLLs
-$script:SkipSqlClient = $true
-$script:SkipAzure = $true
-
-# Then import dbatools.library
-Import-Module dbatools.library
-```
-
-Alternatively, use switch parameters:
+Use the `-ArgumentList` parameter to pass skip flags when importing:
 
 ```powershell
 # Import SqlServer module first
 Import-Module SqlServer
 
 # Then import dbatools.library while skipping conflicting DLLs
+# -ArgumentList takes: SkipSqlClient, SkipAzure, SkipSmo, SkipAssemblies (in that order)
 Import-Module dbatools.library -ArgumentList $true, $true
 ```
 
 ### Available Skip Options
 
-- **`SkipSqlClient`**: Skip loading `Microsoft.Data.SqlClient.dll`
-- **`SkipAzure`**: Skip loading Azure-related DLLs (`Microsoft.Bcl.AsyncInterfaces`, `Azure.Core`, `Azure.Identity`, `Microsoft.Identity.Client`, `Microsoft.IdentityModel.Abstractions`)
-- **`SkipSmo`**: Skip loading all SMO assemblies (`Microsoft.SqlServer.*`)
-- **`SkipAssemblies`**: Array of specific assembly names to skip
+The `-ArgumentList` parameter accepts these values in order:
+
+1. **`SkipSqlClient`** (switch): Skip loading `Microsoft.Data.SqlClient.dll`
+2. **`SkipAzure`** (switch): Skip loading Azure-related DLLs (`Azure.Core`, `Azure.Identity`, `Microsoft.Identity.Client`, `Microsoft.IdentityModel.Abstractions`)
+3. **`SkipSmo`** (switch): Skip loading all SMO assemblies (`Microsoft.SqlServer.*`)
+4. **`SkipAssemblies`** (string array): Specific assembly names to skip
 
 ### Examples
 
-**Skip only SqlClient using module variable:**
+**Skip only SqlClient:**
 ```powershell
-$script:SkipSqlClient = $true
-Import-Module dbatools.library
+Import-Module dbatools.library -ArgumentList $true
 ```
 
-**Skip specific assemblies using module variable:**
+**Skip SqlClient and Azure:**
 ```powershell
-$script:SkipAssemblies = @('Azure.Core', 'Microsoft.Data.SqlClient')
-Import-Module dbatools.library
+Import-Module dbatools.library -ArgumentList $true, $true
 ```
 
-**Combine multiple skip options:**
+**Skip SqlClient, Azure, and SMO:**
 ```powershell
-$script:SkipSqlClient = $true
-$script:SkipAzure = $true
-$script:SkipAssemblies = @('Microsoft.SqlServer.Smo')
-Import-Module dbatools.library -Verbose  # Shows which assemblies are skipped
+Import-Module dbatools.library -ArgumentList $true, $true, $true
+```
+
+**Skip specific assemblies by name:**
+```powershell
+Import-Module dbatools.library -ArgumentList $false, $false, $false, @('Microsoft.SqlServer.Smo', 'Azure.Core')
+```
+
+**Use -Verbose to see what's being skipped:**
+```powershell
+Import-Module dbatools.library -ArgumentList $true, $true -Verbose
 ```
 
 ### ⚠️ Important: PowerShell Core + Credentials Issue
