@@ -1,8 +1,4 @@
 param(
-    # Configuration hashtable for controlling DLL loading
-    # Example: @{SkipSqlClient=$true; SkipAzure=$true}
-    [hashtable]$Configuration = @{},
-
     # Skip loading Microsoft.Data.SqlClient.dll (useful when SqlServer module is already loaded)
     [switch]$SkipSqlClient,
 
@@ -16,35 +12,19 @@ param(
     [string[]]$SkipAssemblies = @()
 )
 
-# Option C: Support module-scoped variables for configuration
+# Support module-scoped variables for configuration
 # Users can set these before importing the module
-if ($null -eq $SkipSqlClient.IsPresent -or -not $SkipSqlClient) {
-    if ($script:SkipSqlClient) { $SkipSqlClient = $true }
+if (-not $SkipSqlClient -and $script:SkipSqlClient) {
+    $SkipSqlClient = $true
 }
-if ($null -eq $SkipAzure.IsPresent -or -not $SkipAzure) {
-    if ($script:SkipAzure) { $SkipAzure = $true }
+if (-not $SkipAzure -and $script:SkipAzure) {
+    $SkipAzure = $true
 }
-if ($null -eq $SkipSmo.IsPresent -or -not $SkipSmo) {
-    if ($script:SkipSmo) { $SkipSmo = $true }
+if (-not $SkipSmo -and $script:SkipSmo) {
+    $SkipSmo = $true
 }
-if ($null -eq $SkipAssemblies -or $SkipAssemblies.Count -eq 0) {
-    if ($script:SkipAssemblies) { $SkipAssemblies = $script:SkipAssemblies }
-}
-
-# Option A: Support hashtable configuration
-if ($Configuration.Count -gt 0) {
-    if ($Configuration.ContainsKey('SkipSqlClient') -and $Configuration.SkipSqlClient) {
-        $SkipSqlClient = $true
-    }
-    if ($Configuration.ContainsKey('SkipAzure') -and $Configuration.SkipAzure) {
-        $SkipAzure = $true
-    }
-    if ($Configuration.ContainsKey('SkipSmo') -and $Configuration.SkipSmo) {
-        $SkipSmo = $true
-    }
-    if ($Configuration.ContainsKey('SkipAssemblies') -and $Configuration.SkipAssemblies) {
-        $SkipAssemblies = $Configuration.SkipAssemblies
-    }
+if (-not $SkipAssemblies -and $script:SkipAssemblies) {
+    $SkipAssemblies = $script:SkipAssemblies
 }
 
 function Get-DbatoolsLibraryPath {
@@ -162,6 +142,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 if ($PSVersionTable.PSEdition -eq "Core") {
     $names = @(
         'Microsoft.SqlServer.Server',
+        'Microsoft.Bcl.AsyncInterfaces',
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
@@ -178,10 +159,10 @@ if ($PSVersionTable.PSEdition -eq "Core") {
     )
 } else {
     $names = @(
+        'Microsoft.Bcl.AsyncInterfaces',
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
-        'Microsoft.Data.SqlClient',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
@@ -226,7 +207,7 @@ foreach ($name in $names) {
     $skipThisAssembly = $false
 
     # Check SkipAzure parameter
-    if ($SkipAzure -and $name -in @('Azure.Core', 'Azure.Identity', 'Microsoft.IdentityModel.Abstractions', 'Microsoft.Identity.Client')) {
+    if ($SkipAzure -and $name -in @('Microsoft.Bcl.AsyncInterfaces', 'Azure.Core', 'Azure.Identity', 'Microsoft.IdentityModel.Abstractions', 'Microsoft.Identity.Client')) {
         Write-Verbose "Skipping $name due to -SkipAzure parameter"
         $skipThisAssembly = $true
     }
