@@ -49,6 +49,7 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
             registry._converters[typeof(decimal)] = DecimalConverter.Default;
             registry._converters[typeof(byte)] = ByteConverter.Default;
             registry._converters[typeof(string)] = new StringConverter();
+            registry._converters[typeof(float[])] = VectorConverter.Default;
 
             return registry;
         }

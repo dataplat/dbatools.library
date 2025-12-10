@@ -188,8 +188,18 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
     /// <summary>
     /// Converts string values to Decimal values with currency symbol support.
-    /// Supports culture-aware parsing for currency symbols, decimal separators, and scientific notation.
-    /// Suitable for SQL Server money and smallmoney data types.
+    /// Supports culture-aware parsing for currency symbols, decimal separators, thousands separators,
+    /// accounting format (negative values in parentheses), and scientific notation.
+    /// Designed for SQL Server money and smallmoney data types.
+    /// <para>
+    /// Note: This converter is NOT registered by default in TypeConverterRegistry because it targets
+    /// the same type (decimal) as DecimalConverter. To use this converter for columns containing
+    /// currency symbols, manually register it for specific columns or create a custom registry:
+    /// <code>
+    /// var registry = TypeConverterRegistry.Default;
+    /// registry.Register(MoneyConverter.Default);
+    /// </code>
+    /// </para>
     /// </summary>
     public sealed class MoneyConverter : CultureAwareConverterBase<decimal>
     {
