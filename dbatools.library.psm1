@@ -1,3 +1,8 @@
+param(
+    # Automatically skip loading assemblies that are already loaded (useful when SqlServer module is already imported)
+    [switch]$AvoidConflicts
+)
+
 function Get-DbatoolsLibraryPath {
     [CmdletBinding()]
     param()
@@ -96,14 +101,26 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 # REMOVED win-sqlclient logic - SqlClient is now directly in lib
 $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Data.SqlClient.dll")
 
-try {
-    Import-Module $sqlclient
-} catch {
-    throw "Couldn't import $sqlclient | $PSItem"
+# Check if SqlClient is already loaded when AvoidConflicts is set
+$skipSqlClient = $false
+if ($AvoidConflicts) {
+    $loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
+    $skipSqlClient = $loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+    if ($skipSqlClient) {
+        Write-Verbose "Skipping Microsoft.Data.SqlClient.dll - already loaded"
+    }
 }
 
-if ($PSVersionTable.PSEdition -ne "Core") {
-    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($onAssemblyResolveEventHandler)
+if (-not $skipSqlClient) {
+    try {
+        Import-Module $sqlclient
+    } catch {
+        throw "Couldn't import $sqlclient | $PSItem"
+    }
+}
+
+if ($PSVersionTable.PSEdition -ne "Core" -and $redirector) {
+    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
 }
 
 if ($PSVersionTable.PSEdition -eq "Core") {
@@ -128,7 +145,6 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
-        'Microsoft.Data.SqlClient',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
@@ -176,13 +192,25 @@ foreach ($name in $names) {
         continue
     }
 
-    $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", "$name.dll")
-    $assemblyfullname = $assemblies.FullName | Out-String
-    if (-not ($assemblyfullname.Contains("$name,"))) {
-        $null = try {
-            $null = Import-Module $assemblyPath
-        } catch {
-            Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
+    # Check if assembly is already loaded when AvoidConflicts is enabled
+    $skipAssembly = $false
+    if ($AvoidConflicts) {
+        $assemblyfullname = $assemblies.FullName | Out-String
+        if ($assemblyfullname.Contains("$name,")) {
+            $skipAssembly = $true
+            Write-Verbose "Skipping $name.dll - already loaded"
+        }
+    }
+
+    if (-not $skipAssembly) {
+        $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", "$name.dll")
+        $assemblyfullname = $assemblies.FullName | Out-String
+        if (-not ($assemblyfullname.Contains("$name,"))) {
+            $null = try {
+                $null = Import-Module $assemblyPath
+            } catch {
+                Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
+            }
         }
     }
 }
