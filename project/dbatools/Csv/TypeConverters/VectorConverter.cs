@@ -10,6 +10,9 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// </summary>
     public sealed class VectorConverter : TypeConverterBase<float[]>
     {
+        /// <summary>Cached separator array for Split operations to avoid repeated allocations.</summary>
+        private static readonly char[] CommaSeparator = new[] { ',' };
+
         /// <summary>Gets the default instance of the converter.</summary>
         public static VectorConverter Default { get; } = new VectorConverter();
 
@@ -36,13 +39,13 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
             value = value.Trim();
 
             // Check for JSON array format and strip brackets
-            if (value.StartsWith("[") && value.EndsWith("]"))
+            if (value.StartsWith("[") && value.EndsWith("]") && value.Length >= 2)
             {
                 value = value.Substring(1, value.Length - 2);
             }
 
             // Split by comma and parse each value
-            string[] parts = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = value.Split(CommaSeparator, StringSplitOptions.RemoveEmptyEntries);
 
             if (parts.Length == 0)
             {

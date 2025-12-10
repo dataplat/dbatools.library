@@ -183,6 +183,71 @@ namespace Dataplat.Dbatools.Csv.Tests
         }
 
         [TestMethod]
+        public void TestDecimalConverterThousandsSeparator()
+        {
+            var converter = DecimalConverter.Default;
+
+            // Test thousands separator (culture-aware)
+            Assert.IsTrue(converter.TryConvert("1,234.56", out decimal result));
+            Assert.AreEqual(1234.56m, result);
+
+            // Test multiple thousands separators
+            Assert.IsTrue(converter.TryConvert("1,234,567.89", out result));
+            Assert.AreEqual(1234567.89m, result);
+
+            // Test negative with thousands separator
+            Assert.IsTrue(converter.TryConvert("-1,234.56", out result));
+            Assert.AreEqual(-1234.56m, result);
+        }
+
+        [TestMethod]
+        public void TestDecimalConverterEdgeCases()
+        {
+            var converter = DecimalConverter.Default;
+
+            // Test zero
+            Assert.IsTrue(converter.TryConvert("0", out decimal result));
+            Assert.AreEqual(0m, result);
+
+            // Test zero in scientific notation
+            Assert.IsTrue(converter.TryConvert("0.0E0", out result));
+            Assert.AreEqual(0m, result);
+
+            // Test very small number
+            Assert.IsTrue(converter.TryConvert("1E-28", out result));
+            Assert.AreEqual(0.0000000000000000000000000001m, result);
+
+            // Test near maximum value (decimal.MaxValue is ~7.9E+28)
+            Assert.IsTrue(converter.TryConvert("1E+28", out result));
+            Assert.AreEqual(10000000000000000000000000000m, result);
+
+            // Test overflow - should fail gracefully
+            Assert.IsFalse(converter.TryConvert("1E+30", out _));
+
+            // Test invalid scientific notation
+            Assert.IsFalse(converter.TryConvert("1E", out _));
+            Assert.IsFalse(converter.TryConvert("E5", out _));
+        }
+
+        [TestMethod]
+        public void TestDecimalConverterDifferentCultures()
+        {
+            // Test with German culture (uses comma as decimal separator)
+            var germanConverter = new DecimalConverter();
+            germanConverter.FormatProvider = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+
+            Assert.IsTrue(germanConverter.TryConvert("1234,56", out decimal result));
+            Assert.AreEqual(1234.56m, result);
+
+            // Test with French culture (uses space as thousands separator, comma as decimal)
+            var frenchConverter = new DecimalConverter();
+            frenchConverter.FormatProvider = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+
+            Assert.IsTrue(frenchConverter.TryConvert("1 234,56", out result));
+            Assert.AreEqual(1234.56m, result);
+        }
+
+        [TestMethod]
         public void TestMoneyConverter()
         {
             var converter = MoneyConverter.Default;

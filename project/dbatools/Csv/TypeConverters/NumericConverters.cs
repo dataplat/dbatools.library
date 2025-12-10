@@ -135,8 +135,15 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
     /// <summary>
     /// Converts string values to Decimal values.
-    /// Supports culture-aware parsing for decimal separators and scientific notation.
+    /// Supports culture-aware parsing for decimal separators, thousands separators, and scientific notation.
     /// Addresses LumenWorks issue #66 for Czech locale decimal parsing.
+    /// <para>
+    /// Note: Uses NumberStyles.Float | NumberStyles.AllowThousands, which enables parsing of:
+    /// - Scientific notation (e.g., "1.23E5")
+    /// - Thousands separators (e.g., "1,234.56")
+    /// This may allow values that were previously rejected. If you need strict parsing without
+    /// thousands separators, use a custom DecimalConverter with NumberStyles.Float only.
+    /// </para>
     /// </summary>
     public sealed class DecimalConverter : CultureAwareConverterBase<decimal>
     {
@@ -194,12 +201,16 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
     /// <para>
     /// Note: This converter is NOT registered by default in TypeConverterRegistry because it targets
     /// the same type (decimal) as DecimalConverter. To use this converter for columns containing
-    /// currency symbols, manually register it for specific columns or create a custom registry:
-    /// <code>
-    /// var registry = TypeConverterRegistry.Default;
-    /// registry.Register(MoneyConverter.Default);
-    /// </code>
+    /// currency symbols, you must clone the registry and register it manually:
     /// </para>
+    /// <example>
+    /// <code>
+    /// // Clone the default registry to avoid modifying the global singleton
+    /// var registry = TypeConverterRegistry.Default.Clone();
+    /// registry.Register(MoneyConverter.Default);
+    /// // Use this custom registry with your CSV reader
+    /// </code>
+    /// </example>
     /// </summary>
     public sealed class MoneyConverter : CultureAwareConverterBase<decimal>
     {
