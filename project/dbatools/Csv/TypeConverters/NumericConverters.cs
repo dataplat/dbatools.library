@@ -135,7 +135,7 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
 
     /// <summary>
     /// Converts string values to Decimal values.
-    /// Supports culture-aware parsing for decimal separators.
+    /// Supports culture-aware parsing for decimal separators and scientific notation.
     /// Addresses LumenWorks issue #66 for Czech locale decimal parsing.
     /// </summary>
     public sealed class DecimalConverter : CultureAwareConverterBase<decimal>
@@ -146,7 +146,7 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
         /// <summary>Initializes a new instance of the <see cref="DecimalConverter"/> class.</summary>
         public DecimalConverter()
         {
-            NumberStyles = NumberStyles.Number;
+            NumberStyles = NumberStyles.Float | NumberStyles.AllowThousands;
         }
 
         /// <inheritdoc />

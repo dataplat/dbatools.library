@@ -161,6 +161,26 @@ namespace Dataplat.Dbatools.Csv.Tests
             Assert.AreEqual(1234567890.123456m, result);
         }
 
+        [TestMethod]
+        public void TestDecimalConverterScientificNotation()
+        {
+            var converter = DecimalConverter.Default;
+
+            // Test case from issue #35
+            Assert.IsTrue(converter.TryConvert("1.2345678E5", out decimal result));
+            Assert.AreEqual(123456.78m, result);
+
+            // Additional scientific notation tests
+            Assert.IsTrue(converter.TryConvert("1.5e10", out result));
+            Assert.AreEqual(15000000000m, result);
+
+            Assert.IsTrue(converter.TryConvert("2.5E-3", out result));
+            Assert.AreEqual(0.0025m, result);
+
+            Assert.IsTrue(converter.TryConvert("-3.14E2", out result));
+            Assert.AreEqual(-314m, result);
+        }
+
         #endregion
 
         #region Type Converter Registry Tests
