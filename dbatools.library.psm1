@@ -101,13 +101,14 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 # REMOVED win-sqlclient logic - SqlClient is now directly in lib
 $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Data.SqlClient.dll")
 
-# Check if Microsoft.Data.SqlClient is already loaded (e.g., from SqlServer module)
-$sqlClientLoaded = [System.AppDomain]::CurrentDomain.GetAssemblies() |
-    Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+# Check if SqlClient is already loaded when AvoidConflicts is set
+$skipSqlClient = $false
+if ($AvoidConflicts) {
+    $loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
+    $skipSqlClient = $loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+}
 
-if ($AvoidConflicts -and $sqlClientLoaded) {
-    Write-Verbose "Skipping Microsoft.Data.SqlClient.dll - already loaded"
-} else {
+if (-not $skipSqlClient) {
     try {
         Import-Module $sqlclient
     } catch {
@@ -115,29 +116,38 @@ if ($AvoidConflicts -and $sqlClientLoaded) {
     }
 }
 
+if ($PSVersionTable.PSEdition -ne "Core") {
+    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($onAssemblyResolveEventHandler)
+}
+
 if ($PSVersionTable.PSEdition -eq "Core") {
-    $names = @(
-        'Microsoft.SqlServer.Server',
-        'Microsoft.Bcl.AsyncInterfaces',
-        'Azure.Core',
-        'Azure.Identity',
-        'Microsoft.IdentityModel.Abstractions',
-        'Microsoft.SqlServer.Dac',
-        'Microsoft.SqlServer.Smo',
-        'Microsoft.SqlServer.SmoExtended',
-        'Microsoft.SqlServer.SqlWmiManagement',
-        'Microsoft.SqlServer.WmiEnum',
-        'Microsoft.SqlServer.Management.RegisteredServers',
-        'Microsoft.SqlServer.Management.Collector',
-        'Microsoft.SqlServer.Management.XEvent',
-        'Microsoft.SqlServer.Management.XEventDbScoped',
-        'Microsoft.SqlServer.XEvent.XELite'
-    )
+    if ($AvoidConflicts) {
+        # Skip loading assemblies that may conflict with already-loaded modules (e.g., SqlServer)
+        $names = @()
+    } else {
+        $names = @(
+            'Microsoft.SqlServer.Server',
+            'Azure.Core',
+            'Azure.Identity',
+            'Microsoft.IdentityModel.Abstractions',
+            'Microsoft.SqlServer.Dac',
+            'Microsoft.SqlServer.Smo',
+            'Microsoft.SqlServer.SmoExtended',
+            'Microsoft.SqlServer.SqlWmiManagement',
+            'Microsoft.SqlServer.WmiEnum',
+            'Microsoft.SqlServer.Management.RegisteredServers',
+            'Microsoft.SqlServer.Management.Collector',
+            'Microsoft.SqlServer.Management.XEvent',
+            'Microsoft.SqlServer.Management.XEventDbScoped',
+            'Microsoft.SqlServer.XEvent.XELite'
+        )
+    }
 } else {
     $names = @(
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
+        'Microsoft.Data.SqlClient',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
@@ -178,17 +188,6 @@ try {
 foreach ($name in $names) {
     # REMOVED win-sqlclient handling and mac-specific logic since files are in standard lib folder
 
-    # If AvoidConflicts is set, check if this assembly is already loaded
-    if ($AvoidConflicts) {
-        $alreadyLoaded = [System.AppDomain]::CurrentDomain.GetAssemblies() |
-            Where-Object { $_.GetName().Name -eq $name }
-
-        if ($alreadyLoaded) {
-            Write-Verbose "Skipping $name - already loaded"
-            continue
-        }
-    }
-
     $x64only = 'Microsoft.SqlServer.Replication', 'Microsoft.SqlServer.XEvent.Linq', 'Microsoft.SqlServer.BatchParser', 'Microsoft.SqlServer.Rmo', 'Microsoft.SqlServer.BatchParserClient'
 
     if ($name -in $x64only -and $env:PROCESSOR_ARCHITECTURE -eq "x86") {
@@ -205,9 +204,4 @@ foreach ($name in $names) {
             Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
         }
     }
-}
-
-# Remove the assembly resolver now that all imports are complete
-if ($PSVersionTable.PSEdition -ne "Core") {
-    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
 }
