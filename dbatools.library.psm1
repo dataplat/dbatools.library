@@ -1,15 +1,6 @@
 param(
-    # Skip loading Microsoft.Data.SqlClient.dll (useful when SqlServer module is already loaded)
-    [switch]$SkipSqlClient,
-
-    # Skip loading Azure-related DLLs (Azure.Core, Azure.Identity, Microsoft.Identity.Client)
-    [switch]$SkipAzure,
-
-    # Skip loading SMO assemblies (useful when SqlServer module is already loaded)
-    [switch]$SkipSmo,
-
-    # Array of specific assembly names to skip (e.g., @('Microsoft.Data.SqlClient', 'Azure.Core'))
-    [string[]]$SkipAssemblies = @()
+    # Automatically skip loading assemblies that are already loaded (useful when SqlServer module is already imported)
+    [switch]$AvoidConflicts
 )
 
 function Get-DbatoolsLibraryPath {
@@ -110,14 +101,18 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 # REMOVED win-sqlclient logic - SqlClient is now directly in lib
 $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Data.SqlClient.dll")
 
-if (-not $SkipSqlClient -and 'Microsoft.Data.SqlClient' -notin $SkipAssemblies) {
+# Check if Microsoft.Data.SqlClient is already loaded (e.g., from SqlServer module)
+$sqlClientLoaded = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+    Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+
+if ($AvoidConflicts -and $sqlClientLoaded) {
+    Write-Verbose "Skipping Microsoft.Data.SqlClient.dll - already loaded"
+} else {
     try {
         Import-Module $sqlclient
     } catch {
         throw "Couldn't import $sqlclient | $PSItem"
     }
-} else {
-    Write-Verbose "Skipping Microsoft.Data.SqlClient.dll import as requested"
 }
 
 if ($PSVersionTable.PSEdition -eq "Core") {
@@ -183,29 +178,15 @@ try {
 foreach ($name in $names) {
     # REMOVED win-sqlclient handling and mac-specific logic since files are in standard lib folder
 
-    # Check if this assembly should be skipped based on parameters
-    $skipThisAssembly = $false
+    # If AvoidConflicts is set, check if this assembly is already loaded
+    if ($AvoidConflicts) {
+        $alreadyLoaded = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+            Where-Object { $_.GetName().Name -eq $name }
 
-    # Check SkipAzure parameter
-    if ($SkipAzure -and $name -in @('Azure.Core', 'Azure.Identity', 'Microsoft.IdentityModel.Abstractions', 'Microsoft.Identity.Client')) {
-        Write-Verbose "Skipping $name due to -SkipAzure parameter"
-        $skipThisAssembly = $true
-    }
-
-    # Check SkipSmo parameter
-    if ($SkipSmo -and $name -match '^Microsoft\.SqlServer\.') {
-        Write-Verbose "Skipping $name due to -SkipSmo parameter"
-        $skipThisAssembly = $true
-    }
-
-    # Check SkipAssemblies parameter
-    if ($name -in $SkipAssemblies) {
-        Write-Verbose "Skipping $name as it is in -SkipAssemblies list"
-        $skipThisAssembly = $true
-    }
-
-    if ($skipThisAssembly) {
-        continue
+        if ($alreadyLoaded) {
+            Write-Verbose "Skipping $name - already loaded"
+            continue
+        }
     }
 
     $x64only = 'Microsoft.SqlServer.Replication', 'Microsoft.SqlServer.XEvent.Linq', 'Microsoft.SqlServer.BatchParser', 'Microsoft.SqlServer.Rmo', 'Microsoft.SqlServer.BatchParserClient'
