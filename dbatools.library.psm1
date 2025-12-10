@@ -119,7 +119,7 @@ if (-not $skipSqlClient) {
     }
 }
 
-if ($PSVersionTable.PSEdition -ne "Core") {
+if ($PSVersionTable.PSEdition -ne "Core" -and $redirector) {
     [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
 }
 
@@ -192,15 +192,25 @@ foreach ($name in $names) {
         continue
     }
 
-    $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", "$name.dll")
-    $assemblyfullname = $assemblies.FullName | Out-String
-    if (-not ($assemblyfullname.Contains("$name,"))) {
-        $null = try {
-            $null = Import-Module $assemblyPath
-        } catch {
-            Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
+    # Check if assembly is already loaded when AvoidConflicts is enabled
+    $skipAssembly = $false
+    if ($AvoidConflicts) {
+        $assemblyfullname = $assemblies.FullName | Out-String
+        if ($assemblyfullname.Contains("$name,")) {
+            $skipAssembly = $true
+            Write-Verbose "Skipping $name.dll - already loaded"
         }
-    } elseif ($AvoidConflicts) {
-        Write-Verbose "Skipping $name.dll - already loaded"
+    }
+
+    if (-not $skipAssembly) {
+        $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", "$name.dll")
+        $assemblyfullname = $assemblies.FullName | Out-String
+        if (-not ($assemblyfullname.Contains("$name,"))) {
+            $null = try {
+                $null = Import-Module $assemblyPath
+            } catch {
+                Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
+            }
+        }
     }
 }
