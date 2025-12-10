@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Dataplat.Dbatools.Csv.TypeConverters;
 
@@ -179,6 +180,184 @@ namespace Dataplat.Dbatools.Csv.Tests
 
             Assert.IsTrue(converter.TryConvert("-3.14E2", out result));
             Assert.AreEqual(-314m, result);
+        }
+
+        [TestMethod]
+        public void TestMoneyConverter()
+        {
+            var converter = MoneyConverter.Default;
+
+            // Test basic decimal values
+            Assert.IsTrue(converter.TryConvert("123.45", out decimal result));
+            Assert.AreEqual(123.45m, result);
+
+            // Test negative values
+            Assert.IsTrue(converter.TryConvert("-99.99", out result));
+            Assert.AreEqual(-99.99m, result);
+        }
+
+        [TestMethod]
+        public void TestMoneyConverterWithCurrencySymbols()
+        {
+            var converter = MoneyConverter.Default;
+
+            // Test US dollar sign
+            Assert.IsTrue(converter.TryConvert("$123.45", out decimal result));
+            Assert.AreEqual(123.45m, result);
+
+            // Test negative with dollar sign
+            Assert.IsTrue(converter.TryConvert("-$99.99", out result));
+            Assert.AreEqual(-99.99m, result);
+
+            // Test parentheses for negative (accounting format)
+            Assert.IsTrue(converter.TryConvert("($50.00)", out result));
+            Assert.AreEqual(-50.00m, result);
+        }
+
+        [TestMethod]
+        public void TestMoneyConverterWithThousandsSeparator()
+        {
+            var converter = MoneyConverter.Default;
+
+            // Test with thousands separator
+            Assert.IsTrue(converter.TryConvert("$1,234.56", out decimal result));
+            Assert.AreEqual(1234.56m, result);
+
+            // Test large number with currency
+            Assert.IsTrue(converter.TryConvert("$1,234,567.89", out result));
+            Assert.AreEqual(1234567.89m, result);
+        }
+
+        [TestMethod]
+        public void TestMoneyConverterScientificNotation()
+        {
+            var converter = MoneyConverter.Default;
+
+            // NumberStyles.Currency includes AllowExponent, so scientific notation should work
+            Assert.IsTrue(converter.TryConvert("1.5E3", out decimal result));
+            Assert.AreEqual(1500m, result);
+
+            Assert.IsTrue(converter.TryConvert("2.5E-2", out result));
+            Assert.AreEqual(0.025m, result);
+        }
+
+        [TestMethod]
+        public void TestMoneyConverterInvalidInput()
+        {
+            var converter = MoneyConverter.Default;
+
+            Assert.IsFalse(converter.TryConvert("invalid", out _));
+            Assert.IsFalse(converter.TryConvert("", out _));
+            Assert.IsFalse(converter.TryConvert(null, out _));
+        }
+
+        #endregion
+
+        #region Vector Converter Tests
+
+        [TestMethod]
+        public void TestVectorConverterJsonArrayFormat()
+        {
+            var converter = VectorConverter.Default;
+
+            // Test JSON array format
+            Assert.IsTrue(converter.TryConvert("[0.1, 0.2, 0.3]", out float[] result));
+            Assert.AreEqual(3, result.Length);
+            Assert.AreEqual(0.1f, result[0], 0.0001f);
+            Assert.AreEqual(0.2f, result[1], 0.0001f);
+            Assert.AreEqual(0.3f, result[2], 0.0001f);
+        }
+
+        [TestMethod]
+        public void TestVectorConverterCommaSeparated()
+        {
+            var converter = VectorConverter.Default;
+
+            // Test comma-separated format (no brackets)
+            Assert.IsTrue(converter.TryConvert("0.5, 1.0, 1.5", out float[] result));
+            Assert.AreEqual(3, result.Length);
+            Assert.AreEqual(0.5f, result[0], 0.0001f);
+            Assert.AreEqual(1.0f, result[1], 0.0001f);
+            Assert.AreEqual(1.5f, result[2], 0.0001f);
+        }
+
+        [TestMethod]
+        public void TestVectorConverterScientificNotation()
+        {
+            var converter = VectorConverter.Default;
+
+            // Test scientific notation in vectors
+            Assert.IsTrue(converter.TryConvert("[1.5e-3, 2.0E2, -3.5e1]", out float[] result));
+            Assert.AreEqual(3, result.Length);
+            Assert.AreEqual(0.0015f, result[0], 0.000001f);
+            Assert.AreEqual(200.0f, result[1], 0.0001f);
+            Assert.AreEqual(-35.0f, result[2], 0.0001f);
+        }
+
+        [TestMethod]
+        public void TestVectorConverterNegativeValues()
+        {
+            var converter = VectorConverter.Default;
+
+            // Test negative values
+            Assert.IsTrue(converter.TryConvert("[-0.5, -1.0, -1.5]", out float[] result));
+            Assert.AreEqual(3, result.Length);
+            Assert.AreEqual(-0.5f, result[0], 0.0001f);
+            Assert.AreEqual(-1.0f, result[1], 0.0001f);
+            Assert.AreEqual(-1.5f, result[2], 0.0001f);
+        }
+
+        [TestMethod]
+        public void TestVectorConverterLargeEmbedding()
+        {
+            var converter = VectorConverter.Default;
+
+            // Test realistic embedding size (e.g., OpenAI ada-002 uses 1536 dimensions)
+            // Create a sample with 100 dimensions for testing
+            string vectorString = "[" + string.Join(", ", Enumerable.Range(0, 100).Select(i => (i * 0.01f).ToString("F3"))) + "]";
+
+            Assert.IsTrue(converter.TryConvert(vectorString, out float[] result));
+            Assert.AreEqual(100, result.Length);
+            Assert.AreEqual(0.0f, result[0], 0.0001f);
+            Assert.AreEqual(0.99f, result[99], 0.0001f);
+        }
+
+        [TestMethod]
+        public void TestVectorConverterWhitespaceHandling()
+        {
+            var converter = VectorConverter.Default;
+
+            // Test various whitespace scenarios
+            Assert.IsTrue(converter.TryConvert("  [  0.1  ,  0.2  ,  0.3  ]  ", out float[] result));
+            Assert.AreEqual(3, result.Length);
+
+            Assert.IsTrue(converter.TryConvert("0.1,0.2,0.3", out result)); // No spaces
+            Assert.AreEqual(3, result.Length);
+        }
+
+        [TestMethod]
+        public void TestVectorConverterInvalidInput()
+        {
+            var converter = VectorConverter.Default;
+
+            // Test invalid inputs
+            Assert.IsFalse(converter.TryConvert("", out _));
+            Assert.IsFalse(converter.TryConvert(null, out _));
+            Assert.IsFalse(converter.TryConvert("[]", out _)); // Empty array
+            Assert.IsFalse(converter.TryConvert("[not, a, number]", out _));
+            Assert.IsFalse(converter.TryConvert("[0.1, invalid, 0.3]", out _));
+            Assert.IsFalse(converter.TryConvert("[", out _)); // Malformed
+        }
+
+        [TestMethod]
+        public void TestVectorConverterSingleValue()
+        {
+            var converter = VectorConverter.Default;
+
+            // Test single-value vector
+            Assert.IsTrue(converter.TryConvert("[42.5]", out float[] result));
+            Assert.AreEqual(1, result.Length);
+            Assert.AreEqual(42.5f, result[0], 0.0001f);
         }
 
         #endregion

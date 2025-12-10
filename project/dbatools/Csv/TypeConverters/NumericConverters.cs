@@ -185,4 +185,31 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
             => byte.TryParse(value, styles, provider, out result);
 #endif
     }
+
+    /// <summary>
+    /// Converts string values to Decimal values with currency symbol support.
+    /// Supports culture-aware parsing for currency symbols, decimal separators, and scientific notation.
+    /// Suitable for SQL Server money and smallmoney data types.
+    /// </summary>
+    public sealed class MoneyConverter : CultureAwareConverterBase<decimal>
+    {
+        /// <summary>Gets the default instance of the converter.</summary>
+        public static MoneyConverter Default { get; } = new MoneyConverter();
+
+        /// <summary>Initializes a new instance of the <see cref="MoneyConverter"/> class.</summary>
+        public MoneyConverter()
+        {
+            NumberStyles = NumberStyles.Currency;
+        }
+
+        /// <inheritdoc />
+        protected override bool TryParseCore(string value, NumberStyles styles, IFormatProvider provider, out decimal result)
+            => decimal.TryParse(value, styles, provider, out result);
+
+#if NET8_0_OR_GREATER
+        /// <inheritdoc />
+        protected override bool TryParseSpan(ReadOnlySpan<char> value, NumberStyles styles, IFormatProvider provider, out decimal result)
+            => decimal.TryParse(value, styles, provider, out result);
+#endif
+    }
 }
