@@ -119,10 +119,6 @@ if (-not $skipSqlClient) {
     }
 }
 
-if ($PSVersionTable.PSEdition -ne "Core" -and $redirector) {
-    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
-}
-
 if ($PSVersionTable.PSEdition -eq "Core") {
     $names = @(
         'Microsoft.SqlServer.Server',
@@ -213,4 +209,8 @@ foreach ($name in $names) {
             }
         }
     }
+}
+
+if ($PSVersionTable.PSEdition -ne "Core" -and $redirector) {
+    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
 }
