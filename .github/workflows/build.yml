@@ -109,13 +109,70 @@ jobs:
           Write-Host "All critical paths verified successfully!" -ForegroundColor Green
         }
 
-    - name: Test module import
+    - name: Test module import (PowerShell Core)
       shell: pwsh
       run: |
         Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
         $module = Get-Module dbatools.library
         Write-Host "Loaded dbatools.library version: $($module.Version)"
         Write-Host "Module path: $($module.Path)"
+
+    - name: Test AvoidConflicts with SqlServer module (Windows PowerShell 5.1)
+      shell: powershell
+      run: |
+        Write-Host "=== Testing AvoidConflicts with SqlServer module on Windows PowerShell 5.1 ===" -ForegroundColor Cyan
+        Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)" -ForegroundColor Yellow
+        Write-Host "PowerShell Edition: $($PSVersionTable.PSEdition)" -ForegroundColor Yellow
+
+        # Install SqlServer module
+        Write-Host "`nInstalling SqlServer module..." -ForegroundColor Cyan
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+        Install-Module SqlServer -Force -AllowClobber -Scope CurrentUser
+        Write-Host "SqlServer module installed successfully" -ForegroundColor Green
+
+        # Import SqlServer module first
+        Write-Host "`nImporting SqlServer module..." -ForegroundColor Cyan
+        Import-Module SqlServer -Force
+        $sqlServerModule = Get-Module SqlServer
+        Write-Host "SqlServer module version: $($sqlServerModule.Version)" -ForegroundColor Green
+
+        # Check what assemblies are loaded after SqlServer import
+        $preLoadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+            Where-Object { $_.GetName().Name -match 'Microsoft\.(Data\.)?SqlClient|Microsoft\.SqlServer' } |
+            ForEach-Object { $_.GetName().Name }
+        Write-Host "`nAssemblies loaded by SqlServer module:" -ForegroundColor Yellow
+        $preLoadedAssemblies | ForEach-Object { Write-Host "  - $_" }
+
+        # Now import dbatools.library with -AvoidConflicts
+        Write-Host "`nImporting dbatools.library with -AvoidConflicts..." -ForegroundColor Cyan
+        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -ArgumentList $true -Force -Verbose
+
+        $dbatoolsLibrary = Get-Module dbatools.library
+        Write-Host "`ndbatools.library version: $($dbatoolsLibrary.Version)" -ForegroundColor Green
+
+        # Verify both modules are loaded
+        $loadedModules = Get-Module | Where-Object { $_.Name -in 'SqlServer', 'dbatools.library' }
+        Write-Host "`nLoaded modules:" -ForegroundColor Yellow
+        $loadedModules | ForEach-Object { Write-Host "  - $($_.Name) v$($_.Version)" }
+
+        if ($loadedModules.Count -eq 2) {
+            Write-Host "`n✅ SUCCESS: Both SqlServer and dbatools.library modules loaded successfully!" -ForegroundColor Green
+        } else {
+            Write-Host "`n❌ FAILURE: Expected 2 modules, got $($loadedModules.Count)" -ForegroundColor Red
+            exit 1
+        }
+
+        # Test that we can use types from both modules
+        Write-Host "`nTesting assembly access..." -ForegroundColor Cyan
+        try {
+            $sqlClientType = [Microsoft.Data.SqlClient.SqlConnection]
+            Write-Host "✅ Microsoft.Data.SqlClient.SqlConnection type accessible" -ForegroundColor Green
+        } catch {
+            Write-Host "❌ Failed to access SqlConnection type: $_" -ForegroundColor Red
+            exit 1
+        }
+
+        Write-Host "`n=== AvoidConflicts test completed successfully ===" -ForegroundColor Green
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
