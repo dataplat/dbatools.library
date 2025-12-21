@@ -54,6 +54,48 @@ Install-Module dbatools.library -Scope AllUsers
 Install-Module dbatools.library -Scope CurrentUser
 ```
 
+## Handling DLL Conflicts with SqlServer Module
+
+If you need to use both the SqlServer module and dbatools.library in the same session, you may encounter DLL version conflicts. dbatools.library provides the `-AvoidConflicts` parameter to automatically skip loading assemblies that are already loaded by another module.
+
+### Usage
+
+Import the SqlServer module first, then import dbatools.library with `-AvoidConflicts`:
+
+```powershell
+# Import SqlServer module first
+Import-Module SqlServer
+
+# Then import dbatools.library with -AvoidConflicts
+Import-Module dbatools.library -ArgumentList $true
+```
+
+When `-AvoidConflicts` is enabled, dbatools.library will:
+- Check if each assembly is already loaded in the current session
+- Skip loading any assemblies that are already present
+- Load only the assemblies that are missing
+
+### Examples
+
+**Basic usage with SqlServer module:**
+```powershell
+Import-Module SqlServer
+Import-Module dbatools.library -ArgumentList $true
+```
+
+**See what's being skipped with -Verbose:**
+```powershell
+Import-Module SqlServer
+Import-Module dbatools.library -ArgumentList $true -Verbose
+# Output will show: "Skipping Microsoft.Data.SqlClient.dll - already loaded" etc.
+```
+
+**Without AvoidConflicts (default behavior):**
+```powershell
+# Loads all assemblies, may cause conflicts if SqlServer module is already loaded
+Import-Module dbatools.library
+```
+
 ### ⚠️ Important: PowerShell Core + Credentials Issue
 
 **If you plan to use SQL Server credentials with PowerShell Core (pwsh), you MUST install to AllUsers scope or grant appropriate permissions.**

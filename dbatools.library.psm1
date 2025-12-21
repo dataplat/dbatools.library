@@ -1,3 +1,9 @@
+param(
+    # Automatically skip loading assemblies that are already loaded (useful when SqlServer module is already imported)
+    [Alias('SkipLoadedAssemblies', 'AllowSharedAssemblies')]
+    [switch]$AvoidConflicts
+)
+
 function Get-DbatoolsLibraryPath {
     [CmdletBinding()]
     param()
@@ -54,29 +60,42 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                         "Microsoft.SqlServer.Rmo",
                         "System.Private.CoreLib",
                         "Azure.Core",
-                        "Azure.Identity"
+                        "Azure.Identity",
+                        "Microsoft.Data.Tools.Utilities",
+                        "Microsoft.Data.Tools.Schema.Sql",
+                        "Microsoft.SqlServer.TransactSql.ScriptDom"
                     };
 
-                    var name = new AssemblyName(e.Name);
-                    var assemblyName = name.Name.ToString();
+                    var requestedName = new AssemblyName(e.Name);
+                    var assemblyName = requestedName.Name;
+
+                    // First, check if any version of this assembly is already loaded
+                    // This handles version mismatches (e.g., SMO requesting SqlClient 5.0.0.0 when 6.0.2 is loaded)
+                    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            if (assembly.GetName().Name == assemblyName)
+                            {
+                                return assembly;
+                            }
+                        }
+                        catch
+                        {
+                            // Some assemblies may throw when accessing GetName()
+                        }
+                    }
+
+                    // Only load from disk if not already loaded and it's in our list
                     foreach (string dll in dlls)
                     {
                         if (assemblyName == dll)
                         {
                             string filelocation = "$dir" + dll + ".dll";
-                            //Console.WriteLine(filelocation);
                             return Assembly.LoadFrom(filelocation);
                         }
                     }
 
-                    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                    {
-                        // maybe this needs to change?
-                        var info = assembly.GetName();
-                        if (info.FullName == e.Name) {
-                            return assembly;
-                        }
-                    }
                     return null;
                 }
             }
@@ -96,14 +115,24 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 # REMOVED win-sqlclient logic - SqlClient is now directly in lib
 $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Data.SqlClient.dll")
 
-try {
-    Import-Module $sqlclient
-} catch {
-    throw "Couldn't import $sqlclient | $PSItem"
+# Get loaded assemblies once for reuse (used for AvoidConflicts checks and later assembly loading)
+$script:loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
+
+# Check if SqlClient is already loaded when AvoidConflicts is set
+$skipSqlClient = $false
+if ($AvoidConflicts) {
+    $skipSqlClient = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+    if ($skipSqlClient) {
+        Write-Verbose "Skipping Microsoft.Data.SqlClient.dll - already loaded"
+    }
 }
 
-if ($PSVersionTable.PSEdition -ne "Core") {
-    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($onAssemblyResolveEventHandler)
+if (-not $skipSqlClient) {
+    try {
+        Import-Module $sqlclient
+    } catch {
+        throw "Couldn't import $sqlclient | $PSItem"
+    }
 }
 
 if ($PSVersionTable.PSEdition -eq "Core") {
@@ -114,6 +143,9 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.IdentityModel.Abstractions',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Dac.Extensions',
+        'Microsoft.Data.Tools.Utilities',
+        'Microsoft.Data.Tools.Schema.Sql',
+        'Microsoft.SqlServer.TransactSql.ScriptDom',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
         'Microsoft.SqlServer.SqlWmiManagement',
@@ -129,9 +161,11 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Azure.Core',
         'Azure.Identity',
         'Microsoft.IdentityModel.Abstractions',
-        'Microsoft.Data.SqlClient',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Dac.Extensions',
+        'Microsoft.Data.Tools.Utilities',
+        'Microsoft.Data.Tools.Schema.Sql',
+        'Microsoft.SqlServer.TransactSql.ScriptDom',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
         'Microsoft.SqlServer.SqlWmiManagement',
@@ -159,8 +193,8 @@ if ($PSVersionTable.OS -match "ARM64") {
 }
 #endregion Names
 
-# this takes 10ms
-$assemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
+# Build string of loaded assembly names once for efficient checking
+$script:loadedAssemblyNames = $script:loadedAssemblies.FullName | Out-String
 
 try {
     $null = Import-Module ([IO.Path]::Combine($script:libraryroot, "third-party", "bogus", "Bogus.dll"))
@@ -169,8 +203,6 @@ try {
 }
 
 foreach ($name in $names) {
-    # REMOVED win-sqlclient handling and mac-specific logic since files are in standard lib folder
-
     $x64only = 'Microsoft.SqlServer.Replication', 'Microsoft.SqlServer.XEvent.Linq', 'Microsoft.SqlServer.BatchParser', 'Microsoft.SqlServer.Rmo', 'Microsoft.SqlServer.BatchParserClient'
 
     if ($name -in $x64only -and $env:PROCESSOR_ARCHITECTURE -eq "x86") {
@@ -178,13 +210,27 @@ foreach ($name in $names) {
         continue
     }
 
-    $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", "$name.dll")
-    $assemblyfullname = $assemblies.FullName | Out-String
-    if (-not ($assemblyfullname.Contains("$name,"))) {
-        $null = try {
-            $null = Import-Module $assemblyPath
-        } catch {
-            Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
+    # Check if assembly is already loaded (always check to avoid duplicate loads)
+    if ($script:loadedAssemblyNames.Contains("$name,")) {
+        if ($AvoidConflicts) {
+            Write-Verbose "Skipping $name.dll - already loaded"
         }
+        continue
     }
+
+    # Load the assembly
+    $assemblyPath = [IO.Path]::Combine($script:libraryroot, "lib", "$name.dll")
+    try {
+        $null = Import-Module $assemblyPath
+    } catch {
+        Write-Error "Could not import $assemblyPath : $($_ | Out-String)"
+    }
+}
+
+# Keep the assembly resolver registered for Windows PowerShell
+# It's needed at runtime when SMO and other assemblies try to resolve dependencies
+# The resolver handles version mismatches (e.g., SMO requesting SqlClient 5.0.0.0 when 6.0.2 is loaded)
+if ($PSVersionTable.PSEdition -ne "Core" -and $redirector) {
+    # Store the redirector in script scope so it stays alive and can be accessed if needed
+    $script:assemblyRedirector = $redirector
 }
