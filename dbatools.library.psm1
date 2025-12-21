@@ -60,7 +60,10 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                         "Microsoft.SqlServer.Rmo",
                         "System.Private.CoreLib",
                         "Azure.Core",
-                        "Azure.Identity"
+                        "Azure.Identity",
+                        "Microsoft.Data.Tools.Utilities",
+                        "Microsoft.Data.Tools.Schema.Sql",
+                        "Microsoft.SqlServer.TransactSql.ScriptDom"
                     };
 
                     var requestedName = new AssemblyName(e.Name);
@@ -140,6 +143,9 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.IdentityModel.Abstractions',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Dac.Extensions',
+        'Microsoft.Data.Tools.Utilities',
+        'Microsoft.Data.Tools.Schema.Sql',
+        'Microsoft.SqlServer.TransactSql.ScriptDom',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
         'Microsoft.SqlServer.SqlWmiManagement',
@@ -157,6 +163,9 @@ if ($PSVersionTable.PSEdition -eq "Core") {
         'Microsoft.IdentityModel.Abstractions',
         'Microsoft.SqlServer.Dac',
         'Microsoft.SqlServer.Dac.Extensions',
+        'Microsoft.Data.Tools.Utilities',
+        'Microsoft.Data.Tools.Schema.Sql',
+        'Microsoft.SqlServer.TransactSql.ScriptDom',
         'Microsoft.SqlServer.Smo',
         'Microsoft.SqlServer.SmoExtended',
         'Microsoft.SqlServer.SqlWmiManagement',
@@ -218,6 +227,10 @@ foreach ($name in $names) {
     }
 }
 
+# Keep the assembly resolver registered for Windows PowerShell
+# It's needed at runtime when SMO and other assemblies try to resolve dependencies
+# The resolver handles version mismatches (e.g., SMO requesting SqlClient 5.0.0.0 when 6.0.2 is loaded)
 if ($PSVersionTable.PSEdition -ne "Core" -and $redirector) {
-    [System.AppDomain]::CurrentDomain.remove_AssemblyResolve($redirector.EventHandler)
+    # Store the redirector in script scope so it stays alive and can be accessed if needed
+    $script:assemblyRedirector = $redirector
 }
