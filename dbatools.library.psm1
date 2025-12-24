@@ -121,8 +121,9 @@ $script:loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
 # Check if SqlClient is already loaded when AvoidConflicts is set
 $skipSqlClient = $false
 if ($AvoidConflicts) {
-    $skipSqlClient = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
-    if ($skipSqlClient) {
+    $existingAssembly = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+    if ($existingAssembly) {
+        $skipSqlClient = $true
         Write-Verbose "Skipping Microsoft.Data.SqlClient.dll - already loaded"
     }
 }
