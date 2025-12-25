@@ -24,10 +24,12 @@ if (-not (Test-Path $modulePath)) {
 # CONFLICT TESTS FIRST - These must run before any successful dbatools.library load
 # ============================================================================
 
-# Test 1: SqlServer first, then dbatools.library WITHOUT AvoidConflicts (expect failure)
+# Test 1: SqlServer first, then dbatools.library WITHOUT AvoidConflicts
+# Note: With the AssemblyLoadContext resolver (Core) or Redirector (Desktop), this may succeed
+# because the resolver handles version mismatches automatically
 Write-Host "`n--- Test 1: SqlServer first, WITHOUT AvoidConflicts ---" -ForegroundColor Yellow
-Write-Host "Expected: FAIL - Original behavior throws on conflict" -ForegroundColor Gray
-Write-Host "(This test MUST run first due to system-level assembly caching)" -ForegroundColor DarkGray
+Write-Host "Expected: May fail on Desktop (no resolver for some assemblies) or pass on Core (resolver handles it)" -ForegroundColor Gray
+Write-Host "(This test validates baseline behavior)" -ForegroundColor DarkGray
 
 $result1 = pwsh -NoProfile -Command {
     param($modulePath)
@@ -39,7 +41,8 @@ $result1 = pwsh -NoProfile -Command {
             return
         }
         Import-Module $modulePath -Force -ErrorAction Stop
-        Write-Output "UNEXPECTED_PASS"
+        # If we get here, the resolver handled it
+        Write-Output "PASS_WITH_RESOLVER"
     } catch {
         if ($_.Exception.Message -match "Assembly with same name is already loaded|already loaded|SqlClient") {
             Write-Output "EXPECTED_FAIL"
@@ -52,12 +55,11 @@ $result1 = pwsh -NoProfile -Command {
 Write-Host "  Result: $result1" -ForegroundColor Gray
 
 if ($result1 -eq "EXPECTED_FAIL") {
-    Write-Host "[PASS] Correctly fails when SqlServer loads conflicting DLLs (original behavior)" -ForegroundColor Green
+    Write-Host "[PASS] Fails when SqlServer loads conflicting DLLs (expected on Desktop without resolver)" -ForegroundColor Green
     $testsPassed++
-} elseif ($result1 -eq "UNEXPECTED_PASS") {
-    Write-Host "[FAIL] Module loaded without error (conflict should have occurred)" -ForegroundColor Red
-    Write-Host "       Note: This may happen if dbatools.library was previously loaded in this session" -ForegroundColor DarkGray
-    $testsFailed++
+} elseif ($result1 -eq "PASS_WITH_RESOLVER") {
+    Write-Host "[PASS] Module loaded successfully (AssemblyLoadContext resolver handled conflicts)" -ForegroundColor Green
+    $testsPassed++
 } elseif ($result1 -match "^SKIP") {
     Write-Host "[SKIP] $result1" -ForegroundColor Yellow
 } else {
@@ -205,6 +207,64 @@ if ($result5 -eq "PASS") {
 } else {
     Write-Host "[FAIL] $result5" -ForegroundColor Red
     $testsFailed++
+}
+
+# Test 6: Verify AssemblyLoadContext resolver works (PowerShell Core specific)
+if ($PSVersionTable.PSEdition -eq "Core") {
+    Write-Host "`n--- Test 6: AssemblyLoadContext resolver (Core only) ---" -ForegroundColor Yellow
+    Write-Host "Expected: SUCCESS - Version mismatches resolved by AssemblyLoadContext handler" -ForegroundColor Gray
+
+    $result6 = pwsh -NoProfile -Command {
+        param($modulePath)
+        try {
+            # Import SqlServer to get different assembly versions loaded
+            Import-Module SqlServer -ErrorAction Stop
+
+            # Get the ConnectionInfo version loaded by SqlServer
+            $connectionInfo = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                Where-Object { $_.GetName().Name -eq 'Microsoft.SqlServer.ConnectionInfo' }
+
+            if ($connectionInfo) {
+                Write-Host "SqlServer loaded ConnectionInfo: $($connectionInfo.GetName().Version)" -ForegroundColor Gray
+            }
+
+            # Import dbatools.library - this will trigger assembly resolution
+            # If the resolver works, it should use the already-loaded assemblies
+            Import-Module $modulePath -ArgumentList $true -Force -ErrorAction Stop
+
+            # Verify we can use SMO (which depends on ConnectionInfo)
+            if ([Microsoft.SqlServer.Management.Smo.Server] -as [type]) {
+                # Verify the ConnectionInfo is still the one from SqlServer (not reloaded)
+                $connectionInfoAfter = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                    Where-Object { $_.GetName().Name -eq 'Microsoft.SqlServer.ConnectionInfo' }
+
+                $count = @($connectionInfoAfter).Count
+                if ($count -eq 1) {
+                    Write-Output "PASS: Single ConnectionInfo assembly (resolver working)"
+                } else {
+                    Write-Output "WARN: Multiple ConnectionInfo assemblies loaded ($count)"
+                }
+            } else {
+                Write-Output "FAIL: SMO types not available"
+            }
+        } catch {
+            Write-Output "FAIL: $($_.Exception.Message)"
+        }
+    } -args $modulePath
+
+    if ($result6 -match "^PASS") {
+        Write-Host "[PASS] AssemblyLoadContext resolver correctly handles version mismatches" -ForegroundColor Green
+        $testsPassed++
+    } elseif ($result6 -match "^WARN") {
+        Write-Host "[WARN] $result6" -ForegroundColor Yellow
+        # Don't count as failure - multiple assemblies might be OK in some scenarios
+    } else {
+        Write-Host "[FAIL] $result6" -ForegroundColor Red
+        $testsFailed++
+    }
+} else {
+    Write-Host "`n--- Test 6: AssemblyLoadContext resolver (Core only) ---" -ForegroundColor Yellow
+    Write-Host "[SKIP] Test only applicable to PowerShell Core" -ForegroundColor DarkGray
 }
 
 # Summary

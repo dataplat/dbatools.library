@@ -1,0 +1,440 @@
+name: Test AvoidConflicts Parameter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dbatools.library.psm1'
+      - 'dbatools.library.psd1'
+      - 'tests/test-avoidconflicts.ps1'
+      - '.github/workflows/test-avoidconflicts.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dbatools.library.psm1'
+      - 'dbatools.library.psd1'
+      - 'tests/test-avoidconflicts.ps1'
+      - '.github/workflows/test-avoidconflicts.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  build:
+    name: Build Library
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            6.0.x
+
+      - name: Install .NET Framework targeting packs
+        shell: pwsh
+        run: |
+          choco install netfx-4.7.2-devpack -y --no-progress
+
+      - name: Build the library
+        run: ./build/build.ps1
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbatools-library
+          path: artifacts/dbatools.library/
+
+  test-pwsh-core:
+    name: PowerShell Core - AvoidConflicts Tests
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dbatools-library
+          path: artifacts/dbatools.library/
+
+      - name: Install SqlServer module
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module SqlServer -Force -AllowClobber -Scope CurrentUser
+          Write-Host "SqlServer module installed: $((Get-Module -ListAvailable SqlServer).Version)"
+
+      - name: Test 1 - Default import without SqlServer (baseline)
+        run: |
+          Write-Host "=== Test 1: Default import without SqlServer ===" -ForegroundColor Cyan
+          Write-Host "PowerShell: $($PSVersionTable.PSVersion) ($($PSVersionTable.PSEdition))"
+
+          Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force -ErrorAction Stop
+
+          $sqlClient = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+              Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+
+          if ($sqlClient) {
+              Write-Host "✅ PASS: SqlClient loaded: $($sqlClient.GetName().Version)" -ForegroundColor Green
+          } else {
+              Write-Host "❌ FAIL: SqlClient not loaded" -ForegroundColor Red
+              exit 1
+          }
+
+          if ([Microsoft.SqlServer.Management.Smo.Server] -as [type]) {
+              Write-Host "✅ PASS: SMO types available" -ForegroundColor Green
+          } else {
+              Write-Host "❌ FAIL: SMO types not available" -ForegroundColor Red
+              exit 1
+          }
+
+      - name: Test 2 - SqlServer first WITHOUT AvoidConflicts (expect failure)
+        run: |
+          Write-Host "=== Test 2: SqlServer first, WITHOUT AvoidConflicts ===" -ForegroundColor Cyan
+          Write-Host "Expected: FAIL due to assembly conflict"
+
+          # Run in isolated process to avoid assembly caching
+          $result = pwsh -NoProfile -Command {
+              try {
+                  Import-Module SqlServer -ErrorAction Stop
+                  Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force -ErrorAction Stop
+                  Write-Output "UNEXPECTED_PASS"
+              } catch {
+                  if ($_.Exception.Message -match "already loaded|Assembly with same name") {
+                      Write-Output "EXPECTED_FAIL"
+                  } else {
+                      Write-Output "FAIL: $($_.Exception.Message)"
+                  }
+              }
+          }
+
+          Write-Host "Result: $result"
+
+          if ($result -eq "EXPECTED_FAIL") {
+              Write-Host "✅ PASS: Correctly fails with conflict (expected behavior)" -ForegroundColor Green
+          } elseif ($result -eq "UNEXPECTED_PASS") {
+              Write-Host "⚠️ INFO: No conflict occurred (assemblies may be compatible)" -ForegroundColor Yellow
+          } else {
+              Write-Host "❌ FAIL: Unexpected result: $result" -ForegroundColor Red
+              exit 1
+          }
+
+      - name: Test 3 - SqlServer first WITH AvoidConflicts (must succeed)
+        run: |
+          Write-Host "=== Test 3: SqlServer first, WITH AvoidConflicts ===" -ForegroundColor Cyan
+          Write-Host "Expected: SUCCESS - AvoidConflicts resolves version mismatches"
+
+          # Run in isolated process
+          $result = pwsh -NoProfile -Command {
+              try {
+                  # Import SqlServer first
+                  Import-Module SqlServer -ErrorAction Stop
+
+                  # Get assemblies loaded by SqlServer
+                  $sqlClientBefore = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                      Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+                  $connectionInfoBefore = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                      Where-Object { $_.GetName().Name -eq 'Microsoft.SqlServer.ConnectionInfo' }
+
+                  Write-Host "SqlServer loaded SqlClient: $($sqlClientBefore.GetName().Version)" -ForegroundColor Gray
+                  Write-Host "SqlServer loaded ConnectionInfo: $($connectionInfoBefore.GetName().Version)" -ForegroundColor Gray
+
+                  # Import dbatools.library with AvoidConflicts
+                  Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -ArgumentList $true -Force -ErrorAction Stop
+
+                  # Verify SMO types work
+                  if ([Microsoft.SqlServer.Management.Smo.Server] -as [type]) {
+                      Write-Output "PASS"
+                  } else {
+                      Write-Output "FAIL: SMO types not available"
+                  }
+              } catch {
+                  Write-Output "FAIL: $($_.Exception.Message)"
+              }
+          }
+
+          Write-Host "Result: $result"
+
+          if ($result -eq "PASS") {
+              Write-Host "✅ PASS: Module loaded successfully with AvoidConflicts" -ForegroundColor Green
+          } else {
+              Write-Host "❌ FAIL: $result" -ForegroundColor Red
+              exit 1
+          }
+
+      - name: Test 4 - Verify AssemblyLoadContext resolver works
+        run: |
+          Write-Host "=== Test 4: AssemblyLoadContext resolver for version mismatches ===" -ForegroundColor Cyan
+          Write-Host "This tests the Core-specific fix for assembly version resolution"
+
+          $result = pwsh -NoProfile -Command {
+              try {
+                  Import-Module SqlServer -ErrorAction Stop
+
+                  # Capture verbose output to verify resolver messages
+                  $verboseOutput = @()
+                  Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -ArgumentList $true -Force -Verbose -ErrorAction Stop 4>&1 |
+                      ForEach-Object {
+                          if ($_ -is [System.Management.Automation.VerboseRecord]) {
+                              $verboseOutput += $_.Message
+                          }
+                      }
+
+                  # Check that both modules are loaded and functional
+                  $sqlServer = Get-Module SqlServer
+                  $dbatools = Get-Module dbatools.library
+
+                  if ($sqlServer -and $dbatools) {
+                      # Test that we can access types from dbatools.library
+                      if ([Microsoft.SqlServer.Management.Smo.Server] -as [type]) {
+                          Write-Output "PASS"
+                      } else {
+                          Write-Output "FAIL: SMO types not accessible"
+                      }
+                  } else {
+                      Write-Output "FAIL: Not all modules loaded (SqlServer: $($null -ne $sqlServer), dbatools.library: $($null -ne $dbatools))"
+                  }
+              } catch {
+                  Write-Output "FAIL: $($_.Exception.Message)"
+              }
+          }
+
+          Write-Host "Result: $result"
+
+          if ($result -eq "PASS") {
+              Write-Host "✅ PASS: AssemblyLoadContext resolver working correctly" -ForegroundColor Green
+          } else {
+              Write-Host "❌ FAIL: $result" -ForegroundColor Red
+              exit 1
+          }
+
+      - name: Test 5 - Verify correct syntax documentation
+        run: |
+          Write-Host "=== Test 5: ArgumentList syntax validation ===" -ForegroundColor Cyan
+
+          # Test that hashtable syntax is rejected with helpful error
+          $result = pwsh -NoProfile -Command {
+              try {
+                  Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -ArgumentList @{AvoidConflicts=$true} -Force -ErrorAction Stop
+                  Write-Output "UNEXPECTED_PASS"
+              } catch {
+                  if ($_.Exception.Message -match "Cannot convert.*Hashtable.*SwitchParameter|Boolean parameters") {
+                      Write-Output "EXPECTED_ERROR"
+                  } else {
+                      Write-Output "UNEXPECTED_ERROR: $($_.Exception.Message)"
+                  }
+              }
+          }
+
+          Write-Host "Result: $result"
+
+          if ($result -eq "EXPECTED_ERROR") {
+              Write-Host "✅ PASS: Hashtable syntax correctly rejected (use -ArgumentList `$true instead)" -ForegroundColor Green
+          } else {
+              Write-Host "❌ FAIL: $result" -ForegroundColor Red
+              exit 1
+          }
+
+  test-windows-powershell:
+    name: Windows PowerShell 5.1 - AvoidConflicts Tests
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dbatools-library
+          path: artifacts/dbatools.library/
+
+      - name: Install SqlServer module
+        shell: powershell
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module SqlServer -Force -AllowClobber -Scope CurrentUser
+          Write-Host "SqlServer module installed: $((Get-Module -ListAvailable SqlServer).Version)"
+
+      - name: Test 1 - Default import without SqlServer (baseline)
+        shell: powershell
+        run: |
+          Write-Host "=== Test 1: Default import without SqlServer ===" -ForegroundColor Cyan
+          Write-Host "PowerShell: $($PSVersionTable.PSVersion) ($($PSVersionTable.PSEdition))"
+
+          Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force -ErrorAction Stop
+
+          $sqlClient = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+              Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+
+          if ($sqlClient) {
+              Write-Host "[PASS] SqlClient loaded: $($sqlClient.GetName().Version)" -ForegroundColor Green
+          } else {
+              Write-Host "[FAIL] SqlClient not loaded" -ForegroundColor Red
+              exit 1
+          }
+
+          if ([Microsoft.SqlServer.Management.Smo.Server] -as [type]) {
+              Write-Host "[PASS] SMO types available" -ForegroundColor Green
+          } else {
+              Write-Host "[FAIL] SMO types not available" -ForegroundColor Red
+              exit 1
+          }
+
+      - name: Test 2 - SqlServer first WITH AvoidConflicts (must succeed)
+        shell: powershell
+        run: |
+          Write-Host "=== Test 2: SqlServer first, WITH AvoidConflicts ===" -ForegroundColor Cyan
+          Write-Host "PowerShell: $($PSVersionTable.PSVersion) ($($PSVersionTable.PSEdition))"
+
+          # Import SqlServer first
+          Import-Module SqlServer -ErrorAction Stop
+          Write-Host "SqlServer loaded" -ForegroundColor Green
+
+          # Get assemblies loaded by SqlServer
+          $sqlClientBefore = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+              Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+          $connectionInfoBefore = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+              Where-Object { $_.GetName().Name -eq 'Microsoft.SqlServer.ConnectionInfo' }
+
+          if ($sqlClientBefore) {
+              Write-Host "SqlServer loaded SqlClient: $($sqlClientBefore.GetName().Version)" -ForegroundColor Yellow
+          }
+          if ($connectionInfoBefore) {
+              Write-Host "SqlServer loaded ConnectionInfo: $($connectionInfoBefore.GetName().Version)" -ForegroundColor Yellow
+          }
+
+          # Import dbatools.library with AvoidConflicts
+          Write-Host "`nImporting dbatools.library with -AvoidConflicts..." -ForegroundColor Cyan
+          Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -ArgumentList $true -Force -Verbose -ErrorAction Stop
+
+          Write-Host "dbatools.library loaded successfully" -ForegroundColor Green
+
+          # Verify SMO types work
+          if ([Microsoft.SqlServer.Management.Smo.Server] -as [type]) {
+              Write-Host "[PASS] SMO types available" -ForegroundColor Green
+          } else {
+              Write-Host "[FAIL] SMO types not available" -ForegroundColor Red
+              exit 1
+          }
+
+          # Verify both modules are loaded
+          $loadedModules = Get-Module | Where-Object { $_.Name -in 'SqlServer', 'dbatools.library' }
+          Write-Host "`nLoaded modules:" -ForegroundColor Cyan
+          $loadedModules | ForEach-Object { Write-Host "  - $($_.Name) v$($_.Version)" -ForegroundColor Gray }
+
+          if ($loadedModules.Count -eq 2) {
+              Write-Host "`n[PASS] Both modules loaded successfully!" -ForegroundColor Green
+          } else {
+              Write-Host "`n[FAIL] Expected 2 modules, got $($loadedModules.Count)" -ForegroundColor Red
+              exit 1
+          }
+
+      - name: Test 3 - Verify Redirector handles version mismatches
+        shell: powershell
+        run: |
+          Write-Host "=== Test 3: Redirector for version mismatches (Desktop-specific) ===" -ForegroundColor Cyan
+          Write-Host "This tests the Desktop PowerShell Redirector class"
+
+          # Start fresh process
+          powershell -NoProfile -Command {
+              try {
+                  Import-Module SqlServer -ErrorAction Stop
+                  Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -ArgumentList $true -Force -ErrorAction Stop
+
+                  # Test that types work after potential version mismatch resolution
+                  if ([Microsoft.SqlServer.Management.Smo.Server] -as [type]) {
+                      Write-Output "PASS"
+                  } else {
+                      Write-Output "FAIL: SMO types not accessible"
+                  }
+              } catch {
+                  Write-Output "FAIL: $($_.Exception.Message)"
+              }
+          } | ForEach-Object {
+              $result = $_
+              Write-Host "Result: $result"
+
+              if ($result -eq "PASS") {
+                  Write-Host "[PASS] Redirector working correctly" -ForegroundColor Green
+              } else {
+                  Write-Host "[FAIL] $result" -ForegroundColor Red
+                  exit 1
+              }
+          }
+
+  test-comprehensive:
+    name: Comprehensive Test Suite
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dbatools-library
+          path: artifacts/dbatools.library/
+
+      - name: Install SqlServer module (PowerShell Core)
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module SqlServer -Force -AllowClobber -Scope CurrentUser
+
+      - name: Run test-avoidconflicts.ps1 test suite
+        run: |
+          Write-Host "Running comprehensive test suite..." -ForegroundColor Cyan
+          ./tests/test-avoidconflicts.ps1
+          if ($LASTEXITCODE -ne 0) {
+              Write-Host "Test suite failed!" -ForegroundColor Red
+              exit 1
+          }
+
+  summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [test-pwsh-core, test-windows-powershell, test-comprehensive]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          echo "## AvoidConflicts Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.test-pwsh-core.result }}" == "success" ]; then
+            echo "✅ PowerShell Core tests: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ PowerShell Core tests: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.test-windows-powershell.result }}" == "success" ]; then
+            echo "✅ Windows PowerShell 5.1 tests: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Windows PowerShell 5.1 tests: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.test-comprehensive.result }}" == "success" ]; then
+            echo "✅ Comprehensive test suite: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Comprehensive test suite: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- Default module import (no conflicts)" >> $GITHUB_STEP_SUMMARY
+          echo "- SqlServer + dbatools.library with AvoidConflicts" >> $GITHUB_STEP_SUMMARY
+          echo "- Assembly version mismatch resolution" >> $GITHUB_STEP_SUMMARY
+          echo "- ArgumentList syntax validation" >> $GITHUB_STEP_SUMMARY
+          echo "- Both PowerShell Core and Windows PowerShell 5.1" >> $GITHUB_STEP_SUMMARY
+
+          # Fail if any test failed
+          if [ "${{ needs.test-pwsh-core.result }}" != "success" ] || \
+             [ "${{ needs.test-windows-powershell.result }}" != "success" ] || \
+             [ "${{ needs.test-comprehensive.result }}" != "success" ]; then
+            echo ""
+            echo "Some tests failed!"
+            exit 1
+          fi
