@@ -59,7 +59,7 @@
     <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="172.76.0" />
     <PackageReference Include="Microsoft.SqlServer.XEvent.XELite" Version="2024.2.5.1" />
     <!-- Azure.Core 1.41.0 incorrectly declares System.ClientModel 1.0.0 as dependency but uses types from 1.1.0+ -->
-    <PackageReference Include="System.ClientModel" Version="1.1.0" />
+    <PackageReference Include="System.ClientModel" Version="1.8.0" />
   </ItemGroup>
 
   <!-- Framework-specific packages -->
