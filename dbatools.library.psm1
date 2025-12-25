@@ -173,6 +173,38 @@ $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Da
 # Get loaded assemblies once for reuse (used for AvoidConflicts checks and later assembly loading)
 $script:loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
 
+# Check for incompatible System.ClientModel or SqlClient versions
+# Azure.Core 1.44+ requires System.ClientModel 1.1+ with IPersistableModel.Write() method
+# SqlServer module's SqlClient 5.x includes older System.ClientModel that's incompatible
+$script:hasIncompatibleClientModel = $false
+if ($AvoidConflicts) {
+    # Check if System.ClientModel is already loaded with incompatible version
+    $existingClientModel = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'System.ClientModel' }
+    if ($existingClientModel) {
+        $clientModelVersion = $existingClientModel.GetName().Version
+        # System.ClientModel 1.1.0+ has the required IPersistableModel interface changes
+        if ($clientModelVersion -lt [Version]'1.1.0') {
+            $script:hasIncompatibleClientModel = $true
+            Write-Verbose "Detected incompatible System.ClientModel version $clientModelVersion - will skip Azure.Core and Azure.Identity to avoid MissingMethodException"
+        }
+    }
+
+    # Check if SqlServer's older SqlClient is loaded (which bundles incompatible System.ClientModel)
+    # SqlClient 5.x from SqlServer module uses System.ClientModel 1.0.x
+    # Our Azure.Core requires System.ClientModel 1.1+
+    if (-not $script:hasIncompatibleClientModel) {
+        $existingSqlClient = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+        if ($existingSqlClient) {
+            $sqlClientVersion = $existingSqlClient.GetName().Version
+            # SqlClient 5.x bundles older System.ClientModel; 6.x bundles compatible versions
+            if ($sqlClientVersion.Major -lt 6) {
+                $script:hasIncompatibleClientModel = $true
+                Write-Verbose "Detected SqlClient $sqlClientVersion (pre-6.0) which uses incompatible System.ClientModel - will skip Azure.Core and Azure.Identity to avoid MissingMethodException"
+            }
+        }
+    }
+}
+
 # Check if SqlClient is already loaded when AvoidConflicts is set
 $skipSqlClient = $false
 if ($AvoidConflicts) {
@@ -263,6 +295,13 @@ foreach ($name in $names) {
 
     if ($name -in $x64only -and $env:PROCESSOR_ARCHITECTURE -eq "x86") {
         Write-Verbose -Message "Skipping $name. x86 not supported for this library."
+        continue
+    }
+
+    # Skip Azure.Core and Azure.Identity if System.ClientModel is incompatible
+    # These assemblies depend on System.ClientModel 1.1+ which has breaking API changes
+    if ($script:hasIncompatibleClientModel -and $name -in @('Azure.Core', 'Azure.Identity')) {
+        Write-Verbose "Skipping $name.dll - incompatible System.ClientModel already loaded"
         continue
     }
 
