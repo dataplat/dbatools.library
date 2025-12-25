@@ -17,56 +17,26 @@ function Get-DbatoolsLibraryPath {
 $script:libraryroot = Get-DbatoolsLibraryPath
 
 if ($PSVersionTable.PSEdition -ne "Core") {
-    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib")
-    $dir = ("$dir\").Replace('\', '\\')
-
     if (-not ("Redirector" -as [type])) {
         $source = @"
             using System;
-            using System.Linq;
+            using System.IO;
             using System.Reflection;
-            using System.Text.RegularExpressions;
 
             public class Redirector
             {
-                public Redirector()
+                private static string _libPath;
+
+                public Redirector(string libPath)
                 {
+                    _libPath = libPath;
                     this.EventHandler = new ResolveEventHandler(AssemblyResolve);
                 }
 
                 public readonly ResolveEventHandler EventHandler;
 
-                protected Assembly AssemblyResolve(object sender, ResolveEventArgs e)
+                protected static Assembly AssemblyResolve(object sender, ResolveEventArgs e)
                 {
-                    string[] dlls = {
-                        "System.Memory",
-                        "System.Runtime",
-                        "System.Management.Automation",
-                        "System.Runtime.CompilerServices.Unsafe",
-                        "Microsoft.Bcl.AsyncInterfaces",
-                        "System.Text.Json",
-                        "System.Resources.Extensions",
-                        "System.ClientModel",
-                        "Microsoft.SqlServer.ConnectionInfo",
-                        "Microsoft.SqlServer.Smo",
-                        "Microsoft.Identity.Client",
-                        "System.Diagnostics.DiagnosticSource",
-                        "Microsoft.IdentityModel.Abstractions",
-                        "Microsoft.Data.SqlClient",
-                        "Microsoft.SqlServer.Types",
-                        "System.Configuration.ConfigurationManager",
-                        "Microsoft.SqlServer.Management.Sdk.Sfc",
-                        "Microsoft.SqlServer.Management.IntegrationServices",
-                        "Microsoft.SqlServer.Replication",
-                        "Microsoft.SqlServer.Rmo",
-                        "System.Private.CoreLib",
-                        "Azure.Core",
-                        "Azure.Identity",
-                        "Microsoft.Data.Tools.Utilities",
-                        "Microsoft.Data.Tools.Schema.Sql",
-                        "Microsoft.SqlServer.TransactSql.ScriptDom"
-                    };
-
                     var requestedName = new AssemblyName(e.Name);
                     var assemblyName = requestedName.Name;
 
@@ -87,13 +57,17 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                         }
                     }
 
-                    // Only load from disk if not already loaded and it's in our list
-                    foreach (string dll in dlls)
+                    // Try to load from our lib folder if the file exists
+                    string dllPath = Path.Combine(_libPath, assemblyName + ".dll");
+                    if (File.Exists(dllPath))
                     {
-                        if (assemblyName == dll)
+                        try
                         {
-                            string filelocation = "$dir" + dll + ".dll";
-                            return Assembly.LoadFrom(filelocation);
+                            return Assembly.LoadFrom(dllPath);
+                        }
+                        catch
+                        {
+                            // Failed to load, return null to let default resolution continue
                         }
                     }
 
@@ -106,10 +80,11 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     }
 
     try {
-        $redirector = New-Object Redirector
+        $libPath = [System.IO.Path]::Combine($script:libraryroot, "lib")
+        $redirector = New-Object Redirector($libPath)
         [System.AppDomain]::CurrentDomain.add_AssemblyResolve($redirector.EventHandler)
     } catch {
-        # unsure
+        Write-Verbose "Could not register Redirector: $_"
     }
 } else {
     # PowerShell Core: Use AssemblyLoadContext.Resolving event for version redirection
