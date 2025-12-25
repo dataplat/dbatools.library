@@ -114,88 +114,81 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 } else {
     # PowerShell Core: Use AssemblyLoadContext.Resolving event for version redirection
     # This handles version mismatches when SqlServer module loads different versions of assemblies
-    $script:coreResolverRegistered = $false
+    # IMPORTANT: Must be implemented in C# because the resolver runs on .NET threads without PowerShell runspaces
+    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib")
+    $dir = ("$dir" + [System.IO.Path]::DirectorySeparatorChar).Replace('\', '\\')
 
-    if (-not $script:coreResolverRegistered) {
-        $script:libPath = [System.IO.Path]::Combine($script:libraryroot, "lib")
+    if (-not ("CoreRedirector" -as [type])) {
+        $coreSource = @"
+            using System;
+            using System.IO;
+            using System.Reflection;
+            using System.Runtime.Loader;
 
-        $resolveHandler = [System.Func[System.Runtime.Loader.AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly]] {
-            param($context, $assemblyName)
+            public class CoreRedirector
+            {
+                private static string _libPath;
+                private static bool _registered = false;
 
-            $name = $assemblyName.Name
+                public static void Register(string libPath)
+                {
+                    if (_registered) return;
+                    _libPath = libPath;
+                    AssemblyLoadContext.Default.Resolving += OnResolving;
+                    _registered = true;
+                }
 
-            # List of assemblies we handle (same as Desktop Redirector)
-            $knownAssemblies = @(
-                'System.Memory',
-                'System.Runtime',
-                'System.Runtime.CompilerServices.Unsafe',
-                'Microsoft.Bcl.AsyncInterfaces',
-                'System.Text.Json',
-                'System.Resources.Extensions',
-                'System.ClientModel',
-                'Microsoft.SqlServer.ConnectionInfo',
-                'Microsoft.SqlServer.Smo',
-                'Microsoft.SqlServer.SmoExtended',
-                'Microsoft.Identity.Client',
-                'System.Diagnostics.DiagnosticSource',
-                'Microsoft.IdentityModel.Abstractions',
-                'Microsoft.Data.SqlClient',
-                'Microsoft.SqlServer.Types',
-                'System.Configuration.ConfigurationManager',
-                'Microsoft.SqlServer.Management.Sdk.Sfc',
-                'Microsoft.SqlServer.Management.IntegrationServices',
-                'Microsoft.SqlServer.Replication',
-                'Microsoft.SqlServer.Rmo',
-                'Azure.Core',
-                'Azure.Identity',
-                'Microsoft.Data.Tools.Utilities',
-                'Microsoft.Data.Tools.Schema.Sql',
-                'Microsoft.SqlServer.TransactSql.ScriptDom',
-                'Microsoft.SqlServer.Dac',
-                'Microsoft.SqlServer.Dac.Extensions',
-                'Microsoft.SqlServer.SqlWmiManagement',
-                'Microsoft.SqlServer.WmiEnum',
-                'Microsoft.SqlServer.Management.RegisteredServers',
-                'Microsoft.SqlServer.Management.Collector',
-                'Microsoft.SqlServer.Management.XEvent',
-                'Microsoft.SqlServer.Management.XEventDbScoped',
-                'Microsoft.SqlServer.XEvent.XELite'
-            )
+                private static Assembly OnResolving(AssemblyLoadContext context, AssemblyName assemblyName)
+                {
+                    string name = assemblyName.Name;
 
-            # First, check if any version of this assembly is already loaded
-            # This handles version mismatches (e.g., dbatools.dll requesting ConnectionInfo 17.100.0.0 when 17.200.0.0 is loaded)
-            foreach ($asm in [System.AppDomain]::CurrentDomain.GetAssemblies()) {
-                try {
-                    if ($asm.GetName().Name -eq $name) {
-                        return $asm
+                    // First, check if any version of this assembly is already loaded
+                    // This handles version mismatches (e.g., dbatools.dll requesting ConnectionInfo 17.100.0.0 when 17.200.0.0 is loaded)
+                    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            if (assembly.GetName().Name == name)
+                            {
+                                return assembly;
+                            }
+                        }
+                        catch
+                        {
+                            // Some assemblies may throw when accessing GetName()
+                        }
                     }
-                } catch {
-                    # Some assemblies may throw when accessing GetName()
+
+                    // Try to load from our lib folder if the file exists
+                    string dllPath = _libPath + name + ".dll";
+                    if (File.Exists(dllPath))
+                    {
+                        try
+                        {
+                            return AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
+                        }
+                        catch
+                        {
+                            // Failed to load, return null to let default resolution continue
+                        }
+                    }
+
+                    return null;
                 }
             }
-
-            # If not loaded and it's a known assembly, try to load from our lib folder
-            if ($name -in $knownAssemblies) {
-                $dllPath = [System.IO.Path]::Combine($script:libPath, "$name.dll")
-                if ([System.IO.File]::Exists($dllPath)) {
-                    try {
-                        return [System.Runtime.Loader.AssemblyLoadContext]::Default.LoadFromAssemblyPath($dllPath)
-                    } catch {
-                        # Failed to load, return null to let default resolution continue
-                    }
-                }
-            }
-
-            return $null
-        }
+"@
 
         try {
-            [System.Runtime.Loader.AssemblyLoadContext]::Default.add_Resolving($resolveHandler)
-            $script:coreResolverRegistered = $true
-            $script:coreResolveHandler = $resolveHandler
+            $null = Add-Type -TypeDefinition $coreSource -ReferencedAssemblies 'System.Runtime.Loader'
         } catch {
-            Write-Verbose "Could not register assembly resolver for PowerShell Core: $_"
+            Write-Verbose "Could not compile CoreRedirector: $_"
         }
+    }
+
+    try {
+        [CoreRedirector]::Register($dir)
+    } catch {
+        Write-Verbose "Could not register CoreRedirector: $_"
     }
 }
 
