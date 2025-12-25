@@ -515,7 +515,7 @@ abc
         }
 
         [TestMethod]
-        public void TestInferSchema_LeadingZeros_TreatedAsString()
+        public void TestInferSchema_LeadingZeros_ParseAsInteger()
         {
             string csvPath = Path.Combine(_tempDir, "leadingzeros.csv");
             File.WriteAllText(csvPath, @"ZipCode,Phone
@@ -525,10 +525,34 @@ abc
 
             var columns = CsvSchemaInference.InferSchemaFromSample(csvPath);
 
-            // Leading zeros should preserve as integer since parsing ignores them
-            // but this tests that we handle them gracefully
-            Assert.IsNotNull(columns[0].SqlDataType);
-            Assert.IsNotNull(columns[1].SqlDataType);
+            // Leading zeros are parsed successfully by int.TryParse (01234 -> 1234)
+            // so the column is inferred as integer. Note: the leading zeros are NOT
+            // preserved in the parsed value. If preserving leading zeros is required,
+            // callers should override the inferred type to varchar.
+            Assert.AreEqual("int", columns[0].SqlDataType);
+            Assert.AreEqual("int", columns[1].SqlDataType); // 0123456789 fits in int (< 2.1 billion)
+        }
+
+        [TestMethod]
+        public void TestInferSchema_DecimalWithNoIntegerPart()
+        {
+            string csvPath = Path.Combine(_tempDir, "decimalnoint.csv");
+            File.WriteAllText(csvPath, @"Value,Tiny,Mixed
+.5,.001,.999
+.25,.002,1.5
+.125,.003,10.25
+");
+
+            var columns = CsvSchemaInference.InferSchemaFromSample(csvPath);
+
+            // Decimals without integer part (e.g., .5 instead of 0.5) should be handled
+            Assert.IsTrue(columns[0].SqlDataType.Contains("decimal"), $"Expected decimal, got {columns[0].SqlDataType}");
+            Assert.IsTrue(columns[1].SqlDataType.Contains("decimal"), $"Expected decimal, got {columns[1].SqlDataType}");
+            Assert.IsTrue(columns[2].SqlDataType.Contains("decimal"), $"Expected decimal, got {columns[2].SqlDataType}");
+
+            // Verify scale is tracked correctly
+            Assert.AreEqual(3, columns[0].Scale); // .5, .25, .125 -> max 3 digits after decimal
+            Assert.AreEqual(3, columns[1].Scale); // .001, .002, .003 -> 3 digits after decimal
         }
 
         #endregion
