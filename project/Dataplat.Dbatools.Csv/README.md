@@ -8,6 +8,7 @@
 
 **What makes this library unique:**
 - **Native IDataReader** - Stream directly to SqlBulkCopy with zero intermediate allocations
+- **Schema Inference** - Auto-detect SQL Server column types (int, bigint, decimal, datetime2, bit, uniqueidentifier, varchar/nvarchar)
 - **Built-in compression** - GZip, Brotli, Deflate, ZLib with decompression bomb protection
 - **Real-world data handling** - Lenient parsing, smart quotes, duplicate headers, field count mismatches
 - **Faster than LumenWorks & CsvHelper** - ~1.5x faster with modern .NET (Span<T>, ArrayPool)
@@ -28,6 +29,8 @@ Install-Package Dataplat.Dbatools.Csv
 ## Features
 
 - **Streaming IDataReader** - Works seamlessly with SqlBulkCopy and other ADO.NET consumers
+- **Schema Inference** - Analyze CSV data to determine optimal SQL Server column types
+- **Strongly Typed Columns** - Define column types for automatic conversion with built-in and custom converters
 - **High Performance** - ~1.5x faster than LumenWorks/CsvHelper with ArrayPool-based memory management
 - **Parallel Processing** - Optional multi-threaded parsing for large files (25K+ rows/sec)
 - **String Interning** - Reduce memory for files with repeated values
@@ -269,6 +272,130 @@ while (reader.Read())
 {
     // Process records
 }
+```
+
+### Schema Inference
+
+Automatically detect optimal SQL Server column types from CSV data. No more `nvarchar(MAX)` for everything:
+
+```csharp
+using Dataplat.Dbatools.Csv.Reader;
+
+// Fast: Sample first 1000 rows (tiny risk if data changes after sample)
+var columns = CsvSchemaInference.InferSchemaFromSample("data.csv");
+
+// Safe: Scan entire file with progress reporting (zero risk of type mismatches)
+var columns = CsvSchemaInference.InferSchema("data.csv", null, progress => {
+    Console.WriteLine($"Progress: {progress:P0}");
+});
+
+// Examine inferred types
+foreach (var col in columns)
+{
+    Console.WriteLine($"{col.ColumnName}: {col.SqlDataType} {(col.IsNullable ? "NULL" : "NOT NULL")}");
+}
+// Output:
+// Id: int NOT NULL
+// Name: nvarchar(100) NULL
+// Price: decimal(10,2) NOT NULL
+// Created: datetime2 NULL
+
+// Generate CREATE TABLE statement
+string sql = CsvSchemaInference.GenerateCreateTableStatement(columns, "Products", "dbo");
+// CREATE TABLE [dbo].[Products] (
+//     [Id] int NOT NULL,
+//     [Name] nvarchar(100) NULL,
+//     [Price] decimal(10,2) NOT NULL,
+//     [Created] datetime2 NULL
+// );
+
+// Use inferred types with CsvDataReader
+var typeMap = CsvSchemaInference.ToColumnTypes(columns);
+var options = new CsvReaderOptions { ColumnTypes = typeMap };
+using var reader = new CsvDataReader("data.csv", options);
+```
+
+**Detected types:** `uniqueidentifier`, `bit`, `int`, `bigint`, `decimal(p,s)`, `datetime2`, `varchar(n)`, `nvarchar(n)` (when Unicode is detected)
+
+**InferredColumn properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ColumnName` | string | Column header name |
+| `SqlDataType` | string | SQL Server data type (e.g., `int`, `decimal(10,2)`, `nvarchar(50)`) |
+| `IsNullable` | bool | True if any NULL/empty values were found |
+| `IsUnicode` | bool | True if non-ASCII characters detected |
+| `MaxLength` | int | Maximum string length observed |
+| `Precision` | int | Decimal precision (total digits) |
+| `Scale` | int | Decimal scale (digits after decimal point) |
+| `Ordinal` | int | Column position (0-based) |
+| `TotalCount` | long | Total rows analyzed |
+| `NonNullCount` | long | Rows with non-null values |
+
+### Strongly Typed Columns
+
+Define column types explicitly for automatic conversion during reading:
+
+```csharp
+var options = new CsvReaderOptions
+{
+    ColumnTypes = new Dictionary<string, Type>
+    {
+        ["Id"] = typeof(int),
+        ["Price"] = typeof(decimal),
+        ["IsActive"] = typeof(bool),
+        ["Created"] = typeof(DateTime),
+        ["UniqueId"] = typeof(Guid)
+    }
+};
+
+using var reader = new CsvDataReader("data.csv", options);
+while (reader.Read())
+{
+    int id = reader.GetInt32(0);           // Already converted from string
+    decimal price = reader.GetDecimal(1);  // Culture-aware parsing
+    bool active = reader.GetBoolean(2);    // Handles true/false/yes/no/1/0
+    DateTime created = reader.GetDateTime(3);
+    Guid guid = reader.GetGuid(4);
+}
+```
+
+**Built-in type converters:** `Guid`, `bool`, `DateTime`, `short`, `int`, `long`, `float`, `double`, `decimal`, `byte`, `string`
+
+**Combine with schema inference:**
+
+```csharp
+// Infer types from CSV data, then use them for reading
+var columns = CsvSchemaInference.InferSchemaFromSample("data.csv");
+var typeMap = CsvSchemaInference.ToColumnTypes(columns);
+
+var options = new CsvReaderOptions { ColumnTypes = typeMap };
+using var reader = new CsvDataReader("data.csv", options);
+```
+
+**Custom type converters:**
+
+```csharp
+using Dataplat.Dbatools.Csv.TypeConverters;
+
+// Create a custom converter for enums or custom types
+public class StatusConverter : TypeConverterBase<OrderStatus>
+{
+    public override bool TryConvert(string value, out OrderStatus result)
+    {
+        return Enum.TryParse(value, true, out result);
+    }
+}
+
+// Register and use
+var registry = TypeConverterRegistry.Default;
+registry.Register(new StatusConverter());
+
+var options = new CsvReaderOptions
+{
+    TypeConverterRegistry = registry,
+    ColumnTypes = new Dictionary<string, Type> { ["Status"] = typeof(OrderStatus) }
+};
 ```
 
 ### Null vs Empty String Handling

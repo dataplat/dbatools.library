@@ -60,19 +60,22 @@ If you need to use both the SqlServer module and dbatools.library in the same se
 
 ### Usage
 
-Import the SqlServer module first, then import dbatools.library with `-AvoidConflicts`:
+Import the SqlServer module first, then import dbatools.library **directly** with `-AvoidConflicts`:
 
 ```powershell
 # Import SqlServer module first
 Import-Module SqlServer
 
 # Then import dbatools.library with -AvoidConflicts
+# IMPORTANT: Use -ArgumentList $true (NOT a hashtable)
 Import-Module dbatools.library -ArgumentList $true
 ```
 
+> **Note:** You must import `dbatools.library` directly, not via the `dbatools` module. The `-ArgumentList` parameter cannot be passed through module dependencies. If you need to use the full `dbatools` module with SqlServer, import `dbatools.library` first with `-ArgumentList $true`, then import `dbatools`.
+
 When `-AvoidConflicts` is enabled, dbatools.library will:
 - Check if each assembly is already loaded in the current session
-- Skip loading any assemblies that are already present
+- Skip loading any assemblies that are already present (including Microsoft.Data.SqlClient)
 - Load only the assemblies that are missing
 
 ### Examples
@@ -81,6 +84,13 @@ When `-AvoidConflicts` is enabled, dbatools.library will:
 ```powershell
 Import-Module SqlServer
 Import-Module dbatools.library -ArgumentList $true
+```
+
+**Using with the full dbatools module:**
+```powershell
+Import-Module SqlServer
+Import-Module dbatools.library -ArgumentList $true  # Load library first with AvoidConflicts
+Import-Module dbatools                              # Then load dbatools (will use already-loaded library)
 ```
 
 **See what's being skipped with -Verbose:**
@@ -94,6 +104,18 @@ Import-Module dbatools.library -ArgumentList $true -Verbose
 ```powershell
 # Loads all assemblies, may cause conflicts if SqlServer module is already loaded
 Import-Module dbatools.library
+```
+
+### Common Mistakes
+
+❌ **Wrong:** Using a hashtable for ArgumentList
+```powershell
+Import-Module dbatools.library -ArgumentList @{AvoidConflicts = $true}  # This will NOT work
+```
+
+✅ **Correct:** Using a boolean value
+```powershell
+Import-Module dbatools.library -ArgumentList $true  # This works correctly
 ```
 
 ### ⚠️ Important: PowerShell Core + Credentials Issue

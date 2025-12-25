@@ -17,55 +17,26 @@ function Get-DbatoolsLibraryPath {
 $script:libraryroot = Get-DbatoolsLibraryPath
 
 if ($PSVersionTable.PSEdition -ne "Core") {
-    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib")
-    $dir = ("$dir\").Replace('\', '\\')
-
     if (-not ("Redirector" -as [type])) {
         $source = @"
             using System;
-            using System.Linq;
+            using System.IO;
             using System.Reflection;
-            using System.Text.RegularExpressions;
 
             public class Redirector
             {
-                public Redirector()
+                private static string _libPath;
+
+                public Redirector(string libPath)
                 {
+                    _libPath = libPath;
                     this.EventHandler = new ResolveEventHandler(AssemblyResolve);
                 }
 
                 public readonly ResolveEventHandler EventHandler;
 
-                protected Assembly AssemblyResolve(object sender, ResolveEventArgs e)
+                protected static Assembly AssemblyResolve(object sender, ResolveEventArgs e)
                 {
-                    string[] dlls = {
-                        "System.Memory",
-                        "System.Runtime",
-                        "System.Management.Automation",
-                        "System.Runtime.CompilerServices.Unsafe",
-                        "Microsoft.Bcl.AsyncInterfaces",
-                        "System.Text.Json",
-                        "System.Resources.Extensions",
-                        "Microsoft.SqlServer.ConnectionInfo",
-                        "Microsoft.SqlServer.Smo",
-                        "Microsoft.Identity.Client",
-                        "System.Diagnostics.DiagnosticSource",
-                        "Microsoft.IdentityModel.Abstractions",
-                        "Microsoft.Data.SqlClient",
-                        "Microsoft.SqlServer.Types",
-                        "System.Configuration.ConfigurationManager",
-                        "Microsoft.SqlServer.Management.Sdk.Sfc",
-                        "Microsoft.SqlServer.Management.IntegrationServices",
-                        "Microsoft.SqlServer.Replication",
-                        "Microsoft.SqlServer.Rmo",
-                        "System.Private.CoreLib",
-                        "Azure.Core",
-                        "Azure.Identity",
-                        "Microsoft.Data.Tools.Utilities",
-                        "Microsoft.Data.Tools.Schema.Sql",
-                        "Microsoft.SqlServer.TransactSql.ScriptDom"
-                    };
-
                     var requestedName = new AssemblyName(e.Name);
                     var assemblyName = requestedName.Name;
 
@@ -86,13 +57,17 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                         }
                     }
 
-                    // Only load from disk if not already loaded and it's in our list
-                    foreach (string dll in dlls)
+                    // Try to load from our lib folder if the file exists
+                    string dllPath = Path.Combine(_libPath, assemblyName + ".dll");
+                    if (File.Exists(dllPath))
                     {
-                        if (assemblyName == dll)
+                        try
                         {
-                            string filelocation = "$dir" + dll + ".dll";
-                            return Assembly.LoadFrom(filelocation);
+                            return Assembly.LoadFrom(dllPath);
+                        }
+                        catch
+                        {
+                            // Failed to load, return null to let default resolution continue
                         }
                     }
 
@@ -105,10 +80,90 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     }
 
     try {
-        $redirector = New-Object Redirector
+        $libPath = [System.IO.Path]::Combine($script:libraryroot, "lib")
+        $redirector = New-Object Redirector($libPath)
         [System.AppDomain]::CurrentDomain.add_AssemblyResolve($redirector.EventHandler)
     } catch {
-        # unsure
+        Write-Verbose "Could not register Redirector: $_"
+    }
+} else {
+    # PowerShell Core: Use AssemblyLoadContext.Resolving event for version redirection
+    # This handles version mismatches when SqlServer module loads different versions of assemblies
+    # IMPORTANT: Must be implemented in C# because the resolver runs on .NET threads without PowerShell runspaces
+    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib")
+    $dir = ("$dir" + [System.IO.Path]::DirectorySeparatorChar).Replace('\', '\\')
+
+    if (-not ("CoreRedirector" -as [type])) {
+        $coreSource = @"
+            using System;
+            using System.IO;
+            using System.Reflection;
+            using System.Runtime.Loader;
+
+            public class CoreRedirector
+            {
+                private static string _libPath;
+                private static bool _registered = false;
+
+                public static void Register(string libPath)
+                {
+                    if (_registered) return;
+                    _libPath = libPath;
+                    AssemblyLoadContext.Default.Resolving += OnResolving;
+                    _registered = true;
+                }
+
+                private static Assembly OnResolving(AssemblyLoadContext context, AssemblyName assemblyName)
+                {
+                    string name = assemblyName.Name;
+
+                    // First, check if any version of this assembly is already loaded
+                    // This handles version mismatches (e.g., dbatools.dll requesting ConnectionInfo 17.100.0.0 when 17.200.0.0 is loaded)
+                    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            if (assembly.GetName().Name == name)
+                            {
+                                return assembly;
+                            }
+                        }
+                        catch
+                        {
+                            // Some assemblies may throw when accessing GetName()
+                        }
+                    }
+
+                    // Try to load from our lib folder if the file exists
+                    string dllPath = _libPath + name + ".dll";
+                    if (File.Exists(dllPath))
+                    {
+                        try
+                        {
+                            return AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
+                        }
+                        catch
+                        {
+                            // Failed to load, return null to let default resolution continue
+                        }
+                    }
+
+                    return null;
+                }
+            }
+"@
+
+        try {
+            $null = Add-Type -TypeDefinition $coreSource -ReferencedAssemblies 'System.Runtime.Loader'
+        } catch {
+            Write-Verbose "Could not compile CoreRedirector: $_"
+        }
+    }
+
+    try {
+        [CoreRedirector]::Register($dir)
+    } catch {
+        Write-Verbose "Could not register CoreRedirector: $_"
     }
 }
 
@@ -118,11 +173,44 @@ $sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Da
 # Get loaded assemblies once for reuse (used for AvoidConflicts checks and later assembly loading)
 $script:loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
 
+# Check for incompatible System.ClientModel or SqlClient versions
+# Azure.Core 1.44+ requires System.ClientModel 1.1+ with IPersistableModel.Write() method
+# SqlServer module's SqlClient 5.x includes older System.ClientModel that's incompatible
+$script:hasIncompatibleClientModel = $false
+if ($AvoidConflicts) {
+    # Check if System.ClientModel is already loaded with incompatible version
+    $existingClientModel = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'System.ClientModel' }
+    if ($existingClientModel) {
+        $clientModelVersion = $existingClientModel.GetName().Version
+        # System.ClientModel 1.1.0+ has the required IPersistableModel interface changes
+        if ($clientModelVersion -lt [Version]'1.1.0') {
+            $script:hasIncompatibleClientModel = $true
+            Write-Verbose "Detected incompatible System.ClientModel version $clientModelVersion - will skip Azure.Core and Azure.Identity to avoid MissingMethodException"
+        }
+    }
+
+    # Check if SqlServer's older SqlClient is loaded (which bundles incompatible System.ClientModel)
+    # SqlClient 5.x from SqlServer module uses System.ClientModel 1.0.x
+    # Our Azure.Core requires System.ClientModel 1.1+
+    if (-not $script:hasIncompatibleClientModel) {
+        $existingSqlClient = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+        if ($existingSqlClient) {
+            $sqlClientVersion = $existingSqlClient.GetName().Version
+            # SqlClient 5.x bundles older System.ClientModel; 6.x bundles compatible versions
+            if ($sqlClientVersion.Major -lt 6) {
+                $script:hasIncompatibleClientModel = $true
+                Write-Verbose "Detected SqlClient $sqlClientVersion (pre-6.0) which uses incompatible System.ClientModel - will skip Azure.Core and Azure.Identity to avoid MissingMethodException"
+            }
+        }
+    }
+}
+
 # Check if SqlClient is already loaded when AvoidConflicts is set
 $skipSqlClient = $false
 if ($AvoidConflicts) {
-    $skipSqlClient = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
-    if ($skipSqlClient) {
+    $existingAssembly = $script:loadedAssemblies | Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' }
+    if ($existingAssembly) {
+        $skipSqlClient = $true
         Write-Verbose "Skipping Microsoft.Data.SqlClient.dll - already loaded"
     }
 }
@@ -207,6 +295,13 @@ foreach ($name in $names) {
 
     if ($name -in $x64only -and $env:PROCESSOR_ARCHITECTURE -eq "x86") {
         Write-Verbose -Message "Skipping $name. x86 not supported for this library."
+        continue
+    }
+
+    # Skip Azure.Core and Azure.Identity if System.ClientModel is incompatible
+    # These assemblies depend on System.ClientModel 1.1+ which has breaking API changes
+    if ($script:hasIncompatibleClientModel -and $name -in @('Azure.Core', 'Azure.Identity')) {
+        Write-Verbose "Skipping $name.dll - incompatible System.ClientModel already loaded"
         continue
     }
 

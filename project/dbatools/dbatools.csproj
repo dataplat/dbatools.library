@@ -7,8 +7,8 @@
     <Product>dbatools</Product>
     <Description>The dbatools PowerShell Module library</Description>
     <Copyright>Copyright © 2025</Copyright>
-    <AssemblyVersion>0.10.0.78</AssemblyVersion>
-    <FileVersion>0.10.0.78</FileVersion>
+    <AssemblyVersion>0.10.0.79</AssemblyVersion>
+    <FileVersion>0.10.0.79</FileVersion>
     <AssemblyName>dbatools</AssemblyName>
     <SkipFunctionsDepsCopy>false</SkipFunctionsDepsCopy>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -58,6 +58,8 @@
     <PackageReference Include="Microsoft.SqlServer.DacFx" Version="170.0.94" />
     <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="172.76.0" />
     <PackageReference Include="Microsoft.SqlServer.XEvent.XELite" Version="2024.2.5.1" />
+    <!-- Azure.Core 1.41.0 incorrectly declares System.ClientModel 1.0.0 as dependency but uses types from 1.1.0+ -->
+    <PackageReference Include="System.ClientModel" Version="1.8.0" />
   </ItemGroup>
 
   <!-- Framework-specific packages -->

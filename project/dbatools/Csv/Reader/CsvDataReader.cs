@@ -3803,6 +3803,11 @@ namespace Dataplat.Dbatools.Csv.Reader
         public IReadOnlyList<StaticColumn> StaticColumnsList => _staticColumns;
 
         /// <summary>
+        /// Gets the options used by this reader.
+        /// </summary>
+        public CsvReaderOptions Options => _options;
+
+        /// <summary>
         /// Gets the field headers.
         /// </summary>
         public string[] GetFieldHeaders()
