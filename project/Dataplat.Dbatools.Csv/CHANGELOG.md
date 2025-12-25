@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.10] - 2025-12-04
+## [1.1.10] - 2025-12-26
 
 ### Added
 - **SQL Server schema inference** - New `CsvSchemaInference` class that analyzes CSV data to determine optimal SQL Server column types. Two modes available:
@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ToColumnTypes()` utility to convert inferred schema to `CsvReaderOptions.ColumnTypes` dictionary
 - Early exit optimization: types are eliminated as values fail validation, reducing unnecessary checks
 - Progress callback support for full-scan mode (fires every ~1% or 10K rows)
+- **MoneyConverter** for SQL Server `money`/`smallmoney` types with support for currency symbols, thousands separators, and accounting format
+- **VectorConverter** for SQL Server 2025 `VECTOR` data type with support for JSON array and comma-separated formats
+
+### Fixed
+- **DecimalConverter scientific notation support** - Changed `NumberStyles` from `Number` to `Float | AllowThousands` to properly parse scientific notation (e.g., `1.2345678E5`)
+- **SQL identifier escaping** - Escape closing brackets in schema, table, and column names to prevent SQL injection in generated `CREATE TABLE` statements
 
 ## [1.1.1] - 2025-12-04
 
