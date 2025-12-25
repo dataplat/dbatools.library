@@ -400,6 +400,7 @@ jobs:
     if: always()
     steps:
       - name: Check test results
+        shell: bash
         run: |
           echo "## AvoidConflicts Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
