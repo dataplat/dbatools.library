@@ -303,25 +303,11 @@ namespace Dataplat.Dbatools.Csv.Reader
         }
 
         /// <summary>
-        /// Gets the options from a CsvDataReader using reflection if necessary.
+        /// Gets the options from a CsvDataReader.
         /// </summary>
         private static CsvReaderOptions GetReaderOptions(CsvDataReader reader)
         {
-            // Try to access the Options property if it exists
-            var optionsProperty = typeof(CsvDataReader).GetProperty("Options");
-            if (optionsProperty != null)
-            {
-                return optionsProperty.GetValue(reader) as CsvReaderOptions;
-            }
-
-            // Fall back to using a field
-            var optionsField = typeof(CsvDataReader).GetField("_options", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (optionsField != null)
-            {
-                return optionsField.GetValue(reader) as CsvReaderOptions;
-            }
-
-            return null;
+            return reader.Options;
         }
 
         /// <summary>
@@ -383,7 +369,10 @@ namespace Dataplat.Dbatools.Csv.Reader
                 throw new ArgumentException("Table name is required.", nameof(tableName));
 
             var sb = new StringBuilder();
-            sb.AppendLine(string.Format("CREATE TABLE [{0}].[{1}]", schemaName, tableName));
+            // Escape ] as ]] to prevent SQL injection via identifier names
+            string escapedSchema = schemaName?.Replace("]", "]]") ?? "dbo";
+            string escapedTable = tableName.Replace("]", "]]");
+            sb.AppendLine(string.Format("CREATE TABLE [{0}].[{1}]", escapedSchema, escapedTable));
             sb.AppendLine("(");
 
             bool first = true;

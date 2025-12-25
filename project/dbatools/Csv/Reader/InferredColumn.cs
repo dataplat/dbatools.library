@@ -78,7 +78,9 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// <returns>A SQL column definition string.</returns>
         public string ToSqlDefinition(bool quoted = true)
         {
-            string name = quoted ? $"[{ColumnName}]" : ColumnName;
+            // Escape ] as ]] to prevent SQL injection via column names
+            string escapedName = ColumnName?.Replace("]", "]]") ?? "";
+            string name = quoted ? $"[{escapedName}]" : escapedName;
             string nullability = IsNullable ? "NULL" : "NOT NULL";
             return $"{name} {SqlDataType} {nullability}";
         }
