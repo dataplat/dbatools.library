@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.10] - 2025-12-04
+
+### Added
+- **SQL Server schema inference** - New `CsvSchemaInference` class that analyzes CSV data to determine optimal SQL Server column types. Two modes available:
+  - `InferSchemaFromSample()` - Fast inference from first N rows (default 1000)
+  - `InferSchema()` - Full file scan with progress callback for zero-risk type detection
+- `InferredColumn` class containing column name, SQL data type, max length, nullability, unicode flag, and decimal precision/scale
+- Type detection for: `uniqueidentifier`, `bit`, `int`, `bigint`, `decimal(p,s)`, `datetime2`, `varchar(n)`, `nvarchar(n)`
+- `GenerateCreateTableStatement()` utility to produce SQL DDL from inferred schema
+- `ToColumnTypes()` utility to convert inferred schema to `CsvReaderOptions.ColumnTypes` dictionary
+- Early exit optimization: types are eliminated as values fail validation, reducing unnecessary checks
+- Progress callback support for full-scan mode (fires every ~1% or 10K rows)
+
 ## [1.1.1] - 2025-12-04
 
 ### Changed
