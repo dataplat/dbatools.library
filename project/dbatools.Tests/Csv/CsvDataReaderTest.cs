@@ -1123,11 +1123,10 @@ namespace Dataplat.Dbatools.Csv.Tests
                 // The parse will fail and the error will be skipped
                 // Depending on how the parser handles this, the row might be skipped
                 // Let's just verify the flag is accessible
-                bool hadError = false;
                 while (reader.Read())
                 {
-                    if (reader.ParseErrorFlag)
-                        hadError = true;
+                    // ParseErrorFlag is accessible during reading
+                    _ = reader.ParseErrorFlag;
                 }
                 // Parse errors were collected
                 Assert.IsTrue(reader.ParseErrors.Count >= 0);

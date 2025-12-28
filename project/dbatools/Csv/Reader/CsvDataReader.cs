@@ -77,6 +77,7 @@ namespace Dataplat.Dbatools.Csv.Reader
         // LumenWorks compatibility flags - reset at start of each Read()
         private bool _missingFieldFlag;
         private bool _parseErrorFlag;
+        private bool _readReturnedFalse;  // True after Read() returns false (EndOfStream)
 
         // Buffer for first data row when no header row (needed to create columns during Initialize)
         private string _bufferedFirstLine;
@@ -671,7 +672,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
 
             // Generate default header name for empty or whitespace-only headers (LumenWorks compatibility)
-            if (string.IsNullOrEmpty(result) || (result != null && result.Trim().Length == 0))
+            if (string.IsNullOrWhiteSpace(result))
             {
                 result = _options.DefaultHeaderName + fieldIndex;
             }
@@ -1497,6 +1498,11 @@ namespace Dataplat.Dbatools.Csv.Reader
             if (result)
             {
                 ReportProgressIfNeeded();
+            }
+            else
+            {
+                // Mark end of stream when Read() returns false
+                _readReturnedFalse = true;
             }
 
             return result;
@@ -3821,7 +3827,7 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// <remarks>
         /// Provides LumenWorks CsvReader compatibility.
         /// </remarks>
-        public bool EndOfStream => _endOfStream && _bufferPosition >= _bufferLength;
+        public bool EndOfStream => _readReturnedFalse;
 
         /// <summary>
         /// Gets whether the current record had missing fields that were padded with nulls.
