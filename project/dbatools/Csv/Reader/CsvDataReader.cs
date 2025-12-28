@@ -611,7 +611,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 var lastOccurrence = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 for (int i = 0; i < _fieldsBuffer.Count; i++)
                 {
-                    string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value);
+                    string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value, i);
                     lastOccurrence[name] = i;
                 }
 
@@ -619,7 +619,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 var tempCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 for (int i = 0; i < _fieldsBuffer.Count; i++)
                 {
-                    string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value);
+                    string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value, i);
                     if (lastOccurrence[name] != i)
                     {
                         // This is not the last occurrence, will be renamed
@@ -633,7 +633,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             // Second pass: create columns
             for (int i = 0; i < _fieldsBuffer.Count; i++)
             {
-                string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value);
+                string name = GetTrimmedHeaderName(_fieldsBuffer[i].Value, i);
 
                 // Check include/exclude filters first
                 if (!ShouldIncludeColumn(name))
@@ -657,13 +657,22 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
         }
 
-        private string GetTrimmedHeaderName(string name)
+        private string GetTrimmedHeaderName(string name, int fieldIndex)
         {
-            if (_options.TrimmingOptions != ValueTrimmingOptions.None && name != null)
+            string result = name;
+
+            if (_options.TrimmingOptions != ValueTrimmingOptions.None && result != null)
             {
-                return name.Trim();
+                result = result.Trim();
             }
-            return name ?? string.Empty;
+
+            // Generate default header name for empty or whitespace-only headers (LumenWorks compatibility)
+            if (string.IsNullOrEmpty(result) || (result != null && result.Trim().Length == 0))
+            {
+                result = _options.DefaultHeaderName + fieldIndex;
+            }
+
+            return result ?? string.Empty;
         }
 
         private string HandleDuplicateHeader(string name, int fieldIndex)

@@ -257,6 +257,29 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// </summary>
         public DuplicateHeaderBehavior DuplicateHeaderBehavior { get; set; } = DuplicateHeaderBehavior.ThrowException;
 
+        private string _defaultHeaderName = "Column";
+
+        /// <summary>
+        /// Gets or sets the default header name prefix used for empty or whitespace-only headers.
+        /// The column index will be appended to the specified name (e.g., "Column0", "Column1").
+        /// Default is "Column".
+        /// This matches the behavior of the LumenWorks CSV library.
+        /// </summary>
+        /// <exception cref="ArgumentNullException">Thrown when value is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when value is empty or whitespace-only.</exception>
+        public string DefaultHeaderName
+        {
+            get => _defaultHeaderName;
+            set
+            {
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value), "DefaultHeaderName cannot be null.");
+                if (string.IsNullOrWhiteSpace(value))
+                    throw new ArgumentException("DefaultHeaderName cannot be empty or whitespace-only.", nameof(value));
+                _defaultHeaderName = value;
+            }
+        }
+
         /// <summary>
         /// Gets or sets the culture to use for parsing numbers and dates.
         /// Default is InvariantCulture.
@@ -477,6 +500,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 ExcludeColumns = ExcludeColumns != null ? new HashSet<string>(ExcludeColumns) : null,
                 DistinguishEmptyFromNull = DistinguishEmptyFromNull,
                 DuplicateHeaderBehavior = DuplicateHeaderBehavior,
+                DefaultHeaderName = DefaultHeaderName,
                 Culture = Culture,
                 QuoteMode = QuoteMode,
                 MismatchedFieldAction = MismatchedFieldAction,

@@ -7,7 +7,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>Dataplat.Dbatools.Csv</PackageId>
-    <Version>1.1.10</Version>
+    <Version>1.1.15</Version>
     <Authors>Chrissy LeMaire</Authors>
     <Company>Dataplat</Company>
     <Product>Dataplat.Dbatools.Csv</Product>
