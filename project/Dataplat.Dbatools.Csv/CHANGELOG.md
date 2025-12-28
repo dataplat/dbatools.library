@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Empty header name generation** - Empty or whitespace-only CSV headers are now automatically assigned default names (e.g., `Column0`, `Column1`) instead of throwing errors. This matches LumenWorks CsvReader behavior and fixes SQL bulk insert failures when CSV files have missing header names.
+- **`DefaultHeaderName` option** - New `CsvReaderOptions.DefaultHeaderName` property allows customizing the prefix for generated header names (default is `"Column"`).
+
 ## [1.1.10] - 2025-12-26
 
 ### Added

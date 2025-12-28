@@ -682,6 +682,143 @@ namespace Dataplat.Dbatools.Csv.Tests
 
         #endregion
 
+        #region Empty Header Tests
+
+        [TestMethod]
+        public void TestEmptyHeader_GeneratesDefaultName()
+        {
+            // LumenWorks compatibility: empty headers become Column#
+            // Reproduces the issue from dbatools where Import-DbaCsv failed
+            // with empty headers causing SQL errors
+            string csv = ",ValidHeader\nValue1,Value2";
+
+            using (var reader = CreateReaderFromString(csv))
+            {
+                Assert.AreEqual(2, reader.FieldCount);
+                Assert.AreEqual("Column0", reader.GetName(0));  // Empty header -> Column0
+                Assert.AreEqual("ValidHeader", reader.GetName(1));
+
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("Value1", reader.GetString(0));
+                Assert.AreEqual("Value2", reader.GetString(1));
+            }
+        }
+
+        [TestMethod]
+        public void TestMultipleEmptyHeaders_GeneratesUniqueNames()
+        {
+            // Multiple empty headers should each get a unique name based on their index
+            string csv = ",,ValidHeader,\nA,B,C,D";
+
+            using (var reader = CreateReaderFromString(csv))
+            {
+                Assert.AreEqual(4, reader.FieldCount);
+                Assert.AreEqual("Column0", reader.GetName(0));
+                Assert.AreEqual("Column1", reader.GetName(1));
+                Assert.AreEqual("ValidHeader", reader.GetName(2));
+                Assert.AreEqual("Column3", reader.GetName(3));
+
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("A", reader.GetString(0));
+                Assert.AreEqual("B", reader.GetString(1));
+                Assert.AreEqual("C", reader.GetString(2));
+                Assert.AreEqual("D", reader.GetString(3));
+            }
+        }
+
+        [TestMethod]
+        public void TestWhitespaceOnlyHeader_GeneratesDefaultName()
+        {
+            // Whitespace-only headers should also be treated as empty
+            string csv = "   ,ValidHeader\nValue1,Value2";
+
+            using (var reader = CreateReaderFromString(csv))
+            {
+                Assert.AreEqual(2, reader.FieldCount);
+                Assert.AreEqual("Column0", reader.GetName(0));  // Whitespace -> Column0
+                Assert.AreEqual("ValidHeader", reader.GetName(1));
+            }
+        }
+
+        [TestMethod]
+        public void TestCustomDefaultHeaderName()
+        {
+            // Users can customize the default header name prefix
+            string csv = ",ValidHeader\nValue1,Value2";
+            var options = new CsvReaderOptions { DefaultHeaderName = "Field" };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.AreEqual(2, reader.FieldCount);
+                Assert.AreEqual("Field0", reader.GetName(0));  // Custom prefix
+                Assert.AreEqual("ValidHeader", reader.GetName(1));
+            }
+        }
+
+        [TestMethod]
+        public void TestEmptyHeaderWithTrimming()
+        {
+            // When trimming is enabled, whitespace headers should still become Column#
+            string csv = "  ,  ValidHeader  \nValue1,Value2";
+            var options = new CsvReaderOptions { TrimmingOptions = ValueTrimmingOptions.All };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.AreEqual(2, reader.FieldCount);
+                Assert.AreEqual("Column0", reader.GetName(0));  // Trimmed empty -> Column0
+                Assert.AreEqual("ValidHeader", reader.GetName(1));  // Trimmed
+            }
+        }
+
+        [TestMethod]
+        public void TestEmptyHeaderInMiddle()
+        {
+            // Empty header in the middle of other headers
+            string csv = "First,,Last\nA,B,C";
+
+            using (var reader = CreateReaderFromString(csv))
+            {
+                Assert.AreEqual(3, reader.FieldCount);
+                Assert.AreEqual("First", reader.GetName(0));
+                Assert.AreEqual("Column1", reader.GetName(1));  // Middle empty -> Column1
+                Assert.AreEqual("Last", reader.GetName(2));
+
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("A", reader.GetString(0));
+                Assert.AreEqual("B", reader.GetString(1));
+                Assert.AreEqual("C", reader.GetString(2));
+            }
+        }
+
+        [TestMethod]
+        public void TestDefaultHeaderNameValidation_RejectsNull()
+        {
+            Assert.ThrowsException<ArgumentNullException>(() =>
+            {
+                new CsvReaderOptions { DefaultHeaderName = null };
+            });
+        }
+
+        [TestMethod]
+        public void TestDefaultHeaderNameValidation_RejectsEmpty()
+        {
+            Assert.ThrowsException<ArgumentException>(() =>
+            {
+                new CsvReaderOptions { DefaultHeaderName = "" };
+            });
+        }
+
+        [TestMethod]
+        public void TestDefaultHeaderNameValidation_RejectsWhitespace()
+        {
+            Assert.ThrowsException<ArgumentException>(() =>
+            {
+                new CsvReaderOptions { DefaultHeaderName = "   " };
+            });
+        }
+
+        #endregion
+
         #region Culture Support Tests
 
         [TestMethod]
