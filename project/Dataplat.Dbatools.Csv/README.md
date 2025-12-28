@@ -360,7 +360,7 @@ while (reader.Read())
 }
 ```
 
-**Built-in type converters:** `Guid`, `bool`, `DateTime`, `short`, `int`, `long`, `float`, `double`, `decimal`, `byte`, `string`
+**Built-in type converters:** `Guid`, `bool`, `DateTime`, `short`, `int`, `long`, `float`, `double`, `decimal`, `byte`, `string`, `money`, `vector` (SQL Server 2025)
 
 **Combine with schema inference:**
 
@@ -457,6 +457,52 @@ reader.GetString(2); // ""
 | `,,` (empty field) | `""` (empty string) | `null` (DBNull.Value) |
 | `,"",` (quoted empty) | `""` (empty string) | `""` (empty string) |
 | `,value,` | `"value"` | `"value"` |
+
+### LumenWorks Compatibility
+
+For projects migrating from LumenWorks CsvReader, these methods provide familiar APIs:
+
+```csharp
+using var reader = new CsvDataReader("data.csv");
+
+while (reader.Read())
+{
+    // Get column index by name (-1 if not found, unlike GetOrdinal which throws)
+    int idx = reader.GetFieldIndex("ColumnName");
+
+    // Get current record as reconstructed CSV string (useful for error logging)
+    string rawData = reader.GetCurrentRawData();
+
+    // Efficiently copy all fields to an array
+    string[] values = new string[reader.FieldCount];
+    reader.CopyCurrentRecordTo(values);
+
+    // Check if current record had issues
+    if (reader.MissingFieldFlag)
+        Console.WriteLine("Record had missing fields (padded with nulls)");
+    if (reader.ParseErrorFlag)
+        Console.WriteLine("Record had a parse error that was skipped");
+}
+
+// Check if stream is fully consumed
+if (reader.EndOfStream)
+    Console.WriteLine("Finished reading all data");
+```
+
+### Empty Header Handling
+
+CSV files with empty or whitespace-only headers are automatically assigned default names:
+
+```csharp
+// CSV: Name,,Value
+// Headers become: Name, Column1, Value
+
+var options = new CsvReaderOptions
+{
+    DefaultHeaderName = "Field"  // Custom prefix (default is "Column")
+};
+// Headers become: Name, Field1, Value
+```
 
 ## Configuration Options
 
