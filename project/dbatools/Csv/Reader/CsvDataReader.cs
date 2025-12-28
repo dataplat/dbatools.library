@@ -74,6 +74,11 @@ namespace Dataplat.Dbatools.Csv.Reader
         private long _currentRecordIndex = -1;
         private long _currentLineNumber;
 
+        // LumenWorks compatibility flags - reset at start of each Read()
+        private bool _missingFieldFlag;
+        private bool _parseErrorFlag;
+        private bool _readReturnedFalse;  // True after Read() returns false (EndOfStream)
+
         // Buffer for first data row when no header row (needed to create columns during Initialize)
         private string _bufferedFirstLine;
         private bool _hasBufferedFirstLine;
@@ -667,7 +672,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
 
             // Generate default header name for empty or whitespace-only headers (LumenWorks compatibility)
-            if (string.IsNullOrEmpty(result) || (result != null && result.Trim().Length == 0))
+            if (string.IsNullOrWhiteSpace(result))
             {
                 result = _options.DefaultHeaderName + fieldIndex;
             }
@@ -1462,6 +1467,10 @@ namespace Dataplat.Dbatools.Csv.Reader
         {
             ThrowIfClosed();
 
+            // Reset LumenWorks compatibility flags
+            _missingFieldFlag = false;
+            _parseErrorFlag = false;
+
             // Check for cancellation
             _options.CancellationToken.ThrowIfCancellationRequested();
 
@@ -1489,6 +1498,11 @@ namespace Dataplat.Dbatools.Csv.Reader
             if (result)
             {
                 ReportProgressIfNeeded();
+            }
+            else
+            {
+                // Mark end of stream when Read() returns false
+                _readReturnedFalse = true;
             }
 
             return result;
@@ -1806,6 +1820,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                     throw new CsvParseException("CSV parse error", error);
 
                 case CsvParseErrorAction.AdvanceToNextLine:
+                    _parseErrorFlag = true;
                     return false; // Signal to continue
 
                 case CsvParseErrorAction.RaiseEvent:
@@ -1815,6 +1830,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                     {
                         throw new CsvParseException("CSV parse error", error);
                     }
+                    _parseErrorFlag = true;
                     return false; // Signal to continue
             }
 
@@ -1835,9 +1851,13 @@ namespace Dataplat.Dbatools.Csv.Reader
                         $"Row has {actualCount} field(s) but expected {expectedCount} based on header.");
 
                 case MismatchedFieldAction.PadWithNulls:
-                    while (_fieldsBuffer.Count < expectedCount)
+                    if (_fieldsBuffer.Count < expectedCount)
                     {
-                        _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                        _missingFieldFlag = true;
+                        while (_fieldsBuffer.Count < expectedCount)
+                        {
+                            _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                        }
                     }
                     break;
 
@@ -1849,9 +1869,13 @@ namespace Dataplat.Dbatools.Csv.Reader
                     break;
 
                 case MismatchedFieldAction.PadOrTruncate:
-                    while (_fieldsBuffer.Count < expectedCount)
+                    if (_fieldsBuffer.Count < expectedCount)
                     {
-                        _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                        _missingFieldFlag = true;
+                        while (_fieldsBuffer.Count < expectedCount)
+                        {
+                            _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                        }
                     }
                     while (_fieldsBuffer.Count > expectedCount)
                     {
@@ -1874,9 +1898,13 @@ namespace Dataplat.Dbatools.Csv.Reader
 
                 case MismatchedFieldAction.PadWithNulls:
                     // Pad missing fields with empty values (will become null)
-                    while (_fieldsBuffer.Count < expectedCount)
+                    if (_fieldsBuffer.Count < expectedCount)
                     {
-                        _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                        _missingFieldFlag = true;
+                        while (_fieldsBuffer.Count < expectedCount)
+                        {
+                            _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                        }
                     }
                     break;
 
@@ -1890,9 +1918,13 @@ namespace Dataplat.Dbatools.Csv.Reader
 
                 case MismatchedFieldAction.PadOrTruncate:
                     // Both pad and truncate
-                    while (_fieldsBuffer.Count < expectedCount)
+                    if (_fieldsBuffer.Count < expectedCount)
                     {
-                        _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                        _missingFieldFlag = true;
+                        while (_fieldsBuffer.Count < expectedCount)
+                        {
+                            _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
+                        }
                     }
                     while (_fieldsBuffer.Count > expectedCount)
                     {
@@ -3789,6 +3821,37 @@ namespace Dataplat.Dbatools.Csv.Reader
         public long CurrentLineNumber => _currentLineNumber;
 
         /// <summary>
+        /// Gets whether the end of the CSV stream has been reached.
+        /// Returns true after Read() has returned false.
+        /// </summary>
+        /// <remarks>
+        /// Provides LumenWorks CsvReader compatibility.
+        /// </remarks>
+        public bool EndOfStream => _readReturnedFalse;
+
+        /// <summary>
+        /// Gets whether the current record had missing fields that were padded with nulls.
+        /// Only set when MismatchedFieldAction is PadWithNulls or PadOrTruncate.
+        /// Reset to false at the start of each Read() call.
+        /// </summary>
+        /// <remarks>
+        /// Provides LumenWorks CsvReader compatibility.
+        /// Note: This flag may not be accurate when parallel processing is enabled.
+        /// </remarks>
+        public bool MissingFieldFlag => _missingFieldFlag;
+
+        /// <summary>
+        /// Gets whether the current record had a parse error that was handled by skipping.
+        /// Only set when ParseErrorAction is AdvanceToNextLine or RaiseEvent (with AdvanceToNextLine action).
+        /// Reset to false at the start of each Read() call.
+        /// </summary>
+        /// <remarks>
+        /// Provides LumenWorks CsvReader compatibility.
+        /// Note: This flag may not be accurate when parallel processing is enabled.
+        /// </remarks>
+        public bool ParseErrorFlag => _parseErrorFlag;
+
+        /// <summary>
         /// Gets the collection of parse errors encountered during reading.
         /// Only populated when CollectParseErrors is true.
         /// </summary>
@@ -3859,6 +3922,36 @@ namespace Dataplat.Dbatools.Csv.Reader
         }
 
         /// <summary>
+        /// Gets the index of the field with the specified header name.
+        /// </summary>
+        /// <param name="header">The header name to find.</param>
+        /// <returns>The zero-based index of the field, or -1 if not found.</returns>
+        /// <remarks>
+        /// Provides LumenWorks CsvReader compatibility. Unlike GetOrdinal(),
+        /// returns -1 instead of throwing when the header is not found.
+        /// </remarks>
+        public int GetFieldIndex(string header)
+        {
+            Initialize();
+            if (header == null)
+                return -1;
+
+            for (int i = 0; i < _columns.Count; i++)
+            {
+                if (string.Equals(_columns[i].Name, header, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            for (int i = 0; i < _staticColumns.Count; i++)
+            {
+                if (string.Equals(_staticColumns[i].Name, header, StringComparison.OrdinalIgnoreCase))
+                    return _columns.Count + i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
         /// Sets the type for a column. Must be called before reading.
         /// </summary>
         public void SetColumnType(string columnName, Type type)
@@ -3914,6 +4007,111 @@ namespace Dataplat.Dbatools.Csv.Reader
                 // Resize converted values array
                 Array.Resize(ref convertedValues, _columns.Count + _staticColumns.Count);
                 _convertedValues = convertedValues;
+            }
+        }
+
+        /// <summary>
+        /// Gets the current record as a raw CSV string representation.
+        /// This reconstructs the line from the parsed field values using the configured delimiter and quote character.
+        /// Useful for debugging and error reporting.
+        /// </summary>
+        /// <remarks>
+        /// This method provides LumenWorks CsvReader compatibility. Note that the returned string is a
+        /// reconstruction from parsed values, so it may differ slightly from the original line
+        /// (e.g., unnecessary quotes may be omitted, whitespace may be trimmed based on options).
+        /// </remarks>
+        /// <returns>A CSV-formatted string of the current record, or an empty string if no record is current.</returns>
+        public string GetCurrentRawData()
+        {
+            var record = _currentRecord;
+            if (record == null || _currentRecordIndex < 0)
+                return string.Empty;
+
+            var wasQuoted = _currentRecordWasQuoted;
+            string delimiter = _options.Delimiter;
+            char quote = _options.Quote;
+
+            var sb = new StringBuilder();
+            int fieldCount = Math.Min(record.Length, _columns.Count);
+
+            for (int i = 0; i < fieldCount; i++)
+            {
+                if (i > 0)
+                    sb.Append(delimiter);
+
+                string value = record[i];
+                if (value == null)
+                    continue;
+
+                // Quote the field if it was originally quoted, or if it contains special characters
+                bool needsQuoting = (wasQuoted != null && i < wasQuoted.Length && wasQuoted[i]) ||
+                                   value.Contains(delimiter) ||
+                                   value.IndexOf(quote) >= 0 ||
+                                   value.IndexOf('\r') >= 0 ||
+                                   value.IndexOf('\n') >= 0;
+
+                if (needsQuoting)
+                {
+                    sb.Append(quote);
+                    // Escape any quotes within the value
+                    foreach (char c in value)
+                    {
+                        if (c == quote)
+                            sb.Append(quote); // Double the quote to escape
+                        sb.Append(c);
+                    }
+                    sb.Append(quote);
+                }
+                else
+                {
+                    sb.Append(value);
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Copies all field values from the current record to the specified string array.
+        /// This provides an efficient way to get all field values at once without repeated indexer calls.
+        /// </summary>
+        /// <remarks>
+        /// This method provides LumenWorks CsvReader compatibility. Only CSV columns are copied,
+        /// not static columns. Use <see cref="GetValues(object[])"/> to get all values including static columns.
+        /// </remarks>
+        /// <param name="array">The destination array. Must have sufficient capacity starting from <paramref name="index"/>.</param>
+        /// <param name="index">The zero-based index in <paramref name="array"/> at which copying begins. Default is 0.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="array"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="index"/> is negative.</exception>
+        /// <exception cref="ArgumentException">Thrown when the destination array has insufficient capacity.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when no current record is available (call Read() first).</exception>
+        public void CopyCurrentRecordTo(string[] array, int index = 0)
+        {
+            if (array == null)
+                throw new ArgumentNullException(nameof(array));
+            if (index < 0)
+                throw new ArgumentOutOfRangeException(nameof(index), index, "Index cannot be negative.");
+
+            var record = _currentRecord;
+            if (record == null || _currentRecordIndex < 0)
+                throw new InvalidOperationException("No current record. Call Read() first.");
+
+            int fieldCount = _columns.Count;
+            if (array.Length - index < fieldCount)
+                throw new ArgumentException($"Destination array has insufficient capacity. Required: {fieldCount}, available: {array.Length - index}.", nameof(array));
+
+            for (int i = 0; i < fieldCount; i++)
+            {
+                // Map from column to source index
+                int sourceIndex = _columns[i].SourceIndex;
+                if (sourceIndex >= 0 && sourceIndex < record.Length)
+                {
+                    array[index + i] = record[sourceIndex];
+                }
+                else
+                {
+                    array[index + i] = null;
+                }
             }
         }
 

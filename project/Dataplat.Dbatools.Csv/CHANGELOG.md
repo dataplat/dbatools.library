@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Empty header name generation** - Empty or whitespace-only CSV headers are now automatically assigned default names (e.g., `Column0`, `Column1`) instead of throwing errors. This matches LumenWorks CsvReader behavior and fixes SQL bulk insert failures when CSV files have missing header names.
 - **`DefaultHeaderName` option** - New `CsvReaderOptions.DefaultHeaderName` property allows customizing the prefix for generated header names (default is `"Column"`).
+- **`GetCurrentRawData()` method** - Returns the current record as a reconstructed CSV string. Useful for debugging and error reporting. Provides LumenWorks CsvReader compatibility.
+- **`CopyCurrentRecordTo()` method** - Efficiently copies all field values from the current record to a string array. Provides LumenWorks CsvReader compatibility.
+- **`EndOfStream` property** - Indicates when the CSV stream has been fully consumed. Provides LumenWorks CsvReader compatibility.
+- **`MissingFieldFlag` property** - Indicates if the current record had missing fields that were padded with nulls.
+- **`ParseErrorFlag` property** - Indicates if the current record had a parse error that was handled by skipping.
+- **`GetFieldIndex()` method** - Returns the column index for a header name, or -1 if not found. Unlike `GetOrdinal()`, does not throw for unknown headers.
 
 ## [1.1.10] - 2025-12-26
 
