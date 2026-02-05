@@ -496,8 +496,33 @@ namespace Dataplat.Dbatools.Csv.Reader
                 if (column.DataType == typeof(string))
                     continue;
 
-                // Use custom converter if specified, otherwise look up from registry
-                column.CachedConverter = column.Converter ?? _options.TypeConverterRegistry?.GetConverter(column.DataType);
+                // Use custom converter if specified
+                if (column.Converter != null)
+                {
+                    column.CachedConverter = column.Converter;
+                    continue;
+                }
+
+                // For DateTime columns, check if we need a custom converter with DateTimeFormats/Culture
+                if (column.DataType == typeof(DateTime) || column.DataType == typeof(DateTime?))
+                {
+                    bool hasCustomFormats = _options.DateTimeFormats != null && _options.DateTimeFormats.Length > 0;
+                    bool hasCustomCulture = _options.Culture != null && !_options.Culture.Equals(CultureInfo.InvariantCulture);
+
+                    if (hasCustomFormats || hasCustomCulture)
+                    {
+                        // Create a custom DateTimeConverter with the specified formats and culture
+                        column.CachedConverter = new DateTimeConverter
+                        {
+                            CustomFormats = _options.DateTimeFormats,
+                            Culture = _options.Culture ?? CultureInfo.InvariantCulture
+                        };
+                        continue;
+                    }
+                }
+
+                // Fall back to registry default converter
+                column.CachedConverter = _options.TypeConverterRegistry?.GetConverter(column.DataType);
             }
         }
 
