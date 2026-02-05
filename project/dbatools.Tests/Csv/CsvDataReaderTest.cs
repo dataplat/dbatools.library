@@ -341,6 +341,64 @@ namespace Dataplat.Dbatools.Csv.Tests
         }
 
         [TestMethod]
+        public void TestDateTimeConversionWithCustomFormats()
+        {
+            // Addresses issue #43: Import-DbaCsv ignores -DateTimeFormats switch
+            // Test that dd/MM/yyyy format is correctly parsed when specified in DateTimeFormats
+            string csv = "Character Column,Test Date Time,Character Column 2\nTest data,04/02/2026 15:14:21,ABC123\nTest Data2,04/02/2026 15:14:21,MNB675";
+            var options = new CsvReaderOptions
+            {
+                DateTimeFormats = new[] { "dd/MM/yyyy HH:mm:ss" },
+                ColumnTypes = new System.Collections.Generic.Dictionary<string, Type>
+                {
+                    { "Test Date Time", typeof(DateTime) }
+                }
+            };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.IsTrue(reader.Read());
+                DateTime dt = reader.GetDateTime(1);
+                Assert.AreEqual(2026, dt.Year);
+                Assert.AreEqual(2, dt.Month, "Month should be February (2), not April (4)");
+                Assert.AreEqual(4, dt.Day, "Day should be 4");
+                Assert.AreEqual(15, dt.Hour);
+                Assert.AreEqual(14, dt.Minute);
+                Assert.AreEqual(21, dt.Second);
+
+                Assert.IsTrue(reader.Read());
+                dt = reader.GetDateTime(1);
+                Assert.AreEqual(2026, dt.Year);
+                Assert.AreEqual(2, dt.Month, "Month should be February (2), not April (4)");
+                Assert.AreEqual(4, dt.Day, "Day should be 4");
+            }
+        }
+
+        [TestMethod]
+        public void TestDateTimeConversionWithCulture()
+        {
+            // Test that Culture parameter is respected for DateTime parsing
+            string csv = "Name,Date\nJohn,04/02/2026";
+            var options = new CsvReaderOptions
+            {
+                Culture = new System.Globalization.CultureInfo("en-GB"),
+                ColumnTypes = new System.Collections.Generic.Dictionary<string, Type>
+                {
+                    { "Date", typeof(DateTime) }
+                }
+            };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.IsTrue(reader.Read());
+                DateTime dt = reader.GetDateTime(1);
+                Assert.AreEqual(2026, dt.Year);
+                Assert.AreEqual(2, dt.Month, "With en-GB culture, 04/02/2026 should be February 4th");
+                Assert.AreEqual(4, dt.Day);
+            }
+        }
+
+        [TestMethod]
         public void TestNumericConversion()
         {
             string csv = "Int,Long,Double,Decimal\n42,9999999999,3.14159,123.45";
