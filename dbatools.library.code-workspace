@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../dbatools"
+		},
+		{
+			"path": "../LeLab"
 		}
 	],
 	"settings": {}
