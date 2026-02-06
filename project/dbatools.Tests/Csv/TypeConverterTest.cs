@@ -239,11 +239,14 @@ namespace Dataplat.Dbatools.Csv.Tests
             Assert.IsTrue(germanConverter.TryConvert("1234,56", out decimal result));
             Assert.AreEqual(1234.56m, result);
 
-            // Test with French culture (uses space as thousands separator, comma as decimal)
+            // Test with French culture (uses non-breaking space as thousands separator, comma as decimal)
+            var frenchCulture = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
             var frenchConverter = new DecimalConverter();
-            frenchConverter.FormatProvider = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+            frenchConverter.FormatProvider = frenchCulture;
 
-            Assert.IsTrue(frenchConverter.TryConvert("1 234,56", out result));
+            // Use the culture's actual group separator (U+00A0 on net472, U+202F on net8.0)
+            string frenchValue = "1" + frenchCulture.NumberFormat.NumberGroupSeparator + "234,56";
+            Assert.IsTrue(frenchConverter.TryConvert(frenchValue, out result));
             Assert.AreEqual(1234.56m, result);
         }
 
@@ -264,7 +267,9 @@ namespace Dataplat.Dbatools.Csv.Tests
         [TestMethod]
         public void TestMoneyConverterWithCurrencySymbols()
         {
-            var converter = MoneyConverter.Default;
+            // Use en-US culture since "$" is not recognized by InvariantCulture (whose currency symbol is "¤")
+            var converter = new MoneyConverter();
+            converter.FormatProvider = System.Globalization.CultureInfo.GetCultureInfo("en-US");
 
             // Test US dollar sign
             Assert.IsTrue(converter.TryConvert("$123.45", out decimal result));
@@ -282,7 +287,9 @@ namespace Dataplat.Dbatools.Csv.Tests
         [TestMethod]
         public void TestMoneyConverterWithThousandsSeparator()
         {
-            var converter = MoneyConverter.Default;
+            // Use en-US culture since "$" is not recognized by InvariantCulture
+            var converter = new MoneyConverter();
+            converter.FormatProvider = System.Globalization.CultureInfo.GetCultureInfo("en-US");
 
             // Test with thousands separator
             Assert.IsTrue(converter.TryConvert("$1,234.56", out decimal result));
@@ -298,7 +305,7 @@ namespace Dataplat.Dbatools.Csv.Tests
         {
             var converter = MoneyConverter.Default;
 
-            // NumberStyles.Currency includes AllowExponent, so scientific notation should work
+            // MoneyConverter uses Currency | AllowExponent, so scientific notation should work
             Assert.IsTrue(converter.TryConvert("1.5E3", out decimal result));
             Assert.AreEqual(1500m, result);
 

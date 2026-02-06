@@ -220,7 +220,7 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
         /// <summary>Initializes a new instance of the <see cref="MoneyConverter"/> class.</summary>
         public MoneyConverter()
         {
-            NumberStyles = NumberStyles.Currency;
+            NumberStyles = NumberStyles.Currency | NumberStyles.AllowExponent;
         }
 
         /// <inheritdoc />

@@ -12,7 +12,7 @@ namespace Dataplat.Dbatools.Commands
     /// Implements the <c>Read-XEvent</c> internal command
     /// </summary>
     [Cmdlet("Read", "XEvent", DefaultParameterSetName = "Default", RemotingCapability = RemotingCapability.PowerShell)]
-    public class ReadXEvent : PSCmdlet
+    public class ReadXEvent : DbaBaseCmdlet
     {
         #region Parameters
         /// <summary>

@@ -10,7 +10,7 @@ namespace Dataplat.Dbatools.Commands
     /// Implements the <c>Import-Command</c> internal command
     /// </summary>
     [Cmdlet("Import", "Command", DefaultParameterSetName = "DefaultParameter", RemotingCapability = RemotingCapability.None)]
-    public class ImportCommand : PSCmdlet
+    public class ImportCommand : DbaBaseCmdlet
     {
         #region Parameters
         /// <summary>

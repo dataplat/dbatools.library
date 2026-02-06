@@ -10,7 +10,7 @@ namespace Dataplat.Dbatools.Commands
     /// Implements the <c>Select-DbaObject</c> command
     /// </summary>
     [Cmdlet("Select", "DbaObject", DefaultParameterSetName = "DefaultParameter", RemotingCapability = RemotingCapability.None)]
-    public class SelectDbaObjectCommand : PSCmdlet
+    public class SelectDbaObjectCommand : DbaBaseCmdlet
     {
         #region Parameters
         /// <summary>

@@ -11,7 +11,7 @@ namespace Dataplat.Dbatools.Commands
     /// Implements the <c>Write-Message</c> command, performing message handling and logging.
     /// </summary>
     [Cmdlet("Write", "Message")]
-    public class WriteMessageCommand : PSCmdlet
+    public class WriteMessageCommand : DbaBaseCmdlet
     {
         #region Parameters
         /// <summary>
@@ -117,7 +117,7 @@ namespace Dataplat.Dbatools.Commands
 		/// This is less user friendly, but allows catching exceptions in calling scripts.
         /// </summary>
         [Parameter()]
-        public bool EnableException;
+        public new bool EnableException;
 
         /// <summary>
         /// Enables breakpoints on the current message. By default, setting '-Debug' will NOT cause an interrupt on the current position.

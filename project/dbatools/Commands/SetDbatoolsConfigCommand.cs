@@ -10,7 +10,7 @@ namespace Dataplat.Dbatools.Commands
     /// Implements the <c>Set-PSFConfig</c> command.
     /// </summary>
     [Cmdlet("Set", "DbatoolsConfig", DefaultParameterSetName = "FullName")]
-    public class SetDbatoolsConfigCommand : PSCmdlet
+    public class SetDbatoolsConfigCommand : DbaBaseCmdlet
     {
         #region Parameters
         /// <summary>
@@ -134,7 +134,7 @@ namespace Dataplat.Dbatools.Commands
         /// Enable throwing exceptions.
         /// </summary>
         [Parameter()]
-        public SwitchParameter EnableException;
+        public new SwitchParameter EnableException;
         #endregion Parameters
 
         #region Private fields

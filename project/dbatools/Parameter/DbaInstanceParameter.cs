@@ -407,6 +407,50 @@ namespace Dataplat.Dbatools.Parameter
                 tempString = tempString.Substring(3);
             }
 
+            // Handle bracketed IPv6 notation: [address]:port, [address],port, or [address]\instance
+            if (tempString.StartsWith("["))
+            {
+                int closeBracket = tempString.IndexOf(']');
+                if (closeBracket > 1)
+                {
+                    string ipv6Address = tempString.Substring(1, closeBracket - 1);
+                    if (Regex.IsMatch(ipv6Address, RegexHelper.IPv6))
+                    {
+                        _ComputerName = ipv6Address;
+                        string remainder = tempString.Substring(closeBracket + 1);
+
+                        // [address] with no port or instance
+                        if (remainder.Length == 0)
+                            return;
+
+                        // [address]:port or [address],port
+                        if (remainder[0] == ':' || remainder[0] == ',')
+                        {
+                            int port;
+                            if (Int32.TryParse(remainder.Substring(1), out port) && port > 0 && port <= 65535)
+                            {
+                                _Port = port;
+                                return;
+                            }
+                        }
+
+                        // [address]\instance
+                        if (remainder[0] == '\\')
+                        {
+                            string instanceName = remainder.Substring(1);
+                            if (Utility.Validation.IsValidInstanceName(instanceName, true))
+                            {
+                                if (instanceName.ToLower() != "default" && instanceName.ToLower() != "mssqlserver")
+                                    _InstanceName = instanceName;
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                throw new PSArgumentException("Failed to parse instance name: " + Name);
+            }
+
             // Case: Default instance | Instance by port
             if (tempString.Split('\\').Length == 1)
             {
