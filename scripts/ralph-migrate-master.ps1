@@ -128,11 +128,9 @@ function Invoke-DomainMigration {
 
         # Invoke Claude Code with the migration prompt
         # The prompt tells Claude to find the next PENDING command and convert it
-        $promptContent = Get-Content $prompt -Raw
-        $invocation = "cd c:\github\dbatools.library && claude --print --dangerously-skip-permissions `"$promptContent`""
-
         try {
-            $result = Invoke-Expression $invocation
+            Set-Location $RepoRoot
+            $result = claude -p --dangerously-skip-permissions (Get-Content $prompt -Raw)
             Write-Host $result
         }
         catch {

@@ -63,8 +63,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
 
     try {
         Set-Location $RepoRoot
-        $promptContent = Get-Content $PromptPath -Raw
-        claude --print --dangerously-skip-permissions $promptContent
+        claude -p --dangerously-skip-permissions (Get-Content $PromptPath -Raw)
     }
     catch {
         Write-Host "[ERROR] Iteration $i failed: $_" -ForegroundColor Red
