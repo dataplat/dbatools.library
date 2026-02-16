@@ -5,8 +5,8 @@
 
 ## Commands
 
-| # | Command | Status | C# File | Build | Parity | Notes |
-|---|---------|--------|---------|-------|--------|-------|
-| 1 | Test-DbaMigrationConstraint | PENDING | | | |  |
-| 2 | Copy-DbaDatabase | PENDING | | | |  |
-| 3 | Start-DbaMigration | PENDING | | | |  |
+| # | Command | Status | C# File | Build | Parity | Pester | Notes |
+|---|---------|--------|---------|-------|--------|--------|-------|
+| 1 | Test-DbaMigrationConstraint | PENDING | | | | |  |
+| 2 | Copy-DbaDatabase | PENDING | | | | |  |
+| 3 | Start-DbaMigration | PENDING | | | | |  |

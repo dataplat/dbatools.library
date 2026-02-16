@@ -28,6 +28,21 @@ dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity 
 
 Record the pass/fail count. Any test that passes now MUST still pass after your conversion. If the baseline itself has failures, note them — you are not responsible for pre-existing failures, but you must not add new ones.
 
+#### Pester Baseline
+
+If Pester integration tests exist for this command, establish a baseline BEFORE making any changes:
+
+```powershell
+cd c:\github\dbatools-ralph
+Import-Module ./dbatools.psm1 -Force
+. ./private/testing/Invoke-ManualPester.ps1
+Invoke-ManualPester -Path tests/{CommandName}.Tests.ps1 -TestIntegration
+```
+
+Record the pass/fail/skip counts. If no test file exists at `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1`, note "No Pester tests" and continue — Pester testing steps later will be skipped.
+
+If the Pester baseline itself has failures, note them — you are not responsible for pre-existing failures, but you must not add new ones.
+
 ### 1. Find Next Command
 
 Read tracker files in `docs/plan/TRACKER-MIGRATE-*.md`. Find the FIRST command with status `PENDING` whose dependencies are all `DONE`.
@@ -218,7 +233,7 @@ performance (no allocations in loops, proper StringBuilder usage), thread safety
 state access, and adherence to C# 7.3 constraints."
 ```
 
-**If existing Pester tests exist** for this command (check `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1`), use `subagent_type="pester-test-guardian"`:
+**If existing Pester tests exist** for this command (check `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1`), use `subagent_type="pester-test-guardian"` to predict compatibility issues BEFORE retiring the PS1 (actual test execution happens in Step 10d):
 ```
 Task prompt: "Evaluate the Pester tests at c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1
 for compatibility with the new C# binary cmdlet at {cs_path}. Identify any tests that
@@ -249,7 +264,41 @@ Edit `c:\github\dbatools-ralph\dbatools.psd1` — remove `'{CommandName}'` from 
 
 Edit `c:\github\dbatools.library\dbatools.library.psd1` — add `'{CommandName}'` to the `CmdletsToExport` array. Keep the array sorted alphabetically.
 
-### 11. Final Test Run
+#### 10d. Run Pester Integration Tests
+
+**This step is MANDATORY if a Pester test file exists.** Skip only if Step 0 noted "No Pester tests."
+
+Re-import the module to pick up the C# cmdlet (the PS1 is now archived), then run the same tests from the baseline:
+
+```powershell
+cd c:\github\dbatools-ralph
+Import-Module ./dbatools.psm1 -Force
+. ./private/testing/Invoke-ManualPester.ps1
+Invoke-ManualPester -Path tests/{CommandName}.Tests.ps1 -TestIntegration
+```
+
+Compare results against the Pester baseline from Step 0:
+- **All tests that passed in the baseline MUST still pass.** A previously-passing test that now fails is a regression in your C# implementation.
+- **Pre-existing failures** (tests that failed in the baseline too) are not your responsibility, but document them.
+- **New passes** (tests that failed before but pass now) are a bonus — note them.
+
+If any baseline-passing test now fails:
+1. Determine if the failure is a C# implementation issue or a test adaptation issue
+2. If implementation issue: go back to Step 4 and fix the C# code, rebuild, re-run all quality gates
+3. If test adaptation issue: use the **Task tool** with `subagent_type="pester-test-guardian"` to adapt the test minimally
+4. Re-run Pester tests until all baseline-passing tests pass again
+
+**Do NOT proceed to Step 11 until Pester tests match or exceed the baseline.**
+
+If tests fail and cannot be fixed after 3 attempts, log failures to `c:/github/dbatools-ralph/tests/migration-failures/{CommandName}.md` with:
+- Test name
+- Failure message
+- Whether it's an implementation or test issue
+- What was attempted
+
+Then STOP — do not mark DONE, do not commit.
+
+### 11. Final C# Unit Test Run
 
 Re-run the test suite one last time after all quality gate fixes:
 
@@ -262,7 +311,7 @@ Compare against the baseline from Step 0. All previously passing tests must stil
 ### 12. Update Tracker and Commit
 
 1. Edit the tracker file: change status from `PENDING` to `DONE`
-2. Fill in the C# File, Build, and Parity columns
+2. Fill in the C# File, Build, Parity, and Pester columns
 3. Commit in **dbatools.library** repo:
 ```bash
 cd c:/github/dbatools.library
@@ -275,7 +324,8 @@ feat(migration): Convert {Command-Name} to C# binary cmdlet
 - All parameters preserved
 - All code paths implemented
 - Build passes
-- Tests pass (baseline maintained)
+- C# unit tests pass (baseline maintained)
+- Pester integration tests pass (baseline maintained)
 - Feature parity verified
 - PS1 retired, cmdlet exported from dbatools.library
 
@@ -324,4 +374,5 @@ public PSCredential SqlCredential { get; set; }
 2. **All done**: All trackers show DONE → create signal file → STOP
 3. **Blocked**: Dependency not met, no other commands ready → describe blocker → STOP
 4. **Build failure**: Cannot fix after 3 attempts → describe error → STOP (do NOT mark DONE)
-5. **Test regression**: Tests that passed at baseline now fail and cannot be fixed → describe failures → STOP (do NOT mark DONE)
+5. **Test regression**: C# unit tests that passed at baseline now fail and cannot be fixed → describe failures → STOP (do NOT mark DONE)
+6. **Pester regression**: Pester integration tests that passed at baseline now fail and cannot be fixed → log to `tests/migration-failures/` → STOP (do NOT mark DONE)

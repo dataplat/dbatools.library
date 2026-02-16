@@ -52,7 +52,7 @@ Import-Module ./dbatools.psm1 -Force
 . ./private/testing/Invoke-ManualPester.ps1
 ```
 
-`Invoke-ManualPester` is the dbatools test runner at `c:\github\dbatools\private\testing\Invoke-ManualPester.ps1`. It handles Pester v4/v5 detection, module imports, `Get-TestConfig`, coverage, and `-TestIntegration` tag filtering. Always use it instead of raw `Invoke-Pester`.
+`Invoke-ManualPester` is the dbatools test runner at `c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1`. It handles Pester v4/v5 detection, module imports, `Get-TestConfig`, coverage, and `-TestIntegration` tag filtering. Always use it instead of raw `Invoke-Pester`.
 
 ## Test Workflow (Before/After Pattern)
 
@@ -61,6 +61,39 @@ Import-Module ./dbatools.psm1 -Force
 3. Run `Invoke-ManualPester -Path <testfile> -TestIntegration` again — time must be comparable to baseline, no new failures
 4. If there are failures, log them to `/tmp/output-validation-failures.md`
 5. Commit modified files
+
+## Migration Workflow Integration
+
+When invoked during a migration (Step 10d of the migration prompt), your job shifts from review-only to **active test execution and triage**:
+
+### Execution Protocol
+
+1. Ensure you are in the dbatools repo: `cd c:\github\dbatools-ralph`
+2. Import the module fresh: `Import-Module ./dbatools.psm1 -Force`
+3. Dot-source the test runner: `. ./private/testing/Invoke-ManualPester.ps1`
+4. Run with integration: `Invoke-ManualPester -Path tests/{CommandName}.Tests.ps1 -TestIntegration`
+
+### Triage Protocol
+
+When tests fail after a C# migration:
+
+1. **"Command not found"** — The PS1 may not have been retired or the module not re-imported. Re-run `Import-Module ./dbatools.psm1 -Force`.
+2. **Output type mismatches** — C# cmdlets may return slightly different types. Adapt the test assertion if the underlying data is correct.
+3. **Property name changes** — If a property was renamed, this is a C# implementation bug (go back to the architect), not a test issue.
+4. **Error behavior differences** — `-EnableException` and `StopFunction` may surface differently from C#. Adapt tests only if the behavior is functionally equivalent.
+
+### What You Can Change
+
+- Test assertions that check type names (if the underlying object is functionally identical)
+- Test setup that assumed PS1-specific behavior (like dot-sourcing)
+- Output variable capture methods
+
+### What You Must NOT Change
+
+- What the test is verifying (the business logic assertion)
+- Expected property values
+- Expected error conditions
+- Test coverage scope
 
 ## Test Patterns
 

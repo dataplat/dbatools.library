@@ -6,13 +6,13 @@ Migrate a PowerShell function to a C# binary cmdlet in dbatools.library.
 
 $ARGUMENTS is the name or path of the PS1 function to migrate. Examples:
 - `/migrate Get-DbaDatabase`
-- `/migrate c:\github\dbatools\public\Get-DbaDatabase.ps1`
+- `/migrate c:\github\dbatools-ralph\public\Get-DbaDatabase.ps1`
 
 ## Instructions
 
 ### Step 1: Locate and read the PS1 source
 
-If a path was given, read it directly. If a function name was given, search for it in `c:\github\dbatools\public\` or `c:\github\dbatools\functions\`.
+If a path was given, read it directly. If a function name was given, search for it in `c:\github\dbatools-ralph\public\` or `c:\github\dbatools-ralph\functions\`.
 
 Read the entire PS1 function file. Do NOT proceed without reading the source.
 
@@ -140,3 +140,4 @@ After creating the scaffold, tell the user:
 4. What patterns were detected (ShouldProcess, instance loop, etc.)
 5. What TODO items remain for manual implementation
 6. Whether the .psd1 CmdletsToExport needs updating
+7. Whether Pester tests exist at `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1` (the full migration workflow will require running them)
