@@ -29,7 +29,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $ScriptRoot = $PSScriptRoot
 $RepoRoot = Split-Path $ScriptRoot -Parent
-$PlanDir = Join-Path $RepoRoot 'docs' 'plan'
+$PlanDir = [IO.Path]::Combine($RepoRoot, 'docs', 'plan')
 
 # Domain execution order - foundation MUST be first
 $DomainOrder = @(

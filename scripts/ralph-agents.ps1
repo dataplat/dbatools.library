@@ -20,7 +20,7 @@ function Get-RalphAgentsJson {
         [string]$RepoRoot = 'c:\github\dbatools.library'
     )
 
-    $agentsDir = Join-Path $RepoRoot '.claude' 'agents'
+    $agentsDir = [IO.Path]::Combine($RepoRoot, '.claude', 'agents')
     $agents = @{}
 
     foreach ($file in Get-ChildItem -Path $agentsDir -Filter '*.md' | Where-Object { $_.Name -ne 'README.md' }) {

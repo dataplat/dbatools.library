@@ -20,9 +20,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = 'c:\github\dbatools.library'
-$TrackerPath = Join-Path $RepoRoot 'docs' 'plan' 'TRACKER-MIGRATE-__UPPER__.md'
-$SignalFile = Join-Path $RepoRoot 'docs' 'plan' '.migrate-__DOMAIN__-complete'
-$PromptPath = Join-Path $RepoRoot 'scripts' 'migrate-prompt.md'
+$TrackerPath = [IO.Path]::Combine($RepoRoot, 'docs', 'plan', 'TRACKER-MIGRATE-__UPPER__.md')
+$SignalFile = [IO.Path]::Combine($RepoRoot, 'docs', 'plan', '.migrate-__DOMAIN__-complete')
+$PromptPath = [IO.Path]::Combine($RepoRoot, 'scripts', 'migrate-prompt.md')
 $Domain = '__DOMAIN__'
 $DomainUpper = '__UPPER__'
 $Dependencies = '__DEPS__'
