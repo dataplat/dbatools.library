@@ -228,7 +228,28 @@ error behavior). Report which tests need adaptation and suggest fixes."
 
 Fix any issues reported by these specialized reviewers before proceeding to Step 10.
 
-### 10. Final Test Run
+### 10. Retire the PS1 Function
+
+The C# cmdlet replaces the PS1 function. Both cannot coexist — PowerShell will error on duplicate command names. Perform these steps in the **dbatools repo** (`c:\github\dbatools`):
+
+#### 10a. Archive the PS1 file
+
+Move the PS1 to an `archive/` folder (gitignored — for reference only, the original is in git history):
+
+```bash
+mkdir -p c:/github/dbatools/archive
+mv c:/github/dbatools/public/{CommandName}.ps1 c:/github/dbatools/archive/{CommandName}.ps1
+```
+
+#### 10b. Remove from dbatools FunctionsToExport
+
+Edit `c:\github\dbatools\dbatools.psd1` — remove `'{CommandName}'` from the `FunctionsToExport` array.
+
+#### 10c. Add to dbatools.library CmdletsToExport
+
+Edit `c:\github\dbatools.library\dbatools.library.psd1` — add `'{CommandName}'` to the `CmdletsToExport` array. Keep the array sorted alphabetically.
+
+### 11. Final Test Run
 
 Re-run the test suite one last time after all quality gate fixes:
 
@@ -238,13 +259,15 @@ dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity 
 
 Compare against the baseline from Step 0. All previously passing tests must still pass. If not, fix and re-run before committing.
 
-### 11. Update Tracker and Commit
+### 12. Update Tracker and Commit
 
 1. Edit the tracker file: change status from `PENDING` to `DONE`
 2. Fill in the C# File, Build, and Parity columns
-3. Commit:
+3. Commit in **dbatools.library** repo:
 ```bash
+cd c:/github/dbatools.library
 git add project/dbatools/Commands/{Verb}{Noun}Command.cs
+git add dbatools.library.psd1
 git add docs/plan/TRACKER-MIGRATE-*.md
 git commit -m "$(cat <<'EOF'
 feat(migration): Convert {Command-Name} to C# binary cmdlet
@@ -254,13 +277,31 @@ feat(migration): Convert {Command-Name} to C# binary cmdlet
 - Build passes
 - Tests pass (baseline maintained)
 - Feature parity verified
+- PS1 retired, cmdlet exported from dbatools.library
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```
 
-4. **STOP** — do not continue to the next command.
+4. Commit in **dbatools** repo:
+```bash
+cd c:/github/dbatools
+git add -u public/{CommandName}.ps1
+git add dbatools.psd1
+git commit -m "$(cat <<'EOF'
+feat(migration): Retire {Command-Name} PS1 — now C# binary cmdlet
+
+- Function removed from FunctionsToExport
+- PS1 archived (C# implementation in dbatools.library)
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+cd c:/github/dbatools.library
+```
+
+5. **STOP** — do not continue to the next command.
 
 ## C# Reference: What's Available in DbaBaseCmdlet
 
