@@ -257,7 +257,7 @@ FOR QUERIES WHERE SORT ORDER MATTERS:
 
 ## Patterns the PS1 Codebase Already Uses (Preserve These)
 
-These patterns appear throughout `c:\github\dbatools\public\` and MUST be preserved in C# conversions:
+These patterns appear throughout `c:\github\dbatools-ralph\public\` and MUST be preserved in C# conversions:
 
 | Pattern | When to Use | Example Source |
 |---------|-------------|---------------|

@@ -7,6 +7,7 @@ C# binary module backing the [dbatools](https://dbatools.io) PowerShell module.
 - **Namespace:** `Dataplat.Dbatools`
 - **Targets:** `net472` and `net8.0`
 - **LangVersion:** 7.3 (NO C# 8+ features)
+- **PowerShell compatibility:** v3+ (no syntax or features from v4+/v5+/v7+)
 - **Build:** `dotnet build project/dbatools/dbatools.csproj`
 - **Tests:** `dotnet test project/dbatools.Tests/dbatools.Tests.csproj`
 
@@ -205,6 +206,7 @@ These are automatically enforced on every edit -- do not fight them:
 7. No `$"..."` string interpolation -- use `String.Format()` (project convention)
 8. No wildcard exports in `.psd1` manifests
 9. Build must succeed after every C# edit
+10. Any PowerShell code (`.psm1`, `.psd1`, scripts) must be PowerShell v3 compatible -- no classes, no `using` statements, no ternary operators, no `??`, no `&&`/`||` pipeline chains, no `ForEach-Object -Parallel`
 
 ## Known Intentional Exceptions
 
