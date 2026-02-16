@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // Setting ComVisible to false makes the types in this assembly not visible
@@ -8,3 +9,6 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("7a0d426f-2e98-4851-8af8-c1b2b17c052d")]
+
+// Allow the test project to access internal members for unit testing
+[assembly: InternalsVisibleTo("dbatools.Tests")]
