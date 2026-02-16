@@ -7,7 +7,7 @@
 
 | # | Command | Status | C# File | Build | Parity | Pester | Notes |
 |---|---------|--------|---------|-------|--------|--------|-------|
-| 1 | Get-DbaConnectedInstance | PENDING | | | | | Read-only, no deps |
+| 1 | Get-DbaConnectedInstance | DONE | GetDbaConnectedInstanceCommand.cs | OK | OK | 2/2 | Read-only, no deps |
 | 2 | Get-DbaConnection | PENDING | | | | | Read-only, no deps |
 | 3 | Test-DbaConnection | PENDING | | | | |  |
 | 4 | Test-DbaPath | PENDING | | | | |  |

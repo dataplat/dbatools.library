@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation.Runspaces;
 
@@ -13,6 +14,14 @@ namespace Dataplat.Dbatools.Connection
         /// List of all registered connections.
         /// </summary>
         public static Dictionary<string, ManagementConnection> Connections = new Dictionary<string, ManagementConnection>();
+
+        /// <summary>
+        /// Cache of active SQL Server connections, keyed by connection string.
+        /// Each value is an array of connection objects (SMO Server or SqlConnection).
+        /// Mirrors the former $script:connectionhash from the PS1 module.
+        /// Uses Hashtable.Synchronized for thread-safe access from both C# and PS1.
+        /// </summary>
+        public static Hashtable ConnectionHash = Hashtable.Synchronized(new Hashtable());
 
         #region Configuration Computer Management
         /// <summary>

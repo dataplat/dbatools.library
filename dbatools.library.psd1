@@ -38,7 +38,9 @@
     RootModule             = 'dbatools.library.psm1'
 
     FunctionsToExport      = @('Get-DbatoolsLibraryPath')
-    CmdletsToExport        = @()
+    CmdletsToExport        = @(
+        'Get-DbaConnectedInstance'
+    )
     AliasesToExport        = @()
 
     PrivateData            = @{
