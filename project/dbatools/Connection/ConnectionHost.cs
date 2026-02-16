@@ -21,7 +21,7 @@ namespace Dataplat.Dbatools.Connection
         /// Mirrors the former $script:connectionhash from the PS1 module.
         /// Uses Hashtable.Synchronized for thread-safe access from both C# and PS1.
         /// </summary>
-        public static Hashtable ConnectionHash = Hashtable.Synchronized(new Hashtable());
+        public static readonly Hashtable ConnectionHash = Hashtable.Synchronized(new Hashtable());
 
         #region Configuration Computer Management
         /// <summary>

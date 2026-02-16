@@ -127,10 +127,10 @@ namespace Dataplat.Dbatools.Commands
                 if (prop != null)
                     return prop.GetValue(baseObj);
             }
-            catch
-            {
-                // Reflection may fail for some types
-            }
+            catch (System.Reflection.TargetInvocationException) { }
+            catch (System.Reflection.AmbiguousMatchException) { }
+            catch (MemberAccessException) { }
+            catch (InvalidOperationException) { }
 
             // Try PSObject properties (note properties, script properties, etc.)
             try
@@ -140,10 +140,8 @@ namespace Dataplat.Dbatools.Commands
                 if (psProp != null)
                     return psProp.Value;
             }
-            catch
-            {
-                // Property access may fail
-            }
+            catch (ExtendedTypeSystemException) { }
+            catch (InvalidOperationException) { }
 
             return null;
         }
