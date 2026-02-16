@@ -41,7 +41,6 @@ lib/
 dbatools.library.zip
 /artifacts
 .roo/mcp.json
-/.claude
 NUL
 
 # Benchmark artifacts

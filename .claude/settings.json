@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-build.sh",
+            "timeout": 120,
+            "statusMessage": "Building C# project..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/enforce-cs-rules.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/enforce-psd1-rules.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
