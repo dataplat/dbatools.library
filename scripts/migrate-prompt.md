@@ -41,7 +41,7 @@ If the next PENDING command has unmet dependencies, skip to the next one that's 
 
 ### 2. Read the PS1 Source
 
-Read the original PS1 file from `c:\github\dbatools\public\{CommandName}.ps1`.
+Read the original PS1 file from `c:\github\dbatools-ralph\public\{CommandName}.ps1`.
 
 **Extract EVERYTHING:**
 - Every parameter: name, type, mandatory, position, pipeline binding, default, validation, aliases, parameter sets
@@ -218,9 +218,9 @@ performance (no allocations in loops, proper StringBuilder usage), thread safety
 state access, and adherence to C# 7.3 constraints."
 ```
 
-**If existing Pester tests exist** for this command (check `c:\github\dbatools\tests\{CommandName}.Tests.ps1`), use `subagent_type="pester-test-guardian"`:
+**If existing Pester tests exist** for this command (check `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1`), use `subagent_type="pester-test-guardian"`:
 ```
-Task prompt: "Evaluate the Pester tests at c:\github\dbatools\tests\{CommandName}.Tests.ps1
+Task prompt: "Evaluate the Pester tests at c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1
 for compatibility with the new C# binary cmdlet at {cs_path}. Identify any tests that
 will break due to the conversion (changed output types, removed properties, different
 error behavior). Report which tests need adaptation and suggest fixes."
@@ -230,20 +230,20 @@ Fix any issues reported by these specialized reviewers before proceeding to Step
 
 ### 10. Retire the PS1 Function
 
-The C# cmdlet replaces the PS1 function. Both cannot coexist — PowerShell will error on duplicate command names. Perform these steps in the **dbatools repo** (`c:\github\dbatools`):
+The C# cmdlet replaces the PS1 function. Both cannot coexist — PowerShell will error on duplicate command names. Perform these steps in the **dbatools repo** (`c:\github\dbatools-ralph`):
 
 #### 10a. Archive the PS1 file
 
 Move the PS1 to an `archive/` folder (gitignored — for reference only, the original is in git history):
 
 ```bash
-mkdir -p c:/github/dbatools/archive
-mv c:/github/dbatools/public/{CommandName}.ps1 c:/github/dbatools/archive/{CommandName}.ps1
+mkdir -p c:/github/dbatools-ralph/archive
+mv c:/github/dbatools-ralph/public/{CommandName}.ps1 c:/github/dbatools-ralph/archive/{CommandName}.ps1
 ```
 
 #### 10b. Remove from dbatools FunctionsToExport
 
-Edit `c:\github\dbatools\dbatools.psd1` — remove `'{CommandName}'` from the `FunctionsToExport` array.
+Edit `c:\github\dbatools-ralph\dbatools.psd1` — remove `'{CommandName}'` from the `FunctionsToExport` array.
 
 #### 10c. Add to dbatools.library CmdletsToExport
 
@@ -286,7 +286,7 @@ EOF
 
 4. Commit in **dbatools** repo:
 ```bash
-cd c:/github/dbatools
+cd c:/github/dbatools-ralph
 git add -u public/{CommandName}.ps1
 git add dbatools.psd1
 git commit -m "$(cat <<'EOF'
