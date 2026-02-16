@@ -1,6 +1,6 @@
 ---
 name: pester-test-guardian
-description: Pester test specialist and guardian. Use PROACTIVELY when evaluating test coverage for converted commands, adapting existing Pester tests to work with the new C#-backed implementations, identifying test performance optimizations, or when any code change needs test validation. Also use when evaluating whether Pester tests could benefit from speed enhancements.
+description: Pester test specialist. Evaluates test compatibility with C# conversions, adapts tests for new implementations, and identifies test performance optimizations.
 tools: Read, Write, Edit, Grep, Glob, Bash
 model: sonnet
 ---
@@ -45,20 +45,26 @@ This is the ONE area where you CAN recommend Pester test changes proactively. Lo
 
 ## Test Setup
 
-Before running any tests:
+**Always spawn a fresh PowerShell process** for testing. The installed `dbatools.library` DLL may be locked by another session. Import the local repo's library FIRST so the freshly built DLL is used:
 
-```powershell
-Import-Module ./dbatools.psm1 -Force
-. ./private/testing/Invoke-ManualPester.ps1
+```bash
+pwsh -NoProfile -Command '
+    Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+    Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
+    . c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1
+    Invoke-ManualPester -Path c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1 -TestIntegration
+'
 ```
+
+**Why this order matters**: Loading `dbatools.library` from `c:\github\dbatools.library` first puts the freshly built DLL into the session. When `dbatools-ralph\dbatools.psm1` loads next, its `RequiredModules = 'dbatools.library'` is already satisfied by the local version, so it won't try to load the installed (potentially locked) copy.
 
 `Invoke-ManualPester` is the dbatools test runner at `c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1`. It handles Pester v4/v5 detection, module imports, `Get-TestConfig`, coverage, and `-TestIntegration` tag filtering. Always use it instead of raw `Invoke-Pester`.
 
 ## Test Workflow (Before/After Pattern)
 
-1. Run `Invoke-ManualPester -Path <testfile> -TestIntegration` — record baseline time and pass/fail count
+1. Run the test in a fresh `pwsh -NoProfile` process — record baseline time and pass/fail count
 2. Make changes (adapt tests, add output validation)
-3. Run `Invoke-ManualPester -Path <testfile> -TestIntegration` again — time must be comparable to baseline, no new failures
+3. Run the same test again in a fresh process — time must be comparable to baseline, no new failures
 4. If there are failures, log them to `/tmp/output-validation-failures.md`
 5. Commit modified files
 
@@ -68,10 +74,16 @@ When invoked during a migration (Step 10d of the migration prompt), your job shi
 
 ### Execution Protocol
 
-1. Ensure you are in the dbatools repo: `cd c:\github\dbatools-ralph`
-2. Import the module fresh: `Import-Module ./dbatools.psm1 -Force`
-3. Dot-source the test runner: `. ./private/testing/Invoke-ManualPester.ps1`
-4. Run with integration: `Invoke-ManualPester -Path tests/{CommandName}.Tests.ps1 -TestIntegration`
+Always run in a fresh `pwsh -NoProfile` process:
+
+```bash
+pwsh -NoProfile -Command '
+    Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+    Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
+    . c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1
+    Invoke-ManualPester -Path c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1 -TestIntegration
+'
+```
 
 ### Triage Protocol
 

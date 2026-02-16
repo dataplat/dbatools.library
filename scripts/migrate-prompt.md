@@ -32,12 +32,16 @@ Record the pass/fail count. Any test that passes now MUST still pass after your 
 
 If Pester integration tests exist for this command, establish a baseline BEFORE making any changes:
 
-```powershell
-cd c:\github\dbatools-ralph
-Import-Module ./dbatools.psm1 -Force
-. ./private/testing/Invoke-ManualPester.ps1
-Invoke-ManualPester -Path tests/{CommandName}.Tests.ps1 -TestIntegration
+```bash
+pwsh -NoProfile -Command '
+    Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+    Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
+    . c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1
+    Invoke-ManualPester -Path c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1 -TestIntegration
+'
 ```
+
+**Always use `pwsh -NoProfile`** to spawn a fresh process. This avoids DLL locking from your current session and ensures a clean module load. Import `dbatools.library` from the local repo FIRST so it satisfies the `RequiredModules` dependency before dbatools loads.
 
 Record the pass/fail/skip counts. If no test file exists at `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1`, note "No Pester tests" and continue — Pester testing steps later will be skipped.
 
@@ -135,13 +139,42 @@ if (ShouldProcess(target, String.Format("Removing {0}", name)))
 - Use `String.Format` (NEVER `$"..."`)
 - C# 7.3 only (NO nullable refs, NO `??=`, NO switch expressions, NO `using var`, NO ranges, NO static local functions)
 
-### 5. Build
+### 5. Build and Deploy
 
 ```bash
 dotnet build project/dbatools/dbatools.csproj
 ```
 
 If it fails, fix errors and rebuild. Do not proceed until the build succeeds.
+
+#### Deploy the built DLL for testing
+
+After a successful build, copy the compiled DLL to the local module staging directory so that Pester tests can load it. The installed module at `C:\Program Files\PowerShell\Modules\dbatools.library\` may be locked by another PowerShell session — **never fight the lock**. Always deploy to the local repo path instead.
+
+```bash
+# Create staging dirs if they don't exist
+mkdir -p c:/github/dbatools.library/core/lib
+mkdir -p c:/github/dbatools.library/desktop/lib
+
+# Copy net8.0 build output to local staging (for PS Core / PS 7+)
+cp project/dbatools/bin/Debug/net8.0/dbatools.dll c:/github/dbatools.library/core/lib/dbatools.dll
+
+# Copy net472 build output to local staging (for Windows PowerShell 5.1)
+cp project/dbatools/bin/Debug/net472/dbatools.dll c:/github/dbatools.library/desktop/lib/dbatools.dll
+```
+
+These paths are gitignored (`lib/` is in `.gitignore`). The `dbatools.library.psm1` loads from `$PSScriptRoot/core/lib/` or `$PSScriptRoot/desktop/lib/`, so when importing from the local repo path, it will find the freshly built DLL.
+
+#### Load the local module for Pester testing
+
+When running Pester tests, import `dbatools.library` from the local repo FIRST so it takes precedence over the installed version:
+
+```powershell
+Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
+```
+
+The `-Force` on the library import ensures it replaces any previously loaded version. Doing this BEFORE importing dbatools-ralph satisfies the `RequiredModules` dependency with the local build.
 
 ### 5b. Run Tests
 
@@ -153,22 +186,105 @@ dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity 
 
 Compare against the baseline from Step 0. If any test that previously passed now fails, fix your code and re-run. Do not proceed until the test count is equal to or better than baseline.
 
-### 6. Quality Gate — Feature Parity
+### 5c. Write C# Unit Tests
 
-Use the **Task tool** with `subagent_type="feature-parity-guardian"` to perform an exhaustive feature parity check:
+Every converted command MUST have a corresponding unit test class. Create `project/dbatools.Tests/Commands/{Verb}{Noun}CommandTests.cs`.
 
+**Pattern:** Follow existing MSTest conventions in the test project:
+```csharp
+using System;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace Dataplat.Dbatools.Tests.Commands
+{
+    [TestClass]
+    public class {Verb}{Noun}CommandTests
+    {
+        #region HelperMethodName
+        [TestMethod]
+        public void HelperMethodName_Scenario_ExpectedResult()
+        {
+            // Arrange, Act, Assert
+        }
+        #endregion
+    }
+}
+```
+
+**What to test (no live SQL Server connections):**
+
+| Testable | Examples |
+|----------|---------|
+| Helper methods | String conversion, array detection, path manipulation, filtering logic |
+| SQL query building | Verify generated SQL strings, batching, escaping, QUOTENAME usage |
+| Output PSObject shape | Verify property names and types on constructed output objects |
+| Parameter validation | Null/empty inputs, boundary conditions, type coercion |
+| Error message formatting | String.Format patterns produce expected messages |
+| Pure business logic | Date math, size conversions, sorting, comparisons |
+
+**Do NOT test:** SMO/SQL connection operations, `ConnectInstance`, `ExecuteWithResults`, or anything requiring a live server.
+
+**To make helpers testable:** Change `private static` helper methods in the command class to `internal static`. The test project has `InternalsVisibleTo` access. Example:
+
+```csharp
+// In the command class — internal so tests can call it directly
+internal static string[] ConvertToStringArray(object input) { ... }
+internal static bool IsArrayInput(object input) { ... }
+```
+
+**Minimum requirements:**
+- At least 3 test methods per command (more for complex commands)
+- Cover: happy path + at least one edge case + at least one error/null case
+- If the command is a pure SMO wrapper with no extractable logic, write parameter validation and output construction tests with a `// Note: limited unit test coverage — command is primarily an SMO wrapper` comment
+- C# 7.3 only (match the main project constraints)
+- Use `Assert.AreEqual`, `Assert.IsTrue`, `Assert.IsNull`, `Assert.ThrowsException<>`, `CollectionAssert`
+
+**Build and run:**
+```bash
+dotnet build project/dbatools.Tests/dbatools.Tests.csproj
+dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity quiet 2>&1 | tail -5
+```
+
+All new tests must pass. Do not proceed until they do.
+
+### 6. Quality Gates
+
+Run review agents in two tiers. **Tier 1 agents always run. Tier 2 agents run ONLY when their trigger condition is met.** Skipping irrelevant Tier 2 agents is correct behavior — not cutting corners.
+
+#### Tier 1: Core Gates (ALWAYS — launch in one parallel batch)
+
+Launch all three of these agents in a **single message with three parallel Task calls**:
+
+1. **Feature Parity** — `subagent_type="feature-parity-guardian"`, `model="sonnet"`
 ```
 Task prompt: "Review the conversion of {CommandName} from {ps1_path} to {cs_path}.
 Verify every parameter, code path, error handler, conditional branch, and output
 property from the PS1 is present in the C#. Report any missing features."
 ```
 
-If the agent reports ANY missing features (parity score below 95%), go back to Step 4 and add them. Do not proceed until parity is achieved.
+2. **Regression Check** — `subagent_type="regression-sentinel"`, `model="sonnet"`
+```
+Task prompt: "Compare the original PS1 at {ps1_path} against the new C# at {cs_path}.
+Check all parameter names, types, defaults, pipeline binding, output types, output
+properties, error conditions, and ShouldProcess messages. Report any breaking changes."
+```
 
-### 7. Quality Gate — Security
+3. **Best Practices** — `subagent_type="best-practices-reviewer"`, `model="sonnet"`
+```
+Task prompt: "Review {cs_path} for code quality: SOLID principles, error handling patterns,
+performance (no allocations in loops, proper StringBuilder usage), thread safety of static
+state access, and adherence to C# 7.3 constraints."
+```
 
-Use the **Task tool** with `subagent_type="security-auditor"` to audit your code:
+If any agent reports issues (parity below 95%, breaking changes, or critical code quality issues), fix them before proceeding.
 
+#### Tier 2: Conditional Gates (check triggers BEFORE launching)
+
+**Read your C# file and check each trigger condition below. Only launch agents whose trigger is met. Launch all applicable Tier 2 agents in a single parallel Task batch.**
+
+**Security** — `subagent_type="security-auditor"`, `model="sonnet"`
+- **TRIGGER**: C# file contains string literals with SQL keywords (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `ALTER`, `EXEC`, `sp_`, `sys.`), OR handles credentials/passwords, OR builds connection strings
+- **SKIP if**: Command is a pure SMO property reader with no SQL strings and no credential handling
 ```
 Task prompt: "Audit {cs_path} for security vulnerabilities. Check every T-SQL query
 for SQL injection (parameterized values, QUOTENAME for identifiers). Check credential
@@ -176,64 +292,44 @@ handling — no credentials in WriteMessage output or exception messages. Check 
 string construction."
 ```
 
-If the agent reports any CRITICAL or HIGH severity issues, fix them immediately before proceeding.
-
-### 8. Quality Gate — Regression Check
-
-Use the **Task tool** with `subagent_type="regression-sentinel"` to detect breaking changes:
-
-```
-Task prompt: "Compare the original PS1 at {ps1_path} against the new C# at {cs_path}.
-Check all parameter names, types, defaults, pipeline binding, output types, output
-properties, error conditions, and ShouldProcess messages. Report any breaking changes."
-```
-
-If the agent reports any breaking changes, fix them before proceeding.
-
-### 9. Quality Gate — dbatools Spirit
-
-Use the **Task tool** with `subagent_type="dbatools-spirit-guardian"` to verify UX quality:
-
-```
-Task prompt: "Review {cs_path} for adherence to the dbatools 'it just works' philosophy.
-Check that defaults are sensible, error messages explain WHY and suggest WHAT TO DO,
-auto-detection is preserved, and a long-time user would not notice behavioral differences."
-```
-
-If the agent rejects the conversion, address its concerns before proceeding.
-
-### 9b. Specialized Reviews (when applicable)
-
-Run these additional agent reviews based on what the command does:
-
-**If the command contains embedded T-SQL queries**, use `subagent_type="tsql-collation-reviewer"`:
+**T-SQL Collation** — `subagent_type="tsql-collation-reviewer"`, `model="haiku"`
+- **TRIGGER**: C# file contains string literals with SQL keywords (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `ALTER`, `EXEC`, `sp_`, `sys.`, `INFORMATION_SCHEMA`)
+- **SKIP if**: No embedded T-SQL queries in the C# file
 ```
 Task prompt: "Review T-SQL in {cs_path} for collation safety. Check temp table joins to
 catalog views for COLLATE DATABASE_DEFAULT, verify QUOTENAME usage, check C# string
 comparisons of SQL metadata use OrdinalIgnoreCase."
 ```
 
-**If the command uses SMO or SqlClient APIs**, use `subagent_type="microsoft-sdk-validator"`:
+**Microsoft SDK** — `subagent_type="microsoft-sdk-validator"`, `model="sonnet"`
+- **TRIGGER**: C# file references SMO types beyond basic `Server` connection (e.g., `Database`, `Table`, `Index`, `Job`, `Login`, `BackupDevice`, `Endpoint`) OR uses `SqlCommand`/`SqlDataReader` directly
+- **SKIP if**: Command only uses `ConnectInstance()` and reads simple server properties
 ```
 Task prompt: "Validate SMO/SqlClient API usage in {cs_path}. Check property access
 patterns, connection lifecycle, and version-specific API availability."
 ```
 
-**If the command has cross-platform concerns** (file paths, Windows APIs, WMI), use `subagent_type="xplat-compatibility-reviewer"`:
+**Cross-Platform** — `subagent_type="xplat-compatibility-reviewer"`, `model="haiku"`
+- **TRIGGER**: C# file uses file system paths (`Path.Combine`, `Directory.`, `File.`), process management (`Process.`), WMI (`ManagementObject`), Registry (`RegistryKey`), or P/Invoke (`DllImport`)
+- **SKIP if**: Command has no file I/O, no OS-level operations, no platform-specific APIs
 ```
 Task prompt: "Review {cs_path} for cross-platform compatibility. Check Path.Combine usage,
 platform guards on Windows-only APIs, StringComparison.OrdinalIgnoreCase, and conditional
 compilation for net472 vs net8.0."
 ```
 
-**Always** run `subagent_type="best-practices-reviewer"` for a senior code review:
+**dbatools Spirit** — `subagent_type="dbatools-spirit-guardian"`, `model="sonnet"`
+- **TRIGGER**: Command has user-facing UX decisions — default parameter values, auto-detection logic, error messages with fix suggestions, or is a frequently-used command verb (Get-Dba*, Test-Dba*, Set-Dba*)
+- **SKIP if**: Command is a pure SMO property wrapper that reads one property and outputs it with no defaults or auto-detection
 ```
-Task prompt: "Review {cs_path} for code quality: SOLID principles, error handling patterns,
-performance (no allocations in loops, proper StringBuilder usage), thread safety of static
-state access, and adherence to C# 7.3 constraints."
+Task prompt: "Review {cs_path} for adherence to the dbatools 'it just works' philosophy.
+Check that defaults are sensible, error messages explain WHY and suggest WHAT TO DO,
+auto-detection is preserved, and a long-time user would not notice behavioral differences."
 ```
 
-**If existing Pester tests exist** for this command (check `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1`), use `subagent_type="pester-test-guardian"` to predict compatibility issues BEFORE retiring the PS1 (actual test execution happens in Step 10d):
+**Pester Compatibility** — `subagent_type="pester-test-guardian"`, `model="sonnet"`
+- **TRIGGER**: Pester test file exists at `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1`
+- **SKIP if**: No Pester test file exists for this command
 ```
 Task prompt: "Evaluate the Pester tests at c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1
 for compatibility with the new C# binary cmdlet at {cs_path}. Identify any tests that
@@ -241,13 +337,22 @@ will break due to the conversion (changed output types, removed properties, diff
 error behavior). Report which tests need adaptation and suggest fixes."
 ```
 
-Fix any issues reported by these specialized reviewers before proceeding to Step 10.
+**Unit Test Review** — `subagent_type="unit-test-guardian"`, `model="haiku"`
+- **TRIGGER**: Always (reviews the unit test file from Step 5c)
+```
+Task prompt: "Review the unit tests at project/dbatools.Tests/Commands/{Verb}{Noun}CommandTests.cs
+for the command converted at {cs_path}. Verify adequate coverage of testable pure logic,
+MSTest pattern compliance, no live SQL dependencies, and minimum 3 test methods.
+Report any untested extractable logic that should have tests."
+```
 
-### 10. Retire the PS1 Function
+Fix any issues reported by Tier 1 or Tier 2 agents before proceeding to Step 7.
+
+### 7. Retire the PS1 Function
 
 The C# cmdlet replaces the PS1 function. Both cannot coexist — PowerShell will error on duplicate command names. Perform these steps in the **dbatools repo** (`c:\github\dbatools-ralph`):
 
-#### 10a. Archive the PS1 file
+#### 7a. Archive the PS1 file
 
 Move the PS1 to an `archive/` folder (gitignored — for reference only, the original is in git history):
 
@@ -256,26 +361,30 @@ mkdir -p c:/github/dbatools-ralph/archive
 mv c:/github/dbatools-ralph/public/{CommandName}.ps1 c:/github/dbatools-ralph/archive/{CommandName}.ps1
 ```
 
-#### 10b. Remove from dbatools FunctionsToExport
+#### 7b. Remove from dbatools FunctionsToExport
 
 Edit `c:\github\dbatools-ralph\dbatools.psd1` — remove `'{CommandName}'` from the `FunctionsToExport` array.
 
-#### 10c. Add to dbatools.library CmdletsToExport
+#### 7c. Add to dbatools.library CmdletsToExport
 
 Edit `c:\github\dbatools.library\dbatools.library.psd1` — add `'{CommandName}'` to the `CmdletsToExport` array. Keep the array sorted alphabetically.
 
-#### 10d. Run Pester Integration Tests
+#### 7d. Run Pester Integration Tests
 
 **This step is MANDATORY if a Pester test file exists.** Skip only if Step 0 noted "No Pester tests."
 
-Re-import the module to pick up the C# cmdlet (the PS1 is now archived), then run the same tests from the baseline:
+Spawn a fresh PowerShell process to pick up the C# cmdlet (the PS1 is now archived). Import the local `dbatools.library` first so the freshly built DLL is loaded:
 
-```powershell
-cd c:\github\dbatools-ralph
-Import-Module ./dbatools.psm1 -Force
-. ./private/testing/Invoke-ManualPester.ps1
-Invoke-ManualPester -Path tests/{CommandName}.Tests.ps1 -TestIntegration
+```bash
+pwsh -NoProfile -Command '
+    Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+    Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
+    . c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1
+    Invoke-ManualPester -Path c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1 -TestIntegration
+'
 ```
+
+**Always use `pwsh -NoProfile`** — never test in the current session where the installed DLL may be locked or a stale module is loaded.
 
 Compare results against the Pester baseline from Step 0:
 - **All tests that passed in the baseline MUST still pass.** A previously-passing test that now fails is a regression in your C# implementation.
@@ -288,7 +397,7 @@ If any baseline-passing test now fails:
 3. If test adaptation issue: use the **Task tool** with `subagent_type="pester-test-guardian"` to adapt the test minimally
 4. Re-run Pester tests until all baseline-passing tests pass again
 
-**Do NOT proceed to Step 11 until Pester tests match or exceed the baseline.**
+**Do NOT proceed to Step 8 until Pester tests match or exceed the baseline.**
 
 If tests fail and cannot be fixed after 3 attempts, log failures to `c:/github/dbatools-ralph/tests/migration-failures/{CommandName}.md` with:
 - Test name
@@ -298,7 +407,7 @@ If tests fail and cannot be fixed after 3 attempts, log failures to `c:/github/d
 
 Then STOP — do not mark DONE, do not commit.
 
-### 11. Final C# Unit Test Run
+### 8. Final C# Unit Test Run
 
 Re-run the test suite one last time after all quality gate fixes:
 
@@ -306,9 +415,9 @@ Re-run the test suite one last time after all quality gate fixes:
 dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity quiet 2>&1 | tail -5
 ```
 
-Compare against the baseline from Step 0. All previously passing tests must still pass. If not, fix and re-run before committing.
+Compare against the baseline from Step 0. All previously passing tests must still pass, plus your new command tests from Step 5c must pass. If not, fix and re-run before committing.
 
-### 12. Update Tracker and Commit
+### 9. Update Tracker and Commit
 
 1. Edit the tracker file: change status from `PENDING` to `DONE`
 2. Fill in the C# File, Build, Parity, and Pester columns
@@ -316,6 +425,7 @@ Compare against the baseline from Step 0. All previously passing tests must stil
 ```bash
 cd c:/github/dbatools.library
 git add project/dbatools/Commands/{Verb}{Noun}Command.cs
+git add project/dbatools.Tests/Commands/{Verb}{Noun}CommandTests.cs
 git add dbatools.library.psd1
 git add docs/plan/TRACKER-MIGRATE-*.md
 git commit -m "$(cat <<'EOF'
@@ -324,7 +434,7 @@ feat(migration): Convert {Command-Name} to C# binary cmdlet
 - All parameters preserved
 - All code paths implemented
 - Build passes
-- C# unit tests pass (baseline maintained)
+- C# unit tests written and passing
 - Pester integration tests pass (baseline maintained)
 - Feature parity verified
 - PS1 retired, cmdlet exported from dbatools.library
