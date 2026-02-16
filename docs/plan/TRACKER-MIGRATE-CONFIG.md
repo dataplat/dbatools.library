@@ -1,0 +1,27 @@
+# Migration Tracker: config
+
+## Dependencies
+- Requires: foundation
+
+## Commands
+
+| # | Command | Status | C# File | Build | Parity | Notes |
+|---|---------|--------|---------|-------|--------|-------|
+| 1 | Get-DbatoolsChangeLog | PENDING | | | | Read-only, no deps |
+| 2 | Get-DbatoolsConfig | PENDING | | | | Read-only, no deps |
+| 3 | Get-DbatoolsConfigValue | PENDING | | | | Read-only, no deps |
+| 4 | Get-DbatoolsError | PENDING | | | | Read-only, no deps |
+| 5 | Get-DbatoolsLog | PENDING | | | | Read-only, no deps |
+| 6 | Get-DbatoolsPath | PENDING | | | | Read-only, no deps |
+| 7 | New-DbatoolsSupportPackage | PENDING | | | | ShouldProcess required |
+| 8 | Set-DbatoolsInsecureConnection | PENDING | | | | ShouldProcess required |
+| 9 | Set-DbatoolsPath | PENDING | | | | ShouldProcess required, depends on Get-DbatoolsPath |
+| 10 | Export-DbatoolsConfig | PENDING | | | |  |
+| 11 | Import-DbatoolsConfig | PENDING | | | |  |
+| 12 | Invoke-DbatoolsFormatter | PENDING | | | |  |
+| 13 | Invoke-DbatoolsRenameHelper | PENDING | | | |  |
+| 14 | Measure-DbatoolsImport | PENDING | | | |  |
+| 15 | Register-DbatoolsConfig | PENDING | | | |  |
+| 16 | Reset-DbatoolsConfig | PENDING | | | |  |
+| 17 | Unregister-DbatoolsConfig | PENDING | | | |  |
+| 18 | Update-Dbatools | PENDING | | | |  |
