@@ -18,6 +18,16 @@ dotnet clean (use dotnet build instead)
 
 ## Your Process
 
+### 0. Baseline Tests
+
+Before making any changes, run the test suite to establish a baseline:
+
+```bash
+dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity quiet 2>&1 | tail -5
+```
+
+Record the pass/fail count. Any test that passes now MUST still pass after your conversion. If the baseline itself has failures, note them — you are not responsible for pre-existing failures, but you must not add new ones.
+
 ### 1. Find Next Command
 
 Read tracker files in `docs/plan/TRACKER-MIGRATE-*.md`. Find the FIRST command with status `PENDING` whose dependencies are all `DONE`.
@@ -118,6 +128,16 @@ dotnet build project/dbatools/dbatools.csproj
 
 If it fails, fix errors and rebuild. Do not proceed until the build succeeds.
 
+### 5b. Run Tests
+
+Run the test suite after the build to verify your conversion doesn't break anything:
+
+```bash
+dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity quiet 2>&1 | tail -5
+```
+
+Compare against the baseline from Step 0. If any test that previously passed now fails, fix your code and re-run. Do not proceed until the test count is equal to or better than baseline.
+
 ### 6. Quality Gate — Feature Parity
 
 Use the **Task tool** with `subagent_type="feature-parity-guardian"` to perform an exhaustive feature parity check:
@@ -198,9 +218,27 @@ performance (no allocations in loops, proper StringBuilder usage), thread safety
 state access, and adherence to C# 7.3 constraints."
 ```
 
+**If existing Pester tests exist** for this command (check `c:\github\dbatools\tests\{CommandName}.Tests.ps1`), use `subagent_type="pester-test-guardian"`:
+```
+Task prompt: "Evaluate the Pester tests at c:\github\dbatools\tests\{CommandName}.Tests.ps1
+for compatibility with the new C# binary cmdlet at {cs_path}. Identify any tests that
+will break due to the conversion (changed output types, removed properties, different
+error behavior). Report which tests need adaptation and suggest fixes."
+```
+
 Fix any issues reported by these specialized reviewers before proceeding to Step 10.
 
-### 10. Update Tracker and Commit
+### 10. Final Test Run
+
+Re-run the test suite one last time after all quality gate fixes:
+
+```bash
+dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity quiet 2>&1 | tail -5
+```
+
+Compare against the baseline from Step 0. All previously passing tests must still pass. If not, fix and re-run before committing.
+
+### 11. Update Tracker and Commit
 
 1. Edit the tracker file: change status from `PENDING` to `DONE`
 2. Fill in the C# File, Build, and Parity columns
@@ -214,6 +252,7 @@ feat(migration): Convert {Command-Name} to C# binary cmdlet
 - All parameters preserved
 - All code paths implemented
 - Build passes
+- Tests pass (baseline maintained)
 - Feature parity verified
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
@@ -240,7 +279,8 @@ public PSCredential SqlCredential { get; set; }
 
 ## Exit Conditions
 
-1. **Normal**: Converted one command, marked DONE, committed → STOP
+1. **Normal**: Converted one command, tests pass, marked DONE, committed → STOP
 2. **All done**: All trackers show DONE → create signal file → STOP
 3. **Blocked**: Dependency not met, no other commands ready → describe blocker → STOP
 4. **Build failure**: Cannot fix after 3 attempts → describe error → STOP (do NOT mark DONE)
+5. **Test regression**: Tests that passed at baseline now fail and cannot be fixed → describe failures → STOP (do NOT mark DONE)
