@@ -65,6 +65,10 @@ $DomainCounts = @{
     'dbmail' = 12; 'migration' = 3
 }
 
+# Load agent definitions for --agents flag
+. (Join-Path $ScriptRoot 'ralph-agents.ps1')
+$agentsJson = Get-RalphAgentsJson -RepoRoot $RepoRoot
+
 function Get-TrackerStatus {
     param([string]$TrackerPath)
     if (-not (Test-Path $TrackerPath)) { return @{ Pending = 0; Done = 0; Total = 0 } }
@@ -126,12 +130,70 @@ function Invoke-DomainMigration {
             continue
         }
 
-        # Invoke Claude Code with the migration prompt
-        # The prompt tells Claude to find the next PENDING command and convert it
+        # Invoke Claude Code with the migration prompt (streaming tool use output)
         try {
             Set-Location $RepoRoot
-            $result = claude -p --dangerously-skip-permissions (Get-Content $prompt -Raw)
-            Write-Host $result
+            $promptContent = Get-Content $prompt -Raw
+            $sessionId = [guid]::NewGuid().ToString()
+
+            $claudeArgs = @(
+                '--dangerously-skip-permissions'
+                '--session-id', $sessionId
+                '--no-session-persistence'
+                '--verbose'
+                '--output-format', 'stream-json'
+                '--agents', $agentsJson
+                '-p', $promptContent
+            )
+
+            & claude @claudeArgs 2>&1 | ForEach-Object {
+                $line = $PSItem
+                try {
+                    $obj = $line | ConvertFrom-Json -ErrorAction Stop
+                    switch ($obj.type) {
+                        'assistant' {
+                            if ($obj.message.content) {
+                                foreach ($c in $obj.message.content) {
+                                    switch ($c.type) {
+                                        'tool_use' {
+                                            $toolName = $c.name
+                                            $detail = ""
+                                            if ($c.input) {
+                                                switch ($toolName) {
+                                                    'Read'  { $detail = Split-Path $c.input.file_path -Leaf }
+                                                    'Write' { $detail = Split-Path $c.input.file_path -Leaf }
+                                                    'Edit'  { $detail = Split-Path $c.input.file_path -Leaf }
+                                                    'Glob'  { $detail = $c.input.pattern -replace '.*/',''}
+                                                    'Grep'  { $detail = $c.input.pattern.Substring(0, [Math]::Min(30, $c.input.pattern.Length)) }
+                                                    'Bash'  { $detail = ($c.input.command -split '\n')[0].Substring(0, [Math]::Min(40, ($c.input.command -split '\n')[0].Length)) }
+                                                    'Task'  { $detail = $c.input.description }
+                                                }
+                                            }
+                                            if ($detail) {
+                                                Write-Host "  > $toolName " -ForegroundColor DarkCyan -NoNewline
+                                                Write-Host $detail -ForegroundColor DarkGray
+                                            } else {
+                                                Write-Host "  > $toolName" -ForegroundColor DarkCyan
+                                            }
+                                        }
+                                        'text' {
+                                            if ($c.text) { Write-Host $c.text -ForegroundColor White }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        'result' {
+                            $duration = [math]::Round($obj.duration_ms / 1000, 1)
+                            $cost = [math]::Round($obj.total_cost_usd, 4)
+                            Write-Host ""
+                            Write-Host "  Completed in ${duration}s (`$$cost)" -ForegroundColor Green
+                        }
+                    }
+                } catch {
+                    if ($line -and $line -notmatch '^\s*$') { Write-Host $line -ForegroundColor DarkGray }
+                }
+            }
         }
         catch {
             Write-Host "[ERROR] Iteration $i failed: $_" -ForegroundColor Red

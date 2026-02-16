@@ -120,58 +120,85 @@ If it fails, fix errors and rebuild. Do not proceed until the build succeeds.
 
 ### 6. Quality Gate — Feature Parity
 
-Compare your C# against the PS1 source. For EVERY item you extracted in Step 2, verify it exists in C#:
+Use the **Task tool** with `subagent_type="feature-parity-guardian"` to perform an exhaustive feature parity check:
 
 ```
-[Feature] — present at [file:line]
-[Feature] — MISSING — must add
-[Feature] — different behavior: [explain]
+Task prompt: "Review the conversion of {CommandName} from {ps1_path} to {cs_path}.
+Verify every parameter, code path, error handler, conditional branch, and output
+property from the PS1 is present in the C#. Report any missing features."
 ```
 
-**Unacceptable excuses for missing features:**
-- "Too complex" — implement it
-- "Nobody uses that" — they do
-- "We can add it later" — no
-- "Edge case" — edge cases are features
-
-**The ONLY acceptable omission:** Features that depend on PowerShell dynamic scoping with no C# equivalent AND cannot be replicated in the cmdlet.
-
-If ANY feature is missing, go back to Step 4 and add it. Do not proceed.
+If the agent reports ANY missing features (parity score below 95%), go back to Step 4 and add them. Do not proceed until parity is achieved.
 
 ### 7. Quality Gate — Security
 
-Check EVERY T-SQL query in your code:
-- User input parameterized (SqlParameter, not concatenation)
-- Object names quoted with QUOTENAME() or brackets
-- No String.Format() with user input into SQL text
+Use the **Task tool** with `subagent_type="security-auditor"` to audit your code:
 
-Check credential handling:
-- Credentials never in WriteMessage output
-- Credentials never in exception messages
-- Connection strings not logged
+```
+Task prompt: "Audit {cs_path} for security vulnerabilities. Check every T-SQL query
+for SQL injection (parameterized values, QUOTENAME for identifiers). Check credential
+handling — no credentials in WriteMessage output or exception messages. Check connection
+string construction."
+```
 
-If ANY security issue exists, fix it immediately.
+If the agent reports any CRITICAL or HIGH severity issues, fix them immediately before proceeding.
 
 ### 8. Quality Gate — Regression Check
 
-Verify against the PS1:
-- All parameter names identical (or aliased)
-- All parameter types identical
-- All default values identical
-- Pipeline binding preserved
-- Output type and properties identical
-- Error conditions identical
-- ShouldProcess messages match
+Use the **Task tool** with `subagent_type="regression-sentinel"` to detect breaking changes:
+
+```
+Task prompt: "Compare the original PS1 at {ps1_path} against the new C# at {cs_path}.
+Check all parameter names, types, defaults, pipeline binding, output types, output
+properties, error conditions, and ShouldProcess messages. Report any breaking changes."
+```
+
+If the agent reports any breaking changes, fix them before proceeding.
 
 ### 9. Quality Gate — dbatools Spirit
 
-Ask yourself:
-- Can a DBA still do `Verb-DbaObject -SqlInstance localhost` and have it work?
-- Are defaults still sensible?
-- Do error messages explain WHY and suggest WHAT TO DO?
-- Would a long-time user notice anything different?
+Use the **Task tool** with `subagent_type="dbatools-spirit-guardian"` to verify UX quality:
 
-If any answer is "no," fix it.
+```
+Task prompt: "Review {cs_path} for adherence to the dbatools 'it just works' philosophy.
+Check that defaults are sensible, error messages explain WHY and suggest WHAT TO DO,
+auto-detection is preserved, and a long-time user would not notice behavioral differences."
+```
+
+If the agent rejects the conversion, address its concerns before proceeding.
+
+### 9b. Specialized Reviews (when applicable)
+
+Run these additional agent reviews based on what the command does:
+
+**If the command contains embedded T-SQL queries**, use `subagent_type="tsql-collation-reviewer"`:
+```
+Task prompt: "Review T-SQL in {cs_path} for collation safety. Check temp table joins to
+catalog views for COLLATE DATABASE_DEFAULT, verify QUOTENAME usage, check C# string
+comparisons of SQL metadata use OrdinalIgnoreCase."
+```
+
+**If the command uses SMO or SqlClient APIs**, use `subagent_type="microsoft-sdk-validator"`:
+```
+Task prompt: "Validate SMO/SqlClient API usage in {cs_path}. Check property access
+patterns, connection lifecycle, and version-specific API availability."
+```
+
+**If the command has cross-platform concerns** (file paths, Windows APIs, WMI), use `subagent_type="xplat-compatibility-reviewer"`:
+```
+Task prompt: "Review {cs_path} for cross-platform compatibility. Check Path.Combine usage,
+platform guards on Windows-only APIs, StringComparison.OrdinalIgnoreCase, and conditional
+compilation for net472 vs net8.0."
+```
+
+**Always** run `subagent_type="best-practices-reviewer"` for a senior code review:
+```
+Task prompt: "Review {cs_path} for code quality: SOLID principles, error handling patterns,
+performance (no allocations in loops, proper StringBuilder usage), thread safety of static
+state access, and adherence to C# 7.3 constraints."
+```
+
+Fix any issues reported by these specialized reviewers before proceeding to Step 10.
 
 ### 10. Update Tracker and Commit
 
