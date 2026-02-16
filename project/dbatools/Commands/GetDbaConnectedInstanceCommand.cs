@@ -94,7 +94,7 @@ namespace Dataplat.Dbatools.Commands
 
                 // Build the output object
                 PSObject result = new PSObject();
-                result.Properties.Add(new PSNoteProperty("SqlInstance", instance ?? key));
+                result.Properties.Add(new PSNoteProperty("SqlInstance", instance ?? ConversionHelpers.HideConnectionString(key)));
                 result.Properties.Add(new PSNoteProperty("ConnectionObject", connectionObject));
                 result.Properties.Add(new PSNoteProperty("ConnectionType", baseValue.GetType().FullName));
                 result.Properties.Add(new PSNoteProperty("Pooled", pooled));
