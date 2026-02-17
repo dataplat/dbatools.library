@@ -12,7 +12,7 @@
 | 3 | Get-DbatoolsConfigValue | DONE | GetDbatoolsConfigValueCommand.cs | OK | 100% | 1/1 | Read-only, no deps |
 | 4 | Get-DbatoolsError | DONE | GetDbatoolsErrorCommand.cs | OK | 100% | 5/5 | Read-only, no deps |
 | 5 | Get-DbatoolsLog | DONE | GetDbatoolsLogCommand.cs | OK | 100% | 16/16 | Read-only, no deps |
-| 6 | Get-DbatoolsPath | PENDING | | | | | Read-only, no deps |
+| 6 | Get-DbatoolsPath | DONE | GetDbatoolsPathCommand.cs | OK | 100% | 1/1 | Read-only, no deps |
 | 7 | New-DbatoolsSupportPackage | PENDING | | | | | ShouldProcess required |
 | 8 | Set-DbatoolsInsecureConnection | PENDING | | | | | ShouldProcess required |
 | 9 | Set-DbatoolsPath | PENDING | | | | | ShouldProcess required, depends on Get-DbatoolsPath |
