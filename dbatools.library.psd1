@@ -73,6 +73,7 @@
         'Resolve-DbaNetworkName',
         'Resolve-DbaPath',
         'Set-DbatoolsInsecureConnection',
+        'Set-DbatoolsPath',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
