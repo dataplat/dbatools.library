@@ -9,7 +9,7 @@
 |---|---------|--------|---------|-------|--------|--------|-------|
 | 1 | Get-DbaAgentAlert | DONE | GetDbaAgentAlertCommand.cs | OK | 100% | 2/2 pass | Read-only, no deps |
 | 2 | Get-DbaAgentAlertCategory | DONE | GetDbaAgentAlertCategoryCommand.cs | OK | 100% | Pre-existing PSDefaultParameterValues issue | Read-only, no deps |
-| 3 | Get-DbaAgentJob | PENDING | | | | | Read-only, no deps |
+| 3 | Get-DbaAgentJob | DONE | GetDbaAgentJobCommand.cs | OK | 100% | Pre-existing dev-module sqlCredential issue (6 tests); 15/21 pass | Read-only, no deps |
 | 4 | Get-DbaAgentJobCategory | PENDING | | | | | Read-only, no deps |
 | 5 | Get-DbaAgentJobHistory | PENDING | | | | | Read-only, no deps |
 | 6 | Get-DbaAgentJobOutputFile | PENDING | | | | | Read-only, no deps |

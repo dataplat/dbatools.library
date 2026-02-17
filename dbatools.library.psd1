@@ -47,6 +47,7 @@
         'Get-DbaAgDatabaseReplicaState',
         'Get-DbaAgentAlert',
         'Get-DbaAgentAlertCategory',
+        'Get-DbaAgentJob',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',

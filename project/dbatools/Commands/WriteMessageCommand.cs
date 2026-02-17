@@ -117,7 +117,7 @@ namespace Dataplat.Dbatools.Commands
 		/// This is less user friendly, but allows catching exceptions in calling scripts.
         /// </summary>
         [Parameter()]
-        public new bool EnableException;
+        public new bool EnableException { get; set; }
 
         /// <summary>
         /// Enables breakpoints on the current message. By default, setting '-Debug' will NOT cause an interrupt on the current position.
