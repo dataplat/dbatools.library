@@ -46,6 +46,7 @@
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',
         'Get-DbatoolsConfig',
+        'Get-DbatoolsConfigValue',
         'Invoke-DbaQuery',
         'Join-DbaPath',
         'New-DbaAzAccessToken',
