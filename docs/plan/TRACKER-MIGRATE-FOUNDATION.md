@@ -13,7 +13,7 @@
 | 4 | Test-DbaPath | DONE | TestDbaPathCommand.cs | OK | OK | 7/7 | Pester improved: 6 pre-existing failures now pass |
 | 5 | New-DbaAzAccessToken | DONE | NewDbaAzAccessTokenCommand.cs | OK | OK | 1/1 | ADAL replaced with direct OAuth2 REST; ServicePrincipal now works on Core |
 | 6 | New-DbaConnectionString | DONE | NewDbaConnectionStringCommand.cs | OK | OK | 1/1 | ShouldProcess preserved; both new and legacy code paths implemented |
-| 7 | New-DbaConnectionStringBuilder | PENDING | | | | | ShouldProcess required |
+| 7 | New-DbaConnectionStringBuilder | DONE | NewDbaConnectionStringBuilderCommand.cs | OK | OK | 30/30 | No ShouldProcess needed; both Microsoft.Data and System.Data providers supported |
 | 8 | New-DbaScriptingOption | PENDING | | | | | ShouldProcess required |
 | 9 | New-DbaSqlParameter | PENDING | | | | | ShouldProcess required |
 | 10 | Clear-DbaConnectionPool | PENDING | | | | |  |

@@ -43,6 +43,7 @@
         'Get-DbaConnection',
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
+        'New-DbaConnectionStringBuilder',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
