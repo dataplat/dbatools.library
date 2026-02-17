@@ -323,8 +323,14 @@ namespace Dataplat.Dbatools.Commands
 
             // Connect-DbaInstance uses opposite exception logic: by default it THROWS (EnableException = true)
             // DisableException reverses this behavior
+            // Also respect -EnableException:$false if explicitly passed by the user
             if (DisableException.IsPresent)
             {
+                EnableException = false;
+            }
+            else if (MyInvocation.BoundParameters.ContainsKey("EnableException") && !EnableException.IsPresent)
+            {
+                // User explicitly passed -EnableException:$false
                 EnableException = false;
             }
             else
@@ -834,7 +840,7 @@ $newServer
         {
             // Mirrors PS1: SqlConnectionInfo from connection string properties, then ServerConnection -> Server
             string script = @"
-param($connectionString, $trustCert, $trustCertBound, $database)
+param($connectionString, $trustCert, $database)
 $sqlConnectionInfo = New-Object -TypeName Microsoft.SqlServer.Management.Common.SqlConnectionInfo
 $csb = New-Object -TypeName Microsoft.Data.SqlClient.SqlConnectionStringBuilder -ArgumentList $connectionString
 
@@ -867,7 +873,7 @@ if ($database -and $database -ne $specifiedDatabase) {
 
 $sqlConnectionInfo.AdditionalParameters = $csb.ConnectionString
 
-if ($trustCertBound) {
+if ($trustCert) {
     Write-Message -Level Debug -Message ""TrustServerCertificate will be set to '$trustCert'""
     $sqlConnectionInfo.TrustServerCertificate = $trustCert
 }
@@ -878,7 +884,7 @@ New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $se
             try
             {
                 Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
-                    connString, TrustServerCertificate.IsPresent, TestBound("TrustServerCertificate"), Database);
+                    connString, TrustServerCertificate.IsPresent, Database);
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
             }
@@ -970,7 +976,8 @@ New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $se
                     MultipleActiveResultSets.IsPresent,
                     SqlExecutionModes,
                     TestBound("SqlExecutionModes"),
-                    StatementTimeout);
+                    StatementTimeout,
+                    EnableException.IsPresent);
 
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
@@ -995,7 +1002,7 @@ param(
     $nonPooledConnection, $trustServerCertificate, $workstationId,
     $batchSeparator, $batchSeparatorBound, $lockTimeout, $lockTimeoutBound,
     $multipleActiveResultSets, $sqlExecutionModes, $sqlExecutionModesBound,
-    $statementTimeout
+    $statementTimeout, $EnableException
 )
 
 $sqlConnectionInfo = New-Object -TypeName Microsoft.SqlServer.Management.Common.SqlConnectionInfo -ArgumentList $serverName
@@ -1374,7 +1381,7 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
         {
             // Register the connected instance for TEPP
             string script = @"
-param($instance, $server, $isAzure, $fields2000Db, $fields200xDb, $fields201xDb, $fields2000Login, $fields200xLogin, $fields201xLogin, $fieldsJob)
+param($instance, $server, $isAzure, $fields2000Db, $fields200xDb, $fields201xDb, $fields2000Login, $fields200xLogin, $fields201xLogin, $fieldsJob, $EnableException)
 
 [Dataplat.Dbatools.TabExpansion.TabExpansionHost]::SetInstance($instance.FullSmoName.ToLowerInvariant(), $server.ConnectionContext.Copy(), ($server.ConnectionContext.FixedServerRoles -match 'SysAdmin'))
 
@@ -1455,7 +1462,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
                     instance, server, isAzure,
                     Fields2000Db, Fields200xDb, Fields201xDb,
                     Fields2000Login, Fields200xLogin, Fields201xLogin,
-                    FieldsJob);
+                    FieldsJob, EnableException.IsPresent);
             }
             catch (Exception ex)
             {
