@@ -74,6 +74,7 @@
         'Resolve-DbaPath',
         'Set-DbatoolsInsecureConnection',
         'Set-DbatoolsPath',
+        'Test-DbaAgSpn',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
