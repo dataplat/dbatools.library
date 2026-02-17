@@ -50,6 +50,7 @@
         'Get-DbaAgentJob',
         'Get-DbaAgHadr',
         'Get-DbaAgListener',
+        'Get-DbaAgReplica',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',
