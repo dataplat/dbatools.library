@@ -8,7 +8,7 @@
 | # | Command | Status | C# File | Build | Parity | Pester | Notes |
 |---|---------|--------|---------|-------|--------|--------|-------|
 | 1 | Get-DbatoolsChangeLog | DONE | GetDbatoolsChangeLogCommand.cs | OK | 100% | 1/1 | Read-only, no deps |
-| 2 | Get-DbatoolsConfig | PENDING | | | | | Read-only, no deps |
+| 2 | Get-DbatoolsConfig | DONE | GetDbatoolsConfigCommand.cs | OK | 100% | 7/7 | Read-only, no deps |
 | 3 | Get-DbatoolsConfigValue | PENDING | | | | | Read-only, no deps |
 | 4 | Get-DbatoolsError | PENDING | | | | | Read-only, no deps |
 | 5 | Get-DbatoolsLog | PENDING | | | | | Read-only, no deps |
