@@ -15,7 +15,7 @@
 | 6 | Get-DbaAgReplica | DONE | GetDbaAgReplicaCommand.cs | OK | 100% | 1/1 unit pass; integration pre-existing infra issue | Read-only, no deps |
 | 7 | Get-DbaAvailabilityGroup | DONE | GetDbaAvailabilityGroupCommand.cs | OK | 100% | 1/1 unit pass; integration pre-existing infra issue | Read-only, no deps |
 | 8 | Test-DbaAgSpn | DONE | TestDbaAgSpnCommand.cs | OK | 100% | 1/1 pass | Fixed PS1 $resolved bug, MSA pattern |
-| 9 | Test-DbaAvailabilityGroup | PENDING | | | | |  |
+| 9 | Test-DbaAvailabilityGroup | DONE | TestDbaAvailabilityGroupCommand.cs | OK | 100% | 1/1 pass | Dual output mode (basic/AddDatabase), fixed replicaServerSMO scope bug from PS1 |
 | 10 | New-DbaAvailabilityGroup | PENDING | | | | | ShouldProcess required |
 | 11 | Set-DbaAgListener | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgListener |
 | 12 | Set-DbaAgReplica | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgReplica |
