@@ -7,7 +7,7 @@
 
 | # | Command | Status | C# File | Build | Parity | Pester | Notes |
 |---|---------|--------|---------|-------|--------|--------|-------|
-| 1 | Get-DbaAgentAlert | PENDING | | | | | Read-only, no deps |
+| 1 | Get-DbaAgentAlert | DONE | GetDbaAgentAlertCommand.cs | OK | 100% | 2/2 pass | Read-only, no deps |
 | 2 | Get-DbaAgentAlertCategory | PENDING | | | | | Read-only, no deps |
 | 3 | Get-DbaAgentJob | PENDING | | | | | Read-only, no deps |
 | 4 | Get-DbaAgentJobCategory | PENDING | | | | | Read-only, no deps |
