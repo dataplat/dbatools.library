@@ -10,7 +10,7 @@
 | 1 | Get-DbaAgBackupHistory | DONE | GetDbaAgBackupHistoryCommand.cs | OK | 100% | 1/1 | Read-only, no deps |
 | 2 | Get-DbaAgDatabase | DONE | GetDbaAgDatabaseCommand.cs | OK | 100% | 2/2 pass | Read-only, no deps |
 | 3 | Get-DbaAgDatabaseReplicaState | DONE | GetDbaAgDatabaseReplicaStateCommand.cs | OK | 100% | Pre-existing infra issue | Read-only, no deps |
-| 4 | Get-DbaAgHadr | PENDING | | | | | Read-only, no deps |
+| 4 | Get-DbaAgHadr | DONE | GetDbaAgHadrCommand.cs | OK | 100% | 2/2 pass | Read-only, no deps |
 | 5 | Get-DbaAgListener | PENDING | | | | | Read-only, no deps |
 | 6 | Get-DbaAgReplica | PENDING | | | | | Read-only, no deps |
 | 7 | Get-DbaAvailabilityGroup | PENDING | | | | | Read-only, no deps |
