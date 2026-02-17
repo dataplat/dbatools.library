@@ -478,7 +478,7 @@ namespace Dataplat.Dbatools.Commands
             if (AzureUnsupported.IsPresent)
             {
                 object engineType = GetPropertyValue(server, "DatabaseEngineType");
-                if (engineType != null && engineType.ToString() == "SqlAzureDatabase")
+                if (engineType != null && String.Equals(engineType.ToString(), "SqlAzureDatabase", StringComparison.OrdinalIgnoreCase))
                 {
                     if (isNewConnection) DisconnectServer(server);
                     StopFunction("Azure SQL Database not supported", target: instance, isContinue: true);
@@ -546,23 +546,23 @@ namespace Dataplat.Dbatools.Commands
             serverName = null;
             connectionString = null;
 
-            string instanceType = instance.Type.ToString();
+            DbaInstanceInputType instanceType = instance.Type;
 
-            if (instanceType == "Server")
+            if (instanceType == DbaInstanceInputType.Server)
             {
                 WriteMessageAtLevel("Server object passed in, will do some checks and then return the original object", MessageLevel.Verbose, null);
                 inputObjectType = "Server";
                 isNewConnection = false;
                 inputObject = instance.InputObject;
             }
-            else if (instanceType == "SqlConnection")
+            else if (instanceType == DbaInstanceInputType.SqlConnection)
             {
                 WriteMessageAtLevel("SqlConnection object passed in, will build server object from instance.InputObject, do some checks and then return the server object", MessageLevel.Verbose, null);
                 inputObjectType = "SqlConnection";
                 isNewConnection = false;
                 inputObject = instance.InputObject;
             }
-            else if (instanceType == "RegisteredServer")
+            else if (instanceType == DbaInstanceInputType.RegisteredServer)
             {
                 WriteMessageAtLevel("RegisteredServer object passed in, will build empty server object, set connection string from instance.InputObject.ConnectionString, do some checks and then return the server object", MessageLevel.Verbose, null);
                 inputObjectType = "RegisteredServer";
@@ -657,7 +657,7 @@ namespace Dataplat.Dbatools.Commands
                     WriteMessageAtLevel(String.Format("ConnectionContext.CurrentDatabase is now [{0}]", currentDb), MessageLevel.Debug, null);
                 }
 
-                if (currentDb != Database)
+                if (!String.Equals(currentDb, Database, StringComparison.OrdinalIgnoreCase))
                 {
                     WriteMessageAtLevel(String.Format("Database [{0}] provided. Does not match ConnectionContext.CurrentDatabase [{1}], copying ConnectionContext and setting the CurrentDatabase", Database, currentDb), MessageLevel.Verbose, null);
                     copyContext = true;
@@ -675,7 +675,7 @@ namespace Dataplat.Dbatools.Commands
             if (!String.IsNullOrEmpty(ApplicationIntent))
             {
                 string currentIntent = GetConnectionContextProperty(inputObject, "ApplicationIntent") as string;
-                if (currentIntent != ApplicationIntent)
+                if (!String.Equals(currentIntent, ApplicationIntent, StringComparison.OrdinalIgnoreCase))
                 {
                     WriteMessageAtLevel("ApplicationIntent provided. Does not match ConnectionContext.ApplicationIntent, copying ConnectionContext and setting the ApplicationIntent", MessageLevel.Verbose, null);
                     copyContext = true;
@@ -1315,11 +1315,11 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
             {
                 WriteMessageAtLevel(String.Format("Setting ComputerName based on {0}", computerNameSource), MessageLevel.Debug, null);
 
-                if (computerNameSource == "instance.ComputerName")
+                if (String.Equals(computerNameSource, "instance.ComputerName", StringComparison.OrdinalIgnoreCase))
                 {
                     computerName = instance.ComputerName;
                 }
-                else if (computerNameSource == "server.ComputerNamePhysicalNetBIOS")
+                else if (String.Equals(computerNameSource, "server.ComputerNamePhysicalNetBIOS", StringComparison.OrdinalIgnoreCase))
                 {
                     computerName = GetPropertyValue(server, "ComputerNamePhysicalNetBIOS") as string;
                 }
@@ -1340,12 +1340,12 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
                 string hostPlatform = GetPropertyValue(server, "HostPlatform") as string;
                 string netName = GetPropertyValue(server, "NetName") as string;
 
-                if (engineType != null && engineType.ToString() == "SqlAzureDatabase")
+                if (engineType != null && String.Equals(engineType.ToString(), "SqlAzureDatabase", StringComparison.OrdinalIgnoreCase))
                 {
                     WriteMessageAtLevel("We are on Azure, so server.ComputerName will be set to instance.ComputerName", MessageLevel.Debug, null);
                     computerName = instance.ComputerName;
                 }
-                else if (hostPlatform == "Linux")
+                else if (String.Equals(hostPlatform, "Linux", StringComparison.OrdinalIgnoreCase))
                 {
                     WriteMessageAtLevel("We are on Linux what is often on docker and the internal name is not useful, so server.ComputerName will be set to instance.ComputerName", MessageLevel.Debug, null);
                     computerName = instance.ComputerName;
