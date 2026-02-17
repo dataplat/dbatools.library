@@ -41,6 +41,7 @@
     CmdletsToExport        = @(
         'Clear-DbaConnectionPool',
         'Connect-DbaInstance',
+        'Disconnect-DbaInstance',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'New-DbaAzAccessToken',
