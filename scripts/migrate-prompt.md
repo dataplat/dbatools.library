@@ -34,14 +34,13 @@ If Pester integration tests exist for this command, establish a baseline BEFORE 
 
 ```bash
 pwsh -NoProfile -Command '
-    Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
     Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
     . c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1
     Invoke-ManualPester -Path c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1 -TestIntegration
 '
 ```
 
-**Always use `pwsh -NoProfile`** to spawn a fresh process. This avoids DLL locking from your current session and ensures a clean module load. Import `dbatools.library` from the local repo FIRST so it satisfies the `RequiredModules` dependency before dbatools loads.
+**Always use `pwsh -NoProfile`** to spawn a fresh process. For the baseline, the installed `dbatools.library` module is fine — a fresh process won't have the DLL locked even if another session does.
 
 Record the pass/fail/skip counts. If no test file exists at `c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1`, note "No Pester tests" and continue — Pester testing steps later will be skipped.
 
@@ -141,40 +140,36 @@ if (ShouldProcess(target, String.Format("Removing {0}", name)))
 
 ### 5. Build and Deploy
 
+#### Compile
+
 ```bash
 dotnet build project/dbatools/dbatools.csproj
 ```
 
 If it fails, fix errors and rebuild. Do not proceed until the build succeeds.
 
-#### Deploy the built DLL for testing
+#### Dev-build a loadable module
 
-After a successful build, copy the compiled DLL to the local module staging directory so that Pester tests can load it. The installed module at `C:\Program Files\PowerShell\Modules\dbatools.library\` may be locked by another PowerShell session — **never fight the lock**. Always deploy to the local repo path instead.
+The installed `dbatools.library` at `C:\Program Files\PowerShell\Modules\` may be locked by another session. **Never fight the lock.** Instead, build a complete loadable module into `artifacts/dbatools.library/` using the dev-build script:
 
 ```bash
-# Create staging dirs if they don't exist
-mkdir -p c:/github/dbatools.library/core/lib
-mkdir -p c:/github/dbatools.library/desktop/lib
-
-# Copy net8.0 build output to local staging (for PS Core / PS 7+)
-cp project/dbatools/bin/Debug/net8.0/dbatools.dll c:/github/dbatools.library/core/lib/dbatools.dll
-
-# Copy net472 build output to local staging (for Windows PowerShell 5.1)
-cp project/dbatools/bin/Debug/net472/dbatools.dll c:/github/dbatools.library/desktop/lib/dbatools.dll
+pwsh -NoProfile -File build/build-dev.ps1
 ```
 
-These paths are gitignored (`lib/` is in `.gitignore`). The `dbatools.library.psm1` loads from `$PSScriptRoot/core/lib/` or `$PSScriptRoot/desktop/lib/`, so when importing from the local repo path, it will find the freshly built DLL.
+This runs `dotnet publish` (which includes all ~142 dependency DLLs — SMO, SqlClient, etc.), copies them alongside the freshly built `dbatools.dll`, and adds the module manifest/loader. The output at `artifacts/dbatools.library/` is a fully self-contained, loadable module.
 
-#### Load the local module for Pester testing
+The `artifacts/` directory is gitignored.
 
-When running Pester tests, import `dbatools.library` from the local repo FIRST so it takes precedence over the installed version:
+#### Load the dev-built module for Pester testing
+
+When running Pester tests, **always spawn a fresh `pwsh -NoProfile` process** and import the dev-built library FIRST:
 
 ```powershell
-Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+Import-Module c:\github\dbatools.library\artifacts\dbatools.library\dbatools.library.psd1 -Force
 Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
 ```
 
-The `-Force` on the library import ensures it replaces any previously loaded version. Doing this BEFORE importing dbatools-ralph satisfies the `RequiredModules` dependency with the local build.
+Loading the dev-built library first satisfies dbatools-ralph's `RequiredModules = 'dbatools.library'` dependency with the freshly built version, so it won't try to load the installed (potentially locked) copy.
 
 ### 5b. Run Tests
 
@@ -373,18 +368,18 @@ Edit `c:\github\dbatools.library\dbatools.library.psd1` — add `'{CommandName}'
 
 **This step is MANDATORY if a Pester test file exists.** Skip only if Step 0 noted "No Pester tests."
 
-Spawn a fresh PowerShell process to pick up the C# cmdlet (the PS1 is now archived). Import the local `dbatools.library` first so the freshly built DLL is loaded:
+Spawn a fresh PowerShell process to pick up the C# cmdlet (the PS1 is now archived). Import the **dev-built** `dbatools.library` (from Step 5) first so the freshly built DLL with your new cmdlet is loaded:
 
 ```bash
 pwsh -NoProfile -Command '
-    Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+    Import-Module c:\github\dbatools.library\artifacts\dbatools.library\dbatools.library.psd1 -Force
     Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
     . c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1
     Invoke-ManualPester -Path c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1 -TestIntegration
 '
 ```
 
-**Always use `pwsh -NoProfile`** — never test in the current session where the installed DLL may be locked or a stale module is loaded.
+**Always use `pwsh -NoProfile`** — never test in the current session where the installed DLL may be locked or a stale module is loaded. The dev-built module at `artifacts/dbatools.library/` contains your freshly compiled `dbatools.dll` plus all dependency DLLs.
 
 Compare results against the Pester baseline from Step 0:
 - **All tests that passed in the baseline MUST still pass.** A previously-passing test that now fails is a regression in your C# implementation.

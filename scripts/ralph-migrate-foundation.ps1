@@ -46,10 +46,6 @@ if (Test-Path $SignalFile) {
     exit 0
 }
 
-# Load agent definitions for --agents flag
-. "$PSScriptRootalph-agents.ps1"
-$agentsJson = Get-RalphAgentsJson -RepoRoot $RepoRoot
-
 for ($i = 1; $i -le $MaxIterations; $i++) {
     $status = Get-TrackerStatus
     if ($status.Pending -eq 0 -and $status.Done -gt 0) {
@@ -76,11 +72,10 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
             '--no-session-persistence'
             '--verbose'
             '--output-format', 'stream-json'
-            '--agents', $agentsJson
-            '-p', $promptContent
+            '-p', '-'
         )
 
-        & claude @claudeArgs 2>&1 | ForEach-Object {
+        $promptContent | & claude @claudeArgs 2>&1 | ForEach-Object {
             $line = $PSItem
             try {
                 $obj = $line | ConvertFrom-Json -ErrorAction Stop

@@ -65,10 +65,6 @@ $DomainCounts = @{
     'dbmail' = 12; 'migration' = 3
 }
 
-# Load agent definitions for --agents flag
-. (Join-Path $ScriptRoot 'ralph-agents.ps1')
-$agentsJson = Get-RalphAgentsJson -RepoRoot $RepoRoot
-
 function Get-TrackerStatus {
     param([string]$TrackerPath)
     if (-not (Test-Path $TrackerPath)) { return @{ Pending = 0; Done = 0; Total = 0 } }
@@ -142,11 +138,10 @@ function Invoke-DomainMigration {
                 '--no-session-persistence'
                 '--verbose'
                 '--output-format', 'stream-json'
-                '--agents', $agentsJson
-                '-p', $promptContent
+                '-p', '-'
             )
 
-            & claude @claudeArgs 2>&1 | ForEach-Object {
+            $promptContent | & claude @claudeArgs 2>&1 | ForEach-Object {
                 $line = $PSItem
                 try {
                     $obj = $line | ConvertFrom-Json -ErrorAction Stop
