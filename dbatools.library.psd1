@@ -44,6 +44,7 @@
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
         'New-DbaConnectionStringBuilder',
+        'New-DbaScriptingOption',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
