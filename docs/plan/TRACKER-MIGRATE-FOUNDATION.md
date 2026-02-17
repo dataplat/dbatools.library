@@ -20,6 +20,6 @@
 | 11 | Connect-DbaInstance | DONE | ConnectDbaInstanceCommand.cs | OK | OK | 21/21 | Core connection command; 1 pre-existing Backup test failure unchanged |
 | 12 | Disconnect-DbaInstance | DONE | DisconnectDbaInstanceCommand.cs | OK | OK | 9/9 | ShouldProcess preserved; handles SMO Server and SqlConnection; Pester improved from 1/2 to 9/9 |
 | 13 | Invoke-DbaQuery | DONE | InvokeDbaQueryCommand.cs | OK | OK | 0/26 (baseline 0/28) | Primary query command; Invoke-DbaAsync inlined; GO splitting, MessagesToOutput, 6 output formats |
-| 14 | Join-DbaPath | PENDING | | | | |  |
+| 14 | Join-DbaPath | DONE | JoinDbaPathCommand.cs | OK | OK | 10/10 | SqlCredential added for SQL auth OS detection; Pester improved from 1/1 to 10/10 |
 | 15 | Resolve-DbaNetworkName | PENDING | | | | |  |
 | 16 | Resolve-DbaPath | PENDING | | | | |  |

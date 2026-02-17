@@ -45,6 +45,7 @@
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Invoke-DbaQuery',
+        'Join-DbaPath',
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
         'New-DbaConnectionStringBuilder',
