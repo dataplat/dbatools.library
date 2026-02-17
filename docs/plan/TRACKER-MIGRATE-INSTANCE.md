@@ -7,7 +7,7 @@
 
 | # | Command | Status | C# File | Build | Parity | Pester | Notes |
 |---|---------|--------|---------|-------|--------|--------|-------|
-| 1 | Get-DbaBuild | PENDING | | | | | Read-only, no deps |
+| 1 | Get-DbaBuild | DONE | GetDbaBuildCommand.cs | OK | 100% | 26/26 | Read-only, no deps |
 | 2 | Get-DbaCpuRingBuffer | PENDING | | | | | Read-only, no deps |
 | 3 | Get-DbaCpuUsage | PENDING | | | | | Read-only, no deps |
 | 4 | Get-DbaDeprecatedFeature | PENDING | | | | | Read-only, no deps |
