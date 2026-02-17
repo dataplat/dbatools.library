@@ -22,4 +22,4 @@
 | 13 | Invoke-DbaQuery | DONE | InvokeDbaQueryCommand.cs | OK | OK | 0/26 (baseline 0/28) | Primary query command; Invoke-DbaAsync inlined; GO splitting, MessagesToOutput, 6 output formats |
 | 14 | Join-DbaPath | DONE | JoinDbaPathCommand.cs | OK | OK | 10/10 | SqlCredential added for SQL auth OS detection; Pester improved from 1/1 to 10/10 |
 | 15 | Resolve-DbaNetworkName | DONE | ResolveDbaNetworkNameCommand.cs | OK | OK | 4/4 | DNS+Ping+WMI/CIM; VeryVerbose levels preserved; Position fix for positional binding |
-| 16 | Resolve-DbaPath | PENDING | | | | |  |
+| 16 | Resolve-DbaPath | DONE | ResolveDbaPathCommand.cs | OK | OK | 1/1 | PS provider-aware via InvokeCommand; EnableException defaults to true matching PS1 behavior |

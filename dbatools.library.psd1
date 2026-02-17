@@ -52,6 +52,7 @@
         'New-DbaScriptingOption',
         'New-DbaSqlParameter',
         'Resolve-DbaNetworkName',
+        'Resolve-DbaPath',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
