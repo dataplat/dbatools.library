@@ -42,6 +42,7 @@
         'Clear-DbaConnectionPool',
         'Connect-DbaInstance',
         'Disconnect-DbaInstance',
+        'Export-DbatoolsConfig',
         'Get-DbaAgBackupHistory',
         'Get-DbaAgDatabase',
         'Get-DbaAgDatabaseReplicaState',

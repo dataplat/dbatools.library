@@ -144,24 +144,16 @@ namespace Dataplat.Dbatools.Internal
             // Convert to JSON and write using PowerShell
             string script = @"
 param($data, $path)
-$data.Values | ConvertTo-Json -Depth 5 | Set-Content -Path $path -Encoding UTF8 -ErrorAction Stop
+$data | ConvertTo-Json | Set-Content -Path $path -Encoding UTF8 -ErrorAction Stop
 ";
-            try
-            {
-                object[] dataValues = new object[data.Values.Count];
-                data.Values.CopyTo(dataValues, 0);
-                cmdlet.InvokeCommand.InvokeScript(
-                    false,
-                    ScriptBlock.Create(script),
-                    null,
-                    dataValues,
-                    path
-                );
-            }
-            catch
-            {
-                // Fallback: write directly as simple JSON
-            }
+            object[] dataValues = new object[data.Values.Count];
+            data.Values.CopyTo(dataValues, 0);
+            cmdlet.InvokeCommand.InvokeScript(
+                false,
+                ScriptBlock.Create(script),
+                null,
+                new object[] { dataValues, path }
+            );
         }
 
         /// <summary>
