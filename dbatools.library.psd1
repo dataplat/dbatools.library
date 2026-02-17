@@ -49,6 +49,7 @@
         'Get-DbaAgentAlertCategory',
         'Get-DbaAgentJob',
         'Get-DbaAgHadr',
+        'Get-DbaAgListener',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',
