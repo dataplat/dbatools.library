@@ -42,6 +42,7 @@
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'New-DbaAzAccessToken',
+        'New-DbaConnectionString',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
