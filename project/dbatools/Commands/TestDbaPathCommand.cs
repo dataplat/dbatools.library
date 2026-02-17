@@ -164,9 +164,7 @@ namespace Dataplat.Dbatools.Commands
                             TestFunctionInterrupt();
                             continue;
                         }
-                        // Escape single quotes to prevent SQL injection
-                        string escapedPath = _paths[i].Replace("'", "''");
-                        queryParts.Add(String.Format("EXEC master.dbo.xp_fileexist N'{0}'", escapedPath));
+                        queryParts.Add(BuildXpFileExistQuery(_paths[i]));
                         validIndices.Add(i);
                     }
                     if (queryParts.Count == 0)
@@ -196,14 +194,15 @@ namespace Dataplat.Dbatools.Commands
                         if (batchResult.Tables.Count > 0 && batchResult.Tables[0].Rows.Count > 0)
                         {
                             DataRow row = batchResult.Tables[0].Rows[0];
-                            bool fileExists = Convert.ToInt32(row[0]) == 1;
-                            bool isDirectory = Convert.ToInt32(row[1]) == 1;
+                            bool fileExists = row[0] != DBNull.Value && Convert.ToInt32(row[0]) == 1;
+                            bool isDirectory = row[1] != DBNull.Value && Convert.ToInt32(row[1]) == 1;
                             WriteObject(fileExists || isDirectory);
                         }
                         else
                         {
                             WriteObject(false);
                         }
+                        // returnSimple guarantees single instance — return exits ProcessRecord
                         return;
                     }
                     else
@@ -216,8 +215,8 @@ namespace Dataplat.Dbatools.Commands
                             if (table.Rows.Count > 0)
                             {
                                 DataRow row = table.Rows[0];
-                                bool fileExists = Convert.ToInt32(row[0]) == 1;
-                                bool isDirectory = Convert.ToInt32(row[1]) == 1;
+                                bool fileExists = row[0] != DBNull.Value && Convert.ToInt32(row[0]) == 1;
+                                bool isDirectory = row[1] != DBNull.Value && Convert.ToInt32(row[1]) == 1;
                                 bool doesPass = fileExists || isDirectory;
 
                                 PSObject result = new PSObject();
@@ -235,7 +234,17 @@ namespace Dataplat.Dbatools.Commands
             }
         }
 
-        #region Private Helpers
+        #region Helpers
+
+        /// <summary>
+        /// Builds a single xp_fileexist EXEC statement for the given path.
+        /// Escapes single quotes to prevent SQL injection and uses the N'' Unicode prefix.
+        /// </summary>
+        internal static string BuildXpFileExistQuery(string path)
+        {
+            string escaped = path.Replace("'", "''");
+            return String.Format("EXEC master.dbo.xp_fileexist N'{0}'", escaped);
+        }
 
         /// <summary>
         /// Connects to a SQL Server instance by invoking Connect-DbaInstance.
@@ -313,7 +322,7 @@ namespace Dataplat.Dbatools.Commands
         /// Determines if the input object represents an array type.
         /// Mirrors PS1: $RawPath -is [array]
         /// </summary>
-        private static bool IsArrayInput(object input)
+        internal static bool IsArrayInput(object input)
         {
             if (input == null)
                 return false;
@@ -330,7 +339,7 @@ namespace Dataplat.Dbatools.Commands
         /// Converts the Path parameter (which may be a single value, array, or PSObject-wrapped)
         /// into a string array. Mirrors PS1: [string[]]$Path
         /// </summary>
-        private static string[] ConvertToStringArray(object input)
+        internal static string[] ConvertToStringArray(object input)
         {
             if (input == null)
                 return new string[0];
