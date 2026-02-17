@@ -64,6 +64,7 @@
         'Get-DbatoolsError',
         'Get-DbatoolsLog',
         'Get-DbatoolsPath',
+        'Import-DbatoolsConfig',
         'Invoke-DbaQuery',
         'Join-DbaPath',
         'New-DbaAzAccessToken',

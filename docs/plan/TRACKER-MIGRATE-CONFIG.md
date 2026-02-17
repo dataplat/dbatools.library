@@ -17,7 +17,7 @@
 | 8 | Set-DbatoolsInsecureConnection | DONE | SetDbatoolsInsecureConnectionCommand.cs | OK | 100% | 4/4 pass | No ShouldProcess (matches PS1) |
 | 9 | Set-DbatoolsPath | DONE | SetDbatoolsPathCommand.cs | OK | 100% | 1/1 | No ShouldProcess (matches PS1), depends on Get-DbatoolsPath |
 | 10 | Export-DbatoolsConfig | DONE | ExportDbatoolsConfigCommand.cs | OK | 100% | 1/1 | Config file export, 4 param sets, scope path computation |
-| 11 | Import-DbatoolsConfig | PENDING | | | | |  |
+| 11 | Import-DbatoolsConfig | DONE | ImportDbatoolsConfigCommand.cs | OK | 100% | 1/1 | Config file import, 2 param sets, Peek mode, include/exclude filters, scope file reading |
 | 12 | Invoke-DbatoolsFormatter | PENDING | | | | |  |
 | 13 | Invoke-DbatoolsRenameHelper | PENDING | | | | |  |
 | 14 | Measure-DbatoolsImport | PENDING | | | | |  |

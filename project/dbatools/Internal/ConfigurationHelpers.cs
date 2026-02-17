@@ -56,18 +56,11 @@ namespace Dataplat.Dbatools.Internal
             if (String.IsNullOrEmpty(url))
                 return new List<Hashtable>();
 
-            try
+            using (WebClient client = new WebClient())
             {
-                using (WebClient client = new WebClient())
-                {
-                    client.Encoding = Encoding.UTF8;
-                    string jsonContent = client.DownloadString(url);
-                    return ParseConfigJson(cmdlet, jsonContent);
-                }
-            }
-            catch
-            {
-                return new List<Hashtable>();
+                client.Encoding = Encoding.UTF8;
+                string jsonContent = client.DownloadString(url);
+                return ParseConfigJson(cmdlet, jsonContent);
             }
         }
 
