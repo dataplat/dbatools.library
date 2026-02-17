@@ -67,6 +67,7 @@
         'Import-DbatoolsConfig',
         'Invoke-DbaQuery',
         'Join-DbaPath',
+        'New-DbaAvailabilityGroup',
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
         'New-DbaConnectionStringBuilder',
