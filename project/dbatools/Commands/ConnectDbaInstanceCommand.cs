@@ -235,6 +235,7 @@ namespace Dataplat.Dbatools.Commands
 
         private string _escapedAzureDomain;
         private bool _tryConnString;
+        private bool _isRunningOnCore;
 
         // SMO default init fields by version
         private static readonly string[] Fields2000Db = new string[] {
@@ -268,6 +269,30 @@ namespace Dataplat.Dbatools.Commands
             "AccessToken"
         };
 
+        // Precomputed extended ignored parameter arrays for CheckIgnoredParameters
+        private static readonly string[] IgnoredParametersForConnStr;
+        private static readonly string[] IgnoredParametersForSqlConn;
+
+        // Cached ScriptBlock objects to avoid repeated parsing on every invocation.
+        // Initialized lazily on first use via EnsureScriptBlocksCached().
+        private static ScriptBlock SB_RecursiveConnect;
+        private static ScriptBlock SB_CopyContext;
+        private static ScriptBlock SB_CreateFromSqlConn;
+        private static ScriptBlock SB_CreateFromConnString;
+        private static ScriptBlock SB_CreateFromString;
+        private static ScriptBlock SB_RetryTrustCert;
+        private static ScriptBlock SB_PostConnectionSetup;
+        private static ScriptBlock SB_GetConfigValue;
+        private static ScriptBlock SB_ConnectContext;
+        private static ScriptBlock SB_DisconnectServer;
+        private static ScriptBlock SB_ExecuteWithResults;
+        private static ScriptBlock SB_LogMaskedConnStr;
+        private static ScriptBlock SB_AddNoteProperty;
+        private static ScriptBlock SB_AddConnHashValue;
+        private static ScriptBlock SB_IsRunningOnCore;
+        private static ScriptBlock SB_NewAzAccessToken;
+        private static bool _scriptBlocksCached;
+
         #endregion Private State
 
         #region Static Constructor
@@ -293,6 +318,169 @@ namespace Dataplat.Dbatools.Commands
             list = new List<string>(Fields200xLogin);
             list.AddRange(new string[] { "PasswordHashAlgorithm" });
             Fields201xLogin = list.ToArray();
+
+            // Build precomputed ignored parameter arrays
+            list = new List<string>(IgnoredParameters);
+            list.Add("ApplicationIntent");
+            list.Add("StatementTimeout");
+            IgnoredParametersForConnStr = list.ToArray();
+
+            list = new List<string>(IgnoredParametersForConnStr);
+            list.Add("DedicatedAdminConnection");
+            IgnoredParametersForSqlConn = list.ToArray();
+        }
+
+        private static void EnsureScriptBlocksCached()
+        {
+            if (_scriptBlocksCached) return;
+
+            SB_RecursiveConnect = ScriptBlock.Create(@"
+param($srvName, $db, $user, $pass, $boundParams)
+$secPass = ConvertTo-SecureString -String $pass -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential($user, $secPass)
+$p = @{}
+foreach ($key in $boundParams.Keys) {
+    if ($key -notin 'SqlInstance','SqlCredential') { $p[$key] = $boundParams[$key] }
+}
+Connect-DbaInstance -SqlInstance $srvName -SqlCredential $cred @p
+");
+
+            SB_CopyContext = ScriptBlock.Create(@"
+param($server, $appIntent, $nonPooled, $stTimeout, $stTimeoutBound, $database, $dac)
+$connContext = $server.ConnectionContext.Copy()
+if ($appIntent) {
+    $connContext.ApplicationIntent = $appIntent
+}
+if ($nonPooled) {
+    $connContext.NonPooledConnection = $true
+}
+if ($stTimeoutBound) {
+    $connContext.StatementTimeout = $stTimeout
+}
+if ($dac -and $server.ConnectionContext.ServerInstance -notmatch '^ADMIN:') {
+    $connContext.ServerInstance = 'ADMIN:' + $connContext.ServerInstance
+    $connContext.NonPooledConnection = $true
+}
+if ($database) {
+    $savedStatementTimeout = $connContext.StatementTimeout
+    $connContext = $connContext.GetDatabaseConnection($database, $false)
+    $connContext.StatementTimeout = $savedStatementTimeout
+}
+$newServer = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $connContext
+if ($database -and $newServer.ConnectionContext.CurrentDatabase -ne $database) {
+    Write-Message -Level Warning -Message ""Changing connection context to database $database was not successful. Current database is $($newServer.ConnectionContext.CurrentDatabase). Please open an issue on https://github.com/dataplat/dbatools/issues.""
+}
+$newServer
+");
+
+            SB_CreateFromSqlConn = ScriptBlock.Create("param($conn) New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $conn");
+
+            SB_CreateFromConnString = ScriptBlock.Create(@"
+param($connectionString, $trustCert, $database)
+$sqlConnectionInfo = New-Object -TypeName Microsoft.SqlServer.Management.Common.SqlConnectionInfo
+$csb = New-Object -TypeName Microsoft.Data.SqlClient.SqlConnectionStringBuilder -ArgumentList $connectionString
+
+if ($csb.ShouldSerialize('Data Source')) {
+    Write-Message -Level Debug -Message ""ServerName will be set to '$($csb.DataSource)'""
+    $sqlConnectionInfo.ServerName = $csb.DataSource
+    $null = $csb.Remove('Data Source')
+}
+if ($csb.ShouldSerialize('User ID')) {
+    Write-Message -Level Debug -Message ""UserName will be set to '$($csb.UserID)'""
+    $sqlConnectionInfo.UserName = $csb.UserID
+    $null = $csb.Remove('User ID')
+}
+if ($csb.ShouldSerialize('Password')) {
+    Write-Message -Level Debug -Message ""Password will be set""
+    $sqlConnectionInfo.Password = $csb.Password
+    $null = $csb.Remove('Password')
+}
+
+$specifiedDatabase = $csb['Database']
+if ($specifiedDatabase -eq '') {
+    $specifiedDatabase = $csb['Initial Catalog']
+}
+if ($database -and $database -ne $specifiedDatabase) {
+    Write-Message -Level Debug -Message ""Database specified in connection string '$specifiedDatabase' does not match Database parameter '$database'. Database parameter will be used.""
+    if ($csb.ShouldSerialize('Database')) { $csb.Remove('Database') }
+    if ($csb.ShouldSerialize('Initial Catalog')) { $csb.Remove('Initial Catalog') }
+    $sqlConnectionInfo.DatabaseName = $database
+}
+
+$sqlConnectionInfo.AdditionalParameters = $csb.ConnectionString
+
+if ($trustCert) {
+    Write-Message -Level Debug -Message ""TrustServerCertificate will be set to '$trustCert'""
+    $sqlConnectionInfo.TrustServerCertificate = $trustCert
+}
+
+$serverConnection = New-Object -TypeName Microsoft.SqlServer.Management.Common.ServerConnection -ArgumentList $sqlConnectionInfo
+New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $serverConnection
+");
+
+            SB_ConnectContext = ScriptBlock.Create("param($s) $s.ConnectionContext.Connect()");
+            SB_DisconnectServer = ScriptBlock.Create("param($s) $s.ConnectionContext.Disconnect()");
+            SB_ExecuteWithResults = ScriptBlock.Create("param($s, $q) $null = $s.ConnectionContext.ExecuteWithResults($q)");
+            SB_AddNoteProperty = ScriptBlock.Create("param($s, $n, $v) Add-Member -InputObject $s -NotePropertyName $n -NotePropertyValue $v -Force");
+            SB_GetConfigValue = ScriptBlock.Create("param($fn) Get-DbatoolsConfigValue -FullName $fn");
+            SB_IsRunningOnCore = ScriptBlock.Create("$PSVersionTable.PSEdition -eq 'Core'");
+
+            SB_LogMaskedConnStr = ScriptBlock.Create(@"
+param($server)
+try {
+    $connStr = $server.ConnectionContext.ConnectionString
+    $csb = New-Object Microsoft.Data.SqlClient.SqlConnectionStringBuilder $connStr
+    if ($csb.Password) { $csb.Password = '********' }
+    Write-Message -Level Debug -Message ""The masked server.ConnectionContext.ConnectionString is $($csb.ConnectionString)""
+} catch {
+    Write-Message -Level Debug -Message ""Failed to mask the connection string""
+}
+");
+
+            SB_AddConnHashValue = ScriptBlock.Create(@"
+param($key, $value)
+try {
+    if ($value.ConnectionContext.NonPooledConnection -or $value.NonPooledConnection) {
+        if (-not [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key]) {
+            [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key] = @()
+        }
+        [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key] += @($value)
+    } else {
+        [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key] = @($value)
+    }
+} catch {
+    # Fallback: just set it
+    [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key] = @($value)
+}
+");
+
+            SB_NewAzAccessToken = ScriptBlock.Create(@"
+param($tenant, $cred)
+$token = (New-DbaAzAccessToken -Type RenewableServicePrincipal -Subtype AzureSqlDb -Tenant $tenant -Credential $cred -ErrorAction Stop).GetAccessToken()
+$token
+");
+
+            SB_RetryTrustCert = ScriptBlock.Create(@"
+param($server)
+$connString = $server.ConnectionContext.SqlConnectionObject.ConnectionString
+$connString = $connString -replace 'Trust Server Certificate=False', 'Trust Server Certificate=True'
+if ($connString -notmatch 'Trust Server Certificate') {
+    if ($connString -match ';$') {
+        $connString += 'Trust Server Certificate=True;'
+    } else {
+        $connString += ';Trust Server Certificate=True;'
+    }
+}
+$server.ConnectionContext.SqlConnectionObject.ConnectionString = $connString
+Write-Message -Level Debug -Message ""Retrying connection with TrustServerCertificate enabled""
+$null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is opening a new connection with TrustServerCertificate'"")
+");
+
+            // SB_CreateFromString and SB_PostConnectionSetup are initialized lazily
+            // in their respective methods since their script strings are very large
+            // and defined inline for readability
+
+            _scriptBlocksCached = true;
         }
 
         #endregion Static Constructor
@@ -305,6 +493,12 @@ namespace Dataplat.Dbatools.Commands
         protected override void BeginProcessing()
         {
             base.BeginProcessing();
+
+            // Ensure cached ScriptBlocks are initialized (done once, thread-safe via PS single-threaded model)
+            EnsureScriptBlocksCached();
+
+            // Cache runtime detection (constant for the lifetime of the process)
+            _isRunningOnCore = IsRunningOnCore();
 
             // Resolve defaults from config values (mirrors the PS1 begin block)
             ResolveDefaultsFromConfig();
@@ -365,9 +559,8 @@ namespace Dataplat.Dbatools.Commands
                 {
                     try
                     {
-                        // Check if running on Core
-                        bool isCore = IsRunningOnCore();
-                        if (isCore)
+                        // Check if running on Core (cached in BeginProcessing)
+                        if (_isRunningOnCore)
                         {
                             WriteMessageAtLevel(
                                 "Generating access tokens is not supported on Core. Will try connection string with Active Directory Service Principal instead. See https://github.com/dataplat/dbatools/pull/7610 for more information.",
@@ -476,7 +669,7 @@ namespace Dataplat.Dbatools.Commands
             LogMaskedConnectionString(server);
 
             // Validate connection by running a simple query
-            bool connectionSucceeded = ValidateConnection(server, instance, isNewConnection, inputObjectType, ref isAzure);
+            bool connectionSucceeded = ValidateConnection(server, instance, isNewConnection, inputObjectType, isAzure);
             if (!connectionSucceeded)
                 return;
 
@@ -617,11 +810,7 @@ namespace Dataplat.Dbatools.Commands
                 }
                 else
                 {
-                    // Build combined list: IgnoredParameters + ApplicationIntent + StatementTimeout
-                    var combined = new List<string>(IgnoredParameters);
-                    combined.Add("ApplicationIntent");
-                    combined.Add("StatementTimeout");
-                    if (TestBound(combined.ToArray()))
+                    if (TestBound(IgnoredParametersForConnStr))
                     {
                         WriteMessageAtLevel("Additional parameters are passed in, but they will be ignored", MessageLevel.Warning, null);
                     }
@@ -629,11 +818,7 @@ namespace Dataplat.Dbatools.Commands
             }
             else if (inputObjectType == "SqlConnection")
             {
-                var combined = new List<string>(IgnoredParameters);
-                combined.Add("ApplicationIntent");
-                combined.Add("StatementTimeout");
-                combined.Add("DedicatedAdminConnection");
-                if (TestBound(combined.ToArray()))
+                if (TestBound(IgnoredParametersForSqlConn))
                 {
                     WriteMessageAtLevel("Additional parameters are passed in, but they will be ignored", MessageLevel.Warning, null);
                 }
@@ -744,19 +929,9 @@ namespace Dataplat.Dbatools.Commands
             string connectAsUserPassword = GetConnectionContextProperty(inputObject, "ConnectAsUserPassword") as string;
             string serverName = GetPropertyValue(inputObject, "Name") as string;
 
-            string script = @"
-param($srvName, $db, $user, $pass, $boundParams)
-$secPass = ConvertTo-SecureString -String $pass -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential($user, $secPass)
-$p = @{}
-foreach ($key in $boundParams.Keys) {
-    if ($key -notin 'SqlInstance','SqlCredential') { $p[$key] = $boundParams[$key] }
-}
-Connect-DbaInstance -SqlInstance $srvName -SqlCredential $cred @p
-";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_RecursiveConnect, null,
                     serverName, Database, connectAsUserName, connectAsUserPassword, MyInvocation.BoundParameters);
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
@@ -771,36 +946,9 @@ Connect-DbaInstance -SqlInstance $srvName -SqlCredential $cred @p
 
         private object CopyAndModifyContext(object inputObject)
         {
-            string script = @"
-param($server, $appIntent, $nonPooled, $stTimeout, $stTimeoutBound, $database, $dac)
-$connContext = $server.ConnectionContext.Copy()
-if ($appIntent) {
-    $connContext.ApplicationIntent = $appIntent
-}
-if ($nonPooled) {
-    $connContext.NonPooledConnection = $true
-}
-if ($stTimeoutBound) {
-    $connContext.StatementTimeout = $stTimeout
-}
-if ($dac -and $server.ConnectionContext.ServerInstance -notmatch '^ADMIN:') {
-    $connContext.ServerInstance = 'ADMIN:' + $connContext.ServerInstance
-    $connContext.NonPooledConnection = $true
-}
-if ($database) {
-    $savedStatementTimeout = $connContext.StatementTimeout
-    $connContext = $connContext.GetDatabaseConnection($database, $false)
-    $connContext.StatementTimeout = $savedStatementTimeout
-}
-$newServer = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $connContext
-if ($database -and $newServer.ConnectionContext.CurrentDatabase -ne $database) {
-    Write-Message -Level Warning -Message ""Changing connection context to database $database was not successful. Current database is $($newServer.ConnectionContext.CurrentDatabase). Please open an issue on https://github.com/dataplat/dbatools/issues.""
-}
-$newServer
-";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_CopyContext, null,
                     inputObject,
                     ApplicationIntent,
                     NonPooledConnection.IsPresent,
@@ -821,10 +969,9 @@ $newServer
 
         private object CreateServerFromSqlConnection(object inputObject)
         {
-            string script = "param($conn) New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $conn";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, inputObject);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_CreateFromSqlConn, null, inputObject);
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
             }
@@ -839,51 +986,9 @@ $newServer
         private object CreateServerFromConnectionString(string connString, string serverName)
         {
             // Mirrors PS1: SqlConnectionInfo from connection string properties, then ServerConnection -> Server
-            string script = @"
-param($connectionString, $trustCert, $database)
-$sqlConnectionInfo = New-Object -TypeName Microsoft.SqlServer.Management.Common.SqlConnectionInfo
-$csb = New-Object -TypeName Microsoft.Data.SqlClient.SqlConnectionStringBuilder -ArgumentList $connectionString
-
-if ($csb.ShouldSerialize('Data Source')) {
-    Write-Message -Level Debug -Message ""ServerName will be set to '$($csb.DataSource)'""
-    $sqlConnectionInfo.ServerName = $csb.DataSource
-    $null = $csb.Remove('Data Source')
-}
-if ($csb.ShouldSerialize('User ID')) {
-    Write-Message -Level Debug -Message ""UserName will be set to '$($csb.UserID)'""
-    $sqlConnectionInfo.UserName = $csb.UserID
-    $null = $csb.Remove('User ID')
-}
-if ($csb.ShouldSerialize('Password')) {
-    Write-Message -Level Debug -Message ""Password will be set""
-    $sqlConnectionInfo.Password = $csb.Password
-    $null = $csb.Remove('Password')
-}
-
-$specifiedDatabase = $csb['Database']
-if ($specifiedDatabase -eq '') {
-    $specifiedDatabase = $csb['Initial Catalog']
-}
-if ($database -and $database -ne $specifiedDatabase) {
-    Write-Message -Level Debug -Message ""Database specified in connection string '$specifiedDatabase' does not match Database parameter '$database'. Database parameter will be used.""
-    if ($csb.ShouldSerialize('Database')) { $csb.Remove('Database') }
-    if ($csb.ShouldSerialize('Initial Catalog')) { $csb.Remove('Initial Catalog') }
-    $sqlConnectionInfo.DatabaseName = $database
-}
-
-$sqlConnectionInfo.AdditionalParameters = $csb.ConnectionString
-
-if ($trustCert) {
-    Write-Message -Level Debug -Message ""TrustServerCertificate will be set to '$trustCert'""
-    $sqlConnectionInfo.TrustServerCertificate = $trustCert
-}
-
-$serverConnection = New-Object -TypeName Microsoft.SqlServer.Management.Common.ServerConnection -ArgumentList $sqlConnectionInfo
-New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $serverConnection
-";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_CreateFromConnString, null,
                     connString, TrustServerCertificate.IsPresent, Database);
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
@@ -941,11 +1046,14 @@ New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $se
 
             // Build server via PowerShell using SqlConnectionInfo -> ServerConnection -> Server
             // This preserves exact compatibility with SMO connection pooling
-            string script = BuildCreateServerScript(authType);
+            if (SB_CreateFromString == null)
+            {
+                SB_CreateFromString = ScriptBlock.Create(BuildCreateServerScript());
+            }
 
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_CreateFromString, null,
                     serverName,
                     authType,
                     username,
@@ -990,7 +1098,7 @@ New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $se
             return null;
         }
 
-        private string BuildCreateServerScript(string authType)
+        private static string BuildCreateServerScript()
         {
             return @"
 param(
@@ -1206,7 +1314,7 @@ $server
 
         #region Connection Validation
 
-        private bool ValidateConnection(object server, DbaInstanceParameter instance, bool isNewConnection, string inputObjectType, ref bool isAzure)
+        private bool ValidateConnection(object server, DbaInstanceParameter instance, bool isNewConnection, string inputObjectType, bool isAzure)
         {
             bool connectionSucceeded = false;
             Exception connectionError = null;
@@ -1221,7 +1329,7 @@ $server
             catch (Exception ex)
             {
                 connectionError = ex;
-                string errorMessage = ex.Message;
+                string errorMessage = GetDeepestExceptionMessage(ex);
 
                 // Check for AllowTrustServerCertificate retry
                 bool isCertError = errorMessage != null && (
@@ -1266,22 +1374,7 @@ $server
 
         private void RetryWithTrustServerCertificate(object server)
         {
-            string script = @"
-param($server)
-$connString = $server.ConnectionContext.SqlConnectionObject.ConnectionString
-$connString = $connString -replace 'Trust Server Certificate=False', 'Trust Server Certificate=True'
-if ($connString -notmatch 'Trust Server Certificate') {
-    if ($connString -match ';$') {
-        $connString += 'Trust Server Certificate=True;'
-    } else {
-        $connString += ';Trust Server Certificate=True;'
-    }
-}
-$server.ConnectionContext.SqlConnectionObject.ConnectionString = $connString
-Write-Message -Level Debug -Message ""Retrying connection with TrustServerCertificate enabled""
-$null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is opening a new connection with TrustServerCertificate'"")
-";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, server);
+            InvokeCommand.InvokeScript(false, SB_RetryTrustCert, null, server);
         }
 
         #endregion Connection Validation
@@ -1456,9 +1549,14 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
     }
 }
 ";
+            if (SB_PostConnectionSetup == null)
+            {
+                SB_PostConnectionSetup = ScriptBlock.Create(script);
+            }
+
             try
             {
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
+                InvokeCommand.InvokeScript(false, SB_PostConnectionSetup, null,
                     instance, server, isAzure,
                     Fields2000Db, Fields200xDb, Fields201xDb,
                     Fields2000Login, Fields200xLogin, Fields201xLogin,
@@ -1585,8 +1683,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         {
             try
             {
-                string script = "param($fn) Get-DbatoolsConfigValue -FullName $fn";
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, fullName);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_GetConfigValue, null, fullName);
                 if (results != null && results.Count > 0 && results[0] != null)
                 {
                     object val = results[0].BaseObject;
@@ -1659,28 +1756,31 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
 
         private void ConnectContext(object server)
         {
-            string script = "param($s) $s.ConnectionContext.Connect()";
             try
             {
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, server);
+                InvokeCommand.InvokeScript(false, SB_ConnectContext, null, server);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                WriteMessageAtLevel(String.Format("ConnectContext failed: {0}", GetDeepestExceptionMessage(ex)), MessageLevel.Debug, null);
+            }
         }
 
         private void DisconnectServer(object server)
         {
-            string script = "param($s) $s.ConnectionContext.Disconnect()";
             try
             {
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, server);
+                InvokeCommand.InvokeScript(false, SB_DisconnectServer, null, server);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                WriteMessageAtLevel(String.Format("DisconnectServer failed: {0}", GetDeepestExceptionMessage(ex)), MessageLevel.Debug, null);
+            }
         }
 
         private void InvokeExecuteWithResults(object server, string sql)
         {
-            string script = "param($s, $q) $null = $s.ConnectionContext.ExecuteWithResults($q)";
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, server, sql);
+            InvokeCommand.InvokeScript(false, SB_ExecuteWithResults, null, server, sql);
         }
 
         private object GetSqlConnectionObject(object server)
@@ -1697,55 +1797,27 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
 
         private void LogMaskedConnectionString(object server)
         {
-            string script = @"
-param($server)
-try {
-    $connStr = $server.ConnectionContext.ConnectionString
-    $csb = New-Object Microsoft.Data.SqlClient.SqlConnectionStringBuilder $connStr
-    if ($csb.Password) { $csb.Password = '********' }
-    Write-Message -Level Debug -Message ""The masked server.ConnectionContext.ConnectionString is $($csb.ConnectionString)""
-} catch {
-    Write-Message -Level Debug -Message ""Failed to mask the connection string""
-}
-";
             try
             {
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, server);
+                InvokeCommand.InvokeScript(false, SB_LogMaskedConnStr, null, server);
             }
             catch { }
         }
 
         private void AddNoteProperty(object server, string name, object value)
         {
-            string script = "param($s, $n, $v) Add-Member -InputObject $s -NotePropertyName $n -NotePropertyValue $v -Force";
             try
             {
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, server, name, value);
+                InvokeCommand.InvokeScript(false, SB_AddNoteProperty, null, server, name, value);
             }
             catch { }
         }
 
         private void AddConnectionHashValue(string key, object value)
         {
-            string script = @"
-param($key, $value)
-try {
-    if ($value.ConnectionContext.NonPooledConnection -or $value.NonPooledConnection) {
-        if (-not [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key]) {
-            [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key] = @()
-        }
-        [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key] += @($value)
-    } else {
-        [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key] = @($value)
-    }
-} catch {
-    # Fallback: just set it
-    [Dataplat.Dbatools.Connection.ConnectionHost]::ConnectionHash[$key] = @($value)
-}
-";
             try
             {
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, key, value);
+                InvokeCommand.InvokeScript(false, SB_AddConnHashValue, null, key, value);
             }
             catch { }
         }
@@ -1754,8 +1826,7 @@ try {
         {
             try
             {
-                string script = "$PSVersionTable.PSEdition -eq 'Core'";
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[0]);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_IsRunningOnCore, null, new object[0]);
                 if (results != null && results.Count > 0 && results[0] != null)
                 {
                     return results[0].BaseObject is bool val && val;
@@ -1767,12 +1838,7 @@ try {
 
         private PSObject InvokeNewDbaAzAccessToken()
         {
-            string script = @"
-param($tenant, $cred)
-$token = (New-DbaAzAccessToken -Type RenewableServicePrincipal -Subtype AzureSqlDb -Tenant $tenant -Credential $cred -ErrorAction Stop).GetAccessToken()
-$token
-";
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, Tenant, SqlCredential);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_NewAzAccessToken, null, Tenant, SqlCredential);
             if (results != null && results.Count > 0)
                 return results[0];
             return null;
