@@ -51,6 +51,7 @@
         'Get-DbaAgHadr',
         'Get-DbaAgListener',
         'Get-DbaAgReplica',
+        'Get-DbaAvailabilityGroup',
         'Get-DbaClientAlias',
         'Get-DbaClientProtocol',
         'Get-DbaConnectedInstance',

@@ -13,7 +13,7 @@
 | 4 | Get-DbaAgHadr | DONE | GetDbaAgHadrCommand.cs | OK | 100% | 2/2 pass | Read-only, no deps |
 | 5 | Get-DbaAgListener | DONE | GetDbaAgListenerCommand.cs | OK | 100% | 1/1 unit pass; integration pre-existing infra issue | Read-only, no deps |
 | 6 | Get-DbaAgReplica | DONE | GetDbaAgReplicaCommand.cs | OK | 100% | 1/1 unit pass; integration pre-existing infra issue | Read-only, no deps |
-| 7 | Get-DbaAvailabilityGroup | PENDING | | | | | Read-only, no deps |
+| 7 | Get-DbaAvailabilityGroup | DONE | GetDbaAvailabilityGroupCommand.cs | OK | 100% | 1/1 unit pass; integration pre-existing infra issue | Read-only, no deps |
 | 8 | Test-DbaAgSpn | PENDING | | | | |  |
 | 9 | Test-DbaAvailabilityGroup | PENDING | | | | |  |
 | 10 | New-DbaAvailabilityGroup | PENDING | | | | | ShouldProcess required |
