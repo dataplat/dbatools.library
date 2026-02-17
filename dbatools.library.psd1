@@ -43,6 +43,7 @@
         'Connect-DbaInstance',
         'Disconnect-DbaInstance',
         'Get-DbaAgBackupHistory',
+        'Get-DbaAgDatabase',
         'Get-DbaAgentAlert',
         'Get-DbaAgentAlertCategory',
         'Get-DbaConnectedInstance',

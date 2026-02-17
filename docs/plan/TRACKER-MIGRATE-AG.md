@@ -8,7 +8,7 @@
 | # | Command | Status | C# File | Build | Parity | Pester | Notes |
 |---|---------|--------|---------|-------|--------|--------|-------|
 | 1 | Get-DbaAgBackupHistory | DONE | GetDbaAgBackupHistoryCommand.cs | OK | 100% | 1/1 | Read-only, no deps |
-| 2 | Get-DbaAgDatabase | PENDING | | | | | Read-only, no deps |
+| 2 | Get-DbaAgDatabase | DONE | GetDbaAgDatabaseCommand.cs | OK | 100% | 2/2 pass | Read-only, no deps |
 | 3 | Get-DbaAgDatabaseReplicaState | PENDING | | | | | Read-only, no deps |
 | 4 | Get-DbaAgHadr | PENDING | | | | | Read-only, no deps |
 | 5 | Get-DbaAgListener | PENDING | | | | | Read-only, no deps |
