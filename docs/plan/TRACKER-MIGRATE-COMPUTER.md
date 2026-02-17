@@ -8,7 +8,7 @@
 | # | Command | Status | C# File | Build | Parity | Pester | Notes |
 |---|---------|--------|---------|-------|--------|--------|-------|
 | 1 | Get-DbaClientAlias | DONE | GetDbaClientAliasCommand.cs | OK | 100% | 7/7 | Read-only, no deps |
-| 2 | Get-DbaClientProtocol | PENDING | | | | | Read-only, no deps |
+| 2 | Get-DbaClientProtocol | DONE | GetDbaClientProtocolCommand.cs | OK | 100% | 1/1 (1 skipped) | Read-only, no deps |
 | 3 | Get-DbaCmConnection | PENDING | | | | | Read-only, no deps |
 | 4 | Get-DbaCmObject | PENDING | | | | | Read-only, no deps |
 | 5 | Get-DbaComputerCertificate | PENDING | | | | | Read-only, no deps |

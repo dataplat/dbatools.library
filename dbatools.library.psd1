@@ -52,6 +52,7 @@
         'Get-DbaAgListener',
         'Get-DbaAgReplica',
         'Get-DbaClientAlias',
+        'Get-DbaClientProtocol',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',
