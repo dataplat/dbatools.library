@@ -13,7 +13,7 @@
 | 4 | Get-DbatoolsError | DONE | GetDbatoolsErrorCommand.cs | OK | 100% | 5/5 | Read-only, no deps |
 | 5 | Get-DbatoolsLog | DONE | GetDbatoolsLogCommand.cs | OK | 100% | 16/16 | Read-only, no deps |
 | 6 | Get-DbatoolsPath | DONE | GetDbatoolsPathCommand.cs | OK | 100% | 1/1 | Read-only, no deps |
-| 7 | New-DbatoolsSupportPackage | PENDING | | | | | ShouldProcess required |
+| 7 | New-DbatoolsSupportPackage | DONE | NewDbatoolsSupportPackageCommand.cs | OK | 100% | 1/1 | ShouldProcess, uses InvokeScript for PS data collection |
 | 8 | Set-DbatoolsInsecureConnection | PENDING | | | | | ShouldProcess required |
 | 9 | Set-DbatoolsPath | PENDING | | | | | ShouldProcess required, depends on Get-DbatoolsPath |
 | 10 | Export-DbatoolsConfig | PENDING | | | | |  |

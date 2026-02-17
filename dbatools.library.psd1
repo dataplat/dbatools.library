@@ -55,6 +55,7 @@
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
         'New-DbaConnectionStringBuilder',
+        'New-DbatoolsSupportPackage',
         'New-DbaScriptingOption',
         'New-DbaSqlParameter',
         'Resolve-DbaNetworkName',
