@@ -899,15 +899,19 @@ New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $se
             if (SqlCredential != null)
             {
                 username = SqlCredential.UserName.TrimStart('\\');
-                // Swap domain\user to user@domain when domain-joined
-                string userDomain = Environment.GetEnvironmentVariable("USERDOMAIN") ?? "";
-                string computerName = Environment.MachineName;
-                if (!String.Equals(userDomain, computerName, StringComparison.OrdinalIgnoreCase))
+                // Swap domain\user to user@domain when domain-joined (Windows only)
+                if (Internal.FlowControl.TestWindows())
                 {
-                    if (username.Contains("\\"))
+                    string userDomain = Environment.GetEnvironmentVariable("USERDOMAIN") ?? "";
+                    string computerName = Environment.MachineName;
+                    if (!String.IsNullOrEmpty(userDomain)
+                        && !String.Equals(userDomain, computerName, StringComparison.OrdinalIgnoreCase))
                     {
-                        string[] parts = username.Split(new char[] { '\\' }, 2);
-                        username = String.Format("{0}@{1}", parts[1], parts[0]);
+                        if (username.Contains("\\"))
+                        {
+                            string[] parts = username.Split(new char[] { '\\' }, 2);
+                            username = String.Format("{0}@{1}", parts[1], parts[0]);
+                        }
                     }
                 }
                 if (username.Contains("@") || username.Contains("\\"))
