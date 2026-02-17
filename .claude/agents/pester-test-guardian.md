@@ -45,18 +45,20 @@ This is the ONE area where you CAN recommend Pester test changes proactively. Lo
 
 ## Test Setup
 
-**Always spawn a fresh PowerShell process** for testing. The installed `dbatools.library` DLL may be locked by another session. Import the local repo's library FIRST so the freshly built DLL is used:
+**Always spawn a fresh PowerShell process** for testing. The installed `dbatools.library` DLL may be locked by another session. Import the **dev-built** library from `artifacts/` FIRST so the freshly built DLL is used:
 
 ```bash
 pwsh -NoProfile -Command '
-    Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+    Import-Module c:\github\dbatools.library\artifacts\dbatools.library\dbatools.library.psd1 -Force
     Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
     . c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1
     Invoke-ManualPester -Path c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1 -TestIntegration
 '
 ```
 
-**Why this order matters**: Loading `dbatools.library` from `c:\github\dbatools.library` first puts the freshly built DLL into the session. When `dbatools-ralph\dbatools.psm1` loads next, its `RequiredModules = 'dbatools.library'` is already satisfied by the local version, so it won't try to load the installed (potentially locked) copy.
+**Why this order matters**: The dev-built module at `artifacts/dbatools.library/` contains the freshly compiled `dbatools.dll` plus all ~142 dependency DLLs (SMO, SqlClient, etc.). Loading it first satisfies dbatools-ralph's `RequiredModules = 'dbatools.library'` dependency, so it won't try to load the installed (potentially locked) copy.
+
+**How to build it**: Run `pwsh -NoProfile -File build/build-dev.ps1` from the `dbatools.library` repo. This creates the complete loadable module in `artifacts/dbatools.library/`.
 
 `Invoke-ManualPester` is the dbatools test runner at `c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1`. It handles Pester v4/v5 detection, module imports, `Get-TestConfig`, coverage, and `-TestIntegration` tag filtering. Always use it instead of raw `Invoke-Pester`.
 
@@ -78,7 +80,7 @@ Always run in a fresh `pwsh -NoProfile` process:
 
 ```bash
 pwsh -NoProfile -Command '
-    Import-Module c:\github\dbatools.library\dbatools.library.psd1 -Force
+    Import-Module c:\github\dbatools.library\artifacts\dbatools.library\dbatools.library.psd1 -Force
     Import-Module c:\github\dbatools-ralph\dbatools.psm1 -Force
     . c:\github\dbatools-ralph\private\testing\Invoke-ManualPester.ps1
     Invoke-ManualPester -Path c:\github\dbatools-ralph\tests\{CommandName}.Tests.ps1 -TestIntegration
