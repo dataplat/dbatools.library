@@ -15,7 +15,7 @@
 | 6 | New-DbaConnectionString | DONE | NewDbaConnectionStringCommand.cs | OK | OK | 1/1 | ShouldProcess preserved; both new and legacy code paths implemented |
 | 7 | New-DbaConnectionStringBuilder | DONE | NewDbaConnectionStringBuilderCommand.cs | OK | OK | 30/30 | No ShouldProcess needed; both Microsoft.Data and System.Data providers supported |
 | 8 | New-DbaScriptingOption | DONE | NewDbaScriptingOptionCommand.cs | OK | OK | 14/14 | No ShouldProcess needed (in-memory factory); Pester improved from 0/1 to 14/14 |
-| 9 | New-DbaSqlParameter | PENDING | | | | | ShouldProcess required |
+| 9 | New-DbaSqlParameter | DONE | NewDbaSqlParameterCommand.cs | OK | OK | 3/3 | No ShouldProcess needed (in-memory factory); Pester improved from 1/3 to 3/3 |
 | 10 | Clear-DbaConnectionPool | PENDING | | | | |  |
 | 11 | Connect-DbaInstance | PENDING | | | | |  |
 | 12 | Disconnect-DbaInstance | PENDING | | | | |  |

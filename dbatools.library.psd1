@@ -45,6 +45,7 @@
         'New-DbaConnectionString',
         'New-DbaConnectionStringBuilder',
         'New-DbaScriptingOption',
+        'New-DbaSqlParameter',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
