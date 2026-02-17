@@ -65,6 +65,7 @@
         'New-DbaSqlParameter',
         'Resolve-DbaNetworkName',
         'Resolve-DbaPath',
+        'Set-DbatoolsInsecureConnection',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
