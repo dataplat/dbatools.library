@@ -42,6 +42,7 @@
         'Clear-DbaConnectionPool',
         'Connect-DbaInstance',
         'Disconnect-DbaInstance',
+        'Get-DbaAgBackupHistory',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',
