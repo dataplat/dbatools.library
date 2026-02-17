@@ -19,6 +19,7 @@ namespace Dataplat.Dbatools.Commands
         /// Credential to use for SQL Server authentication.
         /// </summary>
         [Parameter()]
+        [Alias("Credential", "Cred")]
         public PSCredential SqlCredential { get; set; }
     }
 }

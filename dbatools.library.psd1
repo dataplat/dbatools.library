@@ -40,6 +40,7 @@
     FunctionsToExport      = @('Get-DbatoolsLibraryPath')
     CmdletsToExport        = @(
         'Get-DbaConnectedInstance',
+        'Get-DbaConnection',
         'Test-DbaPath'
     )
     AliasesToExport        = @()
