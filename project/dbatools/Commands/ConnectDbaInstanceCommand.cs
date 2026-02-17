@@ -573,6 +573,11 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
                             AccessToken = InvokeNewDbaAzAccessToken();
                             Tenant = null;
                             SqlCredential = null;
+                            // Update BoundParameters to reflect the changed state
+                            // so downstream logic checking bound params stays consistent
+                            MyInvocation.BoundParameters["AccessToken"] = AccessToken;
+                            MyInvocation.BoundParameters.Remove("Tenant");
+                            MyInvocation.BoundParameters.Remove("SqlCredential");
                         }
                     }
                     catch (Exception ex)
@@ -1426,6 +1431,10 @@ $server
                 else if (String.Equals(computerNameSource, "server.ComputerNamePhysicalNetBIOS", StringComparison.OrdinalIgnoreCase))
                 {
                     computerName = GetPropertyValue(server, "ComputerNamePhysicalNetBIOS") as string;
+                }
+                else
+                {
+                    WriteMessageAtLevel(String.Format("ComputerName source '{0}' is not recognized. Using default.", computerNameSource), MessageLevel.Warning, null);
                 }
 
                 if (!String.IsNullOrEmpty(computerName))
