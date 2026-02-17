@@ -44,6 +44,7 @@
         'Disconnect-DbaInstance',
         'Get-DbaAgBackupHistory',
         'Get-DbaAgentAlert',
+        'Get-DbaAgentAlertCategory',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',
