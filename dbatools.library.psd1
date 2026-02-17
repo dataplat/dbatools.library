@@ -41,6 +41,7 @@
     CmdletsToExport        = @(
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
+        'New-DbaAzAccessToken',
         'Test-DbaConnection',
         'Test-DbaPath'
     )
