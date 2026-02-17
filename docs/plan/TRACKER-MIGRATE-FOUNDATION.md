@@ -21,5 +21,5 @@
 | 12 | Disconnect-DbaInstance | DONE | DisconnectDbaInstanceCommand.cs | OK | OK | 9/9 | ShouldProcess preserved; handles SMO Server and SqlConnection; Pester improved from 1/2 to 9/9 |
 | 13 | Invoke-DbaQuery | DONE | InvokeDbaQueryCommand.cs | OK | OK | 0/26 (baseline 0/28) | Primary query command; Invoke-DbaAsync inlined; GO splitting, MessagesToOutput, 6 output formats |
 | 14 | Join-DbaPath | DONE | JoinDbaPathCommand.cs | OK | OK | 10/10 | SqlCredential added for SQL auth OS detection; Pester improved from 1/1 to 10/10 |
-| 15 | Resolve-DbaNetworkName | PENDING | | | | |  |
+| 15 | Resolve-DbaNetworkName | DONE | ResolveDbaNetworkNameCommand.cs | OK | OK | 4/4 | DNS+Ping+WMI/CIM; VeryVerbose levels preserved; Position fix for positional binding |
 | 16 | Resolve-DbaPath | PENDING | | | | |  |
