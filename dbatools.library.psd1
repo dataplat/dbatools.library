@@ -44,6 +44,7 @@
         'Disconnect-DbaInstance',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
+        'Invoke-DbaQuery',
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
         'New-DbaConnectionStringBuilder',
