@@ -514,8 +514,9 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
             }
 
             // Connect-DbaInstance uses opposite exception logic: by default it THROWS (EnableException = true)
-            // DisableException reverses this behavior
-            // Also respect -EnableException:$false if explicitly passed by the user
+            // PS1: if ($DisableException) { $EnableException = $false } else { $EnableException = $true }
+            // In C#, EnableException is an inherited SwitchParameter that users can also bind explicitly,
+            // so we must respect: -DisableException > -EnableException:$false > default (true)
             if (DisableException.IsPresent)
             {
                 EnableException = false;
@@ -572,10 +573,10 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
                             Tenant = null;
                             SqlCredential = null;
                             // Update BoundParameters to reflect the changed state
-                            // so downstream logic checking bound params stays consistent
+                            // Match PS1: $PSBoundParameters.Tenant = $null (keeps key, sets value null)
                             MyInvocation.BoundParameters["AccessToken"] = AccessToken;
-                            MyInvocation.BoundParameters.Remove("Tenant");
-                            MyInvocation.BoundParameters.Remove("SqlCredential");
+                            MyInvocation.BoundParameters["Tenant"] = null;
+                            MyInvocation.BoundParameters["SqlCredential"] = null;
                         }
                     }
                     catch (Exception ex)
@@ -690,13 +691,14 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
             }
 
             // Check minimum version
+            // PS1: if ($MinimumVersion -and $server.VersionMajor) - VersionMajor of 0 is falsy in PS1
             if (TestBound("MinimumVersion"))
             {
                 object versionMajor = GetPropertyValue(server, "VersionMajor");
                 if (versionMajor != null)
                 {
                     int major = Convert.ToInt32(versionMajor);
-                    if (major < MinimumVersion)
+                    if (major != 0 && major < MinimumVersion)
                     {
                         if (isNewConnection) DisconnectServer(server);
                         StopFunction(String.Format("SQL Server version {0} required - {1} not supported.", MinimumVersion, server), target: instance, isContinue: true);
