@@ -9,7 +9,7 @@
 |---|---------|--------|---------|-------|--------|--------|-------|
 | 1 | Get-DbaConnectedInstance | DONE | GetDbaConnectedInstanceCommand.cs | OK | OK | 2/2 | Read-only, no deps |
 | 2 | Get-DbaConnection | DONE | GetDbaConnectionCommand.cs | OK | OK | 2/2 | Read-only, no deps |
-| 3 | Test-DbaConnection | PENDING | | | | |  |
+| 3 | Test-DbaConnection | DONE | TestDbaConnectionCommand.cs | OK | OK | 2/2 | Pester improved: 1 pre-existing failure now passes |
 | 4 | Test-DbaPath | PENDING | | | | |  |
 | 5 | New-DbaAzAccessToken | PENDING | | | | | ShouldProcess required |
 | 6 | New-DbaConnectionString | PENDING | | | | | ShouldProcess required |
