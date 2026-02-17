@@ -48,6 +48,7 @@
         'Get-DbaAgentAlert',
         'Get-DbaAgentAlertCategory',
         'Get-DbaAgentJob',
+        'Get-DbaAgentJobCategory',
         'Get-DbaAgHadr',
         'Get-DbaAgListener',
         'Get-DbaAgReplica',
