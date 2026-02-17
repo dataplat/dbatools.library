@@ -40,6 +40,7 @@
     FunctionsToExport      = @('Get-DbatoolsLibraryPath')
     CmdletsToExport        = @(
         'Clear-DbaConnectionPool',
+        'Connect-DbaInstance',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'New-DbaAzAccessToken',

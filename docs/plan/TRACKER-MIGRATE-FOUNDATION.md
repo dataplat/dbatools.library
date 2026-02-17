@@ -17,7 +17,7 @@
 | 8 | New-DbaScriptingOption | DONE | NewDbaScriptingOptionCommand.cs | OK | OK | 14/14 | No ShouldProcess needed (in-memory factory); Pester improved from 0/1 to 14/14 |
 | 9 | New-DbaSqlParameter | DONE | NewDbaSqlParameterCommand.cs | OK | OK | 3/3 | No ShouldProcess needed (in-memory factory); Pester improved from 1/3 to 3/3 |
 | 10 | Clear-DbaConnectionPool | DONE | ClearDbaConnectionPoolCommand.cs | OK | OK | 2/2 | Local path calls SqlConnection.ClearAllPools() directly; remote uses Invoke-Command2 |
-| 11 | Connect-DbaInstance | PENDING | | | | |  |
+| 11 | Connect-DbaInstance | DONE | ConnectDbaInstanceCommand.cs | OK | OK | 21/21 | Core connection command; 1 pre-existing Backup test failure unchanged |
 | 12 | Disconnect-DbaInstance | PENDING | | | | |  |
 | 13 | Invoke-DbaQuery | PENDING | | | | |  |
 | 14 | Join-DbaPath | PENDING | | | | |  |
