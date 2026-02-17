@@ -335,9 +335,7 @@ namespace Dataplat.Dbatools.Commands
             if (_scriptBlocksCached) return;
 
             SB_RecursiveConnect = ScriptBlock.Create(@"
-param($srvName, $db, $user, $pass, $boundParams)
-$secPass = ConvertTo-SecureString -String $pass -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential($user, $secPass)
+param($srvName, $db, $cred, $boundParams)
 $p = @{}
 foreach ($key in $boundParams.Keys) {
     if ($key -notin 'SqlInstance','SqlCredential') { $p[$key] = $boundParams[$key] }
@@ -929,15 +927,26 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
 
         private object RecursiveConnectWithNewCredentials(object inputObject)
         {
-            // Get ConnectAsUserName and ConnectAsUserPassword, build credential, recursively call Connect-DbaInstance
+            // Get ConnectAsUserName and ConnectAsUserPassword, build PSCredential in C#
+            // to avoid passing plaintext password to PowerShell script (Script Block Logging exposure)
             string connectAsUserName = GetConnectAsUserName(inputObject);
             string connectAsUserPassword = GetConnectionContextProperty(inputObject, "ConnectAsUserPassword") as string;
             string serverName = GetPropertyValue(inputObject, "Name") as string;
 
+            // Build SecureString and PSCredential in C# so password never appears in script args
+            SecureString securePass = new SecureString();
+            if (connectAsUserPassword != null)
+            {
+                foreach (char c in connectAsUserPassword)
+                    securePass.AppendChar(c);
+            }
+            securePass.MakeReadOnly();
+            PSCredential cred = new PSCredential(connectAsUserName ?? "", securePass);
+
             try
             {
                 Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_RecursiveConnect, null,
-                    serverName, Database, connectAsUserName, connectAsUserPassword, MyInvocation.BoundParameters);
+                    serverName, Database, cred, MyInvocation.BoundParameters);
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
             }
@@ -1856,18 +1865,40 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         private DbaInstanceParameter RewriteForServicePrincipal(DbaInstanceParameter instance)
         {
             string azureServer = instance.InputObject != null ? instance.InputObject.ToString() : instance.ToString();
-            string connStr;
-            if (!String.IsNullOrEmpty(Database))
+
+            // Use SqlConnectionStringBuilder to safely construct the connection string,
+            // preventing connection string injection from server name or database values.
+            // The password is passed via PSCredential to avoid plain string materialization in C#.
+            string script = @"
+param($server, $db, $cred)
+$csb = New-Object Microsoft.Data.SqlClient.SqlConnectionStringBuilder
+$csb.DataSource = $server
+$csb['Authentication'] = 'Active Directory Service Principal'
+$csb.UserID = $cred.UserName
+$csb.Password = $cred.GetNetworkCredential().Password
+if ($db) { $csb.InitialCatalog = $db }
+$csb.ConnectionString
+";
+            try
             {
-                connStr = String.Format("Server={0}; Authentication=Active Directory Service Principal; Database={1}; User Id={2}; Password={3}",
-                    azureServer, Database, SqlCredential.UserName, SqlCredential.GetNetworkCredential().Password);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
+                    azureServer, Database, SqlCredential);
+                if (results != null && results.Count > 0)
+                {
+                    string connStr = results[0].BaseObject as string;
+                    if (!String.IsNullOrEmpty(connStr))
+                    {
+                        return new DbaInstanceParameter(connStr);
+                    }
+                }
             }
-            else
+            catch (Exception ex)
             {
-                connStr = String.Format("Server={0}; Authentication=Active Directory Service Principal; User Id={1}; Password={2}",
-                    azureServer, SqlCredential.UserName, SqlCredential.GetNetworkCredential().Password);
+                StopFunction(String.Format("Failed to rewrite connection for service principal: {0}", GetDeepestExceptionMessage(ex)),
+                    exception: ex, target: instance, isContinue: true);
+                TestFunctionInterrupt();
             }
-            return new DbaInstanceParameter(connStr);
+            return instance;
         }
 
         /// <summary>
