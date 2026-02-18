@@ -78,6 +78,17 @@ namespace Dataplat.Dbatools.Commands
         private string _parameterSetName;
 
         /// <summary>
+        /// Computes the effective isContinue value for StopFunction calls that pass -SilentlyContinue.
+        /// In PS1, when EnableException is true and SilentlyContinue is false, Stop-Function throws
+        /// (ignoring -Continue). When SilentlyContinue is true, it writes a non-terminating error
+        /// and continues. When EnableException is false, -Continue always controls the flow.
+        /// </summary>
+        private bool IsSilentContinue
+        {
+            get { return !EnableException.ToBool() || SilentlyContinue.IsPresent; }
+        }
+
+        /// <summary>
         /// Initializes the cmdlet, reads configuration values.
         /// </summary>
         protected override void BeginProcessing()
@@ -111,7 +122,7 @@ namespace Dataplat.Dbatools.Commands
                         String.Format("Failed to interpret input: {0}", connectionObject.InputObject),
                         category: ErrorCategory.InvalidArgument,
                         target: connectionObject.InputObject,
-                        isContinue: true);
+                        isContinue: IsSilentContinue);
                     TestFunctionInterrupt();
                     continue;
                 }
@@ -210,7 +221,7 @@ namespace Dataplat.Dbatools.Commands
                                 computer, enabledProtocols),
                             errorRecord: new ErrorRecord(ex, "NoConnection", ErrorCategory.OpenError, computer),
                             target: computer,
-                            isContinue: true);
+                            isContinue: IsSilentContinue);
                         TestFunctionInterrupt();
                         break;
                     }
@@ -288,7 +299,7 @@ namespace Dataplat.Dbatools.Commands
                         String.Format("[{0}] Invalid connection credentials", computer),
                         errorRecord: new ErrorRecord(ex, "BadCredentials", ErrorCategory.AuthenticationError, computer),
                         target: computer,
-                        isContinue: true,
+                        isContinue: IsSilentContinue,
                         overrideExceptionMessage: true);
                     TestFunctionInterrupt();
                     return true; // break out of protocol loop for this computer
@@ -305,7 +316,7 @@ namespace Dataplat.Dbatools.Commands
                     errorDetails.Message,
                     errorRecord: new ErrorRecord(ex, "CimRMError", ErrorCategory.NotSpecified, computer),
                     target: computer,
-                    isContinue: true,
+                    isContinue: IsSilentContinue,
                     overrideExceptionMessage: true);
                 TestFunctionInterrupt();
                 return true; // break out of protocol loop for this computer
@@ -363,7 +374,7 @@ namespace Dataplat.Dbatools.Commands
                         String.Format("[{0}] Invalid connection credentials", computer),
                         errorRecord: new ErrorRecord(ex, "BadCredentials", ErrorCategory.AuthenticationError, computer),
                         target: computer,
-                        isContinue: true,
+                        isContinue: IsSilentContinue,
                         overrideExceptionMessage: true);
                     TestFunctionInterrupt();
                     return true;
@@ -380,7 +391,7 @@ namespace Dataplat.Dbatools.Commands
                     errorDetails.Message,
                     errorRecord: new ErrorRecord(ex, "CimDCOMError", ErrorCategory.NotSpecified, computer),
                     target: computer,
-                    isContinue: true,
+                    isContinue: IsSilentContinue,
                     overrideExceptionMessage: true);
                 TestFunctionInterrupt();
                 return true;
@@ -467,7 +478,7 @@ namespace Dataplat.Dbatools.Commands
                         String.Format("[{0}] Invalid connection credentials", computer),
                         errorRecord: new ErrorRecord(ex, "BadCredentials", ErrorCategory.AuthenticationError, computer),
                         target: computer,
-                        isContinue: true);
+                        isContinue: IsSilentContinue);
                     TestFunctionInterrupt();
                     return true;
                 }
@@ -478,7 +489,7 @@ namespace Dataplat.Dbatools.Commands
                         String.Format("[{0}] Invalid class name ({1}), not found in current namespace ({2})", computer, ClassName, Namespace),
                         errorRecord: new ErrorRecord(ex, "InvalidClass", ErrorCategory.InvalidType, computer),
                         target: computer,
-                        isContinue: true);
+                        isContinue: IsSilentContinue);
                     TestFunctionInterrupt();
                     return true;
                 }
@@ -489,7 +500,7 @@ namespace Dataplat.Dbatools.Commands
                         String.Format("[{0}] Failed to access: {1}, in namespace: {2} - There was a provider error. This indicates a potential issue with WMI on the server side.", computer, ClassName, Namespace),
                         errorRecord: new ErrorRecord(ex, "ProviderLoadFailure", ErrorCategory.NotSpecified, computer),
                         target: computer,
-                        isContinue: true);
+                        isContinue: IsSilentContinue);
                     TestFunctionInterrupt();
                     return true;
                 }
