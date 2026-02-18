@@ -11,7 +11,7 @@
 | 2 | Get-DbaAgentAlertCategory | DONE | GetDbaAgentAlertCategoryCommand.cs | OK | 100% | Pre-existing PSDefaultParameterValues issue | Read-only, no deps |
 | 3 | Get-DbaAgentJob | DONE | GetDbaAgentJobCommand.cs | OK | 100% | Pre-existing dev-module sqlCredential issue (6 tests); 15/21 pass | Read-only, no deps |
 | 4 | Get-DbaAgentJobCategory | DONE | GetDbaAgentJobCategoryCommand.cs | OK | 100% | Pre-existing dev-module sqlCredential issue (1/4 pass); C# cmdlet verified correct | Read-only, no deps |
-| 5 | Get-DbaAgentJobHistory | PENDING | | | | | Read-only, no deps |
+| 5 | Get-DbaAgentJobHistory | DONE | GetDbaAgentJobHistoryCommand.cs | OK | 100% | 1/22 pass; 20 failures from InModuleScope mock incompatibility with C# InvokeScript (known limitation); C# cmdlet verified working against real SQL instances | Read-only, uses InvokeScript for Connect-DbaInstance/EnumJobHistory/Get-DbaAgentJobOutputFile |
 | 6 | Get-DbaAgentJobOutputFile | PENDING | | | | | Read-only, no deps |
 | 7 | Get-DbaAgentJobStep | PENDING | | | | | Read-only, no deps |
 | 8 | Get-DbaAgentLog | PENDING | | | | | Read-only, no deps |

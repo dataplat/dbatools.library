@@ -50,6 +50,7 @@
         'Get-DbaAgentAlertCategory',
         'Get-DbaAgentJob',
         'Get-DbaAgentJobCategory',
+        'Get-DbaAgentJobHistory',
         'Get-DbaAgHadr',
         'Get-DbaAgListener',
         'Get-DbaAgReplica',
