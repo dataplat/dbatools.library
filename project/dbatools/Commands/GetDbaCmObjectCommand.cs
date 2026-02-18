@@ -107,14 +107,14 @@ namespace Dataplat.Dbatools.Commands
         /// </summary>
         protected override void ProcessRecord()
         {
-            if (ComputerName == null)
+            DbaCmConnectionParameter[] targets = ComputerName;
+            if (targets == null || targets.Length == 0)
             {
                 // Default to local computer when not specified
-                string localName = Environment.MachineName;
-                ComputerName = new DbaCmConnectionParameter[] { new DbaCmConnectionParameter(localName) };
+                targets = new DbaCmConnectionParameter[] { new DbaCmConnectionParameter(Environment.MachineName) };
             }
 
-            foreach (DbaCmConnectionParameter connectionObject in ComputerName)
+            foreach (DbaCmConnectionParameter connectionObject in targets)
             {
                 if (!connectionObject.Success)
                 {
@@ -183,15 +183,16 @@ namespace Dataplat.Dbatools.Commands
                 }
 
                 // Build the enabled protocols description
-                string enabledProtocols = "None";
+                List<string> protocolList = new List<string>();
                 if (connection.CimRM != ManagementConnectionProtocolState.Disabled)
-                    enabledProtocols += ", CimRM";
+                    protocolList.Add("CimRM");
                 if (connection.CimDCOM != ManagementConnectionProtocolState.Disabled)
-                    enabledProtocols += ", CimDCOM";
+                    protocolList.Add("CimDCOM");
                 if (connection.Wmi != ManagementConnectionProtocolState.Disabled)
-                    enabledProtocols += ", Wmi";
+                    protocolList.Add("Wmi");
                 if (connection.PowerShellRemoting != ManagementConnectionProtocolState.Disabled)
-                    enabledProtocols += ", PowerShellRemoting";
+                    protocolList.Add("PowerShellRemoting");
+                string enabledProtocols = protocolList.Count > 0 ? String.Join(", ", protocolList) : "None";
 
                 // Create list of excluded connection types
                 ManagementConnectionType excludedTypes = ManagementConnectionType.None;
@@ -214,8 +215,7 @@ namespace Dataplat.Dbatools.Commands
                     }
                     catch (Exception ex)
                     {
-                        if (!_disableCache)
-                            ConnectionHost.Connections[computer] = connection;
+                        CacheConnection(computer, connection);
                         StopFunction(
                             String.Format("[{0}] Unable to find a connection to the target system. Ensure the name is typed correctly, and the server allows any of the following protocols: {1}",
                                 computer, enabledProtocols),
@@ -275,8 +275,7 @@ namespace Dataplat.Dbatools.Commands
                     null);
                 connection.ReportSuccess(ManagementConnectionType.CimRM);
                 connection.AddGoodCredential(cred);
-                if (!_disableCache)
-                    ConnectionHost.Connections[computer] = connection;
+                CacheConnection(computer, connection);
 
                 WriteEnumerable(result);
                 return true;
@@ -293,8 +292,7 @@ namespace Dataplat.Dbatools.Commands
                 if (errorDetails.BadCredentials)
                 {
                     connection.AddBadCredential(cred);
-                    if (!_disableCache)
-                        ConnectionHost.Connections[computer] = connection;
+                    CacheConnection(computer, connection);
                     StopFunction(
                         String.Format("[{0}] Invalid connection credentials", computer),
                         errorRecord: new ErrorRecord(ex, "BadCredentials", ErrorCategory.AuthenticationError, computer),
@@ -350,8 +348,7 @@ namespace Dataplat.Dbatools.Commands
                     null);
                 connection.ReportSuccess(ManagementConnectionType.CimDCOM);
                 connection.AddGoodCredential(cred);
-                if (!_disableCache)
-                    ConnectionHost.Connections[computer] = connection;
+                CacheConnection(computer, connection);
 
                 WriteEnumerable(result);
                 return true;
@@ -368,8 +365,7 @@ namespace Dataplat.Dbatools.Commands
                 if (errorDetails.BadCredentials)
                 {
                     connection.AddBadCredential(cred);
-                    if (!_disableCache)
-                        ConnectionHost.Connections[computer] = connection;
+                    CacheConnection(computer, connection);
                     StopFunction(
                         String.Format("[{0}] Invalid connection credentials", computer),
                         errorRecord: new ErrorRecord(ex, "BadCredentials", ErrorCategory.AuthenticationError, computer),
@@ -453,8 +449,7 @@ namespace Dataplat.Dbatools.Commands
                     null);
                 connection.ReportSuccess(ManagementConnectionType.Wmi);
                 connection.AddGoodCredential(cred);
-                if (!_disableCache)
-                    ConnectionHost.Connections[computer] = connection;
+                CacheConnection(computer, connection);
 
                 return true;
             }
@@ -472,8 +467,7 @@ namespace Dataplat.Dbatools.Commands
                 if (reason == "UnauthorizedAccessException")
                 {
                     connection.AddBadCredential(cred);
-                    if (!_disableCache)
-                        ConnectionHost.Connections[computer] = connection;
+                    CacheConnection(computer, connection);
                     StopFunction(
                         String.Format("[{0}] Invalid connection credentials", computer),
                         errorRecord: new ErrorRecord(ex, "BadCredentials", ErrorCategory.AuthenticationError, computer),
@@ -566,8 +560,7 @@ namespace Dataplat.Dbatools.Commands
                     null);
                 connection.ReportSuccess(ManagementConnectionType.PowerShellRemoting);
                 connection.AddGoodCredential(cred);
-                if (!_disableCache)
-                    ConnectionHost.Connections[computer] = connection;
+                CacheConnection(computer, connection);
 
                 return true;
             }
@@ -657,7 +650,7 @@ namespace Dataplat.Dbatools.Commands
                                 break;
                             }
                         }
-                        if (originalError != null && originalError.Contains("__ExtendedStatus"))
+                        if (originalError != null && originalError.IndexOf("__ExtendedStatus", StringComparison.OrdinalIgnoreCase) >= 0)
                         {
                             message = String.Format("[{0}] Something went wrong when looking for {1}, in {2}. This often indicates issues with the target system.", computerName, className, ns);
                         }
@@ -781,6 +774,20 @@ namespace Dataplat.Dbatools.Commands
         #region Utility
 
         /// <summary>
+        /// Stores a connection in the cache in a thread-safe manner.
+        /// </summary>
+        private void CacheConnection(string computer, ManagementConnection connection)
+        {
+            if (!_disableCache)
+            {
+                lock (ConnectionHost.Connections)
+                {
+                    ConnectionHost.Connections[computer] = connection;
+                }
+            }
+        }
+
+        /// <summary>
         /// Writes objects from a CIM result (which may be IEnumerable) to the pipeline.
         /// </summary>
         private void WriteEnumerable(object result)
@@ -812,16 +819,16 @@ namespace Dataplat.Dbatools.Commands
         internal class CimErrorInfo
         {
             /// <summary>CIM error code</summary>
-            public int ErrorCode;
+            public int ErrorCode { get; }
 
             /// <summary>Human-readable error message</summary>
-            public string Message;
+            public string Message { get; }
 
             /// <summary>Whether the error indicates a connection problem (should try next protocol)</summary>
-            public bool BadConnection;
+            public bool BadConnection { get; }
 
             /// <summary>Whether the error indicates invalid credentials</summary>
-            public bool BadCredentials;
+            public bool BadCredentials { get; }
 
             /// <summary>
             /// Creates a new CimErrorInfo instance.
