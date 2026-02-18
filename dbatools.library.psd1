@@ -59,6 +59,7 @@
         'Get-DbaClientAlias',
         'Get-DbaClientProtocol',
         'Get-DbaCmConnection',
+        'Get-DbaCmObject',
         'Get-DbaCpuRingBuffer',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
