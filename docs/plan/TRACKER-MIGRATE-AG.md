@@ -17,7 +17,7 @@
 | 8 | Test-DbaAgSpn | DONE | TestDbaAgSpnCommand.cs | OK | 100% | 1/1 pass | Fixed PS1 $resolved bug, MSA pattern |
 | 9 | Test-DbaAvailabilityGroup | DONE | TestDbaAvailabilityGroupCommand.cs | OK | 100% | 1/1 pass | Dual output mode (basic/AddDatabase), fixed replicaServerSMO scope bug from PS1 |
 | 10 | New-DbaAvailabilityGroup | DONE | NewDbaAvailabilityGroupCommand.cs | OK | 100% | No Pester tests | ShouldProcess, ConfirmImpact.High, 35+ params, config-backed defaults, version-gated SMO, delegates to Add-DbaAgReplica/Join/Listener/Database/Permission |
-| 11 | Set-DbaAgListener | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgListener |
+| 11 | Set-DbaAgListener | DONE | SetDbaAgListenerCommand.cs | OK | 100% | 1/1 pass | ShouldProcess, ConfirmImpact.High, static ScriptBlocks, SqlCredential aliases preserved |
 | 12 | Set-DbaAgReplica | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgReplica |
 | 13 | Set-DbaAvailabilityGroup | PENDING | | | | | ShouldProcess required, depends on Get-DbaAvailabilityGroup |
 | 14 | Add-DbaAgDatabase | PENDING | | | | |  |

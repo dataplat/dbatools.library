@@ -79,6 +79,7 @@
         'New-DbaSqlParameter',
         'Resolve-DbaNetworkName',
         'Resolve-DbaPath',
+        'Set-DbaAgListener',
         'Set-DbatoolsInsecureConnection',
         'Set-DbatoolsPath',
         'Test-DbaAgSpn',
