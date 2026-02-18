@@ -718,7 +718,7 @@ namespace Dataplat.Dbatools.Commands
         /// <summary>
         /// Gets the reason string from a WMI error (checking CategoryInfo.Reason equivalent).
         /// </summary>
-        private static string GetWmiErrorReason(Exception ex)
+        internal static string GetWmiErrorReason(Exception ex)
         {
             if (ex is RuntimeException runtimeEx && runtimeEx.ErrorRecord != null)
             {
@@ -735,7 +735,7 @@ namespace Dataplat.Dbatools.Commands
         /// <summary>
         /// Gets the error category string from a WMI error.
         /// </summary>
-        private static string GetWmiErrorCategory(Exception ex)
+        internal static string GetWmiErrorCategory(Exception ex)
         {
             if (ex is RuntimeException runtimeEx && runtimeEx.ErrorRecord != null)
             {
@@ -748,7 +748,7 @@ namespace Dataplat.Dbatools.Commands
         /// <summary>
         /// Checks if the WMI error is a ProviderLoadFailure.
         /// </summary>
-        private static bool IsProviderLoadFailure(Exception ex)
+        internal static bool IsProviderLoadFailure(Exception ex)
         {
             // Check for ProviderLoadFailure in the exception message or error code
             if (ex.Message != null && ex.Message.Contains("ProviderLoadFailure"))
