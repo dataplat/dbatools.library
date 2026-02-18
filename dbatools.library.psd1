@@ -57,6 +57,7 @@
         'Get-DbaBuild',
         'Get-DbaClientAlias',
         'Get-DbaClientProtocol',
+        'Get-DbaCmConnection',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',

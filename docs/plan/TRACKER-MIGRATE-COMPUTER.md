@@ -9,7 +9,7 @@
 |---|---------|--------|---------|-------|--------|--------|-------|
 | 1 | Get-DbaClientAlias | DONE | GetDbaClientAliasCommand.cs | OK | 100% | 7/7 | Read-only, no deps |
 | 2 | Get-DbaClientProtocol | DONE | GetDbaClientProtocolCommand.cs | OK | 100% | 1/1 (1 skipped) | Read-only, no deps |
-| 3 | Get-DbaCmConnection | PENDING | | | | | Read-only, no deps |
+| 3 | Get-DbaCmConnection | DONE | GetDbaCmConnectionCommand.cs | OK | 100% | 3/3 | Read-only, no deps |
 | 4 | Get-DbaCmObject | PENDING | | | | | Read-only, no deps |
 | 5 | Get-DbaComputerCertificate | PENDING | | | | | Read-only, no deps |
 | 6 | Get-DbaComputerSystem | PENDING | | | | | Read-only, no deps |
