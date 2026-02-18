@@ -18,7 +18,7 @@
 | 9 | Set-DbatoolsPath | DONE | SetDbatoolsPathCommand.cs | OK | 100% | 1/1 | No ShouldProcess (matches PS1), depends on Get-DbatoolsPath |
 | 10 | Export-DbatoolsConfig | DONE | ExportDbatoolsConfigCommand.cs | OK | 100% | 1/1 | Config file export, 4 param sets, scope path computation |
 | 11 | Import-DbatoolsConfig | DONE | ImportDbatoolsConfigCommand.cs | OK | 100% | 1/1 | Config file import, 2 param sets, Peek mode, include/exclude filters, scope file reading |
-| 12 | Invoke-DbatoolsFormatter | PENDING | | | | |  |
+| 12 | Invoke-DbatoolsFormatter | DONE | InvokeDbatoolsFormatterCommand.cs | OK | 100% | 3/3 | File formatter, uses InvokeScript for PSScriptAnalyzer, per-file EOL fix |
 | 13 | Invoke-DbatoolsRenameHelper | PENDING | | | | |  |
 | 14 | Measure-DbatoolsImport | PENDING | | | | |  |
 | 15 | Register-DbatoolsConfig | PENDING | | | | |  |

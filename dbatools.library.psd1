@@ -68,6 +68,7 @@
         'Get-DbatoolsLog',
         'Get-DbatoolsPath',
         'Import-DbatoolsConfig',
+        'Invoke-DbatoolsFormatter',
         'Invoke-DbaQuery',
         'Join-DbaPath',
         'New-DbaAvailabilityGroup',
