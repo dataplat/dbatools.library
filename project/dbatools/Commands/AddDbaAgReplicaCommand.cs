@@ -762,13 +762,19 @@ param($ag)
         }
 
         /// <summary>
-        /// Validates an endpoint URL matches the required TCP://address:port format.
+        /// Validates an endpoint URL matches the required TCP://address:port format with valid port range.
         /// </summary>
         internal static bool IsValidEndpointUrl(string epUrl)
         {
             if (String.IsNullOrEmpty(epUrl) || epUrl.Length > 512)
                 return false;
-            return Regex.IsMatch(epUrl, @"^TCP://[^:]+:\d{1,5}$", RegexOptions.IgnoreCase);
+            Match m = Regex.Match(epUrl, @"^TCP://[^:]+:(\d{1,5})$", RegexOptions.IgnoreCase);
+            if (!m.Success)
+                return false;
+            int port;
+            if (!int.TryParse(m.Groups[1].Value, out port))
+                return false;
+            return port >= 1 && port <= 65535;
         }
 
         /// <summary>

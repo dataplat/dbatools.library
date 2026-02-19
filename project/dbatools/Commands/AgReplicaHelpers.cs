@@ -29,25 +29,6 @@ foreach ($ag in $ags) {
 ");
 
         /// <summary>
-        /// Gets a string property value from a PSObject.
-        /// </summary>
-        internal static string GetPropertyString(PSObject obj, string propertyName)
-        {
-            if (obj == null) return null;
-            try
-            {
-                PSPropertyInfo prop = obj.Properties[propertyName];
-                if (prop != null && prop.Value != null)
-                    return prop.Value.ToString();
-            }
-            catch (Exception)
-            {
-                // PSObject property access can throw for dynamic or computed properties
-            }
-            return null;
-        }
-
-        /// <summary>
         /// Gets a property value (any type) from a PSObject.
         /// </summary>
         internal static object GetPropertyValue(PSObject obj, string propertyName)
@@ -130,7 +111,7 @@ foreach ($ag in $ags) {
         {
             foreach (PSObject item in items)
             {
-                string itemName = GetPropertyString(item, "Name");
+                string itemName = DbaBaseCmdlet.GetPropertyString(item, "Name");
                 if (String.Equals(itemName, name, StringComparison.OrdinalIgnoreCase))
                     return item;
             }

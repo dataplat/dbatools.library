@@ -91,7 +91,7 @@ Get-DbaCredential -SqlInstance $server
             foreach (PSObject agInfo in agInfoResults)
             {
                 if (agInfo == null) continue;
-                string agName = AgReplicaHelpers.GetPropertyString(agInfo, "AgName");
+                string agName = DbaBaseCmdlet.GetPropertyString(agInfo, "AgName");
                 string[] replicaNames = AgReplicaHelpers.GetStringArray(agInfo, "ReplicaNames");
 
                 if (replicaNames == null || replicaNames.Length < 2)
@@ -127,7 +127,7 @@ Get-DbaCredential -SqlInstance $server
                         foreach (PSObject cred in credResults)
                         {
                             if (cred == null) continue;
-                            string credName = AgReplicaHelpers.GetPropertyString(cred, "Name");
+                            string credName = DbaBaseCmdlet.GetPropertyString(cred, "Name");
                             if (credName == null) continue;
 
                             credentials.Add(cred);
@@ -174,7 +174,7 @@ Get-DbaCredential -SqlInstance $server
                     }
                     else
                     {
-                        string identity = AgReplicaHelpers.GetPropertyString(cred, "Identity");
+                        string identity = DbaBaseCmdlet.GetPropertyString(cred, "Identity");
                         PSObject diff = new PSObject();
                         diff.Properties.Add(new PSNoteProperty("AvailabilityGroup", agName));
                         diff.Properties.Add(new PSNoteProperty("Replica", replicaInstance));
@@ -192,14 +192,14 @@ Get-DbaCredential -SqlInstance $server
                     HashSet<string> uniqueIdentities = new HashSet<string>(StringComparer.Ordinal);
                     foreach (PSObject diff in differences)
                     {
-                        string status = AgReplicaHelpers.GetPropertyString(diff, "Status");
+                        string status = DbaBaseCmdlet.GetPropertyString(diff, "Status");
                         if ("Missing".Equals(status, StringComparison.OrdinalIgnoreCase))
                         {
                             hasMissing = true;
                         }
                         else
                         {
-                            string identity = AgReplicaHelpers.GetPropertyString(diff, "Identity") ?? "";
+                            string identity = DbaBaseCmdlet.GetPropertyString(diff, "Identity") ?? "";
                             uniqueIdentities.Add(identity);
                         }
                     }

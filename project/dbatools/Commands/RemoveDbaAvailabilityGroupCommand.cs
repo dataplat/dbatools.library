@@ -236,26 +236,6 @@ $null = $ag.Parent.Query(""DROP AVAILABILITY GROUP [$agName]"")
             }
         }
 
-        /// <summary>
-        /// Gets a string property value from a PSObject.
-        /// </summary>
-        internal static string GetPropertyString(PSObject obj, string propertyName)
-        {
-            if (obj == null)
-                return null;
-            try
-            {
-                PSPropertyInfo prop = obj.Properties[propertyName];
-                if (prop != null && prop.Value != null)
-                    return prop.Value.ToString();
-            }
-            catch (Exception)
-            {
-                // Property may not exist
-            }
-            return null;
-        }
-
         #endregion Helpers
     }
 }

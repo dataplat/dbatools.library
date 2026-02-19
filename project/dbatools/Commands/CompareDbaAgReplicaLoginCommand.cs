@@ -123,7 +123,7 @@ if ($includeModifiedDate) {
             foreach (PSObject agInfo in agInfoResults)
             {
                 if (agInfo == null) continue;
-                string agName = AgReplicaHelpers.GetPropertyString(agInfo, "AgName");
+                string agName = DbaBaseCmdlet.GetPropertyString(agInfo, "AgName");
                 string[] replicaNames = AgReplicaHelpers.GetStringArray(agInfo, "ReplicaNames");
 
                 if (replicaNames == null || replicaNames.Length < 2)
@@ -163,7 +163,7 @@ if ($includeModifiedDate) {
                         foreach (PSObject login in loginResults)
                         {
                             if (login == null) continue;
-                            string loginName = AgReplicaHelpers.GetPropertyString(login, "Name");
+                            string loginName = DbaBaseCmdlet.GetPropertyString(login, "Name");
                             if (loginName == null) continue;
 
                             logins.Add(login);
@@ -240,7 +240,7 @@ if ($includeModifiedDate) {
             bool hasMissing = false;
             foreach (PSObject diff in differences)
             {
-                if ("Missing".Equals(AgReplicaHelpers.GetPropertyString(diff, "Status"), StringComparison.OrdinalIgnoreCase))
+                if ("Missing".Equals(DbaBaseCmdlet.GetPropertyString(diff, "Status"), StringComparison.OrdinalIgnoreCase))
                 {
                     hasMissing = true;
                     break;
@@ -254,7 +254,7 @@ if ($includeModifiedDate) {
                     HashSet<string> uniqueDates = new HashSet<string>();
                     foreach (PSObject diff in differences)
                     {
-                        if ("Present".Equals(AgReplicaHelpers.GetPropertyString(diff, "Status"), StringComparison.OrdinalIgnoreCase))
+                        if ("Present".Equals(DbaBaseCmdlet.GetPropertyString(diff, "Status"), StringComparison.OrdinalIgnoreCase))
                         {
                             object dateVal = AgReplicaHelpers.GetPropertyValue(diff, "ModifyDate");
                             if (dateVal is DateTime dt)

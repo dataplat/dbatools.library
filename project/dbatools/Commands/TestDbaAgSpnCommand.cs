@@ -264,7 +264,7 @@ namespace Dataplat.Dbatools.Commands
             string version = String.Format("{0} {1} Edition {2}", versionString, edition, platform);
 
             int port = 0;
-            object portObj = GetPropertyValue(aglistener, "PortNumber");
+            object portObj = AgReplicaHelpers.GetPropertyValue(aglistener, "PortNumber");
             if (portObj != null)
             {
                 try { port = Convert.ToInt32(portObj); }
@@ -293,7 +293,7 @@ namespace Dataplat.Dbatools.Commands
 
             string serviceAccount = GetPropertyString(server, "ServiceAccount");
             bool isClustered = false;
-            object isClusteredObj = GetPropertyValue(server, "IsClustered");
+            object isClusteredObj = AgReplicaHelpers.GetPropertyValue(server, "IsClustered");
             if (isClusteredObj is bool)
                 isClustered = (bool)isClusteredObj;
 
@@ -472,12 +472,12 @@ namespace Dataplat.Dbatools.Commands
             }
 
             // Set error if SPN is missing and TCP is enabled
-            object isSet = GetPropertyValue(spn, "IsSet");
+            object isSet = AgReplicaHelpers.GetPropertyValue(spn, "IsSet");
             bool isSetBool = false;
             if (isSet is bool)
                 isSetBool = (bool)isSet;
 
-            object tcpEnabled = GetPropertyValue(spn, "TcpEnabled");
+            object tcpEnabled = AgReplicaHelpers.GetPropertyValue(spn, "TcpEnabled");
             bool tcpEnabledBool = true;
             if (tcpEnabled is bool)
                 tcpEnabledBool = (bool)tcpEnabled;
@@ -519,46 +519,6 @@ namespace Dataplat.Dbatools.Commands
                 return "";
 
             return String.Join(".", parts, 1, parts.Length - 1);
-        }
-
-        /// <summary>
-        /// Gets a string property value from a PSObject.
-        /// </summary>
-        internal static string GetPropertyString(PSObject obj, string propertyName)
-        {
-            if (obj == null)
-                return null;
-            try
-            {
-                PSPropertyInfo prop = obj.Properties[propertyName];
-                if (prop != null && prop.Value != null)
-                    return prop.Value.ToString();
-            }
-            catch (Exception)
-            {
-                // Property may not exist
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Gets a raw property value from a PSObject.
-        /// </summary>
-        internal static object GetPropertyValue(PSObject obj, string propertyName)
-        {
-            if (obj == null)
-                return null;
-            try
-            {
-                PSPropertyInfo prop = obj.Properties[propertyName];
-                if (prop != null)
-                    return prop.Value;
-            }
-            catch (Exception)
-            {
-                // Property may not exist
-            }
-            return null;
         }
 
         /// <summary>

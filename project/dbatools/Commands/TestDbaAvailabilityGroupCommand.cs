@@ -818,15 +818,6 @@ namespace Dataplat.Dbatools.Commands
             return null;
         }
 
-        /// <summary>
-        /// Gets a string property value from a PSObject.
-        /// </summary>
-        private static string GetPropertyString(PSObject obj, string propertyName)
-        {
-            return GetPropertyStringStatic(obj, propertyName);
-        }
-
-
         #endregion Helpers
     }
 }

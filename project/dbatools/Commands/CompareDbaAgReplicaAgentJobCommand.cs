@@ -114,7 +114,7 @@ Get-DbaAgentJob -SqlInstance $server
             foreach (PSObject agInfo in agInfoResults)
             {
                 if (agInfo == null) continue;
-                string agName = AgReplicaHelpers.GetPropertyString(agInfo, "AgName");
+                string agName = DbaBaseCmdlet.GetPropertyString(agInfo, "AgName");
                 string[] replicaNames = AgReplicaHelpers.GetStringArray(agInfo, "ReplicaNames");
 
                 if (replicaNames == null || replicaNames.Length < 2)
@@ -150,7 +150,7 @@ Get-DbaAgentJob -SqlInstance $server
                         foreach (PSObject job in jobResults)
                         {
                             if (job == null) continue;
-                            string jobName = AgReplicaHelpers.GetPropertyString(job, "Name");
+                            string jobName = DbaBaseCmdlet.GetPropertyString(job, "Name");
                             if (jobName == null) continue;
 
                             if (ExcludeSystemJob.IsPresent && _systemJobs.Contains(jobName))
@@ -227,7 +227,7 @@ Get-DbaAgentJob -SqlInstance $server
             bool hasMissing = false;
             foreach (PSObject diff in differences)
             {
-                if ("Missing".Equals(AgReplicaHelpers.GetPropertyString(diff, "Status"), StringComparison.OrdinalIgnoreCase))
+                if ("Missing".Equals(DbaBaseCmdlet.GetPropertyString(diff, "Status"), StringComparison.OrdinalIgnoreCase))
                 {
                     hasMissing = true;
                     break;
@@ -241,7 +241,7 @@ Get-DbaAgentJob -SqlInstance $server
                     HashSet<string> uniqueDates = new HashSet<string>();
                     foreach (PSObject diff in differences)
                     {
-                        if ("Present".Equals(AgReplicaHelpers.GetPropertyString(diff, "Status"), StringComparison.OrdinalIgnoreCase))
+                        if ("Present".Equals(DbaBaseCmdlet.GetPropertyString(diff, "Status"), StringComparison.OrdinalIgnoreCase))
                         {
                             object dateVal = AgReplicaHelpers.GetPropertyValue(diff, datePropertyName);
                             if (dateVal is DateTime dt)

@@ -280,46 +280,6 @@ Get-DbaAvailabilityGroup @params
         }
 
         /// <summary>
-        /// Gets a string property value from a PSObject.
-        /// </summary>
-        internal static string GetPropertyString(PSObject obj, string propertyName)
-        {
-            if (obj == null)
-                return null;
-            try
-            {
-                PSPropertyInfo prop = obj.Properties[propertyName];
-                if (prop != null && prop.Value != null)
-                    return prop.Value.ToString();
-            }
-            catch (Exception)
-            {
-                // Property may not exist
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Gets an object property value from a PSObject wrapped as PSObject.
-        /// </summary>
-        internal static PSObject GetPropertyObject(PSObject obj, string propertyName)
-        {
-            if (obj == null)
-                return null;
-            try
-            {
-                PSPropertyInfo prop = obj.Properties[propertyName];
-                if (prop != null && prop.Value != null)
-                    return PSObject.AsPSObject(prop.Value);
-            }
-            catch (Exception)
-            {
-                // Property may not exist
-            }
-            return null;
-        }
-
-        /// <summary>
         /// Adds or updates a NoteProperty on a PSObject, matching Add-Member -Force behavior.
         /// </summary>
         internal static void AddOrSetProperty(PSObject obj, string name, object value)

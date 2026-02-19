@@ -225,19 +225,22 @@ foreach ($ag in $ags) {
                         {
                             foreach (string ag in AvailabilityGroup)
                             {
-                                try
+                                if (ShouldProcess(instance.ToString(), String.Format("Revoking CreateAnyDatabase on Availability Group {0}", ag)))
                                 {
-                                    InvokeCommand.InvokeScript(
-                                        false, _revokeCreateAnyDbScript, null,
-                                        new object[] { server, ag });
-                                }
-                                catch (Exception ex)
-                                {
-                                    StopFunction(
-                                        String.Format("Failure revoking CreateAnyDatabase for Availability Group {0}", ag),
-                                        errorRecord: new ErrorRecord(ex, "RevokeDbaAgPermission_CreateAnyDb", ErrorCategory.InvalidOperation, instance),
-                                        target: instance);
-                                    return;
+                                    try
+                                    {
+                                        InvokeCommand.InvokeScript(
+                                            false, _revokeCreateAnyDbScript, null,
+                                            new object[] { server, ag });
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        StopFunction(
+                                            String.Format("Failure revoking CreateAnyDatabase for Availability Group {0}", ag),
+                                            errorRecord: new ErrorRecord(ex, "RevokeDbaAgPermission_CreateAnyDb", ErrorCategory.InvalidOperation, instance),
+                                            target: instance);
+                                        return;
+                                    }
                                 }
                             }
                         }
@@ -396,25 +399,6 @@ foreach ($ag in $ags) {
                     return true;
             }
             return false;
-        }
-
-        /// <summary>
-        /// Gets a string property value from a PSObject.
-        /// </summary>
-        private static string GetPropertyString(PSObject obj, string propertyName)
-        {
-            if (obj == null) return null;
-            try
-            {
-                PSPropertyInfo prop = obj.Properties[propertyName];
-                if (prop != null && prop.Value != null)
-                    return prop.Value.ToString();
-            }
-            catch (Exception)
-            {
-                // Property may not exist
-            }
-            return null;
         }
 
         /// <summary>

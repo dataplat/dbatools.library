@@ -91,7 +91,7 @@ Get-DbaAgentOperator -SqlInstance $server
             foreach (PSObject agInfo in agInfoResults)
             {
                 if (agInfo == null) continue;
-                string agName = AgReplicaHelpers.GetPropertyString(agInfo, "AgName");
+                string agName = DbaBaseCmdlet.GetPropertyString(agInfo, "AgName");
                 string[] replicaNames = AgReplicaHelpers.GetStringArray(agInfo, "ReplicaNames");
 
                 if (replicaNames == null || replicaNames.Length < 2)
@@ -127,7 +127,7 @@ Get-DbaAgentOperator -SqlInstance $server
                         foreach (PSObject op in opResults)
                         {
                             if (op == null) continue;
-                            string opName = AgReplicaHelpers.GetPropertyString(op, "Name");
+                            string opName = DbaBaseCmdlet.GetPropertyString(op, "Name");
                             if (opName == null) continue;
 
                             operators.Add(op);
@@ -174,7 +174,7 @@ Get-DbaAgentOperator -SqlInstance $server
                     }
                     else
                     {
-                        string email = AgReplicaHelpers.GetPropertyString(op, "EmailAddress");
+                        string email = DbaBaseCmdlet.GetPropertyString(op, "EmailAddress");
                         PSObject diff = new PSObject();
                         diff.Properties.Add(new PSNoteProperty("AvailabilityGroup", agName));
                         diff.Properties.Add(new PSNoteProperty("Replica", replicaInstance));
@@ -192,14 +192,14 @@ Get-DbaAgentOperator -SqlInstance $server
                     HashSet<string> uniqueEmails = new HashSet<string>(StringComparer.Ordinal);
                     foreach (PSObject diff in differences)
                     {
-                        string status = AgReplicaHelpers.GetPropertyString(diff, "Status");
+                        string status = DbaBaseCmdlet.GetPropertyString(diff, "Status");
                         if ("Missing".Equals(status, StringComparison.OrdinalIgnoreCase))
                         {
                             hasMissing = true;
                         }
                         else
                         {
-                            string email = AgReplicaHelpers.GetPropertyString(diff, "EmailAddress") ?? "";
+                            string email = DbaBaseCmdlet.GetPropertyString(diff, "EmailAddress") ?? "";
                             uniqueEmails.Add(email);
                         }
                     }

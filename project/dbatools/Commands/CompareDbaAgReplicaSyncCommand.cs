@@ -156,7 +156,7 @@ $server.UserDefinedMessages
             foreach (PSObject agInfo in agInfoResults)
             {
                 if (agInfo == null) continue;
-                string agName = AgReplicaHelpers.GetPropertyString(agInfo, "AgName");
+                string agName = DbaBaseCmdlet.GetPropertyString(agInfo, "AgName");
                 string[] replicaNames = AgReplicaHelpers.GetStringArray(agInfo, "ReplicaNames");
 
                 if (replicaNames == null || replicaNames.Length < 2)
@@ -243,7 +243,7 @@ $server.UserDefinedMessages
                         foreach (PSObject login in results)
                         {
                             if (login == null) continue;
-                            string name = AgReplicaHelpers.GetPropertyString(login, "Name");
+                            string name = DbaBaseCmdlet.GetPropertyString(login, "Name");
                             if (name == null) continue;
                             logins.Add(login);
                             if (!loginNameSet.Contains(name))
@@ -334,8 +334,8 @@ $server.UserDefinedMessages
             CompareProperty(diffs, baseConfig, config, "Language");
 
             // SQL Login specific properties
-            string baseLoginType = AgReplicaHelpers.GetPropertyString(baseConfig, "LoginType");
-            string configLoginType = AgReplicaHelpers.GetPropertyString(config, "LoginType");
+            string baseLoginType = DbaBaseCmdlet.GetPropertyString(baseConfig, "LoginType");
+            string configLoginType = DbaBaseCmdlet.GetPropertyString(config, "LoginType");
             if ("SqlLogin".Equals(baseLoginType, StringComparison.OrdinalIgnoreCase) &&
                 "SqlLogin".Equals(configLoginType, StringComparison.OrdinalIgnoreCase))
             {
@@ -344,8 +344,8 @@ $server.UserDefinedMessages
             }
 
             // Compare server roles
-            string baseRoles = AgReplicaHelpers.GetPropertyString(baseConfig, "ServerRoles") ?? "";
-            string configRoles = AgReplicaHelpers.GetPropertyString(config, "ServerRoles") ?? "";
+            string baseRoles = DbaBaseCmdlet.GetPropertyString(baseConfig, "ServerRoles") ?? "";
+            string configRoles = DbaBaseCmdlet.GetPropertyString(config, "ServerRoles") ?? "";
 
             HashSet<string> baseRoleSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> configRoleSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -390,8 +390,8 @@ $server.UserDefinedMessages
         /// </summary>
         private void CompareProperty(List<string> diffs, PSObject baseConfig, PSObject config, string propertyName)
         {
-            string baseVal = AgReplicaHelpers.GetPropertyString(baseConfig, propertyName) ?? "";
-            string configVal = AgReplicaHelpers.GetPropertyString(config, propertyName) ?? "";
+            string baseVal = DbaBaseCmdlet.GetPropertyString(baseConfig, propertyName) ?? "";
+            string configVal = DbaBaseCmdlet.GetPropertyString(config, propertyName) ?? "";
             if (!String.Equals(baseVal, configVal, StringComparison.OrdinalIgnoreCase))
             {
                 diffs.Add(String.Format("{0}: {1} vs {2}", propertyName, configVal, baseVal));
@@ -421,7 +421,7 @@ $server.UserDefinedMessages
                         foreach (PSObject obj in results)
                         {
                             if (obj == null) continue;
-                            string name = AgReplicaHelpers.GetPropertyString(obj, "Name");
+                            string name = DbaBaseCmdlet.GetPropertyString(obj, "Name");
                             if (name == null) continue;
                             names.Add(name);
                             if (!nameSet.Contains(name))
