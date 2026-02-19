@@ -86,6 +86,7 @@
         'Resolve-DbaNetworkName',
         'Resolve-DbaPath',
         'Set-DbaAgListener',
+        'Set-DbaAgReplica',
         'Set-DbatoolsInsecureConnection',
         'Set-DbatoolsPath',
         'Test-DbaAgSpn',
