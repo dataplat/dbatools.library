@@ -101,6 +101,7 @@
         'Join-DbaAvailabilityGroup',
         'Join-DbaPath',
         'New-DbaAgentAlert',
+        'New-DbaAgentAlertCategory',
         'New-DbaAvailabilityGroup',
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
