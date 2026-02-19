@@ -54,6 +54,7 @@
         'Disconnect-DbaInstance',
         'Enable-DbaAgHadr',
         'Export-DbatoolsConfig',
+        'Find-DbaAgentJob',
         'Grant-DbaAgPermission',
         'Get-DbaAgBackupHistory',
         'Get-DbaAgDatabase',
