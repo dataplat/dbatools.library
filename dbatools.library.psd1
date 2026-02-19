@@ -100,6 +100,7 @@
         'Invoke-DbaQuery',
         'Join-DbaAvailabilityGroup',
         'Join-DbaPath',
+        'New-DbaAgentAlert',
         'New-DbaAvailabilityGroup',
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
