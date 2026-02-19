@@ -23,10 +23,10 @@ dotnet clean (use dotnet build instead)
 Before making any changes, run the test suite to establish a baseline:
 
 ```bash
-dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity quiet 2>&1 | tail -5
+dotnet test project/dbatools.Tests/dbatools.Tests.csproj --verbosity quiet 2>&1 | tail -10
 ```
 
-Record the pass/fail count. Any test that passes now MUST still pass after your conversion. If the baseline itself has failures, note them — you are not responsible for pre-existing failures, but you must not add new ones.
+Record the pass/fail count for BOTH net472 and net8.0. ALL tests MUST pass on BOTH frameworks — zero failures, zero crashes. If the baseline has any failures on either framework, STOP and fix them before proceeding with the conversion. Do not ignore or skip failures on any framework.
 
 #### Pester Baseline
 
@@ -176,10 +176,10 @@ Loading the dev-built library first satisfies dbatools-ralph's `RequiredModules 
 Run the test suite after the build to verify your conversion doesn't break anything:
 
 ```bash
-dotnet test project/dbatools.Tests/dbatools.Tests.csproj --no-build --verbosity quiet 2>&1 | tail -5
+dotnet test project/dbatools.Tests/dbatools.Tests.csproj --verbosity quiet 2>&1 | tail -10
 ```
 
-Compare against the baseline from Step 0. If any test that previously passed now fails, fix your code and re-run. Do not proceed until the test count is equal to or better than baseline.
+ALL tests MUST pass on BOTH net472 and net8.0. Compare against the baseline from Step 0. If any test fails on either framework, fix your code and re-run. Do not proceed until all tests pass on both frameworks.
 
 ### 5c. Write C# Unit Tests
 
@@ -382,9 +382,9 @@ pwsh -NoProfile -Command '
 **Always use `pwsh -NoProfile`** — never test in the current session where the installed DLL may be locked or a stale module is loaded. The dev-built module at `artifacts/dbatools.library/` contains your freshly compiled `dbatools.dll` plus all dependency DLLs.
 
 Compare results against the Pester baseline from Step 0:
-- **All tests that passed in the baseline MUST still pass.** A previously-passing test that now fails is a regression in your C# implementation.
-- **Pre-existing failures** (tests that failed in the baseline too) are not your responsibility, but document them.
-- **New passes** (tests that failed before but pass now) are a bonus — note them.
+- **ALL tests MUST pass.** There are no pre-existing failures — if something fails, it's a real problem that must be fixed.
+- A previously-passing test that now fails is a regression in your C# implementation — fix it.
+- If any test fails, determine the root cause and fix it before proceeding.
 
 If any baseline-passing test now fails:
 1. Determine if the failure is a C# implementation issue or a test adaptation issue

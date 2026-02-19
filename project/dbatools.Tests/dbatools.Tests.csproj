@@ -8,6 +8,8 @@
     <ReferencePath>$(ProgramFiles)\Common Files\microsoft shared\VSTT\$(VisualStudioVersion)\UITestExtensionPackages</ReferencePath>
     <IsCodedUITest>False</IsCodedUITest>
     <TestProjectType>UnitTest</TestProjectType>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <AssemblyTitle>dbatools.Tests</AssemblyTitle>
     <Product>dbatools.Tests</Product>
     <Copyright>Copyright ©  2021</Copyright>
@@ -40,6 +42,11 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\dbatools\dbatools.csproj" />
+  </ItemGroup>
+
+  <!-- Fix net472 test runner: MSTest 3.x needs System.Collections.Immutable at runtime -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
   </ItemGroup>
 
   <!-- PowerShell type references for testing Internal helpers -->
