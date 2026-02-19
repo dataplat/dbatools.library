@@ -40,6 +40,7 @@
     FunctionsToExport      = @('Get-DbatoolsLibraryPath')
     CmdletsToExport        = @(
         'Add-DbaAgDatabase',
+        'Add-DbaAgListener',
         'Clear-DbaConnectionPool',
         'Connect-DbaInstance',
         'Disconnect-DbaInstance',
