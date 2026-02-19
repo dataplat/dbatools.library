@@ -24,7 +24,7 @@
 | 15 | Find-DbaAgentJob | DONE | FindDbaAgentJobCommand.cs | OK | 100% | 4/13 pass (9 pre-existing BeforeAll sqlCredential failures) | Read-only, inlines Get-JobList, reuses GetDbaAgentJobCommand helpers |
 | 16 | New-DbaAgentAlert | DONE | NewDbaAgentAlertCommand.cs | OK | 100% | 6/6 pass | ShouldProcess, OutputType, fixes -Disabled bug from PS1 |
 | 17 | New-DbaAgentAlertCategory | DONE | NewDbaAgentAlertCategoryCommand.cs | OK | 100% | 4/5 pass (1 pre-existing $WarnVar scoping bug) | ShouldProcess, OutputType, Force; Pester improved from 1/5 to 4/5 |
-| 18 | New-DbaAgentJob | PENDING | | | | | ShouldProcess required |
+| 18 | New-DbaAgentJob | DONE | NewDbaAgentJobCommand.cs | OK | 100% | 7/7 pass (improved from 1/4 baseline) | ShouldProcess, OutputType, fixes NetsendLevel param bug and Force+Category bug |
 | 19 | New-DbaAgentJobCategory | PENDING | | | | | ShouldProcess required |
 | 20 | New-DbaAgentJobStep | PENDING | | | | | ShouldProcess required |
 | 21 | New-DbaAgentOperator | PENDING | | | | | ShouldProcess required |
