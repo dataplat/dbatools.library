@@ -87,6 +87,7 @@
         'Resolve-DbaPath',
         'Set-DbaAgListener',
         'Set-DbaAgReplica',
+        'Set-DbaAvailabilityGroup',
         'Set-DbatoolsInsecureConnection',
         'Set-DbatoolsPath',
         'Test-DbaAgSpn',
