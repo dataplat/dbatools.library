@@ -20,7 +20,7 @@
 | 11 | Set-DbaAgListener | DONE | SetDbaAgListenerCommand.cs | OK | 100% | 1/1 pass | ShouldProcess, ConfirmImpact.High, static ScriptBlocks, SqlCredential aliases preserved |
 | 12 | Set-DbaAgReplica | DONE | SetDbaAgReplicaCommand.cs | OK | 100% | 1/1 param pass; integration pre-existing infra issue | ShouldProcess, ConfirmImpact.Medium, ReadOnlyRoutingList load-balanced detection, ConnectionModeInSecondaryRole alias normalization |
 | 13 | Set-DbaAvailabilityGroup | DONE | SetDbaAvailabilityGroupCommand.cs | OK | 100% | 1/1 param pass; integration pre-existing infra issue | ShouldProcess, ConfirmImpact.Medium, ClusterConnectionOption version check (SQL 2025+), static ScriptBlocks |
-| 14 | Add-DbaAgDatabase | PENDING | | | | |  |
+| 14 | Add-DbaAgDatabase | DONE | AddDbaAgDatabaseCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.Low, 5-step workflow (seeding/backup/restore/add/sync), dual parameter sets, progress bars, SQL injection hardened, COLLATE-safe DMV queries |
 | 15 | Add-DbaAgListener | PENDING | | | | |  |
 | 16 | Add-DbaAgReplica | PENDING | | | | |  |
 | 17 | Disable-DbaAgHadr | PENDING | | | | | ShouldProcess required |
