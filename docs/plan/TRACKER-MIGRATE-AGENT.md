@@ -13,7 +13,7 @@
 | 4 | Get-DbaAgentJobCategory | DONE | GetDbaAgentJobCategoryCommand.cs | OK | 100% | Pre-existing dev-module sqlCredential issue (1/4 pass); C# cmdlet verified correct | Read-only, no deps |
 | 5 | Get-DbaAgentJobHistory | DONE | GetDbaAgentJobHistoryCommand.cs | OK | 100% | 1/22 pass; 20 failures from InModuleScope mock incompatibility with C# InvokeScript (known limitation); C# cmdlet verified working against real SQL instances | Read-only, uses InvokeScript for Connect-DbaInstance/EnumJobHistory/Get-DbaAgentJobOutputFile |
 | 6 | Get-DbaAgentJobOutputFile | DONE | GetDbaAgentJobOutputFileCommand.cs | OK | 100% | 14/14 pass | Read-only, no deps |
-| 7 | Get-DbaAgentJobStep | PENDING | | | | | Read-only, no deps |
+| 7 | Get-DbaAgentJobStep | DONE | GetDbaAgentJobStepCommand.cs | OK | 100% | 11/11 pass, 1 skip | Read-only, no deps |
 | 8 | Get-DbaAgentLog | PENDING | | | | | Read-only, no deps |
 | 9 | Get-DbaAgentOperator | PENDING | | | | | Read-only, no deps |
 | 10 | Get-DbaAgentProxy | PENDING | | | | | Read-only, no deps |
