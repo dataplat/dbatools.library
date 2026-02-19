@@ -14,9 +14,13 @@ namespace Dataplat.Dbatools.Commands
     [OutputType(typeof(RunspaceContainer))]
     public class GetDbaRunspaceCommand : DbaBaseCmdlet
     {
+        /// <summary>
+        /// Wildcard name filter for runspaces to retrieve.
+        /// </summary>
         [Parameter(Position = 0)]
         public string Name { get; set; } = "*";
 
+        /// <inheritdoc />
         protected override void ProcessRecord()
         {
             foreach (RunspaceContainer container in RunspaceHost.Runspaces.Values)
@@ -33,12 +37,19 @@ namespace Dataplat.Dbatools.Commands
     [Cmdlet("Register", "DbaRunspace")]
     public class RegisterDbaRunspaceCommand : DbaBaseCmdlet
     {
+        /// <summary>
+        /// The scriptblock to execute in the managed runspace.
+        /// </summary>
         [Parameter(Mandatory = true)]
         public ScriptBlock ScriptBlock { get; set; }
 
+        /// <summary>
+        /// Name to register the runspace under.
+        /// </summary>
         [Parameter(Mandatory = true)]
         public string Name { get; set; }
 
+        /// <inheritdoc />
         protected override void ProcessRecord()
         {
             string normalizedName = Name.ToLowerInvariant();
@@ -62,12 +73,19 @@ namespace Dataplat.Dbatools.Commands
     [Cmdlet("Start", "DbaRunspace")]
     public class StartDbaRunspaceCommand : DbaBaseCmdlet
     {
+        /// <summary>
+        /// Names of the runspaces to start.
+        /// </summary>
         [Parameter(ValueFromPipeline = true)]
         public string[] Name { get; set; }
 
+        /// <summary>
+        /// Runspace containers to start.
+        /// </summary>
         [Parameter(ValueFromPipeline = true)]
         public RunspaceContainer[] Runspace { get; set; }
 
+        /// <inheritdoc />
         protected override void ProcessRecord()
         {
             List<RunspaceContainer> toStart = new List<RunspaceContainer>();
@@ -119,12 +137,19 @@ namespace Dataplat.Dbatools.Commands
     [Cmdlet("Stop", "DbaRunspace")]
     public class StopDbaRunspaceCommand : DbaBaseCmdlet
     {
+        /// <summary>
+        /// Names of the runspaces to stop.
+        /// </summary>
         [Parameter(ValueFromPipeline = true)]
         public string[] Name { get; set; }
 
+        /// <summary>
+        /// Runspace containers to stop.
+        /// </summary>
         [Parameter(ValueFromPipeline = true)]
         public RunspaceContainer[] Runspace { get; set; }
 
+        /// <inheritdoc />
         protected override void ProcessRecord()
         {
             List<RunspaceContainer> toStop = new List<RunspaceContainer>();
