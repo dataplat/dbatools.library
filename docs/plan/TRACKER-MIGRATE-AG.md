@@ -22,7 +22,7 @@
 | 13 | Set-DbaAvailabilityGroup | DONE | SetDbaAvailabilityGroupCommand.cs | OK | 100% | 1/1 param pass; integration pre-existing infra issue | ShouldProcess, ConfirmImpact.Medium, ClusterConnectionOption version check (SQL 2025+), static ScriptBlocks |
 | 14 | Add-DbaAgDatabase | DONE | AddDbaAgDatabaseCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.Low, 5-step workflow (seeding/backup/restore/add/sync), dual parameter sets, progress bars, SQL injection hardened, COLLATE-safe DMV queries |
 | 15 | Add-DbaAgListener | DONE | AddDbaAgListenerCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.Low, static ScriptBlocks, subnet auto-calculation, DHCP support, Passthru, ValidateRange on Port |
-| 16 | Add-DbaAgReplica | PENDING | | | | |  |
+| 16 | Add-DbaAgReplica | DONE | AddDbaAgReplicaCommand.cs | OK | 100% | 25/25 unit pass | ShouldProcess, ConfirmImpact.Low, 20+ params, config-backed defaults, endpoint auto-creation, WSFC permissions, XE session config, Passthru, anchored regex (ReDoS fix), ValidateRange on BackupPriority/SessionTimeout, fixed PS1 $second.Name bug |
 | 17 | Disable-DbaAgHadr | PENDING | | | | | ShouldProcess required |
 | 18 | Enable-DbaAgHadr | PENDING | | | | | ShouldProcess required |
 | 19 | Remove-DbaAgDatabase | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgDatabase |

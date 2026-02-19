@@ -41,6 +41,7 @@
     CmdletsToExport        = @(
         'Add-DbaAgDatabase',
         'Add-DbaAgListener',
+        'Add-DbaAgReplica',
         'Clear-DbaConnectionPool',
         'Connect-DbaInstance',
         'Disconnect-DbaInstance',
