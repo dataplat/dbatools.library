@@ -79,6 +79,7 @@
         'Get-DbaClientProtocol',
         'Get-DbaCmConnection',
         'Get-DbaCmObject',
+        'Get-DbaComputerCertificate',
         'Get-DbaCpuRingBuffer',
         'Get-DbaCpuUsage',
         'Get-DbaDeprecatedFeature',

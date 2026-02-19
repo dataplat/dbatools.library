@@ -11,7 +11,7 @@
 | 2 | Get-DbaClientProtocol | DONE | GetDbaClientProtocolCommand.cs | OK | 100% | 1/1 (1 skipped) | Read-only, no deps |
 | 3 | Get-DbaCmConnection | DONE | GetDbaCmConnectionCommand.cs | OK | 100% | 3/3 | Read-only, no deps |
 | 4 | Get-DbaCmObject | DONE | GetDbaCmObjectCommand.cs | OK | 100% | 2/2 (2 test-adapt) | Read-only, no deps |
-| 5 | Get-DbaComputerCertificate | PENDING | | | | | Read-only, no deps |
+| 5 | Get-DbaComputerCertificate | DONE | GetDbaComputerCertificateCommand.cs | OK | 100% | 1/1 (3 skipped) | Read-only, no deps |
 | 6 | Get-DbaComputerSystem | PENDING | | | | | Read-only, no deps |
 | 7 | Get-DbaDiskSpace | PENDING | | | | | Read-only, no deps |
 | 8 | Get-DbaLocaleSetting | PENDING | | | | | Read-only, no deps |
