@@ -62,3 +62,4 @@ TestResults/
 
 # Local publish script with API key
 publish.ps1
+docs/plan/.migrate-foundation-complete
