@@ -87,6 +87,7 @@
         'Import-DbatoolsConfig',
         'Invoke-DbaAgFailover',
         'Invoke-DbatoolsFormatter',
+        'Invoke-DbatoolsRenameHelper',
         'Invoke-DbaQuery',
         'Join-DbaAvailabilityGroup',
         'Join-DbaPath',
