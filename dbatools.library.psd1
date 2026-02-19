@@ -83,6 +83,7 @@
         'Get-DbaCpuRingBuffer',
         'Get-DbaCpuUsage',
         'Get-DbaDeprecatedFeature',
+        'Get-DbaRunningJob',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',
