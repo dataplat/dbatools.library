@@ -67,6 +67,7 @@
         'Get-DbaAgentJobStep',
         'Get-DbaAgentLog',
         'Get-DbaAgentOperator',
+        'Get-DbaAgentProxy',
         'Get-DbaAgHadr',
         'Get-DbaAgListener',
         'Get-DbaAgReplica',

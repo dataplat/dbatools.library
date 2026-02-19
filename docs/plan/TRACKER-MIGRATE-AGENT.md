@@ -16,7 +16,7 @@
 | 7 | Get-DbaAgentJobStep | DONE | GetDbaAgentJobStepCommand.cs | OK | 100% | 11/11 pass, 1 skip | Read-only, no deps |
 | 8 | Get-DbaAgentLog | DONE | GetDbaAgentLogCommand.cs | OK | 100% | 10/10 pass, 1 skip | Read-only, no deps |
 | 9 | Get-DbaAgentOperator | DONE | GetDbaAgentOperatorCommand.cs | OK | 100% | 3/3 pass (fixed pre-existing 2 failures) | Read-only, no deps |
-| 10 | Get-DbaAgentProxy | PENDING | | | | | Read-only, no deps |
+| 10 | Get-DbaAgentProxy | DONE | GetDbaAgentProxyCommand.cs | OK | 100% | 1/1 pass (9 pre-existing failures) | Read-only, no deps |
 | 11 | Get-DbaAgentSchedule | PENDING | | | | | Read-only, no deps |
 | 12 | Get-DbaAgentServer | PENDING | | | | | Read-only, no deps |
 | 13 | Get-DbaRunningJob | PENDING | | | | | Read-only, no deps |
