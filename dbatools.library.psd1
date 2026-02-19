@@ -81,6 +81,7 @@
         'Get-DbaCmObject',
         'Get-DbaCpuRingBuffer',
         'Get-DbaCpuUsage',
+        'Get-DbaDeprecatedFeature',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',

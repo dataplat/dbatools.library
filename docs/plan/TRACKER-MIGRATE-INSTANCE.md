@@ -10,7 +10,7 @@
 | 1 | Get-DbaBuild | DONE | GetDbaBuildCommand.cs | OK | 100% | 26/26 | Read-only, no deps |
 | 2 | Get-DbaCpuRingBuffer | DONE | GetDbaCpuRingBufferCommand.cs | OK | 100% | 2/2 | Read-only, no deps |
 | 3 | Get-DbaCpuUsage | DONE | GetDbaCpuUsageCommand.cs | OK | 100% | 2/2 | Read-only, no deps |
-| 4 | Get-DbaDeprecatedFeature | PENDING | | | | | Read-only, no deps |
+| 4 | Get-DbaDeprecatedFeature | DONE | GetDbaDeprecatedFeatureCommand.cs | OK | 100% | 4/4 | Read-only, no deps |
 | 5 | Get-DbaDump | PENDING | | | | | Read-only, no deps |
 | 6 | Get-DbaErrorLog | PENDING | | | | | Read-only, no deps |
 | 7 | Get-DbaErrorLogConfig | PENDING | | | | | Read-only, no deps |
