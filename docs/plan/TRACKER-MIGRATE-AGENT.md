@@ -20,7 +20,7 @@
 | 11 | Get-DbaAgentSchedule | DONE | GetDbaAgentScheduleCommand.cs | OK | 100% | 1/1 pass (10 pre-existing failures in BeforeAll) | Read-only, no deps |
 | 12 | Get-DbaAgentServer | DONE | GetDbaAgentServerCommand.cs | OK | 100% | 2/2 pass (fixed pre-existing 1 failure) | Read-only, no deps |
 | 13 | Get-DbaRunningJob | DONE | GetDbaRunningJobCommand.cs | OK | OK | 1/1 | Read-only, delegates to Get-DbaAgentJob |
-| 14 | Test-DbaAgentJobOwner | PENDING | | | | |  |
+| 14 | Test-DbaAgentJobOwner | DONE | TestDbaAgentJobOwnerCommand.cs | OK | 100% | 3/3 pass (2 pre-existing failures from New-DbaAgentJob sqlCredential issue) | Read-only, no deps |
 | 15 | Find-DbaAgentJob | PENDING | | | | |  |
 | 16 | New-DbaAgentAlert | PENDING | | | | | ShouldProcess required |
 | 17 | New-DbaAgentAlertCategory | PENDING | | | | | ShouldProcess required |

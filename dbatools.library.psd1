@@ -121,6 +121,7 @@
         'Sync-DbaAvailabilityGroup',
         'Set-DbatoolsInsecureConnection',
         'Set-DbatoolsPath',
+        'Test-DbaAgentJobOwner',
         'Test-DbaAgSpn',
         'Test-DbaAvailabilityGroup',
         'Test-DbaConnection',
