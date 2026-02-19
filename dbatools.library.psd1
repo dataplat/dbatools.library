@@ -78,6 +78,7 @@
         'Get-DbaCmConnection',
         'Get-DbaCmObject',
         'Get-DbaCpuRingBuffer',
+        'Get-DbaCpuUsage',
         'Get-DbaConnectedInstance',
         'Get-DbaConnection',
         'Get-DbatoolsChangeLog',
