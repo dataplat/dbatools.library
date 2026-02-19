@@ -383,15 +383,18 @@ $server | Disconnect-DbaInstance -WhatIf:$false
                     bool dacNeeded = !ExcludePassword.IsPresent;
                     if (dacNeeded)
                     {
-                        // Check if pipeline source already has DAC
-                        PSObject firstObj = PSObject.AsPSObject(inputObjects[0]);
-                        string parentName = GetParentName(firstObj);
-                        bool dacConnected = parentName != null && parentName.StartsWith("ADMIN:", StringComparison.OrdinalIgnoreCase);
-
-                        if (!dacConnected)
+                        // Check if ALL pipeline objects have a DAC parent
+                        foreach (object inputObj in inputObjects)
                         {
-                            StopFunction("Pipeline source must use a dedicated admin connection to retrieve passwords. Use -ExcludePassword to bypass this requirement if you don't need passwords.");
-                            return;
+                            PSObject psInputObj = PSObject.AsPSObject(inputObj);
+                            string parentName = GetParentName(psInputObj);
+                            bool dacConnected = parentName != null && parentName.StartsWith("ADMIN:", StringComparison.OrdinalIgnoreCase);
+
+                            if (!dacConnected)
+                            {
+                                StopFunction("Pipeline source must use a dedicated admin connection to retrieve passwords. Use -ExcludePassword to bypass this requirement if you don't need passwords.");
+                                return;
+                            }
                         }
                     }
 
@@ -628,6 +631,27 @@ $server | Disconnect-DbaInstance -WhatIf:$false
                 {
                     // Best effort DAC disconnect
                 }
+            }
+        }
+
+        /// <summary>
+        /// Cleans up the DAC connection if the pipeline is aborted (e.g., Ctrl-C).
+        /// </summary>
+        protected override void StopProcessing()
+        {
+            if (_dacOpened && _dacServer != null)
+            {
+                try
+                {
+                    InvokeCommand.InvokeScript(
+                        false, _disconnectScript, null,
+                        new object[] { _dacServer });
+                }
+                catch (Exception)
+                {
+                    // Best effort DAC disconnect on abort
+                }
+                _dacOpened = false;
             }
         }
 

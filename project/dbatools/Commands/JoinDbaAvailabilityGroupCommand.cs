@@ -86,6 +86,11 @@ $server.JoinAvailabilityGroup($agName)
         private List<string> _agNames = new List<string>();
 
         /// <summary>
+        /// ClusterType resolved from InputObject (avoids mutating the parameter property).
+        /// </summary>
+        private string _resolvedClusterType;
+
+        /// <summary>
         /// Collects pipeline InputObject items and resolves AG names.
         /// </summary>
         protected override void ProcessRecord()
@@ -112,11 +117,11 @@ $server.JoinAvailabilityGroup($agName)
                         _agNames.Add(name);
 
                     // Extract ClusterType from InputObject if not bound
-                    if (!TestBound("ClusterType") && String.IsNullOrEmpty(ClusterType))
+                    if (!TestBound("ClusterType") && String.IsNullOrEmpty(_resolvedClusterType))
                     {
                         string ct = GetPropertyString(psObj, "ClusterType");
                         if (!String.IsNullOrEmpty(ct))
-                            ClusterType = ct;
+                            _resolvedClusterType = ct;
                     }
                 }
             }
@@ -150,14 +155,15 @@ $server.JoinAvailabilityGroup($agName)
                 return;
 
             // Validate ClusterType against whitelist to prevent SQL injection
+            string effectiveClusterType = TestBound("ClusterType") ? ClusterType : _resolvedClusterType;
             string validatedClusterType = null;
-            if (!String.IsNullOrEmpty(ClusterType))
+            if (!String.IsNullOrEmpty(effectiveClusterType))
             {
-                if (String.Equals(ClusterType, "External", StringComparison.OrdinalIgnoreCase))
+                if (String.Equals(effectiveClusterType, "External", StringComparison.OrdinalIgnoreCase))
                     validatedClusterType = "External";
-                else if (String.Equals(ClusterType, "Wsfc", StringComparison.OrdinalIgnoreCase))
+                else if (String.Equals(effectiveClusterType, "Wsfc", StringComparison.OrdinalIgnoreCase))
                     validatedClusterType = "Wsfc";
-                else if (String.Equals(ClusterType, "None", StringComparison.OrdinalIgnoreCase))
+                else if (String.Equals(effectiveClusterType, "None", StringComparison.OrdinalIgnoreCase))
                     validatedClusterType = "None";
             }
 
