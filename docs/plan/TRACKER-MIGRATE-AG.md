@@ -23,8 +23,8 @@
 | 14 | Add-DbaAgDatabase | DONE | AddDbaAgDatabaseCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.Low, 5-step workflow (seeding/backup/restore/add/sync), dual parameter sets, progress bars, SQL injection hardened, COLLATE-safe DMV queries |
 | 15 | Add-DbaAgListener | DONE | AddDbaAgListenerCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.Low, static ScriptBlocks, subnet auto-calculation, DHCP support, Passthru, ValidateRange on Port |
 | 16 | Add-DbaAgReplica | DONE | AddDbaAgReplicaCommand.cs | OK | 100% | 25/25 unit pass | ShouldProcess, ConfirmImpact.Low, 20+ params, config-backed defaults, endpoint auto-creation, WSFC permissions, XE session config, Passthru, anchored regex (ReDoS fix), ValidateRange on BackupPriority/SessionTimeout, fixed PS1 $second.Name bug |
-| 17 | Disable-DbaAgHadr | PENDING | | | | | ShouldProcess required |
-| 18 | Enable-DbaAgHadr | PENDING | | | | | ShouldProcess required |
+| 17 | Disable-DbaAgHadr | DONE | DisableDbaAgHadrCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, WMI-based (DbaBaseCmdlet), static ScriptBlocks, Force restart, TestElevation |
+| 18 | Enable-DbaAgHadr | DONE | EnableDbaAgHadrCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, WMI-based (DbaBaseCmdlet), static ScriptBlocks, Force restart, TestElevation |
 | 19 | Remove-DbaAgDatabase | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgDatabase |
 | 20 | Remove-DbaAgListener | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgListener |
 | 21 | Remove-DbaAgReplica | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgReplica |
