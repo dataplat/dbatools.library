@@ -25,10 +25,10 @@
 | 16 | Add-DbaAgReplica | DONE | AddDbaAgReplicaCommand.cs | OK | 100% | 25/25 unit pass | ShouldProcess, ConfirmImpact.Low, 20+ params, config-backed defaults, endpoint auto-creation, WSFC permissions, XE session config, Passthru, anchored regex (ReDoS fix), ValidateRange on BackupPriority/SessionTimeout, fixed PS1 $second.Name bug |
 | 17 | Disable-DbaAgHadr | DONE | DisableDbaAgHadrCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, WMI-based (DbaBaseCmdlet), static ScriptBlocks, Force restart, TestElevation |
 | 18 | Enable-DbaAgHadr | DONE | EnableDbaAgHadrCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, WMI-based (DbaBaseCmdlet), static ScriptBlocks, Force restart, TestElevation |
-| 19 | Remove-DbaAgDatabase | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgDatabase |
-| 20 | Remove-DbaAgListener | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgListener |
-| 21 | Remove-DbaAgReplica | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgReplica |
-| 22 | Remove-DbaAvailabilityGroup | PENDING | | | | | ShouldProcess required, depends on Get-DbaAvailabilityGroup |
+| 19 | Remove-DbaAgDatabase | DONE | RemoveDbaAgDatabaseCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, InputObject (Database+AgDb), wired AvailabilityGroup filter (PS1 bug fix) |
+| 20 | Remove-DbaAgListener | DONE | RemoveDbaAgListenerCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, wired AvailabilityGroup filter (PS1 bug fix) |
+| 21 | Remove-DbaAgReplica | DONE | RemoveDbaAgReplicaCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, fixed PS1 null AvailabilityGroup output (Parent.AvailabilityGroup bug) |
+| 22 | Remove-DbaAvailabilityGroup | DONE | RemoveDbaAvailabilityGroupCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, T-SQL DROP with bracket-quoted name (SQL injection fix), AllAvailabilityGroups switch |
 | 23 | Compare-DbaAgReplicaAgentJob | PENDING | | | | |  |
 | 24 | Compare-DbaAgReplicaCredential | PENDING | | | | |  |
 | 25 | Compare-DbaAgReplicaLogin | PENDING | | | | |  |
