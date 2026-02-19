@@ -103,6 +103,7 @@
         'New-DbaAgentAlert',
         'New-DbaAgentAlertCategory',
         'New-DbaAgentJob',
+        'New-DbaAgentJobCategory',
         'New-DbaAvailabilityGroup',
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
