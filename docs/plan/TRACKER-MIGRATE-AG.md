@@ -29,16 +29,16 @@
 | 20 | Remove-DbaAgListener | DONE | RemoveDbaAgListenerCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, wired AvailabilityGroup filter (PS1 bug fix) |
 | 21 | Remove-DbaAgReplica | DONE | RemoveDbaAgReplicaCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, fixed PS1 null AvailabilityGroup output (Parent.AvailabilityGroup bug) |
 | 22 | Remove-DbaAvailabilityGroup | DONE | RemoveDbaAvailabilityGroupCommand.cs | OK | 100% | 1/1 param (common param diff expected); integration pre-existing infra issue | ShouldProcess, ConfirmImpact.High, T-SQL DROP with bracket-quoted name (SQL injection fix), AllAvailabilityGroups switch |
-| 23 | Compare-DbaAgReplicaAgentJob | PENDING | | | | |  |
-| 24 | Compare-DbaAgReplicaCredential | PENDING | | | | |  |
-| 25 | Compare-DbaAgReplicaLogin | PENDING | | | | |  |
-| 26 | Compare-DbaAgReplicaOperator | PENDING | | | | |  |
-| 27 | Compare-DbaAgReplicaSync | PENDING | | | | |  |
-| 28 | Compare-DbaAvailabilityGroup | PENDING | | | | |  |
-| 29 | Grant-DbaAgPermission | PENDING | | | | |  |
-| 30 | Invoke-DbaAgFailover | PENDING | | | | |  |
-| 31 | Join-DbaAvailabilityGroup | PENDING | | | | |  |
-| 32 | Resume-DbaAgDbDataMovement | PENDING | | | | |  |
-| 33 | Revoke-DbaAgPermission | PENDING | | | | |  |
-| 34 | Suspend-DbaAgDbDataMovement | PENDING | | | | |  |
-| 35 | Sync-DbaAvailabilityGroup | PENDING | | | | |  |
+| 23 | Compare-DbaAgReplicaAgentJob | DONE | CompareDbaAgReplicaAgentJobCommand.cs | OK | 93% | No Pester tests | ScriptBlock delegation, ExcludeSystemJob, IncludeModifiedDate, AgReplicaHelpers shared |
+| 24 | Compare-DbaAgReplicaCredential | DONE | CompareDbaAgReplicaCredentialCommand.cs | OK | 93% | No Pester tests | Identity uniqueness comparison (case-sensitive), AgReplicaHelpers shared |
+| 25 | Compare-DbaAgReplicaLogin | DONE | CompareDbaAgReplicaLoginCommand.cs | OK | 91% | No Pester tests | ExcludeSystemLogin, IncludeModifiedDate, sys.server_principals query, AgReplicaHelpers shared |
+| 26 | Compare-DbaAgReplicaOperator | DONE | CompareDbaAgReplicaOperatorCommand.cs | OK | 93% | No Pester tests | Email uniqueness comparison (case-sensitive), AgReplicaHelpers shared |
+| 27 | Compare-DbaAgReplicaSync | DONE | CompareDbaAgReplicaSyncCommand.cs | OK | 95% | No Pester tests | 8 object types, login property-level diffs, Exclude ValidateSet(13), AgReplicaHelpers shared |
+| 28 | Compare-DbaAvailabilityGroup | DONE | CompareDbaAvailabilityGroupCommand.cs | OK | 94% | No Pester tests | Orchestrator, Type ValidateSet(5) default All, delegates to 4 sub-commands |
+| 29 | Grant-DbaAgPermission | DONE | GrantDbaAgPermissionCommand.cs | OK | 95% | No Pester tests | ShouldProcess, ConfirmImpact.Low, endpoint+AG dual permissions, auto-creates logins, ObjectPermissionSet, CreateAnyDatabase special handling |
+| 30 | Invoke-DbaAgFailover | DONE | InvokeDbaAgFailoverCommand.cs | OK | 95% | No Pester tests | ShouldProcess, ConfirmImpact.High, Force suppresses confirmation, graceful vs force-with-data-loss failover, Refresh after failover |
+| 31 | Join-DbaAvailabilityGroup | DONE | JoinDbaAvailabilityGroupCommand.cs | OK | 95% | No Pester tests | ShouldProcess, ConfirmImpact.Low, ClusterType auto-detect from InputObject, SQL 2017+ T-SQL path vs SMO, SQL injection hardened (bracket escape) |
+| 32 | Resume-DbaAgDbDataMovement | DONE | ResumeDbaAgDbDataMovementCommand.cs | OK | 95% | No Pester tests | ShouldProcess, ConfirmImpact.High, collect-in-ProcessRecord/execute-in-EndProcessing, AvailabilityGroup filter |
+| 33 | Revoke-DbaAgPermission | DONE | RevokeDbaAgPermissionCommand.cs | OK | 95% | No Pester tests | ShouldProcess, ConfirmImpact.Low, mirrors Grant, fixed PS1 bugs (undefined $perm, GRANT instead of REVOKE for CreateAnyDatabase) |
+| 34 | Suspend-DbaAgDbDataMovement | DONE | SuspendDbaAgDbDataMovementCommand.cs | OK | 95% | No Pester tests | ShouldProcess, ConfirmImpact.High, mirrors Resume, collect-in-ProcessRecord/execute-in-EndProcessing |
+| 35 | Sync-DbaAvailabilityGroup | DONE | SyncDbaAvailabilityGroupCommand.cs | OK | 93% | No Pester tests | Most complex (407-line PS1), DAC connection, 15 Copy/Sync delegations, Write-Progress, SyncCombo deduplication, Force suppresses confirmation |
