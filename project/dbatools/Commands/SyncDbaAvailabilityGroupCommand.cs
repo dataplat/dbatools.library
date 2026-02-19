@@ -157,7 +157,7 @@ param($agObjects, $primaryDomainInstanceName)
 param($server, $secondaries, $exclude, $login, $excludeLogin, $job, $excludeJob,
       $disableJobOnDest, $credential, $excludePassword, $force,
       $hasCred, $hasLogin, $hasExcludeLogin, $hasJob, $hasExcludeJob,
-      $primaryName, $secondaryNames)
+      $primaryName, $secondaryNames, $shouldProcessDbOwner)
 
 $stepCounter = 0
 $totalSteps = 15
@@ -178,7 +178,7 @@ if ($exclude -notcontains 'Logins') {
     Copy-DbaLogin @loginParams
 }
 
-if ($exclude -notcontains 'DatabaseOwner') {
+if ($exclude -notcontains 'DatabaseOwner' -and $shouldProcessDbOwner) {
     Write-Progress -Activity $activity -Status 'Updating database owners' -PercentComplete (($stepCounter / $totalSteps) * 100)
     $stepCounter++
     foreach ($sec in $secondaries) {
@@ -585,6 +585,11 @@ $server | Disconnect-DbaInstance -WhatIf:$false
                     return;
                 }
 
+                // Compute ShouldProcess for DatabaseOwner step (Update-SqlDbOwner lacks its own ShouldProcess)
+                bool shouldProcessDbOwner = ShouldProcess(
+                    String.Format("from {0} to secondaries", combo.PrimaryName),
+                    "Updating database owners to match newly migrated logins");
+
                 try
                 {
                     InvokeCommand.InvokeScript(
@@ -606,7 +611,10 @@ $server | Disconnect-DbaInstance -WhatIf:$false
                             TestBound("Login"),
                             TestBound("ExcludeLogin"),
                             TestBound("Job"),
-                            TestBound("ExcludeJob")
+                            TestBound("ExcludeJob"),
+                            combo.PrimaryName,
+                            null,
+                            shouldProcessDbOwner
                         });
                 }
                 catch (Exception ex)
