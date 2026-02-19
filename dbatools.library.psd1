@@ -51,6 +51,7 @@
         'Get-DbaAgentJob',
         'Get-DbaAgentJobCategory',
         'Get-DbaAgentJobHistory',
+        'Get-DbaAgentJobOutputFile',
         'Get-DbaAgHadr',
         'Get-DbaAgListener',
         'Get-DbaAgReplica',
