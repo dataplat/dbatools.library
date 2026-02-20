@@ -178,6 +178,16 @@ project/dbatools/
   Validation/      Validation types
 ```
 
+## Type Extensions (xml/dbatools.Types.ps1xml)
+
+- Adds `.Query()` and `.Invoke()` ScriptMethods to `Microsoft.SqlServer.Management.Smo.Server` and `Database`
+- Used by 336+ callers throughout dbatools -- CRITICAL for test success
+- Also sets SerializationDepth for DbatoolsException and DbatoolsExceptionRecord
+- Loaded in `dbatools.library.psm1` via `Update-TypeData -PrependPath ... -ErrorAction SilentlyContinue`
+- **NEVER use TypesToProcess in psd1** -- causes hard errors when both dbatools.library and dbatools load the same types
+- `Update-TypeData` with `-ErrorAction SilentlyContinue` is idempotent and handles duplicates gracefully
+- `build/build.ps1` copies `xml/` directory to `artifacts/dbatools.library/xml/`
+
 ## Assembly Loading
 
 - Framework detection in `dbatools.library.psm1`
