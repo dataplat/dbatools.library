@@ -106,6 +106,7 @@
         'New-DbaAgentJob',
         'New-DbaAgentJobCategory',
         'New-DbaAgentJobStep',
+        'New-DbaAgentOperator',
         'New-DbaAvailabilityGroup',
         'New-DbaAzAccessToken',
         'New-DbaConnectionString',
