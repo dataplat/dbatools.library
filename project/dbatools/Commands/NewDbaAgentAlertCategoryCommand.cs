@@ -45,7 +45,7 @@ namespace Dataplat.Dbatools.Commands
                 try
                 {
                     string script = "$ConfirmPreference = 'None'";
-                    InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, null);
+                    InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, null);
                 }
                 catch (Exception)
                 {
@@ -188,7 +188,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -231,7 +231,7 @@ $alertCategory.Create()";
             try
             {
                 string script = "param($s) $null = $s.JobServer.Refresh()";
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+                InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
             }
             catch (Exception)
             {

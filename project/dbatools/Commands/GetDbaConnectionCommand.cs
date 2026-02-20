@@ -108,7 +108,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -121,7 +121,7 @@ namespace Dataplat.Dbatools.Commands
         private Collection<PSObject> ServerQuery(object server, string sql)
         {
             string script = "param($s, $q) $s.Query($q)";
-            return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, sql });
+            return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, sql });
         }
     }
 }

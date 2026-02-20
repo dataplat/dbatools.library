@@ -392,7 +392,7 @@ Get-DbaAgListener -SqlInstance $server -AvailabilityGroup $agName -Listener $lis
                     if (result != null && result.Count > 0)
                     {
                         object listenerObj = result[0].BaseObject;
-                        InvokeCommand.InvokeScript(false, _invokeCreateScript, null, new object[] { listenerObj });
+                        InvokeCommand.InvokeScript(true, _invokeCreateScript, null, new object[] { listenerObj });
                         createSucceeded = true;
                     }
                 }

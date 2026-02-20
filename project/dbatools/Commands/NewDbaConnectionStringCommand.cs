@@ -204,7 +204,7 @@ param($legacy, $fullSmoName, $applicationIntent, $clientName, $connectTimeout, $
       $encryptConnection, $encryptBound, $failoverPartner, $maxPoolSize, $minPoolSize,
       $multipleActiveResultSets, $multiSubnetFailover, $nonPooledConnection,
       $packetSize, $pooledConnectionLifetime, $trustServerCertificate,
-      $workstationId, $isLocalDb, $isAzure, $sqlCredential, $username,
+      $workstationId, $isLocalDb, $isAzure, $p_sqlCredential, $username,
       $password, $isAdUser, $connectTimeoutBound, $appendConnectionString)
 
 if ($legacy) {
@@ -239,7 +239,7 @@ if ($pooledConnectionLifetime) { $connStringBuilder['Load Balance Timeout'] = $p
 if ($trustServerCertificate) { $connStringBuilder['TrustServerCertificate'] = $true } else { $connStringBuilder['TrustServerCertificate'] = $false }
 if ($workstationId) { $connStringBuilder['Workstation Id'] = $workstationId }
 
-if ($sqlCredential) {
+if ($p_sqlCredential) {
     $connStringBuilder['User ID'] = $username
     $connStringBuilder['Password'] = $password
     if ($isAzure -and $isAdUser) {
@@ -623,7 +623,7 @@ if ($instance.GetType() -eq [Microsoft.SqlServer.Management.Smo.Server]) {
             {
                 bool isAzure = TestAzure(instance);
                 Collection<PSObject> results = InvokeCommand.InvokeScript(
-                    false,
+                    true,
                     _serverObjectScriptBlock,
                     null,
                     instance, Legacy.ToBool(), Database, isAzure);
@@ -708,7 +708,7 @@ if ($instance.GetType() -eq [Microsoft.SqlServer.Management.Smo.Server]) {
             try
             {
                 Collection<PSObject> results = InvokeCommand.InvokeScript(
-                    false,
+                    true,
                     _buildScriptBlock,
                     null,
                     Legacy.ToBool(),
@@ -768,7 +768,7 @@ if ($instance.GetType() -eq [Microsoft.SqlServer.Management.Smo.Server]) {
             try
             {
                 Collection<PSObject> results = InvokeCommand.InvokeScript(
-                    false,
+                    true,
                     _legacyScriptBlock,
                     null,
                     instance,

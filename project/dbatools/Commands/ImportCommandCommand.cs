@@ -41,14 +41,14 @@ namespace Dataplat.Dbatools.Commands
                     {
                         using (var sr = new StreamReader(stream, Encoding.UTF8))
                         {
-                            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create(sr.ReadToEnd()), null, null);
+                            SessionState.InvokeCommand.InvokeScript(true, ScriptBlock.Create(sr.ReadToEnd()), null, null);
                         }
                     }
                 }
             }
             else
             {
-                SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create(File.ReadAllText(Path)), null, null);
+                SessionState.InvokeCommand.InvokeScript(true, ScriptBlock.Create(File.ReadAllText(Path)), null, null);
             }
 
         }

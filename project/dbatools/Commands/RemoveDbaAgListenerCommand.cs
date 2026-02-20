@@ -218,7 +218,7 @@ $agName
         {
             try
             {
-                return InvokeCommand.InvokeScript(false, _getDbaAgListenerScript, null,
+                return InvokeCommand.InvokeScript(true, _getDbaAgListenerScript, null,
                     new object[]
                     {
                         SqlInstance,

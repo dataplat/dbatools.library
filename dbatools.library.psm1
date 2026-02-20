@@ -329,3 +329,14 @@ if ($PSVersionTable.PSEdition -ne "Core" -and $redirector) {
     # Store the redirector in script scope so it stays alive and can be accessed if needed
     $script:assemblyRedirector = $redirector
 }
+
+# Load the main dbatools binary module (contains C# cmdlet implementations)
+# Must be loaded AFTER all dependency assemblies (SMO, SqlClient, etc.) are available
+$dbatoolsDll = [IO.Path]::Combine($script:libraryroot, "lib", "dbatools.dll")
+if (Test-Path $dbatoolsDll) {
+    try {
+        $null = Import-Module $dbatoolsDll
+    } catch {
+        Write-Error "Could not import dbatools binary module: $($_ | Out-String)"
+    }
+}

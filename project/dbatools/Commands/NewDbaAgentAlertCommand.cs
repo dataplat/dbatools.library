@@ -281,7 +281,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -416,7 +416,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetProperty(PSObject obj, string propertyName, object value)
         {
             string script = String.Format("param($o, $v) $o.{0} = $v", propertyName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj, value });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj, value });
         }
 
         /// <summary>
@@ -425,7 +425,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetPropertyViaScript(PSObject obj, string propertyName, string valueExpression)
         {
             string script = String.Format("param($o) $o.{0} = {1}", propertyName, valueExpression);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj });
         }
 
         /// <summary>
@@ -434,7 +434,7 @@ namespace Dataplat.Dbatools.Commands
         private void InvokeAlertCreate(PSObject alert)
         {
             string script = "param($a) $a.Create()";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { alert });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { alert });
         }
 
         /// <summary>
@@ -443,7 +443,7 @@ namespace Dataplat.Dbatools.Commands
         private void InvokeAlertAlter(PSObject alert)
         {
             string script = "param($a) $a.Alter()";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { alert });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { alert });
         }
 
         /// <summary>
@@ -454,7 +454,7 @@ namespace Dataplat.Dbatools.Commands
             string script = String.Format(
                 "param($a, $op) $a.AddNotification($op, [Microsoft.SqlServer.Management.Smo.Agent.NotifyMethods]::{0})",
                 notifyMethod);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { alert, operatorName });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { alert, operatorName });
         }
 
         /// <summary>
@@ -465,7 +465,7 @@ namespace Dataplat.Dbatools.Commands
             try
             {
                 string script = "param($s) $null = $s.JobServer.Refresh()";
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+                InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
             }
             catch (Exception)
             {

@@ -151,7 +151,7 @@ namespace Dataplat.Dbatools.Commands
             {
                 try
                 {
-                    InvokeCommand.InvokeScript(false, ScriptBlock.Create("$ConfirmPreference = 'None'"), null, null);
+                    InvokeCommand.InvokeScript(true, ScriptBlock.Create("$ConfirmPreference = 'None'"), null, null);
                 }
                 catch (Exception)
                 {
@@ -574,7 +574,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -603,7 +603,7 @@ namespace Dataplat.Dbatools.Commands
         private void RemoveExistingJob(object server, string jobName)
         {
             string script = "param($s, $j) $null = Remove-DbaAgentJob -SqlInstance $s -Job $j -EnableException -Confirm:$false";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, jobName });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, jobName });
         }
 
         /// <summary>
@@ -614,7 +614,7 @@ namespace Dataplat.Dbatools.Commands
             try
             {
                 string script = "param($s) $null = $s.JobServer.Refresh()";
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+                InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
             }
             catch (Exception)
             {
@@ -641,7 +641,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetProperty(PSObject obj, string propertyName, object value)
         {
             string script = String.Format("param($o, $v) $o.{0} = $v", propertyName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj, value });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj, value });
         }
 
         /// <summary>
@@ -667,7 +667,7 @@ namespace Dataplat.Dbatools.Commands
         private void CreateJobCategory(object server, string categoryName)
         {
             string script = "param($s, $c) New-DbaAgentJobCategory -SqlInstance $s -Category $c";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, categoryName });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, categoryName });
         }
 
         /// <summary>
@@ -710,7 +710,7 @@ namespace Dataplat.Dbatools.Commands
         private void InvokeMethod(PSObject obj, string methodName)
         {
             string script = String.Format("param($o) $o.{0}()", methodName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj });
         }
 
         /// <summary>
@@ -719,7 +719,7 @@ namespace Dataplat.Dbatools.Commands
         private void InvokeMethodWithArg(PSObject obj, string methodName, object arg)
         {
             string script = String.Format("param($o, $a) $o.{0}($a)", methodName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj, arg });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj, arg });
         }
 
         /// <summary>
@@ -728,7 +728,7 @@ namespace Dataplat.Dbatools.Commands
         private void AttachSchedules(object server, PSObject job, object[] schedules)
         {
             string script = "param($s, $j, $sch) $null = Set-DbaAgentJob -SqlInstance $s -Job $j -Schedule $sch";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, job, schedules });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, job, schedules });
         }
 
         /// <summary>
@@ -737,7 +737,7 @@ namespace Dataplat.Dbatools.Commands
         private void AttachScheduleIds(object server, PSObject job, int[] scheduleIds)
         {
             string script = "param($s, $j, $sid) $null = Set-DbaAgentJob -SqlInstance $s -Job $j -ScheduleId $sid";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, job, scheduleIds });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, job, scheduleIds });
         }
 
         /// <summary>
@@ -748,7 +748,7 @@ namespace Dataplat.Dbatools.Commands
             try
             {
                 string script = "param($s, $n) Add-TeppCacheItem -SqlInstance $s -Type job -Name $n";
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, jobName });
+                InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, jobName });
             }
             catch (Exception)
             {

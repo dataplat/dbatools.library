@@ -778,7 +778,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -820,7 +820,7 @@ namespace Dataplat.Dbatools.Commands
         private void RefreshJob(PSObject job)
         {
             string script = "param($j) $j.Refresh()";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job });
         }
 
         /// <summary>
@@ -889,7 +889,7 @@ namespace Dataplat.Dbatools.Commands
         private void RenameJob(PSObject job, string newName)
         {
             string script = "param($j, $n) $j.Rename($n)";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job, newName });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job, newName });
         }
 
         /// <summary>
@@ -952,7 +952,7 @@ namespace Dataplat.Dbatools.Commands
         private void AddSharedSchedule(PSObject job, int scheduleId)
         {
             string script = "param($j, $id) $j.AddSharedSchedule($id)";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job, scheduleId });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job, scheduleId });
         }
 
         /// <summary>
@@ -961,7 +961,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetJobEnabled(PSObject job, bool enabled)
         {
             string script = "param($j, $v) $j.IsEnabled = $v";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job, enabled });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job, enabled });
         }
 
         /// <summary>
@@ -970,7 +970,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetJobStringProperty(PSObject job, string propertyName, string value)
         {
             string script = String.Format("param($j, $v) $j.{0} = $v", propertyName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job, value });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job, value });
         }
 
         /// <summary>
@@ -979,7 +979,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetJobNullProperty(PSObject job, string propertyName)
         {
             string script = String.Format("param($j) $j.{0} = $null", propertyName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job });
         }
 
         /// <summary>
@@ -988,7 +988,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetJobIntProperty(PSObject job, string propertyName, int value)
         {
             string script = String.Format("param($j, $v) $j.{0} = $v", propertyName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job, value });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job, value });
         }
 
         /// <summary>
@@ -1014,7 +1014,7 @@ namespace Dataplat.Dbatools.Commands
         private void CreateCategory(object server, string categoryName)
         {
             string script = "param($s, $c) New-DbaAgentJobCategory -SqlInstance $s -Category $c";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, categoryName });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, categoryName });
         }
 
         /// <summary>
@@ -1101,7 +1101,7 @@ namespace Dataplat.Dbatools.Commands
         private void AlterJob(PSObject job)
         {
             string script = "param($j) $j.Alter()";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job });
         }
 
         /// <summary>

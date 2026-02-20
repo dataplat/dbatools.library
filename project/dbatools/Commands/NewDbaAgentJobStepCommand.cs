@@ -170,7 +170,7 @@ namespace Dataplat.Dbatools.Commands
             {
                 try
                 {
-                    InvokeCommand.InvokeScript(false, ScriptBlock.Create("$ConfirmPreference = 'None'"), null, null);
+                    InvokeCommand.InvokeScript(true, ScriptBlock.Create("$ConfirmPreference = 'None'"), null, null);
                 }
                 catch (Exception)
                 {
@@ -649,7 +649,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -748,7 +748,7 @@ foreach ($tStep in $j.JobSteps) {
         $tStep.OnSuccessStep = ($tStep.OnSuccessStep) + 1
     }
 }";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { job, stepId });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { job, stepId });
         }
 
         /// <summary>
@@ -788,7 +788,7 @@ foreach ($tStep in $j.JobSteps) {
                 script = "param($i, $j, $s) Remove-DbaAgentJobStep -SqlInstance $i -Job $j -StepName $s -Confirm:$false";
                 args = new object[] { instance, job, stepName };
             }
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
         }
 
         /// <summary>
@@ -836,7 +836,7 @@ foreach ($flag in $f) {
     $combined = $combined -bor [Microsoft.SqlServer.Management.Smo.Agent.JobStepFlags]$flag
 }
 $s.JobStepFlags = $combined";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { jobStep, flags });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { jobStep, flags });
         }
 
         /// <summary>
@@ -845,7 +845,7 @@ $s.JobStepFlags = $combined";
         private void SetProperty(PSObject obj, string propertyName, object value)
         {
             string script = String.Format("param($o, $v) $o.{0} = $v", propertyName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj, value });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj, value });
         }
 
         /// <summary>
@@ -854,7 +854,7 @@ $s.JobStepFlags = $combined";
         private void InvokeMethod(PSObject obj, string methodName)
         {
             string script = String.Format("param($o) $o.{0}()", methodName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj });
         }
 
         /// <summary>

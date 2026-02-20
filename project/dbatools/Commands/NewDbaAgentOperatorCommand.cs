@@ -559,7 +559,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -615,7 +615,7 @@ namespace Dataplat.Dbatools.Commands
         private void DropOperator(object server, string operatorName)
         {
             string script = "param($s, $n) $s.JobServer.Operators[$n].Drop()";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, operatorName });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, operatorName });
         }
 
         /// <summary>
@@ -637,7 +637,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetProperty(PSObject obj, string propertyName, object value)
         {
             string script = String.Format("param($o, $v) $o.{0} = $v", propertyName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj, value });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj, value });
         }
 
         /// <summary>
@@ -646,7 +646,7 @@ namespace Dataplat.Dbatools.Commands
         private void InvokeMethod(PSObject obj, string methodName)
         {
             string script = String.Format("param($o) $o.{0}()", methodName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj });
         }
 
         /// <summary>
@@ -672,7 +672,7 @@ namespace Dataplat.Dbatools.Commands
 $s.JobServer.AlertSystem.FailSafeOperator = $n
 $s.JobServer.AlertSystem.NotificationMethod = [Microsoft.SqlServer.Management.Smo.Agent.NotifyMethods]::$m
 $s.JobServer.AlertSystem.Alter()";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, operatorName, smoMethod });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, operatorName, smoMethod });
         }
 
         /// <summary>

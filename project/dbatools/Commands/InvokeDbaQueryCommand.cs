@@ -400,7 +400,7 @@ namespace Dataplat.Dbatools.Commands
                 try
                 {
                     string script = "param($s) $s | Disconnect-DbaInstance -Verbose:$false";
-                    InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+                    InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
                 }
                 catch (Exception)
                 {
@@ -1111,7 +1111,7 @@ try {
     Invoke-TlsWebRequest -Uri $uri -OutFile $outFile -ErrorAction Stop
 }
 ";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null,
                 new object[] { url, destPath });
         }
 

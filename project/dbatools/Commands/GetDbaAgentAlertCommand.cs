@@ -186,7 +186,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -220,7 +220,7 @@ namespace Dataplat.Dbatools.Commands
         private Collection<PSObject> GetAlerts(object server)
         {
             string script = "param($s) $s.JobServer.Alerts";
-            return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+            return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
         }
 
         /// <summary>

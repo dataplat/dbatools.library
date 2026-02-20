@@ -138,11 +138,11 @@ namespace Dataplat.Dbatools.Commands
             Collection<PSObject> results;
             if (SqlCredential != null)
             {
-                results = InvokeCommand.InvokeScript(false, ConnectWithCredScript, null, new object[] { instance, SqlCredential });
+                results = InvokeCommand.InvokeScript(true, ConnectWithCredScript, null, new object[] { instance, SqlCredential });
             }
             else
             {
-                results = InvokeCommand.InvokeScript(false, ConnectScript, null, new object[] { instance });
+                results = InvokeCommand.InvokeScript(true, ConnectScript, null, new object[] { instance });
             }
 
             if (results != null && results.Count > 0)
@@ -194,7 +194,7 @@ namespace Dataplat.Dbatools.Commands
                 tsQuery = "SELECT cpu_ticks / CONVERT(FLOAT, cpu_ticks_in_ms) AS TimeStamp FROM sys.dm_os_sys_info";
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, TimestampQueryScript, null, new object[] { server, tsQuery });
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, TimestampQueryScript, null, new object[] { server, tsQuery });
             if (results != null && results.Count > 0 && results[0] != null)
             {
                 object baseObj = results[0].BaseObject;
@@ -255,7 +255,7 @@ namespace Dataplat.Dbatools.Commands
         /// </summary>
         private Collection<PSObject> ExecuteQuery(object server, string sql)
         {
-            return InvokeCommand.InvokeScript(false, QueryScript, null, new object[] { server, sql });
+            return InvokeCommand.InvokeScript(true, QueryScript, null, new object[] { server, sql });
         }
 
         /// <summary>

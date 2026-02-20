@@ -267,7 +267,7 @@ namespace Dataplat.Dbatools.Commands
                 // Refresh database
                 try
                 {
-                    InvokeCommand.InvokeScript(false, _refreshDbScript, null, new object[] { db });
+                    InvokeCommand.InvokeScript(true, _refreshDbScript, null, new object[] { db });
                 }
                 catch (Exception)
                 {

@@ -644,7 +644,7 @@ param($ag)
                             WriteMessageVerbose("WSFC Cluster requires granting [NT AUTHORITY\\SYSTEM] a few things. Setting now.");
                             try
                             {
-                                InvokeCommand.InvokeScript(false, _wsfcPermissionsScript, null, new object[] { server });
+                                InvokeCommand.InvokeScript(true, _wsfcPermissionsScript, null, new object[] { server });
                             }
                             catch (Exception ex)
                             {
@@ -684,7 +684,7 @@ param($ag)
                             {
                                 try
                                 {
-                                    InvokeCommand.InvokeScript(false, _grantSeedingScript, null,
+                                    InvokeCommand.InvokeScript(true, _grantSeedingScript, null,
                                         new object[] { server, agName });
                                 }
                                 catch (Exception ex)
@@ -704,7 +704,7 @@ param($ag)
                             {
                                 try
                                 {
-                                    InvokeCommand.InvokeScript(false, _grantEndpointScript, null,
+                                    InvokeCommand.InvokeScript(true, _grantEndpointScript, null,
                                         new object[] { server, serviceAccount });
                                 }
                                 catch (Exception ex)

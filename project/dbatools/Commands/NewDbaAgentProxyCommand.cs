@@ -444,7 +444,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance, minimumVersion };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0];
             return null;
@@ -520,7 +520,7 @@ namespace Dataplat.Dbatools.Commands
         private void DropProxy(object jobServer, string proxyName)
         {
             string script = "param($js, $n) $js.ProxyAccounts[$n].Drop()";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { jobServer, proxyName });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { jobServer, proxyName });
         }
 
         /// <summary>
@@ -529,7 +529,7 @@ namespace Dataplat.Dbatools.Commands
         private void RefreshProxyAccounts(object jobServer)
         {
             string script = "param($js) $js.ProxyAccounts.Refresh()";
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { jobServer });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { jobServer });
         }
 
         /// <summary>
@@ -653,7 +653,7 @@ namespace Dataplat.Dbatools.Commands
         private void InvokeMethod(PSObject obj, string methodName)
         {
             string script = String.Format("param($o) $o.{0}()", methodName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj });
         }
 
         /// <summary>
@@ -671,7 +671,7 @@ namespace Dataplat.Dbatools.Commands
             {
                 script = String.Format("param($o, $a) $o.{0}($a)", methodName);
             }
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj, arg });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj, arg });
         }
 
         /// <summary>

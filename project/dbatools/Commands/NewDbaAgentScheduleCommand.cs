@@ -147,7 +147,7 @@ namespace Dataplat.Dbatools.Commands
             {
                 try
                 {
-                    InvokeCommand.InvokeScript(false, ScriptBlock.Create("$ConfirmPreference = 'None'"), null, null);
+                    InvokeCommand.InvokeScript(true, ScriptBlock.Create("$ConfirmPreference = 'None'"), null, null);
                 }
                 catch (Exception)
                 {
@@ -455,7 +455,7 @@ namespace Dataplat.Dbatools.Commands
                     try
                     {
                         string teppScript = "param($s, $n) Add-TeppCacheItem -SqlInstance $s -Type schedule -Name $n";
-                        InvokeCommand.InvokeScript(false, ScriptBlock.Create(teppScript), null, new object[] { server, _scheduleName });
+                        InvokeCommand.InvokeScript(true, ScriptBlock.Create(teppScript), null, new object[] { server, _scheduleName });
                     }
                     catch (Exception)
                     {
@@ -939,7 +939,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -985,7 +985,7 @@ namespace Dataplat.Dbatools.Commands
         private void SetProperty(PSObject obj, string propertyName, object value)
         {
             string script = String.Format("param($o, $v) $o.{0} = $v", propertyName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj, value });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj, value });
         }
 
         /// <summary>
@@ -994,7 +994,7 @@ namespace Dataplat.Dbatools.Commands
         private void InvokeMethod(PSObject obj, string methodName)
         {
             string script = String.Format("param($o) $o.{0}()", methodName);
-            InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { obj });
+            InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { obj });
         }
 
         /// <summary>
@@ -1008,7 +1008,7 @@ namespace Dataplat.Dbatools.Commands
 $null = $s.Refresh()
 $null = $s.JobServer.Refresh()
 $null = $s.JobServer.SharedSchedules.Refresh()";
-                InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+                InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
             }
             catch (Exception)
             {
@@ -1052,7 +1052,7 @@ $null = $s.JobServer.SharedSchedules.Refresh()";
             Collection<PSObject> jobs;
             try
             {
-                jobs = InvokeCommand.InvokeScript(false, ScriptBlock.Create(getJobsScript), null, getJobsArgs);
+                jobs = InvokeCommand.InvokeScript(true, ScriptBlock.Create(getJobsScript), null, getJobsArgs);
             }
             catch (Exception)
             {
@@ -1076,10 +1076,10 @@ $null = $s.JobServer.SharedSchedules.Refresh()";
                     string attachScript = "param($j, $id) $j.AddSharedSchedule($id)";
                     try
                     {
-                        InvokeCommand.InvokeScript(false, ScriptBlock.Create(attachScript), null, new object[] { j, scheduleId });
+                        InvokeCommand.InvokeScript(true, ScriptBlock.Create(attachScript), null, new object[] { j, scheduleId });
 
                         string refreshScript = "param($js) $js.Refresh()";
-                        InvokeCommand.InvokeScript(false, ScriptBlock.Create(refreshScript), null, new object[] { jobSchedule });
+                        InvokeCommand.InvokeScript(true, ScriptBlock.Create(refreshScript), null, new object[] { jobSchedule });
                     }
                     catch (Exception attachEx)
                     {

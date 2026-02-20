@@ -328,7 +328,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -342,7 +342,7 @@ namespace Dataplat.Dbatools.Commands
             string script = "param($s) @($s.AvailabilityGroups).Count";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
                 if (results != null && results.Count > 0 && results[0] != null)
                 {
                     return Convert.ToInt32(results[0].BaseObject);
@@ -363,7 +363,7 @@ namespace Dataplat.Dbatools.Commands
             string script = "param($s, $n) $n -in $s.AvailabilityGroups.Name";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, agName });
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, agName });
                 if (results != null && results.Count > 0 && results[0] != null)
                 {
                     return Convert.ToBoolean(results[0].BaseObject);
@@ -384,7 +384,7 @@ namespace Dataplat.Dbatools.Commands
             string script = "param($s, $n) ($s.AvailabilityGroups | Where-Object { $_.Name -eq $n }).AvailabilityReplicas.Name";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server, agName });
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server, agName });
                 if (results != null && results.Count > 0)
                 {
                     object[] names = new object[results.Count];
@@ -410,7 +410,7 @@ namespace Dataplat.Dbatools.Commands
             string script = "param($sl, $ag) (Get-DbaAgDatabase -SqlInstance $sl[0] -AvailabilityGroup $ag).Name";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { serverList, agName });
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { serverList, agName });
                 if (results != null && results.Count > 0)
                 {
                     List<string> names = new List<string>();
@@ -509,7 +509,7 @@ Get-DbaDbBackupHistory @params
 
             try
             {
-                return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+                return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             }
             catch (Exception ex)
             {
@@ -554,7 +554,7 @@ Get-DbaDbBackupHistory @params
             string script = "param($results, $serverName) $results | Select-DbaBackupInformation -ServerName $serverName";
             try
             {
-                Collection<PSObject> filtered = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { agResults, agName });
+                Collection<PSObject> filtered = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { agResults, agName });
                 if (filtered != null)
                 {
                     foreach (PSObject result in filtered)

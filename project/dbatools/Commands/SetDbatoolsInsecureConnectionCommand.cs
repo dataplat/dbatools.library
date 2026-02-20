@@ -59,7 +59,7 @@ namespace Dataplat.Dbatools.Commands
             // Set sql.connection.trustcert = true
             try
             {
-                InvokeCommand.InvokeScript(false, SetConfigScript, null, TrustCertKey, true);
+                InvokeCommand.InvokeScript(true, SetConfigScript, null, TrustCertKey, true);
             }
             catch (Exception ex)
             {
@@ -71,7 +71,7 @@ namespace Dataplat.Dbatools.Commands
             // Set sql.connection.encrypt = false
             try
             {
-                InvokeCommand.InvokeScript(false, SetConfigScript, null, EncryptKey, false);
+                InvokeCommand.InvokeScript(true, SetConfigScript, null, EncryptKey, false);
             }
             catch (Exception ex)
             {
@@ -85,7 +85,7 @@ namespace Dataplat.Dbatools.Commands
                 // Register sql.connection.trustcert
                 try
                 {
-                    InvokeCommand.InvokeScript(false, RegisterConfigScript, null, TrustCertKey, Scope);
+                    InvokeCommand.InvokeScript(true, RegisterConfigScript, null, TrustCertKey, Scope);
                 }
                 catch (Exception ex)
                 {
@@ -97,7 +97,7 @@ namespace Dataplat.Dbatools.Commands
                 // Register sql.connection.encrypt
                 try
                 {
-                    InvokeCommand.InvokeScript(false, RegisterConfigScript, null, EncryptKey, Scope);
+                    InvokeCommand.InvokeScript(true, RegisterConfigScript, null, EncryptKey, Scope);
                 }
                 catch (Exception ex)
                 {

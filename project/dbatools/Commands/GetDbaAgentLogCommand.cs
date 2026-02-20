@@ -146,7 +146,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, script, null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, script, null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -170,7 +170,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { server };
             }
 
-            return InvokeCommand.InvokeScript(false, script, null, args);
+            return InvokeCommand.InvokeScript(true, script, null, args);
         }
 
         /// <summary>

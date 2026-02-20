@@ -200,7 +200,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             // Return the PSObject wrapper, not BaseObject, to preserve NoteProperties
             // added by Connect-DbaInstance (ComputerName, DomainInstanceName, etc.)
             if (results != null && results.Count > 0)
@@ -235,7 +235,7 @@ namespace Dataplat.Dbatools.Commands
         private Collection<PSObject> GetOperators(object server)
         {
             string script = "param($s) $s.JobServer.Operators";
-            return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+            return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
         }
 
         /// <summary>
@@ -246,7 +246,7 @@ namespace Dataplat.Dbatools.Commands
             try
             {
                 string script = "param($s) $s.JobServer.Alerts";
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
                 return results ?? new Collection<PSObject>();
             }
             catch (Exception)
@@ -263,7 +263,7 @@ namespace Dataplat.Dbatools.Commands
             try
             {
                 string script = "param($s) $s.JobServer.Jobs";
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
                 return results ?? new Collection<PSObject>();
             }
             catch (Exception)

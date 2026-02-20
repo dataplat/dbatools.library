@@ -213,7 +213,7 @@ param()
 ";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[0]);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[0]);
                 if (results != null && results.Count > 0)
                     return results[0];
             }
@@ -244,7 +244,7 @@ param()
                 args = new object[] { instance.ComputerName };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0];
             return null;
@@ -287,7 +287,7 @@ try {
                 args = new object[] { instance.ComputerName };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
             {
                 object value = results[0].BaseObject;
@@ -340,7 +340,7 @@ try {
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -428,7 +428,7 @@ try {
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0 && results[0] != null)
                 return results[0].BaseObject;
             return null;
@@ -443,7 +443,7 @@ try {
                 return null;
 
             string script = "param($s) (Test-DbaConnectionAuthScheme -SqlInstance $s -EnableException).AuthScheme";
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
             if (results != null && results.Count > 0 && results[0] != null)
                 return results[0].BaseObject;
             return null;

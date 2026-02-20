@@ -384,7 +384,7 @@ $server.Query(""SELECT TOP 1 * FROM sys.dm_hadr_automatic_seeding WHERE ag_id = 
                     {
                         WriteMessageAtLevel(String.Format("Setting seeding mode for replica {0} to {1}.", replicaName, SeedingMode), MessageLevel.Verbose, null);
                         object replica = GetReplicaObject(ag, replicaName);
-                        InvokeCommand.InvokeScript(false, _setSeedingModeAlter, null, new object[] { replica, SeedingMode });
+                        InvokeCommand.InvokeScript(true, _setSeedingModeAlter, null, new object[] { replica, SeedingMode });
 
                         if (String.Equals(SeedingMode, "Automatic", StringComparison.OrdinalIgnoreCase))
                         {
@@ -392,7 +392,7 @@ $server.Query(""SELECT TOP 1 * FROM sys.dm_hadr_automatic_seeding WHERE ag_id = 
                             WriteMessageAtLevel(
                                 String.Format("Setting GrantAvailabilityGroupCreateDatabasePrivilege on server {0} for Availability Group {1}.", replicaServer, AvailabilityGroup),
                                 MessageLevel.Verbose, null);
-                            InvokeCommand.InvokeScript(false, _grantAgPermission, null, new object[] { replicaServer, AvailabilityGroup });
+                            InvokeCommand.InvokeScript(true, _grantAgPermission, null, new object[] { replicaServer, AvailabilityGroup });
                         }
                     }
                     catch (Exception ex)
@@ -528,7 +528,7 @@ $server.Query(""SELECT TOP 1 * FROM sys.dm_hadr_automatic_seeding WHERE ag_id = 
                             }
                         }
 
-                        InvokeCommand.InvokeScript(false, _restoreDb, null, new object[] { backups, restoreParams });
+                        InvokeCommand.InvokeScript(true, _restoreDb, null, new object[] { backups, restoreParams });
                     }
                     catch (Exception ex)
                     {
@@ -749,7 +749,7 @@ $server.Query(""SELECT TOP 1 * FROM sys.dm_hadr_automatic_seeding WHERE ag_id = 
                             String.Format("Joining database {0} on replica {1}", dbName, replicaName),
                             MessageLevel.Verbose, null);
                         // NOTE: JoinAvailablityGroup() is a typo in SMO - do NOT fix
-                        InvokeCommand.InvokeScript(false, _joinAgDb, null, new object[] { replicaAgDb });
+                        InvokeCommand.InvokeScript(true, _joinAgDb, null, new object[] { replicaAgDb });
                     }
                     catch (Exception ex)
                     {
@@ -1116,7 +1116,7 @@ $server.Query(""SELECT TOP 1 * FROM sys.dm_hadr_automatic_seeding WHERE ag_id = 
         {
             try
             {
-                InvokeCommand.InvokeScript(false, _refreshObj, null, new object[] { obj });
+                InvokeCommand.InvokeScript(true, _refreshObj, null, new object[] { obj });
             }
             catch (Exception)
             {
@@ -1247,7 +1247,7 @@ $server.Query(""SELECT TOP 1 * FROM sys.dm_hadr_automatic_seeding WHERE ag_id = 
         /// </summary>
         private object InvokeScriptSingle(ScriptBlock script, params object[] args)
         {
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, script, null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, script, null, args);
             if (results != null && results.Count > 0 && results[0] != null)
                 return results[0].BaseObject ?? results[0];
             return null;

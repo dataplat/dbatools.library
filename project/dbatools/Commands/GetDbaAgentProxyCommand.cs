@@ -168,7 +168,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             // Return the PSObject wrapper, not BaseObject, to preserve NoteProperties
             // added by Connect-DbaInstance (ComputerName, DomainInstanceName, etc.)
             if (results != null && results.Count > 0)
@@ -182,7 +182,7 @@ namespace Dataplat.Dbatools.Commands
         private Collection<PSObject> GetProxyAccounts(object server)
         {
             string script = "param($s) $s.JobServer.ProxyAccounts";
-            return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { server });
+            return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { server });
         }
 
         /// <summary>

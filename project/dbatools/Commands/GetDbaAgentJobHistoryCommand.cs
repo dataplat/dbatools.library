@@ -573,7 +573,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
             return null;
@@ -626,7 +626,7 @@ $srv.JobServer.EnumJobHistory($filter)
                 argsList.Add(TestBound("OutcomeType") ? (object)OutcomeType : null);
             }
 
-            return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, argsList.ToArray());
+            return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, argsList.ToArray());
         }
 
         /// <summary>
@@ -698,7 +698,7 @@ $srv.JobServer.EnumJobHistory($filter)
                     }
                 }
 
-                Collection<PSObject> outfiles = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+                Collection<PSObject> outfiles = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
                 if (outfiles == null) return result;
 
                 foreach (PSObject outfile in outfiles)

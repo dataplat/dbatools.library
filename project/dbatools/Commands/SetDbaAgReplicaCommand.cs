@@ -433,7 +433,7 @@ $null = $replica.SetLoadBalancedReadOnlyRoutingList($rorl)
 
             try
             {
-                return InvokeCommand.InvokeScript(false, _getAgReplicaScript, null, args);
+                return InvokeCommand.InvokeScript(true, _getAgReplicaScript, null, args);
             }
             catch (Exception ex)
             {

@@ -369,7 +369,7 @@ namespace Dataplat.Dbatools.Commands
         {
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, _sbGetConfigValue, null, fullName);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, _sbGetConfigValue, null, fullName);
                 if (results != null && results.Count > 0 && results[0] != null)
                 {
                     object val = results[0].BaseObject;
@@ -397,7 +397,7 @@ namespace Dataplat.Dbatools.Commands
         {
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, _sbTestWindows, null);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, _sbTestWindows, null);
                 if (results != null && results.Count > 0 && results[0] != null)
                 {
                     object val = results[0].BaseObject;

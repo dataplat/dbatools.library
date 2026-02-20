@@ -170,7 +170,7 @@ namespace Dataplat.Dbatools.Commands
                 args = new object[] { instance };
             }
 
-            var results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+            var results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             if (results != null && results.Count > 0)
             {
                 if (results[0].BaseObject is bool boolResult)

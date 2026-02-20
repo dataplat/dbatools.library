@@ -246,7 +246,7 @@ param($replica) $replica.Parent.Name
         {
             try
             {
-                return InvokeCommand.InvokeScript(false, _getDbaAgReplicaScript, null,
+                return InvokeCommand.InvokeScript(true, _getDbaAgReplicaScript, null,
                     new object[]
                     {
                         SqlInstance,

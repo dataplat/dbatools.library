@@ -223,7 +223,7 @@ $listener.Alter()
 
             try
             {
-                return InvokeCommand.InvokeScript(false, _getAgListenersScript, null, args);
+                return InvokeCommand.InvokeScript(true, _getAgListenersScript, null, args);
             }
             catch (Exception ex)
             {
@@ -241,7 +241,7 @@ $listener.Alter()
         /// </summary>
         private void SetPortAndAlter(object listenerObj)
         {
-            InvokeCommand.InvokeScript(false, _setPortAndAlterScript, null, new object[] { listenerObj, Port });
+            InvokeCommand.InvokeScript(true, _setPortAndAlterScript, null, new object[] { listenerObj, Port });
         }
 
         /// <summary>

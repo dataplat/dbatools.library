@@ -221,11 +221,11 @@ namespace Dataplat.Dbatools.Commands
             Collection<PSObject> results;
             if (SqlCredential != null)
             {
-                results = InvokeCommand.InvokeScript(false, ConnectWithCredScript, null, new object[] { instance, SqlCredential });
+                results = InvokeCommand.InvokeScript(true, ConnectWithCredScript, null, new object[] { instance, SqlCredential });
             }
             else
             {
-                results = InvokeCommand.InvokeScript(false, ConnectScript, null, new object[] { instance });
+                results = InvokeCommand.InvokeScript(true, ConnectScript, null, new object[] { instance });
             }
 
             if (results != null && results.Count > 0)
@@ -238,7 +238,7 @@ namespace Dataplat.Dbatools.Commands
         /// </summary>
         private Collection<PSObject> InvokeGetDbaProcess(object server)
         {
-            return InvokeCommand.InvokeScript(false, GetProcessScript, null, new object[] { server });
+            return InvokeCommand.InvokeScript(true, GetProcessScript, null, new object[] { server });
         }
 
         /// <summary>
@@ -248,10 +248,10 @@ namespace Dataplat.Dbatools.Commands
         {
             if (Credential != null)
             {
-                return InvokeCommand.InvokeScript(false, GetCmObjectWithCredScript, null,
+                return InvokeCommand.InvokeScript(true, GetCmObjectWithCredScript, null,
                     new object[] { computerName, "Win32_PerfFormattedData_PerfProc_Thread", Credential });
             }
-            return InvokeCommand.InvokeScript(false, GetCmObjectScript, null,
+            return InvokeCommand.InvokeScript(true, GetCmObjectScript, null,
                 new object[] { computerName, "Win32_PerfFormattedData_PerfProc_Thread" });
         }
 
@@ -322,7 +322,7 @@ JOIN sys.dm_os_workers w ON er.task_address = w.task_address
 JOIN sys.dm_os_threads t ON w.thread_address = t.thread_address";
             }
 
-            return InvokeCommand.InvokeScript(false, QueryScript, null, new object[] { server, sql });
+            return InvokeCommand.InvokeScript(true, QueryScript, null, new object[] { server, sql });
         }
 
         /// <summary>

@@ -332,7 +332,7 @@ $ag.Alter()
 
             try
             {
-                return InvokeCommand.InvokeScript(false, _getAgScript, null, args);
+                return InvokeCommand.InvokeScript(true, _getAgScript, null, args);
             }
             catch (Exception ex)
             {

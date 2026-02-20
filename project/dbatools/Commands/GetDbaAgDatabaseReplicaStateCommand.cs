@@ -305,7 +305,7 @@ Get-DbaAvailabilityGroup @params
 
             try
             {
-                return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+                return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             }
             catch (Exception ex)
             {
@@ -325,7 +325,7 @@ Get-DbaAvailabilityGroup @params
         {
             try
             {
-                return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, new object[] { arg });
+                return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, new object[] { arg });
             }
             catch (Exception ex)
             {

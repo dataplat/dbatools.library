@@ -456,7 +456,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
                         string onceName = String.Format("MessageOnce.{0}.{1}", FunctionName, Once).ToLower();
                         if (!(Configuration.ConfigurationHost.Configurations.TryGetValue(onceName, out var existingConfig) && (bool)existingConfig.Value))
                         {
-                            InvokeCommand.InvokeScript(false, ScriptBlock.Create(_writeHostScript), null, _MessageHost);
+                            InvokeCommand.InvokeScript(true, ScriptBlock.Create(_writeHostScript), null, _MessageHost);
                             channels = channels | LogEntryType.Information;
 
                             Configuration.Config cfg = new Configuration.Config();
@@ -472,7 +472,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
                     else
                     {
                         //InvokeCommand.InvokeScript(_writeHostScript, _MessageHost);
-                        InvokeCommand.InvokeScript(false, ScriptBlock.Create(_writeHostScript), null, _MessageHost);
+                        InvokeCommand.InvokeScript(true, ScriptBlock.Create(_writeHostScript), null, _MessageHost);
                         channels = channels | LogEntryType.Information;
                     }
                 }
@@ -494,11 +494,11 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
                 if (_isDebug)
                 {
                     if (Breakpoint.ToBool())
-                        InvokeCommand.InvokeScript(false, ScriptBlock.Create(@"$DebugPreference = 'Inquire'"), null, null);
+                        InvokeCommand.InvokeScript(true, ScriptBlock.Create(@"$DebugPreference = 'Inquire'"), null, null);
                     else
                     {
                         restoreInquire = (ActionPreference)GetVariableValue("DebugPreference") == ActionPreference.Inquire;
-                        InvokeCommand.InvokeScript(false, ScriptBlock.Create(@"$DebugPreference = 'Continue'"), null, null);
+                        InvokeCommand.InvokeScript(true, ScriptBlock.Create(@"$DebugPreference = 'Continue'"), null, null);
                     }
                     WriteDebug(String.Format("{0} | {1}", Line, _MessageStreams));
                     channels = channels | LogEntryType.Debug;
@@ -510,7 +510,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
                 }
 
                 if (restoreInquire)
-                    InvokeCommand.InvokeScript(false, ScriptBlock.Create(@"$DebugPreference = 'Inquire'"), null, null);
+                    InvokeCommand.InvokeScript(true, ScriptBlock.Create(@"$DebugPreference = 'Inquire'"), null, null);
             }
             #endregion Message handling
 
@@ -542,7 +542,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
 
             if (MessageHost.TargetTransforms.ContainsKey(lowTypeName))
             {
-                try { return InvokeCommand.InvokeScript(false, ScriptBlock.Create(MessageHost.TargetTransforms[lowTypeName].ToString()), null, Item); }
+                try { return InvokeCommand.InvokeScript(true, ScriptBlock.Create(MessageHost.TargetTransforms[lowTypeName].ToString()), null, Item); }
                 catch (Exception e)
                 {
                     MessageHost.WriteTransformError(new ErrorRecord(e, "Write-Message", ErrorCategory.OperationStopped, null), FunctionName, ModuleName, Item, TransformType.Target, System.Management.Automation.Runspaces.Runspace.DefaultRunspace.InstanceId);
@@ -553,7 +553,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
             TransformCondition transform = MessageHost.TargetTransformlist.Get(lowTypeName, ModuleName, FunctionName);
             if (transform != null)
             {
-                try { return InvokeCommand.InvokeScript(false, ScriptBlock.Create(transform.ScriptBlock.ToString()), null, Item); }
+                try { return InvokeCommand.InvokeScript(true, ScriptBlock.Create(transform.ScriptBlock.ToString()), null, Item); }
                 catch (Exception e)
                 {
                     MessageHost.WriteTransformError(new ErrorRecord(e, "Write-Message", ErrorCategory.OperationStopped, null), FunctionName, ModuleName, Item, TransformType.Target, System.Management.Automation.Runspaces.Runspace.DefaultRunspace.InstanceId);
@@ -578,7 +578,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
 
             if (MessageHost.ExceptionTransforms.ContainsKey(lowTypeName))
             {
-                try { return (Exception)InvokeCommand.InvokeScript(false, ScriptBlock.Create(MessageHost.ExceptionTransforms[lowTypeName].ToString()), null, Item)[0].BaseObject; }
+                try { return (Exception)InvokeCommand.InvokeScript(true, ScriptBlock.Create(MessageHost.ExceptionTransforms[lowTypeName].ToString()), null, Item)[0].BaseObject; }
                 catch (Exception e)
                 {
                     MessageHost.WriteTransformError(new ErrorRecord(e, "Write-Message", ErrorCategory.OperationStopped, null), FunctionName, ModuleName, Item, TransformType.Exception, System.Management.Automation.Runspaces.Runspace.DefaultRunspace.InstanceId);
@@ -589,7 +589,7 @@ else { Write-HostColor -String $string -DefaultColor ([Dataplat.Dbatools.Message
             TransformCondition transform = MessageHost.ExceptionTransformList.Get(lowTypeName, ModuleName, FunctionName);
             if (transform != null)
             {
-                try { return (Exception)InvokeCommand.InvokeScript(false, ScriptBlock.Create(transform.ScriptBlock.ToString()), null, Item)[0].BaseObject; }
+                try { return (Exception)InvokeCommand.InvokeScript(true, ScriptBlock.Create(transform.ScriptBlock.ToString()), null, Item)[0].BaseObject; }
                 catch (Exception e)
                 {
                     MessageHost.WriteTransformError(new ErrorRecord(e, "Write-Message", ErrorCategory.OperationStopped, null), FunctionName, ModuleName, Item, TransformType.Exception, System.Management.Automation.Runspaces.Runspace.DefaultRunspace.InstanceId);

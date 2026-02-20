@@ -215,7 +215,7 @@ $null = $ag.Parent.Query(""DROP AVAILABILITY GROUP [$agName]"")
         {
             try
             {
-                return InvokeCommand.InvokeScript(false, _getDbaAvailabilityGroupScript, null,
+                return InvokeCommand.InvokeScript(true, _getDbaAvailabilityGroupScript, null,
                     new object[]
                     {
                         SqlInstance,

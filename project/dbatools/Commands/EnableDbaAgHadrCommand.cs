@@ -168,7 +168,7 @@ $null = Start-DbaService -ComputerName $computerFullName -InstanceName $instance
             {
                 try
                 {
-                    InvokeCommand.InvokeScript(false, _enableHadrScript, null,
+                    InvokeCommand.InvokeScript(true, _enableHadrScript, null,
                         new object[] { computer, Credential, Credential != null, instanceName });
                 }
                 catch (Exception ex)
@@ -192,9 +192,9 @@ $null = Start-DbaService -ComputerName $computerFullName -InstanceName $instance
                 {
                     try
                     {
-                        InvokeCommand.InvokeScript(false, _stopServicesScript, null,
+                        InvokeCommand.InvokeScript(true, _stopServicesScript, null,
                             new object[] { computer, instanceName });
-                        InvokeCommand.InvokeScript(false, _startServicesScript, null,
+                        InvokeCommand.InvokeScript(true, _startServicesScript, null,
                             new object[] { computer, instanceName });
                     }
                     catch (Exception ex)

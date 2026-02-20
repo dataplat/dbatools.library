@@ -249,7 +249,7 @@ Get-DbaAvailabilityGroup @params
 
             try
             {
-                return InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null, args);
+                return InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null, args);
             }
             catch (Exception ex)
             {
@@ -268,7 +268,7 @@ Get-DbaAvailabilityGroup @params
         {
             try
             {
-                return InvokeCommand.InvokeScript(false, _getAvailabilityDatabasesScript, null, new object[] { agObject });
+                return InvokeCommand.InvokeScript(true, _getAvailabilityDatabasesScript, null, new object[] { agObject });
             }
             catch (Exception ex)
             {

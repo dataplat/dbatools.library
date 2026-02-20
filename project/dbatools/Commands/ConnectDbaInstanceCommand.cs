@@ -947,7 +947,7 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
 
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_RecursiveConnect, null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, SB_RecursiveConnect, null,
                     serverName, Database, cred, MyInvocation.BoundParameters);
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
@@ -964,7 +964,7 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
         {
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_CopyContext, null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, SB_CopyContext, null,
                     inputObject,
                     ApplicationIntent,
                     NonPooledConnection.IsPresent,
@@ -987,7 +987,7 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
         {
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_CreateFromSqlConn, null, inputObject);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, SB_CreateFromSqlConn, null, inputObject);
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
             }
@@ -1004,7 +1004,7 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
             // Mirrors PS1: SqlConnectionInfo from connection string properties, then ServerConnection -> Server
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_CreateFromConnString, null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, SB_CreateFromConnString, null,
                     connString, TrustServerCertificate.IsPresent, Database);
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
@@ -1069,7 +1069,7 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
 
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_CreateFromString, null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, SB_CreateFromString, null,
                     serverName,
                     authType,
                     username,
@@ -1118,7 +1118,7 @@ $null = $server.ConnectionContext.ExecuteWithResults(""SELECT 'dbatools is openi
         {
             return @"
 param(
-    $serverName, $authType, $username, $sqlCredential, $accessToken,
+    $serverName, $authType, $username, $p_sqlCredential, $accessToken,
     $appendConnectionString, $failoverPartner, $multiSubnetFailover,
     $alwaysEncrypted, $applicationIntent, $clientName, $networkProtocol,
     $connectTimeout, $database, $fullSmoName, $encryptConnection,
@@ -1232,7 +1232,7 @@ if ($nonPooledConnection) {
 # SecurePassword and UserName
 if ($authType -in 'azure ad', 'azure sql', 'local sql') {
     Write-Message -Level Debug -Message ""SecurePassword will be set""
-    $sqlConnectionInfo.SecurePassword = $sqlCredential.Password
+    $sqlConnectionInfo.SecurePassword = $p_sqlCredential.Password
     Write-Message -Level Debug -Message ""UserName will be set to '$username'""
     $sqlConnectionInfo.UserName = $username
 }
@@ -1296,7 +1296,7 @@ if ($authType -eq 'local ad') {
     Write-Message -Level Debug -Message ""ConnectAsUserName will be set to '$username'""
     $serverConnection.ConnectAsUserName = $username
     Write-Message -Level Debug -Message ""ConnectAsUserPassword will be set""
-    $serverConnection.ConnectAsUserPassword = $sqlCredential.GetNetworkCredential().Password
+    $serverConnection.ConnectAsUserPassword = $p_sqlCredential.GetNetworkCredential().Password
 }
 
 Write-Message -Level Debug -Message ""Building Server from ServerConnection""
@@ -1390,7 +1390,7 @@ $server
 
         private void RetryWithTrustServerCertificate(object server)
         {
-            InvokeCommand.InvokeScript(false, SB_RetryTrustCert, null, server);
+            InvokeCommand.InvokeScript(true, SB_RetryTrustCert, null, server);
         }
 
         #endregion Connection Validation
@@ -1576,7 +1576,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
 
             try
             {
-                InvokeCommand.InvokeScript(false, SB_PostConnectionSetup, null,
+                InvokeCommand.InvokeScript(true, SB_PostConnectionSetup, null,
                     instance, server, isAzure,
                     Fields2000Db, Fields200xDb, Fields201xDb,
                     Fields2000Login, Fields200xLogin, Fields201xLogin,
@@ -1703,7 +1703,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         {
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_GetConfigValue, null, fullName);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, SB_GetConfigValue, null, fullName);
                 if (results != null && results.Count > 0 && results[0] != null)
                 {
                     object val = results[0].BaseObject;
@@ -1778,7 +1778,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         {
             try
             {
-                InvokeCommand.InvokeScript(false, SB_ConnectContext, null, server);
+                InvokeCommand.InvokeScript(true, SB_ConnectContext, null, server);
             }
             catch (Exception ex)
             {
@@ -1790,7 +1790,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         {
             try
             {
-                InvokeCommand.InvokeScript(false, SB_DisconnectServer, null, server);
+                InvokeCommand.InvokeScript(true, SB_DisconnectServer, null, server);
             }
             catch (Exception ex)
             {
@@ -1800,7 +1800,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
 
         private void InvokeExecuteWithResults(object server, string sql)
         {
-            InvokeCommand.InvokeScript(false, SB_ExecuteWithResults, null, server, sql);
+            InvokeCommand.InvokeScript(true, SB_ExecuteWithResults, null, server, sql);
         }
 
         private object GetSqlConnectionObject(object server)
@@ -1819,7 +1819,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         {
             try
             {
-                InvokeCommand.InvokeScript(false, SB_LogMaskedConnStr, null, server);
+                InvokeCommand.InvokeScript(true, SB_LogMaskedConnStr, null, server);
             }
             catch { }
         }
@@ -1828,7 +1828,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         {
             try
             {
-                InvokeCommand.InvokeScript(false, SB_AddNoteProperty, null, server, name, value);
+                InvokeCommand.InvokeScript(true, SB_AddNoteProperty, null, server, name, value);
             }
             catch { }
         }
@@ -1837,7 +1837,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         {
             try
             {
-                InvokeCommand.InvokeScript(false, SB_AddConnHashValue, null, key, value);
+                InvokeCommand.InvokeScript(true, SB_AddConnHashValue, null, key, value);
             }
             catch { }
         }
@@ -1846,7 +1846,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
         {
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_IsRunningOnCore, null, new object[0]);
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, SB_IsRunningOnCore, null, new object[0]);
                 if (results != null && results.Count > 0 && results[0] != null)
                 {
                     return results[0].BaseObject is bool val && val;
@@ -1858,7 +1858,7 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
 
         private PSObject InvokeNewDbaAzAccessToken()
         {
-            Collection<PSObject> results = InvokeCommand.InvokeScript(false, SB_NewAzAccessToken, null, Tenant, SqlCredential);
+            Collection<PSObject> results = InvokeCommand.InvokeScript(true, SB_NewAzAccessToken, null, Tenant, SqlCredential);
             if (results != null && results.Count > 0)
                 return results[0];
             return null;
@@ -1883,7 +1883,7 @@ $csb.ConnectionString
 ";
             try
             {
-                Collection<PSObject> results = InvokeCommand.InvokeScript(false, ScriptBlock.Create(script), null,
+                Collection<PSObject> results = InvokeCommand.InvokeScript(true, ScriptBlock.Create(script), null,
                     azureServer, Database, SqlCredential);
                 if (results != null && results.Count > 0)
                 {
