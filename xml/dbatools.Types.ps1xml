@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Types>
+<!--Microsoft.SqlServer.Management.Smo.Database -->
+<Type>
+<Name>Microsoft.SqlServer.Management.Smo.Database</Name>
+<Members>
+<ScriptMethod>
+<Name>Query</Name>
+<Script>
+param (
+    $Query,
+    $AllTables = $false
+)
+
+if ($AllTables) { ($this.ExecuteWithResults($Query)).Tables }
+else { ($this.ExecuteWithResults($Query)).Tables[0] }
+</Script>
+</ScriptMethod>
+<ScriptMethod>
+<Name>Invoke</Name>
+<Script>
+param (
+    $Command
+)
+$this.ExecuteNonQuery($Command)
+</Script>
+</ScriptMethod>
+</Members>
+</Type>
+
+<!--Microsoft.SqlServer.Management.Smo.Server -->
+<Type>
+<Name>Microsoft.SqlServer.Management.Smo.Server</Name>
+<Members>
+<ScriptMethod>
+<Name>Query</Name>
+<Script>
+param (
+    [string]$Query,
+    [string]$Database,
+    [bool]$AllTables
+)
+
+try {
+    if ($Database) {
+        $dataSet = $this.Databases[$Database].ExecuteWithResults($Query)
+    } else {
+        $dataSet = $this.ConnectionContext.ExecuteWithResults($Query)
+    }
+    if ($AllTables) {
+        $dataSet.Tables
+    } else {
+        $dataSet.Tables[0]
+    }
+} catch {
+    $message = ''
+    $innerException = $_.Exception.InnerException
+    while ($innerException.InnerException) {
+        $message += $innerException.Message
+        $innerException = $innerException.InnerException
+    }
+    $message += $innerException.Message
+    throw $message
+}
+</Script>
+</ScriptMethod>
+<ScriptMethod>
+<Name>Invoke</Name>
+<Script>
+param (
+    [string]$Command,
+    [string]$Database
+)
+
+try {
+    if ($Database) {
+        $this.Databases[$Database].ExecuteNonQuery($Command)
+    } else {
+        $this.ConnectionContext.ExecuteNonQuery($Command)
+    }
+} catch {
+    $message = ''
+    $innerException = $_.Exception.InnerException
+    while ($innerException.InnerException) {
+        $message += $innerException.Message
+        $innerException = $innerException.InnerException
+    }
+    $message += $innerException.Message
+    throw $message
+}
+</Script>
+</ScriptMethod>
+</Members>
+</Type>
+<Type>
+<Name>Dataplat.Dbatools.dbaSystem.DbatoolsException</Name>
+<Members>
+<MemberSet>
+<Name>PSStandardMembers</Name>
+<Members>
+<NoteProperty>
+<Name>SerializationDepth</Name>
+<Value>2</Value>
+</NoteProperty>
+</Members>
+</MemberSet>
+</Members>
+</Type>
+<Type>
+<Name>Dataplat.Dbatools.dbaSystem.DbatoolsExceptionRecord</Name>
+<Members>
+<MemberSet>
+<Name>PSStandardMembers</Name>
+<Members>
+<NoteProperty>
+<Name>SerializationDepth</Name>
+<Value>2</Value>
+</NoteProperty>
+</Members>
+</MemberSet>
+</Members>
+</Type>
+</Types>

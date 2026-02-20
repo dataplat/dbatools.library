@@ -117,6 +117,10 @@ if (-not $SkipImport) {
     Write-Host "`n=== Skipping module import ===" -ForegroundColor Yellow
 }
 
+# Set up TestConfig so Pester tests can access CommonParameters and instance info
+$TestConfig = Get-TestConfig
+Write-Host "  TestConfig loaded (CommonParameters: $($TestConfig.CommonParameters.Count), Instances: $($TestConfig.InstanceSingle))" -ForegroundColor Green
+
 # =============================================================================
 # Step 3: Resolve test files
 # =============================================================================

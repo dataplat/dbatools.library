@@ -248,6 +248,15 @@ if ($v6Unsafe) {
 Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $dbatoolsLibraryDir -Force
 Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $dbatoolsLibraryDir -Force
 Copy-Item -Path (Join-Path $root "LICENSE") -Destination $dbatoolsLibraryDir -Force -ErrorAction SilentlyContinue
+
+# Copy xml directory (types/format files)
+$xmlSrc = Join-Path $root "xml"
+if (Test-Path $xmlSrc) {
+    $xmlDest = Join-Path $dbatoolsLibraryDir "xml"
+    $null = New-Item -ItemType Directory -Path $xmlDest -Force
+    Copy-Item -Path (Join-Path $xmlSrc "*") -Destination $xmlDest -Recurse -Force
+    Write-Host "Copied xml directory to artifacts/dbatools.library/xml" -ForegroundColor Green
+}
 Write-Host "Copied module files to artifacts/dbatools.library" -ForegroundColor Green
 
 # Copy third-party-licenses
