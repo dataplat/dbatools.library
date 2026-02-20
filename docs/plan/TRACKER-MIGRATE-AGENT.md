@@ -28,7 +28,7 @@
 | 19 | New-DbaAgentJobCategory | DONE | NewDbaAgentJobCategoryCommand.cs | OK | 100% | 8/8 pass | ShouldProcess, OutputType, Force; stale test data requires manual cleanup due to pre-existing Remove-DbaAgentJobCategory sqlCredential bug |
 | 20 | New-DbaAgentJobStep | DONE | NewDbaAgentJobStepCommand.cs | OK | 100% | Improved from 1/8 to 7/8 (1 pre-existing WarningVariable capture issue); AfterAll cleanup fails due to pre-existing Remove-DbaAgentJob PS1 sqlCredential issue | ShouldProcess, OutputType, fixes Force+StepId bug (was hardcoded ID=1), fixes Insert OnSuccessStep renumbering, fixes multi-Flag handling |
 | 21 | New-DbaAgentOperator | DONE | NewDbaAgentOperatorCommand.cs | OK | 100% | 5/5 pass (improved from 1/5 baseline; 4 pre-existing TypeData failures fixed by C# cmdlet) | ShouldProcess, OutputType, fixes PS1 Weekends/Everyday typo bugs, fixes failsafe NotificationMethod SMO path bug, adds NormalizePagerDay for case-insensitive ValidateSet |
-| 22 | New-DbaAgentProxy | PENDING | | | | | ShouldProcess required |
+| 22 | New-DbaAgentProxy | DONE | NewDbaAgentProxyCommand.cs | OK | 100% | 1/1 pass (4 pre-existing BeforeAll failures from New-DbaCredential sqlCredential bug) | ShouldProcess, OutputType, fixes PS1 $proxy warning bug and SubSystems casing bug |
 | 23 | New-DbaAgentSchedule | PENDING | | | | | ShouldProcess required |
 | 24 | Set-DbaAgentAlert | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgentAlert |
 | 25 | Set-DbaAgentJob | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgentJob |
