@@ -465,7 +465,7 @@ namespace Dataplat.Dbatools.Commands
                 instanceArg = instance.ToString();
             }
 
-            script = "param($inst, $cred, $db, $appIntent, $appendConn) " +
+            script = "param($inst, $cred, $p_db, $appIntent, $appendConn) " +
                      "Connect-DbaInstance -SqlInstance $inst -NonPooledConnection" +
                      " -Verbose:$false";
             args.Add(instanceArg);
@@ -478,7 +478,7 @@ namespace Dataplat.Dbatools.Commands
 
             if (!String.IsNullOrEmpty(Database))
             {
-                script += " -Database $db";
+                script += " -Database $p_db";
             }
             args.Add(Database);
 
@@ -499,7 +499,7 @@ namespace Dataplat.Dbatools.Commands
             args.Add(AppendConnectionString);
 
             Collection<PSObject> results = InvokeCommand.InvokeScript(
-                false, ScriptBlock.Create(script), null, args.ToArray());
+                true, ScriptBlock.Create(script), null, args.ToArray());
 
             if (results != null && results.Count > 0)
                 return results[0].BaseObject;
@@ -1026,7 +1026,7 @@ return $Err
                     // Use Export-DbaScript -Passthru to get the SQL script
                     string script = "param($obj) Export-DbaScript -InputObject $obj -Passthru -EnableException";
                     Collection<PSObject> results = InvokeCommand.InvokeScript(
-                        false, ScriptBlock.Create(script), null, new object[] { obj });
+                        true, ScriptBlock.Create(script), null, new object[] { obj });
 
                     if (results == null || results.Count == 0)
                     {
@@ -1083,7 +1083,7 @@ foreach ($path in $paths) {
 }
 ";
             Collection<PSObject> results = InvokeCommand.InvokeScript(
-                false, ScriptBlock.Create(script), null, new object[] { path });
+                true, ScriptBlock.Create(script), null, new object[] { path });
 
             if (results != null)
             {
@@ -1125,16 +1125,16 @@ try {
         private object InvokeDatabaseSwitch(object connContext, string dbName)
         {
             string script = @"
-param($ctx, $db)
+param($ctx, $p_db)
 $savedTimeout = $ctx.StatementTimeout
-$newCtx = $ctx.Copy().GetDatabaseConnection($db)
+$newCtx = $ctx.Copy().GetDatabaseConnection($p_db)
 $newCtx.StatementTimeout = $savedTimeout
 $newCtx
 ";
             try
             {
                 Collection<PSObject> results = InvokeCommand.InvokeScript(
-                    false, ScriptBlock.Create(script), null, new object[] { connContext, dbName });
+                    true, ScriptBlock.Create(script), null, new object[] { connContext, dbName });
                 if (results != null && results.Count > 0)
                     return results[0].BaseObject;
             }
@@ -1216,7 +1216,7 @@ $newCtx
             {
                 string script = "param($p) (Resolve-Path -LiteralPath $p).ProviderPath";
                 Collection<PSObject> results = InvokeCommand.InvokeScript(
-                    false, ScriptBlock.Create(script), null, new object[] { path });
+                    true, ScriptBlock.Create(script), null, new object[] { path });
                 if (results != null && results.Count > 0)
                     return results[0].ToString();
             }
@@ -1244,7 +1244,7 @@ $newCtx
             {
                 string script = "param() Get-DbatoolsPath -Name temp";
                 Collection<PSObject> results = InvokeCommand.InvokeScript(
-                    false, ScriptBlock.Create(script), null, new object[0]);
+                    true, ScriptBlock.Create(script), null, new object[0]);
                 if (results != null && results.Count > 0)
                 {
                     string tempDir = results[0].ToString();

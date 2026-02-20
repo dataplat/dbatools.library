@@ -1872,13 +1872,13 @@ if ($loadedSmoVersion -ge 11 -and -not $isAzure) {
             // preventing connection string injection from server name or database values.
             // The password is passed via PSCredential to avoid plain string materialization in C#.
             string script = @"
-param($server, $db, $cred)
+param($server, $p_db, $cred)
 $csb = New-Object Microsoft.Data.SqlClient.SqlConnectionStringBuilder
-$csb.DataSource = $server
+$csb['Data Source'] = $server
 $csb['Authentication'] = 'Active Directory Service Principal'
-$csb.UserID = $cred.UserName
+$csb['User ID'] = $cred.UserName
 $csb.Password = $cred.GetNetworkCredential().Password
-if ($db) { $csb.InitialCatalog = $db }
+if ($p_db) { $csb['Initial Catalog'] = $p_db }
 $csb.ConnectionString
 ";
             try
