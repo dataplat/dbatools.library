@@ -201,24 +201,43 @@ namespace Dataplat.Dbatools.Commands
     [Cmdlet("Register", "DbaMaintenanceTask", DefaultParameterSetName = "Repeating")]
     public class RegisterDbaMaintenanceTaskCommand : DbaBaseCmdlet
     {
+        /// <summary>
+        /// Name of the maintenance task to register.
+        /// </summary>
         [Parameter(Mandatory = true)]
         public string Name { get; set; }
 
+        /// <summary>
+        /// The scriptblock to execute as the maintenance task.
+        /// </summary>
         [Parameter(Mandatory = true)]
         public ScriptBlock ScriptBlock { get; set; }
 
+        /// <summary>
+        /// Whether to execute the task only once.
+        /// </summary>
         [Parameter(ParameterSetName = "Once", Mandatory = true)]
         public SwitchParameter Once { get; set; }
 
+        /// <summary>
+        /// Interval between repeated executions of the task.
+        /// </summary>
         [Parameter(ParameterSetName = "Repeating", Mandatory = true)]
         public TimeSpan Interval { get; set; }
 
+        /// <summary>
+        /// Initial delay before first execution.
+        /// </summary>
         [Parameter()]
         public TimeSpan Delay { get; set; }
 
+        /// <summary>
+        /// Priority of the maintenance task.
+        /// </summary>
         [Parameter()]
         public MaintenancePriority Priority { get; set; } = MaintenancePriority.Medium;
 
+        /// <inheritdoc />
         protected override void ProcessRecord()
         {
             string normalizedName = Name.ToLowerInvariant();

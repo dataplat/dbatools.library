@@ -4,7 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Management.Automation;
-using System.Net;
+using System.Net.Http;
 using System.Text;
 
 namespace Dataplat.Dbatools.Internal
@@ -56,10 +56,9 @@ namespace Dataplat.Dbatools.Internal
             if (String.IsNullOrEmpty(url))
                 return new List<Hashtable>();
 
-            using (WebClient client = new WebClient())
+            using (HttpClient client = new HttpClient())
             {
-                client.Encoding = Encoding.UTF8;
-                string jsonContent = client.DownloadString(url);
+                string jsonContent = client.GetStringAsync(url).GetAwaiter().GetResult();
                 return ParseConfigJson(cmdlet, jsonContent);
             }
         }
