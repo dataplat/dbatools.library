@@ -128,6 +128,7 @@
         'Set-DbaAgListener',
         'Set-DbaAgReplica',
         'Set-DbaAgentAlert',
+        'Set-DbaAgentJob',
         'Set-DbaAvailabilityGroup',
         'Suspend-DbaAgDbDataMovement',
         'Sync-DbaAvailabilityGroup',
