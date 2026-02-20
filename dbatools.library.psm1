@@ -340,3 +340,10 @@ if (Test-Path $dbatoolsDll) {
         Write-Error "Could not import dbatools binary module: $($_ | Out-String)"
     }
 }
+
+# Load type extensions (Query/Invoke on SMO Server/Database, serialization depth for exceptions)
+# Use -ErrorAction SilentlyContinue because dbatools may also load identical type data
+$typesFile = [IO.Path]::Combine($PSScriptRoot, "xml", "dbatools.Types.ps1xml")
+if (Test-Path $typesFile) {
+    Update-TypeData -PrependPath $typesFile -ErrorAction SilentlyContinue
+}

@@ -34,9 +34,6 @@
     # but only in Full .NET because Core does something different
     RequiredAssemblies     = @()
 
-    # Type files (.ps1xml) to be loaded when importing this module
-    TypesToProcess         = @('xml/dbatools.Types.ps1xml')
-
     # Script module or binary module file associated with this manifest.
     RootModule             = 'dbatools.library.psm1'
 
