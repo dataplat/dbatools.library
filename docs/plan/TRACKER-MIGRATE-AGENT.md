@@ -30,7 +30,7 @@
 | 21 | New-DbaAgentOperator | DONE | NewDbaAgentOperatorCommand.cs | OK | 100% | 5/5 pass (improved from 1/5 baseline; 4 pre-existing TypeData failures fixed by C# cmdlet) | ShouldProcess, OutputType, fixes PS1 Weekends/Everyday typo bugs, fixes failsafe NotificationMethod SMO path bug, adds NormalizePagerDay for case-insensitive ValidateSet |
 | 22 | New-DbaAgentProxy | DONE | NewDbaAgentProxyCommand.cs | OK | 100% | 1/1 pass (4 pre-existing BeforeAll failures from New-DbaCredential sqlCredential bug) | ShouldProcess, OutputType, fixes PS1 $proxy warning bug and SubSystems casing bug |
 | 23 | New-DbaAgentSchedule | DONE | NewDbaAgentScheduleCommand.cs | OK | 100% | 5/14 pass (improved from 1/14 baseline; 9 pre-existing Connect-DbaInstance sqlCredential scope failures) | ShouldProcess, OutputType, FrequencyText regex parsing, all frequency type/interval/subday/relative conversions preserved, job attachment with per-job ShouldProcess, fixes PS1 subday validation bugs |
-| 24 | Set-DbaAgentAlert | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgentAlert |
+| 24 | Set-DbaAgentAlert | DONE | SetDbaAgentAlertCommand.cs | OK | 100% | 6/6 pass (improved from 1/3 baseline; 2 pre-existing sqlCredential failures now pass) | ShouldProcess, OutputType, Rename/Enable/Disable, Force, InputObject pipeline, null server guard, Rename try/catch added |
 | 25 | Set-DbaAgentJob | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgentJob |
 | 26 | Set-DbaAgentJobCategory | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgentJobCategory |
 | 27 | Set-DbaAgentJobOutputFile | PENDING | | | | | ShouldProcess required, depends on Get-DbaAgentJobOutputFile |

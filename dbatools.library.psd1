@@ -127,6 +127,7 @@
         'Resolve-DbaPath',
         'Set-DbaAgListener',
         'Set-DbaAgReplica',
+        'Set-DbaAgentAlert',
         'Set-DbaAvailabilityGroup',
         'Suspend-DbaAgDbDataMovement',
         'Sync-DbaAvailabilityGroup',
