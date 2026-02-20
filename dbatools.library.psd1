@@ -76,6 +76,7 @@
         'Get-DbaAgReplica',
         'Get-DbaAvailabilityGroup',
         'Get-DbaAvailableCollation',
+        'Get-DbaBinaryFileTable',
         'Get-DbaBuild',
         'Get-DbaClientAlias',
         'Get-DbaClientProtocol',

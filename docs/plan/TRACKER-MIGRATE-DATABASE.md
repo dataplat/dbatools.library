@@ -8,7 +8,7 @@
 | # | Command | Status | C# File | Build | Parity | Pester | Notes |
 |---|---------|--------|---------|-------|--------|--------|-------|
 | 1 | Get-DbaAvailableCollation | DONE | GetDbaAvailableCollationCommand.cs | OK | OK | 2/2 pass | Read-only, no deps |
-| 2 | Get-DbaBinaryFileTable | PENDING | | | | | Read-only, no deps |
+| 2 | Get-DbaBinaryFileTable | DONE | GetDbaBinaryFileTableCommand.cs | OK | OK | 1/1 pass (2 pre-existing failures) | Read-only, no deps |
 | 3 | Get-DbaDatabase | PENDING | | | | | Read-only, no deps |
 | 4 | Get-DbaDbccHelp | PENDING | | | | | Read-only, no deps |
 | 5 | Get-DbaDbccMemoryStatus | PENDING | | | | | Read-only, no deps |
