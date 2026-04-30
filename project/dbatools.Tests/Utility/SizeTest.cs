@@ -86,19 +86,11 @@ namespace Dataplat.Dbatools.Utility
         }
 
         [TestMethod]
-        [ExpectedException(typeof(ArgumentException))]
         public void TestCompareToObjOfInvalid()
         {
             var size = new Size();
-            try
-            {
-                size.CompareTo(Guid.Empty);
-            }
-            catch (ArgumentException ex)
-            {
-                Assert.AreEqual("Cannot compare a Dataplat.Dbatools.Utility.Size to a System.Guid", ex.Message);
-                throw;
-            }
+            var ex = Assert.ThrowsException<ArgumentException>(() => size.CompareTo(Guid.Empty));
+            Assert.AreEqual("Cannot compare a Dataplat.Dbatools.Utility.Size to a System.Guid", ex.Message);
         }
 
 
