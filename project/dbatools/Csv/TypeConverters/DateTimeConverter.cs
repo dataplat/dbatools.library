@@ -29,7 +29,7 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
         /// <summary>
         /// Gets or sets the date time styles to use for parsing.
         /// </summary>
-        public DateTimeStyles Styles { get; set; } = DateTimeStyles.AllowWhiteSpaces;
+        public DateTimeStyles Styles { get; set; } = DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AdjustToUniversal;
 
         /// <summary>
         /// Gets or sets whether to assume UTC when no timezone is specified.

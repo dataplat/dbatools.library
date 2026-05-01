@@ -298,11 +298,13 @@ namespace Dataplat.Dbatools.Csv.Tests
             Assert.IsTrue(germanConverter.TryConvert("1234,56", out decimal result));
             Assert.AreEqual(1234.56m, result);
 
-            // Test with French culture (uses space as thousands separator, comma as decimal)
+            // Test with French culture (uses culture-specific thousands separator, comma as decimal)
+            var frenchCulture = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
             var frenchConverter = new DecimalConverter();
-            frenchConverter.FormatProvider = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+            frenchConverter.FormatProvider = frenchCulture;
 
-            Assert.IsTrue(frenchConverter.TryConvert("1 234,56", out result));
+            string frenchValue = string.Format(frenchCulture, "1{0}234,56", frenchCulture.NumberFormat.NumberGroupSeparator);
+            Assert.IsTrue(frenchConverter.TryConvert(frenchValue, out result));
             Assert.AreEqual(1234.56m, result);
         }
 
@@ -323,7 +325,8 @@ namespace Dataplat.Dbatools.Csv.Tests
         [TestMethod]
         public void TestMoneyConverterWithCurrencySymbols()
         {
-            var converter = MoneyConverter.Default;
+            var converter = new MoneyConverter();
+            converter.FormatProvider = System.Globalization.CultureInfo.GetCultureInfo("en-US");
 
             // Test US dollar sign
             Assert.IsTrue(converter.TryConvert("$123.45", out decimal result));
@@ -341,7 +344,8 @@ namespace Dataplat.Dbatools.Csv.Tests
         [TestMethod]
         public void TestMoneyConverterWithThousandsSeparator()
         {
-            var converter = MoneyConverter.Default;
+            var converter = new MoneyConverter();
+            converter.FormatProvider = System.Globalization.CultureInfo.GetCultureInfo("en-US");
 
             // Test with thousands separator
             Assert.IsTrue(converter.TryConvert("$1,234.56", out decimal result));
@@ -357,12 +361,9 @@ namespace Dataplat.Dbatools.Csv.Tests
         {
             var converter = MoneyConverter.Default;
 
-            // NumberStyles.Currency includes AllowExponent, so scientific notation should work
-            Assert.IsTrue(converter.TryConvert("1.5E3", out decimal result));
-            Assert.AreEqual(1500m, result);
-
-            Assert.IsTrue(converter.TryConvert("2.5E-2", out result));
-            Assert.AreEqual(0.025m, result);
+            // NumberStyles.Currency does NOT include AllowExponent
+            Assert.IsFalse(converter.TryConvert("1.5E3", out decimal _));
+            Assert.IsFalse(converter.TryConvert("2.5E-2", out decimal _));
         }
 
         [TestMethod]

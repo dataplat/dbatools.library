@@ -407,6 +407,33 @@ namespace Dataplat.Dbatools.Parameter
                 tempString = tempString.Substring(3);
             }
 
+            // Handle bracket-enclosed IPv6 with optional port, e.g. [::1]:1433 or [::1]
+            if (tempString.StartsWith("["))
+            {
+                int closeBracket = tempString.IndexOf(']');
+                if (closeBracket > 1)
+                {
+                    _ComputerName = tempString.Substring(1, closeBracket - 1);
+                    string remainder = tempString.Substring(closeBracket + 1);
+                    if (remainder.Length > 0 && (remainder[0] == ':' || remainder[0] == ','))
+                    {
+                        if (Int32.TryParse(remainder.Substring(1), out int port) && port <= 65535)
+                        {
+                            _Port = port;
+                        }
+                        else
+                        {
+                            throw new PSArgumentException(String.Format("Failed to parse instance name: {0}", Name));
+                        }
+                    }
+                    else if (remainder.Length > 0)
+                    {
+                        throw new PSArgumentException(String.Format("Failed to parse instance name: {0}", Name));
+                    }
+                    return;
+                }
+            }
+
             // Case: Default instance | Instance by port
             if (tempString.Split('\\').Length == 1)
             {

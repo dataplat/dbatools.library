@@ -2580,6 +2580,8 @@ namespace Dataplat.Dbatools.Csv.Reader
         {
             if (!EnsureBufferData())
             {
+                // EOF right after a delimiter means an empty trailing field (e.g. "Jane,")
+                _fieldsBuffer.Add(new FieldInfo(string.Empty, false));
                 _endOfRecord = true;
                 return;
             }
