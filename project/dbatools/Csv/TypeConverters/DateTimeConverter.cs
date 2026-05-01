@@ -92,14 +92,15 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
                 }
             }
 
-            // Try standard formats
-            if (DateTime.TryParseExact(trimmed, StandardFormats, Culture, styles, out result))
+            // Try culture-native parsing before hardcoded formats so the culture's
+            // own day/month ordering takes precedence (fixes de-CH dd.MM.yyyy vs MM.dd.yyyy)
+            if (DateTime.TryParse(trimmed, Culture, styles, out result))
             {
                 return true;
             }
 
-            // Fall back to general parsing
-            return DateTime.TryParse(trimmed, Culture, styles, out result);
+            // Fall back to standard formats for unusual patterns the culture doesn't cover
+            return DateTime.TryParseExact(trimmed, StandardFormats, Culture, styles, out result);
         }
 
         /// <summary>
@@ -132,17 +133,18 @@ namespace Dataplat.Dbatools.Csv.TypeConverters
                 }
             }
 
-            // Try standard formats
-            if (DateTime.TryParseExact(trimmed, StandardFormats, effectiveCulture, styles, out DateTime stdParsed))
+            // Try culture-native parsing before hardcoded formats so the culture's
+            // own day/month ordering takes precedence (fixes de-CH dd.MM.yyyy vs MM.dd.yyyy)
+            if (DateTime.TryParse(trimmed, effectiveCulture, styles, out DateTime cultureParsed))
             {
-                result = stdParsed;
+                result = cultureParsed;
                 return true;
             }
 
-            // Fall back to general parsing
-            if (DateTime.TryParse(trimmed, effectiveCulture, styles, out DateTime generalParsed))
+            // Fall back to standard formats for unusual patterns the culture doesn't cover
+            if (DateTime.TryParseExact(trimmed, StandardFormats, effectiveCulture, styles, out DateTime stdParsed))
             {
-                result = generalParsed;
+                result = stdParsed;
                 return true;
             }
 

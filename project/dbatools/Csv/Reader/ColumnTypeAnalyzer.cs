@@ -316,14 +316,15 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
             }
 
-            // Try standard formats
-            if (DateTime.TryParseExact(value, StandardDateTimeFormats, _culture, styles, out _))
+            // Try culture-native parsing before hardcoded formats so the culture's
+            // own day/month ordering takes precedence (fixes de-CH dd.MM.yyyy vs MM.dd.yyyy)
+            if (DateTime.TryParse(value, _culture, styles, out _))
             {
                 return true;
             }
 
-            // Try general parsing as fallback
-            return DateTime.TryParse(value, _culture, styles, out _);
+            // Fall back to standard formats for unusual patterns the culture doesn't cover
+            return DateTime.TryParseExact(value, StandardDateTimeFormats, _culture, styles, out _);
         }
 
         /// <summary>

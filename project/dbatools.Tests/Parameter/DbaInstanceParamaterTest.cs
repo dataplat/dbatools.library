@@ -28,19 +28,11 @@ namespace Dataplat.Dbatools.Parameter
         [DataRow(" \n \t")]
         [DataRow(" \v\t\t ")]
         [DataRow(null)]
-        [ExpectedException(typeof(BloodyHellGiveMeSomethingToWorkWithException), "Bloody hell! Don't give me an empty string for an instance name")]
         [TestMethod]
         public void TestEmptyString(string whitespace)
         {
-            try
-            {
-                new DbaInstanceParameter(whitespace);
-            }
-            catch (BloodyHellGiveMeSomethingToWorkWithException ex)
-            {
-                Assert.AreEqual("DbaInstanceParameter", ex.ParameterClass);
-                throw;
-            }
+            var ex = Assert.ThrowsException<BloodyHellGiveMeSomethingToWorkWithException>(() => new DbaInstanceParameter(whitespace));
+            Assert.AreEqual("DbaInstanceParameter", ex.ParameterClass);
         }
 
         [TestMethod]
@@ -50,18 +42,16 @@ namespace Dataplat.Dbatools.Parameter
             Assert.IsTrue(dbaInstanceParamater.IsConnectionString);
         }
 
-        [ExpectedException(typeof(ArgumentException))]
         [TestMethod]
         public void TestConnectionStringBadKey()
         {
-            new DbaInstanceParameter("Server=tcp:server.database.windows.net;Database=myDataBase;Trusted_Connection = True;Wrong=true");
+            Assert.ThrowsException<ArgumentException>(() => new DbaInstanceParameter("Server=tcp:server.database.windows.net;Database=myDataBase;Trusted_Connection = True;Wrong=true"));
         }
 
-        [ExpectedException(typeof(FormatException))]
         [TestMethod]
         public void TestConnectionStringBadValue()
         {
-            new DbaInstanceParameter("Server=tcp:server.database.windows.net;Database=myDataBase;Trusted_Connection=weird");
+            Assert.ThrowsException<FormatException>(() => new DbaInstanceParameter("Server=tcp:server.database.windows.net;Database=myDataBase;Trusted_Connection=weird"));
         }
 
         /// <summary>

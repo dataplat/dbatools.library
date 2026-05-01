@@ -854,13 +854,12 @@ namespace Dataplat.Dbatools.Csv.Tests
         }
 
         [TestMethod]
-        [ExpectedException(typeof(ArgumentException))]
         public void TestGetOrdinalNotFound()
         {
             string csv = "Name,Age\nJohn,30";
             using (var reader = CreateReaderFromString(csv))
             {
-                reader.GetOrdinal("NonExistent");
+                Assert.ThrowsException<ArgumentException>(() => reader.GetOrdinal("NonExistent"));
             }
         }
 
