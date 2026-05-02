@@ -95,6 +95,7 @@ namespace Dataplat.Dbatools.Parameter
         {
             get
             {
+                if (!String.IsNullOrEmpty(_NamedPipePath)) { return _NamedPipePath; }
                 string temp = _ComputerName;
                 if (_Port > 0) { temp += (":" + _Port); }
                 if (!String.IsNullOrEmpty(_InstanceName)) { temp += ("\\" + _InstanceName); }
@@ -110,6 +111,7 @@ namespace Dataplat.Dbatools.Parameter
         {
             get
             {
+                if (!String.IsNullOrEmpty(_NamedPipePath)) { return "NP:" + _NamedPipePath; }
                 string temp = _ComputerName;
                 if (_NetworkProtocol == SqlConnectionProtocol.NP) { temp = "NP:" + temp; }
                 if (_NetworkProtocol == SqlConnectionProtocol.TCP) { temp = "TCP:" + temp; }
@@ -131,6 +133,7 @@ namespace Dataplat.Dbatools.Parameter
             get
             {
                 string temp = _ComputerName;
+                if (!String.IsNullOrEmpty(_NamedPipePath)) { temp = _NamedPipePath; }
                 if (_NetworkProtocol == SqlConnectionProtocol.NP) { temp = "NP_" + temp; }
                 if (_NetworkProtocol == SqlConnectionProtocol.TCP) { temp = "TCP_" + temp; }
 
@@ -214,6 +217,7 @@ namespace Dataplat.Dbatools.Parameter
 
         private string _ComputerName;
         private string _InstanceName;
+        private string _NamedPipePath;
         private int _Port;
         private SqlConnectionProtocol _NetworkProtocol = SqlConnectionProtocol.Any;
 
@@ -330,6 +334,18 @@ namespace Dataplat.Dbatools.Parameter
             if (UtilityHost.IsLike(tempString, "*.WORKGROUP"))
                 tempString = Regex.Replace(tempString, @"\.WORKGROUP$", "", RegexOptions.IgnoreCase);
 
+            // Handle and clear protocols. Otherwise it'd make port detection unneccessarily messy
+            if (Regex.IsMatch(tempString, "^TCP:", RegexOptions.IgnoreCase)) //TODO: Use case insinsitive String.BeginsWith()
+            {
+                _NetworkProtocol = SqlConnectionProtocol.TCP;
+                tempString = tempString.Substring(4);
+            }
+            if (Regex.IsMatch(tempString, "^NP:", RegexOptions.IgnoreCase)) // TODO: Use case insinsitive String.BeginsWith()
+            {
+                _NetworkProtocol = SqlConnectionProtocol.NP;
+                tempString = tempString.Substring(3);
+            }
+
             // Named Pipe path notation interpretation
             if (Regex.IsMatch(tempString, @"^\\\\[^\\]+\\pipe\\([^\\]+\\){0,1}[t]{0,1}sql\\query$", RegexOptions.IgnoreCase))
             {
@@ -341,6 +357,8 @@ namespace Dataplat.Dbatools.Parameter
 
                     if (Regex.IsMatch(tempString, @"\\MSSQL\$[^\\]+\\", RegexOptions.IgnoreCase))
                         _InstanceName = Regex.Match(tempString, @"\\MSSQL\$([^\\]+)\\", RegexOptions.IgnoreCase).Groups[1].Value;
+                    else if (!Regex.IsMatch(tempString, @"^\\\\[^\\]+\\pipe\\[t]{0,1}sql\\query$", RegexOptions.IgnoreCase))
+                        _NamedPipePath = tempString;
                 }
                 catch (Exception e)
                 {
@@ -366,6 +384,13 @@ namespace Dataplat.Dbatools.Parameter
                     _Port = tempParam.Port;
                 }
                 _NetworkProtocol = tempParam.NetworkProtocol;
+                _NamedPipePath = tempParam._NamedPipePath;
+
+                if (!String.IsNullOrEmpty(_NamedPipePath))
+                {
+                    connectionString.DataSource = FullSmoName;
+                    InputObject = connectionString.ConnectionString;
+                }
 
                 if (UtilityHost.IsLike(tempString, @"(localdb)\*"))
                     _NetworkProtocol = SqlConnectionProtocol.NP;
@@ -394,18 +419,6 @@ namespace Dataplat.Dbatools.Parameter
                 throw;
             }
             catch { }
-
-            // Handle and clear protocols. Otherwise it'd make port detection unneccessarily messy
-            if (Regex.IsMatch(tempString, "^TCP:", RegexOptions.IgnoreCase)) //TODO: Use case insinsitive String.BeginsWith()
-            {
-                _NetworkProtocol = SqlConnectionProtocol.TCP;
-                tempString = tempString.Substring(4);
-            }
-            if (Regex.IsMatch(tempString, "^NP:", RegexOptions.IgnoreCase)) // TODO: Use case insinsitive String.BeginsWith()
-            {
-                _NetworkProtocol = SqlConnectionProtocol.NP;
-                tempString = tempString.Substring(3);
-            }
 
             // Handle bracket-enclosed IPv6 with optional port, e.g. [::1]:1433 or [::1]
             if (tempString.StartsWith("["))
@@ -583,6 +596,7 @@ namespace Dataplat.Dbatools.Parameter
                 _Port = tempParam.Port;
             }
             _NetworkProtocol = tempParam.NetworkProtocol;
+            _NamedPipePath = tempParam._NamedPipePath;
         }
 
         /// <summary>
@@ -698,6 +712,9 @@ namespace Dataplat.Dbatools.Parameter
 
                         if (parm.Port != 1433)
                             _Port = parm.Port;
+
+                        _NetworkProtocol = parm.NetworkProtocol;
+                        _NamedPipePath = parm._NamedPipePath;
                     }
                     catch (Exception e)
                     {

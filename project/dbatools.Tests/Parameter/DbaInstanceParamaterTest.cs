@@ -43,6 +43,34 @@ namespace Dataplat.Dbatools.Parameter
         }
 
         [TestMethod]
+        public void TestWidNamedPipe()
+        {
+            var dbaInstanceParamater = new DbaInstanceParameter(@"np:\\.\pipe\MICROSOFT##WID\tsql\query");
+
+            Assert.AreEqual(".", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual(@"\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
+            Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual(SqlConnectionProtocol.NP, dbaInstanceParamater.NetworkProtocol);
+            Assert.IsTrue(dbaInstanceParamater.IsLocalHost);
+            Assert.IsFalse(dbaInstanceParamater.IsConnectionString);
+        }
+
+        [TestMethod]
+        public void TestWidNamedPipeConnectionString()
+        {
+            var dbaInstanceParamater = new DbaInstanceParameter(@"server=\\.\pipe\MICROSOFT##WID\tsql\query;database=SUSDB;trusted_connection=true;");
+            var connectionString = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder((string)dbaInstanceParamater.InputObject);
+
+            Assert.AreEqual(".", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual(@"\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
+            Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", connectionString.DataSource);
+            Assert.AreEqual(SqlConnectionProtocol.NP, dbaInstanceParamater.NetworkProtocol);
+            Assert.IsTrue(dbaInstanceParamater.IsLocalHost);
+            Assert.IsTrue(dbaInstanceParamater.IsConnectionString);
+        }
+
+        [TestMethod]
         public void TestConnectionStringBadKey()
         {
             Assert.ThrowsException<ArgumentException>(() => new DbaInstanceParameter("Server=tcp:server.database.windows.net;Database=myDataBase;Trusted_Connection = True;Wrong=true"));
