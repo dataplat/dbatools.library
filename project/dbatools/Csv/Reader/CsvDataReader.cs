@@ -2929,10 +2929,10 @@ namespace Dataplat.Dbatools.Csv.Reader
                 char c = _buffer[_bufferPosition];
 
                 // Handle escaped quotes (RFC 4180: "" or custom escape like \")
-                if (c == escape && _bufferPosition + 1 < _bufferLength)
+                char peekNext;
+                if (c == escape && TryPeekNextChar(out peekNext))
                 {
-                    char next = _buffer[_bufferPosition + 1];
-                    if (next == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(next)))
+                    if (peekNext == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(peekNext)))
                     {
                         _quotedFieldBuilder.Append(quote);
                         _bufferPosition += 2;
@@ -3001,14 +3001,14 @@ namespace Dataplat.Dbatools.Csv.Reader
                 char c = _buffer[_bufferPosition];
 
                 // Handle escaped quotes (RFC 4180: "" or backslash escape)
-                if (c == escape && _bufferPosition + 1 < _bufferLength)
+                char peekNext;
+                if (c == escape && TryPeekNextChar(out peekNext))
                 {
-                    char next = _buffer[_bufferPosition + 1];
-                    if (next == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(next)))
+                    if (peekNext == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(peekNext)))
                     {
                         _quotedFieldBuilder.Append(quote);
                         _fieldAccumulator.Append(c);
-                        _fieldAccumulator.Append(next);
+                        _fieldAccumulator.Append(peekNext);
                         _bufferPosition += 2;
                         quotedLength += 2;
                         CheckQuotedFieldLength(quotedLength);
@@ -3017,14 +3017,13 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
 
                 // Backslash escape in lenient mode
-                if (c == '\\' && _bufferPosition + 1 < _bufferLength)
+                if (c == '\\' && TryPeekNextChar(out peekNext))
                 {
-                    char next = _buffer[_bufferPosition + 1];
-                    if (next == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(next)))
+                    if (peekNext == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(peekNext)))
                     {
                         _quotedFieldBuilder.Append(quote);
                         _fieldAccumulator.Append(c);
-                        _fieldAccumulator.Append(next);
+                        _fieldAccumulator.Append(peekNext);
                         _bufferPosition += 2;
                         quotedLength += 2;
                         CheckQuotedFieldLength(quotedLength);
@@ -3464,6 +3463,30 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
 
             return true;
+        }
+
+        private bool TryPeekNextChar(out char next)
+        {
+            if (_bufferPosition + 1 < _bufferLength)
+            {
+                next = _buffer[_bufferPosition + 1];
+                return true;
+            }
+
+            if (!PeekMoreDataWithoutMoving())
+            {
+                next = '\0';
+                return false;
+            }
+
+            if (_bufferPosition + 1 < _bufferLength)
+            {
+                next = _buffer[_bufferPosition + 1];
+                return true;
+            }
+
+            next = '\0';
+            return false;
         }
 
         /// <summary>
