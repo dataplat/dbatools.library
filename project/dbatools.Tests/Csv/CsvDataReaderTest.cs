@@ -1714,6 +1714,21 @@ namespace Dataplat.Dbatools.Csv.Tests
             }
         }
 
+        [TestMethod]
+        public void TestNormalizeSmartQuotes_StrictModeWithEscapedSmartQuotes()
+        {
+            string csv = "A,B\n\"\u201C\u201D\",\"\"";
+            var options = new CsvReaderOptions { NormalizeQuotes = true };
+
+            using (var reader = CreateReaderFromString(csv, options))
+            {
+                Assert.IsTrue(reader.Read());
+                Assert.AreEqual("\"", reader.GetString(0));
+                Assert.AreEqual(string.Empty, reader.GetString(1));
+                Assert.IsFalse(reader.Read());
+            }
+        }
+
         #endregion
 
         #region Parallel Processing Tests
