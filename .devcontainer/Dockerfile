@@ -17,7 +17,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends powershell && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 20 and Claude Code
+# Install Node.js 20 for Claude Code CLI
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update && \
     apt-get install -y --no-install-recommends nodejs && \
@@ -27,22 +27,18 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
 COPY ./scripts/*.ps1 /home/vscode/
 RUN mkdir -p /home/vscode/.config/powershell && \
     cp /home/vscode/profile.ps1 /home/vscode/.config/powershell/Microsoft.PowerShell_profile.ps1 && \
-    cp /home/vscode/profile.ps1 /home/vscode/.config/powershell/Microsoft.dotnet-interactive_profile.ps1 && \
     cp /home/vscode/profile.ps1 /home/vscode/.config/powershell/Microsoft.VSCode_profile.ps1 && \
     chmod +x /home/vscode/*.ps1 && \
     chown -R vscode:vscode /home/vscode
 
-# stfu about my multi workspace project
 RUN git config --system --add safe.directory '*'
 
 # Switch to non-root user for local install
 USER vscode
 WORKDIR /home/vscode
 
-# Local Claude install
-RUN npm install @anthropic-ai/claude-code && \
-    npm install ccusage && \
-    npm install @modelcontextprotocol/server-brave-search
+# Install Claude Code CLI
+RUN npm install @anthropic-ai/claude-code
 
 # Add local node_modules/.bin to PATH
 ENV PATH="/home/vscode/node_modules/.bin:$PATH"
