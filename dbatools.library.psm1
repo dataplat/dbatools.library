@@ -96,8 +96,10 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     if (-not ("CoreRedirector" -as [type])) {
         $coreSource = @"
             using System;
+            using System.Collections.Generic;
             using System.IO;
             using System.Reflection;
+            using System.Runtime.InteropServices;
             using System.Runtime.Loader;
 
             public class CoreRedirector
@@ -110,6 +112,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                     if (_registered) return;
                     _libPath = libPath;
                     AssemblyLoadContext.Default.Resolving += OnResolving;
+                    AssemblyLoadContext.Default.ResolvingUnmanagedDll += OnResolvingUnmanagedDll;
                     _registered = true;
                 }
 
@@ -134,27 +137,163 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                         }
                     }
 
-                    // Try to load from our lib folder if the file exists
-                    string dllPath = _libPath + name + ".dll";
-                    if (File.Exists(dllPath))
+                    foreach (string dllPath in GetManagedAssemblyPaths(name))
                     {
-                        try
+                        if (File.Exists(dllPath))
                         {
-                            return AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
-                        }
-                        catch
-                        {
-                            // Failed to load, return null to let default resolution continue
+                            try
+                            {
+                                return AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
+                            }
+                            catch
+                            {
+                                // Failed to load, try the next candidate
+                            }
                         }
                     }
 
                     return null;
                 }
+
+                private static IntPtr OnResolvingUnmanagedDll(Assembly assembly, string libraryName)
+                {
+                    string architectureRid = GetArchitectureRid();
+                    if (String.IsNullOrEmpty(architectureRid))
+                    {
+                        return IntPtr.Zero;
+                    }
+
+                    foreach (string fileName in GetNativeLibraryNames(libraryName))
+                    {
+                        string nativePath = Path.Combine(_libPath, "runtimes", architectureRid, "native", fileName);
+                        if (File.Exists(nativePath))
+                        {
+                            try
+                            {
+                                return NativeLibrary.Load(nativePath);
+                            }
+                            catch
+                            {
+                                // Failed to load, try the next candidate
+                            }
+                        }
+                    }
+
+                    return IntPtr.Zero;
+                }
+
+                private static string[] GetManagedAssemblyPaths(string name)
+                {
+                    string fileName = name + ".dll";
+                    string platformRid = GetPlatformRid();
+                    string architectureRid = GetArchitectureRid();
+
+                    var paths = new List<string>();
+                    paths.Add(Path.Combine(_libPath, fileName));
+
+                    if (!String.IsNullOrEmpty(platformRid))
+                    {
+                        paths.Add(Path.Combine(_libPath, "runtimes", platformRid, "lib", "net8.0", fileName));
+                        paths.Add(Path.Combine(_libPath, "runtimes", platformRid, "lib", "netstandard1.6", fileName));
+                    }
+
+                    if (!String.IsNullOrEmpty(architectureRid))
+                    {
+                        paths.Add(Path.Combine(_libPath, "runtimes", architectureRid, "lib", "net8.0", fileName));
+                        paths.Add(Path.Combine(_libPath, "runtimes", architectureRid, "lib", "netstandard1.6", fileName));
+                    }
+
+                    return paths.ToArray();
+                }
+
+                private static string[] GetNativeLibraryNames(string libraryName)
+                {
+                    var names = new List<string>();
+                    names.Add(libraryName);
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        if (!libraryName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                        {
+                            names.Add(libraryName + ".dll");
+                        }
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        if (!libraryName.EndsWith(".dylib", StringComparison.OrdinalIgnoreCase))
+                        {
+                            names.Add(libraryName + ".dylib");
+                            names.Add("lib" + libraryName + ".dylib");
+                        }
+                    }
+                    else
+                    {
+                        if (!libraryName.EndsWith(".so", StringComparison.OrdinalIgnoreCase))
+                        {
+                            names.Add(libraryName + ".so");
+                            names.Add("lib" + libraryName + ".so");
+                        }
+                    }
+
+                    return names.ToArray();
+                }
+
+                private static string GetPlatformRid()
+                {
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        return "win";
+                    }
+
+                    return "unix";
+                }
+
+                private static string GetArchitectureRid()
+                {
+                    string osPart;
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        osPart = "win";
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        osPart = "linux";
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        osPart = "osx";
+                    }
+                    else
+                    {
+                        return null;
+                    }
+
+                    string architecture;
+                    switch (RuntimeInformation.ProcessArchitecture)
+                    {
+                        case Architecture.X86:
+                            architecture = "x86";
+                            break;
+                        case Architecture.X64:
+                            architecture = "x64";
+                            break;
+                        case Architecture.Arm:
+                            architecture = "arm";
+                            break;
+                        case Architecture.Arm64:
+                            architecture = "arm64";
+                            break;
+                        default:
+                            return null;
+                    }
+
+                    return osPart + "-" + architecture;
+                }
             }
 "@
 
         try {
-            $null = Add-Type -TypeDefinition $coreSource -ReferencedAssemblies 'System.Runtime.Loader'
+            $null = Add-Type -TypeDefinition $coreSource -ReferencedAssemblies 'System.Runtime.Loader','System.Runtime.InteropServices','System.Collections'
         } catch {
             Write-Verbose "Could not compile CoreRedirector: $_"
         }
@@ -167,8 +306,59 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     }
 }
 
-# REMOVED win-sqlclient logic - SqlClient is now directly in lib
-$sqlclient = [System.IO.Path]::Combine($script:libraryroot, "lib", "Microsoft.Data.SqlClient.dll")
+function Get-DbatoolsSqlClientPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$LibraryRoot
+    )
+
+    $libPath = [System.IO.Path]::Combine($LibraryRoot, "lib")
+    if ($PSVersionTable.PSEdition -eq "Core") {
+        if ($IsWindows) {
+            $runtimeSqlClient = [System.IO.Path]::Combine($libPath, "runtimes", "win", "lib", "net8.0", "Microsoft.Data.SqlClient.dll")
+        } else {
+            $runtimeSqlClient = [System.IO.Path]::Combine($libPath, "runtimes", "unix", "lib", "net8.0", "Microsoft.Data.SqlClient.dll")
+        }
+
+        if (Test-Path $runtimeSqlClient) {
+            return $runtimeSqlClient
+        }
+    }
+
+    [System.IO.Path]::Combine($libPath, "Microsoft.Data.SqlClient.dll")
+}
+
+function Add-DbatoolsNativeSearchPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$LibraryRoot
+    )
+
+    if ($PSVersionTable.PSEdition -ne "Core" -or -not $IsWindows) {
+        return
+    }
+
+    $architecture = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+    $nativeRid = "win-$architecture"
+    $nativePath = [System.IO.Path]::Combine($LibraryRoot, "lib", "runtimes", $nativeRid, "native")
+    if (-not (Test-Path $nativePath)) {
+        return
+    }
+
+    $pathSeparator = [System.IO.Path]::PathSeparator
+    $pathParts = $env:PATH -split [Regex]::Escape([string]$pathSeparator)
+    if ($pathParts -contains $nativePath) {
+        return
+    }
+
+    $env:PATH = $nativePath + $pathSeparator + $env:PATH
+    [System.Environment]::SetEnvironmentVariable("PATH", $env:PATH, "Process")
+}
+
+Add-DbatoolsNativeSearchPath -LibraryRoot $script:libraryroot
+$sqlclient = Get-DbatoolsSqlClientPath -LibraryRoot $script:libraryroot
 
 # Get loaded assemblies once for reuse (used for AvoidConflicts checks and later assembly loading)
 $script:loadedAssemblies = [System.AppDomain]::CurrentDomain.GetAssemblies()
