@@ -63,3 +63,4 @@ TestResults/
 
 # Local publish script with API key
 publish.ps1
+/.codex/worktrees
