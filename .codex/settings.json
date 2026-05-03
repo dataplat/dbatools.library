@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CODEX_PROJECT_DIR:-.}\"/.codex/hooks/stop-file-length.sh",
+            "timeout": 15,
+            "statusMessage": "Checking file lengths (400-line limit)..."
+          }
+        ]
+      }
+    ]
+  }
+}
