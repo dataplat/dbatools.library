@@ -2588,8 +2588,8 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             char c = _buffer[_bufferPosition];
 
-            // Check for quoted field (including smart quotes when NormalizeQuotes is enabled)
-            if (c == _options.Quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(c)))
+            // Check for quoted field after optional smart quote normalization.
+            if (NormalizeForQuoteParsing(c) == _options.Quote)
             {
                 if (_options.QuoteMode == QuoteMode.Lenient)
                 {
@@ -2611,15 +2611,6 @@ namespace Dataplat.Dbatools.Csv.Reader
             {
                 ReadUnquotedFieldDirectMultiDelim();
             }
-        }
-
-        /// <summary>
-        /// Checks if a character is a smart double quote.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsSmartDoubleQuote(char c)
-        {
-            return c == LeftDoubleQuote || c == RightDoubleQuote;
         }
 
         /// <summary>
@@ -2927,12 +2918,13 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
 
                 char c = _buffer[_bufferPosition];
+                char normalized = NormalizeForQuoteParsing(c);
 
                 // Handle escaped quotes (RFC 4180: "" or custom escape like \")
                 char peekNext;
-                if (c == escape && TryPeekNextChar(out peekNext))
+                if (normalized == escape && TryPeekNextChar(out peekNext))
                 {
-                    if (peekNext == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(peekNext)))
+                    if (NormalizeForQuoteParsing(peekNext) == quote)
                     {
                         _quotedFieldBuilder.Append(quote);
                         _bufferPosition += 2;
@@ -2943,7 +2935,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
 
                 // Check for closing quote (including smart quotes when NormalizeQuotes is enabled)
-                if (c == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(c)))
+                if (normalized == quote)
                 {
                     // Found closing quote
                     _bufferPosition++; // Skip closing quote
@@ -2956,13 +2948,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                     return;
                 }
 
-                // Handle smart quote normalization for single quotes
-                if (_options.NormalizeQuotes && (c == LeftSingleQuote || c == RightSingleQuote))
-                {
-                    c = '\'';
-                }
-
-                _quotedFieldBuilder.Append(c);
+                _quotedFieldBuilder.Append(normalized);
                 _bufferPosition++;
                 quotedLength++;
                 CheckQuotedFieldLength(quotedLength);
@@ -2975,7 +2961,7 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// </summary>
         private void ReadQuotedFieldDirectLenient()
         {
-            char openingQuote = _buffer[_bufferPosition];
+            char openingQuote = NormalizeForQuoteParsing(_buffer[_bufferPosition]);
             _bufferPosition++; // Skip opening quote
             _quotedFieldBuilder.Clear();
 
@@ -2999,16 +2985,17 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
 
                 char c = _buffer[_bufferPosition];
+                char normalized = NormalizeForQuoteParsing(c);
 
                 // Handle escaped quotes (RFC 4180: "" or backslash escape)
                 char peekNext;
-                if (c == escape && TryPeekNextChar(out peekNext))
+                if (normalized == escape && TryPeekNextChar(out peekNext))
                 {
-                    if (peekNext == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(peekNext)))
+                    if (NormalizeForQuoteParsing(peekNext) == quote)
                     {
                         _quotedFieldBuilder.Append(quote);
-                        _fieldAccumulator.Append(c);
-                        _fieldAccumulator.Append(peekNext);
+                        _fieldAccumulator.Append(normalized);
+                        _fieldAccumulator.Append(NormalizeForQuoteParsing(peekNext));
                         _bufferPosition += 2;
                         quotedLength += 2;
                         CheckQuotedFieldLength(quotedLength);
@@ -3019,11 +3006,11 @@ namespace Dataplat.Dbatools.Csv.Reader
                 // Backslash escape in lenient mode
                 if (c == '\\' && TryPeekNextChar(out peekNext))
                 {
-                    if (peekNext == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(peekNext)))
+                    if (NormalizeForQuoteParsing(peekNext) == quote)
                     {
                         _quotedFieldBuilder.Append(quote);
                         _fieldAccumulator.Append(c);
-                        _fieldAccumulator.Append(peekNext);
+                        _fieldAccumulator.Append(NormalizeForQuoteParsing(peekNext));
                         _bufferPosition += 2;
                         quotedLength += 2;
                         CheckQuotedFieldLength(quotedLength);
@@ -3032,7 +3019,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
 
                 // Check for closing quote
-                if (c == quote || (_options.NormalizeQuotes && IsSmartDoubleQuote(c)))
+                if (normalized == quote)
                 {
                     int afterQuote = _bufferPosition + 1;
 
@@ -3111,8 +3098,8 @@ namespace Dataplat.Dbatools.Csv.Reader
                         }
 
                         // Not a valid closing position - treat quote as literal and include it
-                        _quotedFieldBuilder.Append(c);
-                        _fieldAccumulator.Append(c);
+                        _quotedFieldBuilder.Append(normalized);
+                        _fieldAccumulator.Append(normalized);
                         _bufferPosition++;
                         quotedLength++;
                         CheckQuotedFieldLength(quotedLength);
@@ -3130,15 +3117,8 @@ namespace Dataplat.Dbatools.Csv.Reader
                     return;
                 }
 
-                // Handle smart quote normalization for single quotes
-                char normalized = c;
-                if (_options.NormalizeQuotes && (c == LeftSingleQuote || c == RightSingleQuote))
-                {
-                    normalized = '\'';
-                }
-
                 _quotedFieldBuilder.Append(normalized);
-                _fieldAccumulator.Append(c);
+                _fieldAccumulator.Append(normalized);
                 _bufferPosition++;
                 quotedLength++;
                 CheckQuotedFieldLength(quotedLength);
@@ -3487,6 +3467,12 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             next = '\0';
             return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private char NormalizeForQuoteParsing(char c)
+        {
+            return _options.NormalizeQuotes ? NormalizeSmartQuoteChar(c) : c;
         }
 
         /// <summary>
