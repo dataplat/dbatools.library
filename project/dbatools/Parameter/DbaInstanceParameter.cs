@@ -230,12 +230,14 @@ namespace Dataplat.Dbatools.Parameter
 
         private static string SanitizeFileName(string value)
         {
-            foreach (char c in InvalidFileNameChars)
+            char[] chars = value.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
             {
-                value = value.Replace(c, '_');
+                if (Array.IndexOf(InvalidFileNameChars, chars[i]) >= 0)
+                    chars[i] = '_';
             }
 
-            return value;
+            return new string(chars);
         }
 
         #region Uncontracted properties
@@ -372,8 +374,9 @@ namespace Dataplat.Dbatools.Parameter
 
                     _ComputerName = Regex.Match(tempString, @"^\\\\([^\\]+)\\").Groups[1].Value;
 
-                    if (Regex.IsMatch(tempString, @"\\MSSQL\$[^\\]+\\", RegexOptions.IgnoreCase))
-                        _InstanceName = Regex.Match(tempString, @"\\MSSQL\$([^\\]+)\\", RegexOptions.IgnoreCase).Groups[1].Value;
+                    Match namedPipeInstance = Regex.Match(tempString, @"\\MSSQL\$([^\\]+)\\", RegexOptions.IgnoreCase);
+                    if (namedPipeInstance.Success)
+                        _InstanceName = namedPipeInstance.Groups[1].Value;
                     else if (!Regex.IsMatch(tempString, @"^\\\\[^\\]+\\pipe\\[t]{0,1}sql\\query$", RegexOptions.IgnoreCase))
                         _NamedPipePath = tempString;
                 }

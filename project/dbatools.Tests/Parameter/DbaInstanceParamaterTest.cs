@@ -48,6 +48,23 @@ namespace Dataplat.Dbatools.Parameter
             var dbaInstanceParamater = new DbaInstanceParameter(@"np:\\.\pipe\MICROSOFT##WID\tsql\query");
 
             Assert.AreEqual(".", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual("MSSQLSERVER", dbaInstanceParamater.InstanceName);
+            Assert.AreEqual(@"\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
+            Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual(@"NP_._MICROSOFT##WID", dbaInstanceParamater.FileNameFriendly);
+            AssertFileNameFriendlySafe(dbaInstanceParamater.FileNameFriendly);
+            Assert.AreEqual(SqlConnectionProtocol.NP, dbaInstanceParamater.NetworkProtocol);
+            Assert.IsTrue(dbaInstanceParamater.IsLocalHost);
+            Assert.IsFalse(dbaInstanceParamater.IsConnectionString);
+        }
+
+        [TestMethod]
+        public void TestWidNamedPipeWithoutProtocolPrefix()
+        {
+            var dbaInstanceParamater = new DbaInstanceParameter(@"\\.\pipe\MICROSOFT##WID\tsql\query");
+
+            Assert.AreEqual(".", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual("MSSQLSERVER", dbaInstanceParamater.InstanceName);
             Assert.AreEqual(@"\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
             Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
             Assert.AreEqual(@"NP_._MICROSOFT##WID", dbaInstanceParamater.FileNameFriendly);
@@ -64,6 +81,7 @@ namespace Dataplat.Dbatools.Parameter
             var connectionString = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder((string)dbaInstanceParamater.InputObject);
 
             Assert.AreEqual(".", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual("MSSQLSERVER", dbaInstanceParamater.InstanceName);
             Assert.AreEqual(@"\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
             Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
             Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", connectionString.DataSource);
@@ -80,6 +98,7 @@ namespace Dataplat.Dbatools.Parameter
             var dbaInstanceParamater = new DbaInstanceParameter(@"np:\\server\pipe\MICROSOFT##WID\tsql\query");
 
             Assert.AreEqual("server", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual("MSSQLSERVER", dbaInstanceParamater.InstanceName);
             Assert.AreEqual(@"\\server\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
             Assert.AreEqual(@"NP:\\server\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
             Assert.AreEqual(@"NP_server_MICROSOFT##WID", dbaInstanceParamater.FileNameFriendly);
