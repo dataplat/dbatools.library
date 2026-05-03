@@ -44,8 +44,10 @@ dbatools.library.zip
 /.claude/*
 !/.claude/
 !/.claude/hooks/
+!/.claude/commands/
 !/.claude/settings.json
 !/.claude/hooks/stop-file-length.sh
+!/.claude/commands/*.md
 NUL
 
 # Benchmark artifacts
