@@ -377,8 +377,12 @@ namespace Dataplat.Dbatools.Parameter
                     Match namedPipeInstance = Regex.Match(tempString, @"\\MSSQL\$([^\\]+)\\", RegexOptions.IgnoreCase);
                     if (namedPipeInstance.Success)
                         _InstanceName = namedPipeInstance.Groups[1].Value;
+                    // Non-standard pipes such as WID cannot be split into server + instance, so keep the full path.
                     else if (!Regex.IsMatch(tempString, @"^\\\\[^\\]+\\pipe\\[t]{0,1}sql\\query$", RegexOptions.IgnoreCase))
+                    {
+                        // Leave _InstanceName unset; InstanceName falls back to MSSQLSERVER for WID/default-instance pipes.
                         _NamedPipePath = tempString;
+                    }
                 }
                 catch (Exception e)
                 {
