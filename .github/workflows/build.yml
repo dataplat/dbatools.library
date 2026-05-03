@@ -118,37 +118,7 @@ jobs:
         Write-Host "Module path: $($module.Path)"
 
     - name: Verify SqlClient runtime asset selection
-      shell: pwsh
-      run: |
-        Import-Module ./artifacts/dbatools.library/dbatools.library.psd1 -Force
-
-        $sqlClient = [System.AppDomain]::CurrentDomain.GetAssemblies() |
-          Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' } |
-          Select-Object -First 1
-
-        if (-not $sqlClient) {
-          throw "Microsoft.Data.SqlClient was not loaded"
-        }
-
-        $location = $sqlClient.Location.Replace('/', '\')
-        $expected = if ($IsWindows) {
-          "runtimes\win\lib\net8.0\Microsoft.Data.SqlClient.dll"
-        } else {
-          "runtimes\unix\lib\net8.0\Microsoft.Data.SqlClient.dll"
-        }
-
-        if ($location -notlike "*$expected") {
-          throw "Microsoft.Data.SqlClient loaded from unexpected path: $($sqlClient.Location)"
-        }
-
-        if ($IsWindows) {
-          $sniPath = "./artifacts/dbatools.library/core/lib/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll"
-          if (-not (Test-Path $sniPath)) {
-            throw "Missing Windows x64 SqlClient native SNI DLL at $sniPath"
-          }
-        }
-
-        Write-Host "SqlClient runtime asset verified: $($sqlClient.Location)"
+      uses: ./.github/actions/verify-sqlclient
 
     - name: Test AvoidConflicts with SqlServer module (Windows PowerShell 5.1)
       shell: powershell
