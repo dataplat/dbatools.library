@@ -50,6 +50,8 @@ namespace Dataplat.Dbatools.Parameter
             Assert.AreEqual(".", dbaInstanceParamater.ComputerName);
             Assert.AreEqual(@"\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
             Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual(@"NP_._MICROSOFT##WID", dbaInstanceParamater.FileNameFriendly);
+            AssertFileNameFriendlySafe(dbaInstanceParamater.FileNameFriendly);
             Assert.AreEqual(SqlConnectionProtocol.NP, dbaInstanceParamater.NetworkProtocol);
             Assert.IsTrue(dbaInstanceParamater.IsLocalHost);
             Assert.IsFalse(dbaInstanceParamater.IsConnectionString);
@@ -65,9 +67,26 @@ namespace Dataplat.Dbatools.Parameter
             Assert.AreEqual(@"\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
             Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
             Assert.AreEqual(@"NP:\\.\pipe\MICROSOFT##WID\tsql\query", connectionString.DataSource);
+            Assert.AreEqual(@"NP_._MICROSOFT##WID", dbaInstanceParamater.FileNameFriendly);
+            AssertFileNameFriendlySafe(dbaInstanceParamater.FileNameFriendly);
             Assert.AreEqual(SqlConnectionProtocol.NP, dbaInstanceParamater.NetworkProtocol);
             Assert.IsTrue(dbaInstanceParamater.IsLocalHost);
             Assert.IsTrue(dbaInstanceParamater.IsConnectionString);
+        }
+
+        [TestMethod]
+        public void TestRemoteWidNamedPipe()
+        {
+            var dbaInstanceParamater = new DbaInstanceParameter(@"np:\\server\pipe\MICROSOFT##WID\tsql\query");
+
+            Assert.AreEqual("server", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual(@"\\server\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullName);
+            Assert.AreEqual(@"NP:\\server\pipe\MICROSOFT##WID\tsql\query", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual(@"NP_server_MICROSOFT##WID", dbaInstanceParamater.FileNameFriendly);
+            AssertFileNameFriendlySafe(dbaInstanceParamater.FileNameFriendly);
+            Assert.AreEqual(SqlConnectionProtocol.NP, dbaInstanceParamater.NetworkProtocol);
+            Assert.IsFalse(dbaInstanceParamater.IsLocalHost);
+            Assert.IsFalse(dbaInstanceParamater.IsConnectionString);
         }
 
         [TestMethod]
@@ -293,12 +312,11 @@ namespace Dataplat.Dbatools.Parameter
             Assert.IsFalse(regular.FileNameFriendly.Contains("\\"));
 
             // Test that all results contain no invalid filename characters
-            var invalidChars = System.IO.Path.GetInvalidFileNameChars();
-            Assert.IsFalse(npDot.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
-            Assert.IsFalse(npDotInstance.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
-            Assert.IsFalse(tcpInstance.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
-            Assert.IsFalse(withPort.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
-            Assert.IsFalse(regular.FileNameFriendly.IndexOfAny(invalidChars) >= 0);
+            AssertFileNameFriendlySafe(npDot.FileNameFriendly);
+            AssertFileNameFriendlySafe(npDotInstance.FileNameFriendly);
+            AssertFileNameFriendlySafe(tcpInstance.FileNameFriendly);
+            AssertFileNameFriendlySafe(withPort.FileNameFriendly);
+            AssertFileNameFriendlySafe(regular.FileNameFriendly);
         }
 
         /// <summary>
@@ -309,30 +327,38 @@ namespace Dataplat.Dbatools.Parameter
         {
             // Test with IPv6 address (contains colons and brackets)
             var ipv6 = new DbaInstanceParameter("::1");
-            var invalidChars = System.IO.Path.GetInvalidFileNameChars();
-            Assert.IsFalse(ipv6.FileNameFriendly.IndexOfAny(invalidChars) >= 0,
-                "IPv6 address FileNameFriendly should not contain invalid filename characters");
+            AssertFileNameFriendlySafe(ipv6.FileNameFriendly);
 
             // Test with IPv6 address and port
             var ipv6Port = new DbaInstanceParameter("[::1]:1433");
-            Assert.IsFalse(ipv6Port.FileNameFriendly.IndexOfAny(invalidChars) >= 0,
-                "IPv6 with port FileNameFriendly should not contain invalid filename characters");
+            AssertFileNameFriendlySafe(ipv6Port.FileNameFriendly);
 
             // Test with regular IPv6 address
             var ipv6Full = new DbaInstanceParameter("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
-            Assert.IsFalse(ipv6Full.FileNameFriendly.IndexOfAny(invalidChars) >= 0,
-                "Full IPv6 address FileNameFriendly should not contain invalid filename characters");
+            AssertFileNameFriendlySafe(ipv6Full.FileNameFriendly);
 
             // Test with IPv4 address and port (contains colon)
             var ipv4Port = new DbaInstanceParameter("192.168.1.1:1433");
-            Assert.IsFalse(ipv4Port.FileNameFriendly.IndexOfAny(invalidChars) >= 0,
-                "IPv4 with port FileNameFriendly should not contain invalid filename characters");
+            AssertFileNameFriendlySafe(ipv4Port.FileNameFriendly);
 
             // Test that the results are not empty
             Assert.IsFalse(string.IsNullOrWhiteSpace(ipv6.FileNameFriendly));
             Assert.IsFalse(string.IsNullOrWhiteSpace(ipv6Port.FileNameFriendly));
             Assert.IsFalse(string.IsNullOrWhiteSpace(ipv6Full.FileNameFriendly));
             Assert.IsFalse(string.IsNullOrWhiteSpace(ipv4Port.FileNameFriendly));
+        }
+
+        private static void AssertFileNameFriendlySafe(string fileNameFriendly)
+        {
+            foreach (char c in System.IO.Path.GetInvalidFileNameChars())
+            {
+                Assert.IsFalse(fileNameFriendly.IndexOf(c) >= 0);
+            }
+
+            foreach (char c in "<>:\"/\\|?*")
+            {
+                Assert.IsFalse(fileNameFriendly.IndexOf(c) >= 0);
+            }
         }
     }
 }

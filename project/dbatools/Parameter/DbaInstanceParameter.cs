@@ -133,7 +133,16 @@ namespace Dataplat.Dbatools.Parameter
             get
             {
                 string temp = _ComputerName;
-                if (!String.IsNullOrEmpty(_NamedPipePath)) { temp = _NamedPipePath; }
+                if (!String.IsNullOrEmpty(_NamedPipePath))
+                {
+                    Match pipeSegment = Regex.Match(_NamedPipePath, @"\\pipe\\([^\\]+)\\", RegexOptions.IgnoreCase);
+                    if (pipeSegment.Success && !String.IsNullOrEmpty(pipeSegment.Groups[1].Value))
+                    {
+                        temp = temp + "_" + pipeSegment.Groups[1].Value;
+                    }
+                    return SanitizeFileName("NP_" + temp);
+                }
+
                 if (_NetworkProtocol == SqlConnectionProtocol.NP) { temp = "NP_" + temp; }
                 if (_NetworkProtocol == SqlConnectionProtocol.TCP) { temp = "TCP_" + temp; }
 
@@ -155,14 +164,7 @@ namespace Dataplat.Dbatools.Parameter
                     result = temp;
                 }
 
-                // Sanitize any remaining invalid filename characters
-                char[] invalidChars = Path.GetInvalidFileNameChars();
-                foreach (char c in invalidChars)
-                {
-                    result = result.Replace(c, '_');
-                }
-
-                return result;
+                return SanitizeFileName(result);
             }
         }
 
@@ -220,6 +222,21 @@ namespace Dataplat.Dbatools.Parameter
         private string _NamedPipePath;
         private int _Port;
         private SqlConnectionProtocol _NetworkProtocol = SqlConnectionProtocol.Any;
+
+        private static string SanitizeFileName(string value)
+        {
+            char[] invalidChars = Path.GetInvalidFileNameChars()
+                .Concat(new char[] { '<', '>', ':', '"', '/', '\\', '|', '?', '*' })
+                .Distinct()
+                .ToArray();
+
+            foreach (char c in invalidChars)
+            {
+                value = value.Replace(c, '_');
+            }
+
+            return value;
+        }
 
         #region Uncontracted properties
         /// <summary>
@@ -334,13 +351,13 @@ namespace Dataplat.Dbatools.Parameter
             if (UtilityHost.IsLike(tempString, "*.WORKGROUP"))
                 tempString = Regex.Replace(tempString, @"\.WORKGROUP$", "", RegexOptions.IgnoreCase);
 
-            // Handle and clear protocols. Otherwise it'd make port detection unneccessarily messy
-            if (Regex.IsMatch(tempString, "^TCP:", RegexOptions.IgnoreCase)) //TODO: Use case insinsitive String.BeginsWith()
+            // Handle and clear protocols. Otherwise it'd make port detection unnecessarily messy
+            if (Regex.IsMatch(tempString, "^TCP:", RegexOptions.IgnoreCase)) // TODO: Use case insensitive String.StartsWith()
             {
                 _NetworkProtocol = SqlConnectionProtocol.TCP;
                 tempString = tempString.Substring(4);
             }
-            if (Regex.IsMatch(tempString, "^NP:", RegexOptions.IgnoreCase)) // TODO: Use case insinsitive String.BeginsWith()
+            if (Regex.IsMatch(tempString, "^NP:", RegexOptions.IgnoreCase)) // TODO: Use case insensitive String.StartsWith()
             {
                 _NetworkProtocol = SqlConnectionProtocol.NP;
                 tempString = tempString.Substring(3);
