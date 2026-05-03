@@ -146,6 +146,7 @@ function Assert-Version {
 $oldModuleVersion = Get-ModuleVersion -Path $manifestPath
 $oldMainAssemblyVersion = Get-XmlElementValue -Path $mainProjectPath -ElementName "AssemblyVersion"
 $oldMainFileVersion = Get-XmlElementValue -Path $mainProjectPath -ElementName "FileVersion"
+$oldMainVersion = Get-XmlElementValue -Path $mainProjectPath -ElementName "Version"
 $oldCsvVersion = Get-XmlElementValue -Path $csvProjectPath -ElementName "Version"
 
 if (-not $ModuleVersion) {
@@ -165,13 +166,17 @@ Assert-Version -Name "CsvVersion" -Version $CsvVersion -Pattern "^\d+\.\d+\.\d+(
 if ($oldMainAssemblyVersion -ne $oldMainFileVersion) {
     throw "AssemblyVersion ($oldMainAssemblyVersion) and FileVersion ($oldMainFileVersion) do not match."
 }
+if ($oldMainAssemblyVersion -ne $oldMainVersion) {
+    throw "AssemblyVersion ($oldMainAssemblyVersion) and Version ($oldMainVersion) do not match."
+}
 
 Set-ModuleVersion -Path $manifestPath -Version $ModuleVersion
 Set-XmlElementValue -Path $mainProjectPath -ElementName "AssemblyVersion" -OldValue $oldMainAssemblyVersion -NewValue $MainVersion
 Set-XmlElementValue -Path $mainProjectPath -ElementName "FileVersion" -OldValue $oldMainFileVersion -NewValue $MainVersion
+Set-XmlElementValue -Path $mainProjectPath -ElementName "Version" -OldValue $oldMainVersion -NewValue $MainVersion
 Set-XmlElementValue -Path $csvProjectPath -ElementName "Version" -OldValue $oldCsvVersion -NewValue $CsvVersion
 
 Write-Host "Bumped versions:" -ForegroundColor Green
 Write-Host "  ModuleVersion: $oldModuleVersion -> $ModuleVersion"
-Write-Host "  dbatools AssemblyVersion/FileVersion: $oldMainAssemblyVersion -> $MainVersion"
+Write-Host "  dbatools AssemblyVersion/FileVersion/Version: $oldMainAssemblyVersion -> $MainVersion"
 Write-Host "  Dataplat.Dbatools.Csv Version: $oldCsvVersion -> $CsvVersion"

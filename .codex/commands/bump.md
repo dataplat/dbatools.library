@@ -8,7 +8,7 @@ Run the repository version bump workflow.
 1. Run `pwsh -NoProfile -File build/bump-version.ps1 $ARGUMENTS` from the repository root.
 2. Inspect the version diff for:
    - `dbatools.library.psd1` `ModuleVersion`
-   - `project/dbatools/dbatools.csproj` `AssemblyVersion` and `FileVersion`
+   - `project/dbatools/dbatools.csproj` `AssemblyVersion`, `FileVersion`, and `Version`
    - `project/Dataplat.Dbatools.Csv/Dataplat.Dbatools.Csv.csproj` `Version`
 3. Build the versioned projects:
    - `dotnet build project/dbatools/dbatools.csproj`
