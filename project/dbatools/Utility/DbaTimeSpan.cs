@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -7,11 +7,10 @@ namespace Dataplat.Dbatools.Utility
     /// <summary>
     /// A wrapper class, encapsuling a regular TimeSpan object. Used to provide custom timespan display.
     /// </summary>
-    public class DbaTimeSpan : IComparable, IComparable<TimeSpan>, IComparable<DbaTimeSpan>, IEquatable<TimeSpan>
+    public partial class DbaTimeSpan : IComparable, IComparable<TimeSpan>, IComparable<DbaTimeSpan>, IEquatable<TimeSpan>
     {
         internal TimeSpan _timespan;
 
-        #region Properties
         /// <summary>
         /// Gets the days component of the time interval represented by the current TimeSpan structure.
         /// </summary>
@@ -132,9 +131,7 @@ namespace Dataplat.Dbatools.Utility
                 return _timespan.TotalSeconds;
             }
         }
-        #endregion Properties
 
-        #region Constructors
         /// <summary>
         /// 
         /// </summary>
@@ -197,9 +194,7 @@ namespace Dataplat.Dbatools.Utility
         {
             _timespan = new TimeSpan(days, hours, minutes, seconds, milliseconds);
         }
-        #endregion Constructors
 
-        #region Methods
         /// <summary>
         /// Parses an input string as timespan
         /// </summary>
@@ -388,28 +383,5 @@ namespace Dataplat.Dbatools.Utility
         {
             return _timespan.ToString(format, formatProvider);
         }
-        #endregion Methods
-
-        #region Implicit Operators
-        /// <summary>
-        /// Implicitly converts a DbaTimeSpan object into a TimeSpan object
-        /// </summary>
-        /// <param name="Base">The original object to revert</param>
-        public static implicit operator TimeSpan(DbaTimeSpan Base)
-        {
-            try { return Base.GetBaseObject(); }
-            catch { }
-            return new TimeSpan();
-        }
-
-        /// <summary>
-        /// Implicitly converts a TimeSpan object into a DbaTimeSpan object
-        /// </summary>
-        /// <param name="Base">The original object to wrap</param>
-        public static implicit operator DbaTimeSpan(TimeSpan Base)
-        {
-            return new DbaTimeSpan(Base);
-        }
-        #endregion Implicit Operators
     }
 }

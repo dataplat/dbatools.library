@@ -10,6 +10,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Check file lengths
+      run: ./build/check-file-lengths.ps1
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:

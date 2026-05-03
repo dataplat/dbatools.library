@@ -245,6 +245,7 @@ if ($v6Unsafe) {
 # Copy root module files
 Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $dbatoolsLibraryDir -Force
 Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $dbatoolsLibraryDir -Force
+Copy-Item -Path (Join-Path $root "dbatools.library.CoreRedirector.cs") -Destination $dbatoolsLibraryDir -Force
 Copy-Item -Path (Join-Path $root "LICENSE") -Destination $dbatoolsLibraryDir -Force -ErrorAction SilentlyContinue
 Write-Host "Copied module files to artifacts/dbatools.library" -ForegroundColor Green
 
