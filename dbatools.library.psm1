@@ -90,8 +90,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     # PowerShell Core: Use AssemblyLoadContext.Resolving event for version redirection
     # This handles version mismatches when SqlServer module loads different versions of assemblies
     # IMPORTANT: Must be implemented in C# because the resolver runs on .NET threads without PowerShell runspaces
-    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib")
-    $dir = ("$dir" + [System.IO.Path]::DirectorySeparatorChar).Replace('\', '\\')
+    $dir = [System.IO.Path]::Combine($script:libraryroot, "lib") + [System.IO.Path]::DirectorySeparatorChar
 
     if (-not ("CoreRedirector" -as [type])) {
         $coreSource = @"
@@ -107,6 +106,8 @@ if ($PSVersionTable.PSEdition -ne "Core") {
             {
                 private static string _libPath;
                 private static bool _registered = false;
+                private static readonly string _platformRid = ComputePlatformRid();
+                private static readonly string _architectureRid = ComputeArchitectureRid();
 
                 public static void Register(string libPath)
                 {
@@ -157,17 +158,17 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                     return null;
                 }
 
+                // This resolver is global to the load context, but it only returns module-owned native assets from _libPath.
                 private static IntPtr OnResolvingUnmanagedDll(Assembly assembly, string libraryName)
                 {
-                    string architectureRid = GetArchitectureRid();
-                    if (String.IsNullOrEmpty(architectureRid))
+                    if (String.IsNullOrEmpty(_architectureRid))
                     {
                         return IntPtr.Zero;
                     }
 
                     foreach (string fileName in GetNativeLibraryNames(libraryName))
                     {
-                        string nativePath = Path.Combine(_libPath, "runtimes", architectureRid, "native", fileName);
+                        string nativePath = Path.Combine(_libPath, "runtimes", _architectureRid, "native", fileName);
                         if (File.Exists(nativePath))
                         {
                             try
@@ -188,19 +189,17 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                 private static string[] GetManagedAssemblyPaths(string name)
                 {
                     string fileName = name + ".dll";
-                    string platformRid = GetPlatformRid();
-                    string architectureRid = GetArchitectureRid();
 
                     var paths = new List<string>();
 
-                    if (!String.IsNullOrEmpty(platformRid))
+                    if (!String.IsNullOrEmpty(_platformRid))
                     {
-                        paths.Add(Path.Combine(_libPath, "runtimes", platformRid, "lib", "net8.0", fileName));
+                        paths.Add(Path.Combine(_libPath, "runtimes", _platformRid, "lib", "net8.0", fileName));
                     }
 
-                    if (!String.IsNullOrEmpty(architectureRid))
+                    if (!String.IsNullOrEmpty(_architectureRid))
                     {
-                        paths.Add(Path.Combine(_libPath, "runtimes", architectureRid, "lib", "net8.0", fileName));
+                        paths.Add(Path.Combine(_libPath, "runtimes", _architectureRid, "lib", "net8.0", fileName));
                     }
 
                     paths.Add(Path.Combine(_libPath, fileName));
@@ -240,10 +239,10 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                     return names.ToArray();
                 }
 
-                private static string GetPlatformRid()
+                private static string ComputePlatformRid()
                 {
                     // Managed runtime assets used by the module, especially SqlClient, ship
-                    // win/unix folders. OS-specific native assets are handled by GetArchitectureRid.
+                    // win/unix folders. OS-specific native assets are handled by ComputeArchitectureRid.
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
                         return "win";
@@ -252,7 +251,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                     return "unix";
                 }
 
-                private static string GetArchitectureRid()
+                private static string ComputeArchitectureRid()
                 {
                     string osPart;
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
