@@ -90,6 +90,22 @@ namespace Dataplat.Dbatools.Parameter
         }
 
         [TestMethod]
+        public void TestNamedInstancePipeWithProtocolPrefix()
+        {
+            var dbaInstanceParamater = new DbaInstanceParameter(@"np:\\server\pipe\MSSQL$inst\sql\query");
+
+            Assert.AreEqual("server", dbaInstanceParamater.ComputerName);
+            Assert.AreEqual("inst", dbaInstanceParamater.InstanceName);
+            Assert.AreEqual(@"server\inst", dbaInstanceParamater.FullName);
+            Assert.AreEqual(@"NP:server\inst", dbaInstanceParamater.FullSmoName);
+            Assert.AreEqual("NP_server_inst", dbaInstanceParamater.FileNameFriendly);
+            AssertFileNameFriendlySafe(dbaInstanceParamater.FileNameFriendly);
+            Assert.AreEqual(SqlConnectionProtocol.NP, dbaInstanceParamater.NetworkProtocol);
+            Assert.IsFalse(dbaInstanceParamater.IsLocalHost);
+            Assert.IsFalse(dbaInstanceParamater.IsConnectionString);
+        }
+
+        [TestMethod]
         public void TestConnectionStringBadKey()
         {
             Assert.ThrowsException<ArgumentException>(() => new DbaInstanceParameter("Server=tcp:server.database.windows.net;Database=myDataBase;Trusted_Connection = True;Wrong=true"));
@@ -352,12 +368,14 @@ namespace Dataplat.Dbatools.Parameter
         {
             foreach (char c in System.IO.Path.GetInvalidFileNameChars())
             {
-                Assert.IsFalse(fileNameFriendly.IndexOf(c) >= 0);
+                Assert.IsFalse(fileNameFriendly.IndexOf(c) >= 0,
+                    String.Format("FileNameFriendly contains invalid character U+{0:X4} in '{1}'", (int)c, fileNameFriendly));
             }
 
             foreach (char c in "<>:\"/\\|?*")
             {
-                Assert.IsFalse(fileNameFriendly.IndexOf(c) >= 0);
+                Assert.IsFalse(fileNameFriendly.IndexOf(c) >= 0,
+                    String.Format("FileNameFriendly contains reserved filename character U+{0:X4} in '{1}'", (int)c, fileNameFriendly));
             }
         }
     }

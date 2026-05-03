@@ -140,6 +140,7 @@ namespace Dataplat.Dbatools.Parameter
                     {
                         temp = temp + "_" + pipeSegment.Groups[1].Value;
                     }
+                    // If a future pipe shape has no pipe segment to extract, keep the server name fallback compact and safe.
                     return SanitizeFileName("NP_" + temp);
                 }
 
@@ -222,15 +223,14 @@ namespace Dataplat.Dbatools.Parameter
         private string _NamedPipePath;
         private int _Port;
         private SqlConnectionProtocol _NetworkProtocol = SqlConnectionProtocol.Any;
+        private static readonly char[] InvalidFileNameChars = Path.GetInvalidFileNameChars()
+            .Concat(new char[] { '<', '>', ':', '"', '/', '\\', '|', '?', '*' })
+            .Distinct()
+            .ToArray();
 
         private static string SanitizeFileName(string value)
         {
-            char[] invalidChars = Path.GetInvalidFileNameChars()
-                .Concat(new char[] { '<', '>', ':', '"', '/', '\\', '|', '?', '*' })
-                .Distinct()
-                .ToArray();
-
-            foreach (char c in invalidChars)
+            foreach (char c in InvalidFileNameChars)
             {
                 value = value.Replace(c, '_');
             }
