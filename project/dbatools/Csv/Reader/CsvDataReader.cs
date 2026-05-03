@@ -126,8 +126,6 @@ namespace Dataplat.Dbatools.Csv.Reader
         private bool _useFastConversion;               // True when simple string-only conversion can be used
         private bool _useFastParsing;                  // True when ultra-fast inline parsing can be used
 
-
-
         /// <summary>
         /// Holds information about a parsed field including its value and whether it was quoted.
         /// </summary>
@@ -142,8 +140,6 @@ namespace Dataplat.Dbatools.Csv.Reader
                 WasQuoted = wasQuoted;
             }
         }
-
-
 
         /// <summary>
         /// Represents a line read from the input with its metadata.
@@ -188,8 +184,6 @@ namespace Dataplat.Dbatools.Csv.Reader
                 Error = error;
             }
         }
-
-
 
         // Parallel processing state (volatile for thread visibility across main/worker threads)
         private volatile bool _useParallelProcessing;

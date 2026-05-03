@@ -145,150 +145,150 @@ namespace Dataplat.Dbatools.Utility
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified tick count.
         /// </summary>
-        /// <param name="ticks"></param>
+        /// <param name="ticks">The number of ticks that represent the timestamp.</param>
         public DbaDateTimeBase(long ticks)
         {
             _timestamp = new DateTime(ticks);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified tick count and kind.
         /// </summary>
-        /// <param name="ticks"></param>
-        /// <param name="kind"></param>
+        /// <param name="ticks">The number of ticks that represent the timestamp.</param>
+        /// <param name="kind">The value that indicates whether the timestamp is local, UTC, or unspecified.</param>
         public DbaDateTimeBase(long ticks, System.DateTimeKind kind)
         {
             _timestamp = new DateTime(ticks, kind);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified year, month, and day.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
         public DbaDateTimeBase(int year, int month, int day)
         {
             _timestamp = new DateTime(year, month, day);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified date using a calendar.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
-        /// <param name="calendar"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
+        /// <param name="calendar">The calendar used to interpret the date components.</param>
         public DbaDateTimeBase(int year, int month, int day, System.Globalization.Calendar calendar)
         {
             _timestamp = new DateTime(year, month, day, calendar);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified date and time.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
-        /// <param name="hour"></param>
-        /// <param name="minute"></param>
-        /// <param name="second"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
+        /// <param name="hour">The hour component.</param>
+        /// <param name="minute">The minute component.</param>
+        /// <param name="second">The second component.</param>
         public DbaDateTimeBase(int year, int month, int day, int hour, int minute, int second)
         {
             _timestamp = new DateTime(year, month, day, hour, minute, second);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified date, time, and kind.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
-        /// <param name="hour"></param>
-        /// <param name="minute"></param>
-        /// <param name="second"></param>
-        /// <param name="kind"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
+        /// <param name="hour">The hour component.</param>
+        /// <param name="minute">The minute component.</param>
+        /// <param name="second">The second component.</param>
+        /// <param name="kind">The value that indicates whether the timestamp is local, UTC, or unspecified.</param>
         public DbaDateTimeBase(int year, int month, int day, int hour, int minute, int second, System.DateTimeKind kind)
         {
             _timestamp = new DateTime(year, month, day, hour, minute, second, kind);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified date and time using a calendar.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
-        /// <param name="hour"></param>
-        /// <param name="minute"></param>
-        /// <param name="second"></param>
-        /// <param name="calendar"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
+        /// <param name="hour">The hour component.</param>
+        /// <param name="minute">The minute component.</param>
+        /// <param name="second">The second component.</param>
+        /// <param name="calendar">The calendar used to interpret the date and time components.</param>
         public DbaDateTimeBase(int year, int month, int day, int hour, int minute, int second, System.Globalization.Calendar calendar)
         {
             _timestamp = new DateTime(year, month, day, hour, minute, second, calendar);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified date and time including milliseconds.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
-        /// <param name="hour"></param>
-        /// <param name="minute"></param>
-        /// <param name="second"></param>
-        /// <param name="millisecond"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
+        /// <param name="hour">The hour component.</param>
+        /// <param name="minute">The minute component.</param>
+        /// <param name="second">The second component.</param>
+        /// <param name="millisecond">The millisecond component.</param>
         public DbaDateTimeBase(int year, int month, int day, int hour, int minute, int second, int millisecond)
         {
             _timestamp = new DateTime(year, month, day, hour, minute, second, millisecond);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified date, time, milliseconds, and kind.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
-        /// <param name="hour"></param>
-        /// <param name="minute"></param>
-        /// <param name="second"></param>
-        /// <param name="millisecond"></param>
-        /// <param name="kind"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
+        /// <param name="hour">The hour component.</param>
+        /// <param name="minute">The minute component.</param>
+        /// <param name="second">The second component.</param>
+        /// <param name="millisecond">The millisecond component.</param>
+        /// <param name="kind">The value that indicates whether the timestamp is local, UTC, or unspecified.</param>
         public DbaDateTimeBase(int year, int month, int day, int hour, int minute, int second, int millisecond, System.DateTimeKind kind)
         {
             _timestamp = new DateTime(year, month, day, hour, minute, second, millisecond, kind);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified date and time including milliseconds using a calendar.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
-        /// <param name="hour"></param>
-        /// <param name="minute"></param>
-        /// <param name="second"></param>
-        /// <param name="millisecond"></param>
-        /// <param name="calendar"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
+        /// <param name="hour">The hour component.</param>
+        /// <param name="minute">The minute component.</param>
+        /// <param name="second">The second component.</param>
+        /// <param name="millisecond">The millisecond component.</param>
+        /// <param name="calendar">The calendar used to interpret the date and time components.</param>
         public DbaDateTimeBase(int year, int month, int day, int hour, int minute, int second, int millisecond, System.Globalization.Calendar calendar)
         {
             _timestamp = new DateTime(year, month, day, hour, minute, second, millisecond, calendar);
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new instance from the specified date, time, milliseconds, calendar, and kind.
         /// </summary>
-        /// <param name="year"></param>
-        /// <param name="month"></param>
-        /// <param name="day"></param>
-        /// <param name="hour"></param>
-        /// <param name="minute"></param>
-        /// <param name="second"></param>
-        /// <param name="millisecond"></param>
-        /// <param name="calendar"></param>
-        /// <param name="kind"></param>
+        /// <param name="year">The year component.</param>
+        /// <param name="month">The month component.</param>
+        /// <param name="day">The day component.</param>
+        /// <param name="hour">The hour component.</param>
+        /// <param name="minute">The minute component.</param>
+        /// <param name="second">The second component.</param>
+        /// <param name="millisecond">The millisecond component.</param>
+        /// <param name="calendar">The calendar used to interpret the date and time components.</param>
+        /// <param name="kind">The value that indicates whether the timestamp is local, UTC, or unspecified.</param>
         public DbaDateTimeBase(int year, int month, int day, int hour, int minute, int second, int millisecond, System.Globalization.Calendar calendar, System.DateTimeKind kind)
         {
             _timestamp = new DateTime(year, month, day, hour, minute, second, millisecond, calendar, kind);

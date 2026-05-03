@@ -41,7 +41,11 @@ lib/
 dbatools.library.zip
 /artifacts
 .roo/mcp.json
-/.claude
+/.claude/*
+!/.claude/
+!/.claude/hooks/
+!/.claude/settings.json
+!/.claude/hooks/stop-file-length.sh
 NUL
 
 # Benchmark artifacts

@@ -202,34 +202,49 @@ namespace Dataplat.Dbatools.Csv.Tests
             };
 
             var errors = new System.Collections.Concurrent.ConcurrentBag<Exception>();
-            var reader = CreateReaderFromString(sb.ToString(), options);
-
-            // Start reading in the background
-            var readTask = System.Threading.Tasks.Task.Run(() =>
+            using (var readStarted = new System.Threading.ManualResetEventSlim(false))
+            using (var continueReading = new System.Threading.ManualResetEventSlim(false))
             {
+                var reader = CreateReaderFromString(sb.ToString(), options);
                 try
                 {
-                    while (reader.Read())
+                    // Start reading in the background and wait until the reader has entered the loop.
+                    var readTask = System.Threading.Tasks.Task.Run(() =>
                     {
-                        // Simulate some work
-                        System.Threading.Thread.Sleep(1);
-                    }
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Expected when reader is disposed
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(ex);
-                }
-            });
+                        try
+                        {
+                            while (reader.Read())
+                            {
+                                readStarted.Set();
+                                if (!continueReading.Wait(TimeSpan.FromSeconds(5)))
+                                {
+                                    errors.Add(new TimeoutException("Timed out waiting to continue dispose test."));
+                                    return;
+                                }
+                            }
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            // Expected when reader is disposed
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add(ex);
+                        }
+                    });
 
-            // Wait a bit then dispose
-            System.Threading.Thread.Sleep(10);
-            reader.Dispose();
+                    Assert.IsTrue(readStarted.Wait(TimeSpan.FromSeconds(5)), "Reader should start before dispose.");
+                    reader.Dispose();
+                    continueReading.Set();
 
-            readTask.Wait(TimeSpan.FromSeconds(5));
+                    Assert.IsTrue(readTask.Wait(TimeSpan.FromSeconds(5)), "Read task should finish after dispose.");
+                }
+                finally
+                {
+                    continueReading.Set();
+                    reader.Dispose();
+                }
+            }
 
             // Should not have unexpected errors (ObjectDisposedException is fine)
             foreach (var error in errors)
