@@ -20,7 +20,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             csvBuilder.AppendLine("Name,Value");
             for (int i = 0; i < 100; i++)
             {
-                csvBuilder.AppendLine($"Row{i},SomeDataThatRepeatsWell");
+                csvBuilder.AppendLine(String.Format("Row{0},SomeDataThatRepeatsWell", i));
             }
             string csvData = csvBuilder.ToString();
             byte[] uncompressedBytes = Encoding.UTF8.GetBytes(csvData);
@@ -59,9 +59,9 @@ namespace Dataplat.Dbatools.Csv.Tests
                     });
 
                     Assert.IsTrue(ex.Message.Contains("Decompressed data exceeded maximum allowed size"),
-                        $"Expected bomb protection message, got: {ex.Message}");
+                        String.Format("Expected bomb protection message, got: {0}", ex.Message));
                     Assert.IsTrue(ex.Message.Contains("decompression bomb"),
-                        $"Expected 'decompression bomb' in message, got: {ex.Message}");
+                        String.Format("Expected 'decompression bomb' in message, got: {0}", ex.Message));
                 }
             }
         }

@@ -201,7 +201,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 // Create columns based on field count
                 for (int i = 0; i < _fieldsBuffer.Count; i++)
                 {
-                    var col = new CsvColumn($"Column{i}", _columns.Count, typeof(string));
+                    var col = new CsvColumn(String.Format("Column{0}", i), _columns.Count, typeof(string));
                     col.SourceIndex = i;
                     _columns.Add(col);
                 }
@@ -305,18 +305,18 @@ namespace Dataplat.Dbatools.Csv.Reader
             switch (_options.DuplicateHeaderBehavior)
             {
                 case DuplicateHeaderBehavior.ThrowException:
-                    throw new CsvParseException($"Duplicate column header '{name}' found at index {fieldIndex}. " +
+                    throw new CsvParseException(String.Format("Duplicate column header '{0}' found at index {1}. ", name, fieldIndex) +
                         "Use DuplicateHeaderBehavior option to handle duplicates.");
 
                 case DuplicateHeaderBehavior.Rename:
                     _headerNameCounts[name] = count + 1;
-                    string newName = $"{name}_{count + 1}";
+                    string newName = String.Format("{0}_{1}", name, count + 1);
                     // Ensure the new name is also unique
                     while (_headerNameCounts.ContainsKey(newName))
                     {
                         count++;
                         _headerNameCounts[name] = count + 1;
-                        newName = $"{name}_{count + 1}";
+                        newName = String.Format("{0}_{1}", name, count + 1);
                     }
                     _headerNameCounts[newName] = 1;
                     return newName;

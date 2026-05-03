@@ -74,7 +74,7 @@ namespace Dataplat.Dbatools.Csv.Writer
 
             // Escape quotes by doubling them (RFC 4180)
             string escaped = value.Replace(_options.Quote.ToString(), new string(_options.Quote, 2));
-            return $"{_options.Quote}{escaped}{_options.Quote}";
+            return String.Format("{0}{1}{0}", _options.Quote, escaped);
         }
 
         private bool NeedsQuoting(string value)

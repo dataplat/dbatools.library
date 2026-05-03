@@ -179,7 +179,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             if (_options.MaxQuotedFieldLength > 0 && length > _options.MaxQuotedFieldLength)
             {
                 throw new CsvParseException(
-                    $"Quoted field exceeded maximum length of {_options.MaxQuotedFieldLength:N0} characters at line {_currentLineNumber + 1}. " +
+                    String.Format("Quoted field exceeded maximum length of {0:N0} characters at line {1}. ", _options.MaxQuotedFieldLength, _currentLineNumber + 1) +
                     "This may indicate malformed data or a denial-of-service attack.");
             }
         }

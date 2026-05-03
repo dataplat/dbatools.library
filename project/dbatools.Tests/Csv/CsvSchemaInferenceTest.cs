@@ -161,7 +161,7 @@ FALSE,NO,OFF,F,N
 
             foreach (var col in columns)
             {
-                Assert.AreEqual("bit", col.SqlDataType, $"Column {col.ColumnName} should be bit");
+                Assert.AreEqual("bit", col.SqlDataType, String.Format("Column {0} should be bit", col.ColumnName));
             }
         }
 
@@ -189,7 +189,7 @@ FALSE,NO,OFF,F,N
             string csvPath = Path.Combine(_tempDir, "longstrings.csv");
             string longString = new string('x', 5000);
             string veryLongString = new string('y', 10000);
-            File.WriteAllText(csvPath, $"Short,Long,VeryLong\nabc,{longString},{veryLongString}\n");
+            File.WriteAllText(csvPath, String.Format("Short,Long,VeryLong\nabc,{0},{1}\n", longString, veryLongString));
 
             var columns = CsvSchemaInference.InferSchemaFromSample(csvPath);
 
@@ -211,7 +211,7 @@ FALSE,NO,OFF,F,N
                 {
                     // Mix of values to test type detection
                     string category = i % 10 == 0 ? "A" : (i % 10 == 1 ? "B" : "C");
-                    writer.WriteLine($"{i},{i * 1.5m:F2},{category}");
+                    writer.WriteLine(String.Format("{0},{1:F2},{2}", i, i * 1.5m, category));
                 }
             }
 
@@ -240,7 +240,7 @@ FALSE,NO,OFF,F,N
                 writer.WriteLine("Id,Value");
                 for (int i = 0; i < 1000; i++)
                 {
-                    writer.WriteLine($"{i},{i * 10}");
+                    writer.WriteLine(String.Format("{0},{1}", i, i * 10));
                 }
             }
 
@@ -268,7 +268,7 @@ FALSE,NO,OFF,F,N
                 sb.AppendLine("Id,Value");
                 for (int i = 0; i < 10000; i++)
                 {
-                    sb.AppendLine($"{i},{i * 10}");
+                    sb.AppendLine(String.Format("{0},{1}", i, i * 10));
                 }
 
                 using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString())))
@@ -302,7 +302,7 @@ FALSE,NO,OFF,F,N
                 for (int i = 0; i < 5000; i++)
                 {
                     // Keep all values in same range (1-100, price ~20)
-                    writer.WriteLine($"{(i % 100) + 1},{19.99m + (i % 10) * 0.01m:F2},Product{(i % 10)}");
+                    writer.WriteLine(String.Format("{0},{1:F2},Product{2}", (i % 100) + 1, 19.99m + (i % 10) * 0.01m, i % 10));
                 }
             }
 

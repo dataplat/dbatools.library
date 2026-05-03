@@ -56,7 +56,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             {
                 _workerThreads[i] = new Thread(WorkerLoop)
                 {
-                    Name = $"CsvReader-Worker-{i}",
+                    Name = String.Format("CsvReader-Worker-{0}", i),
                     IsBackground = true
                 };
                 _workerThreads[i].Start();
@@ -182,7 +182,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
                             if (_options.MaxParseErrors > 0 && _parallelParseErrors.Count >= _options.MaxParseErrors)
                             {
-                                _pipelineException = new CsvParseException($"Maximum parse errors ({_options.MaxParseErrors}) exceeded", error) { IsMaxErrorsExceeded = true };
+                                _pipelineException = new CsvParseException(String.Format("Maximum parse errors ({0}) exceeded", _options.MaxParseErrors), error) { IsMaxErrorsExceeded = true };
                                 _cancellationSource.Cancel();
                                 return;
                             }

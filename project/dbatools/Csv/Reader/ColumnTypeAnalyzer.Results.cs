@@ -72,7 +72,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
                 else
                 {
-                    column.SqlDataType = $"decimal({precision},{scale})";
+                    column.SqlDataType = String.Format("decimal({0},{1})", precision, scale);
                     column.Precision = precision;
                     column.Scale = scale;
                 }
@@ -104,15 +104,15 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             if (_maxLength == 0)
             {
-                return $"{baseType}(1)";
+                return String.Format("{0}(1)", baseType);
             }
             else if (_maxLength > maxAllowed)
             {
-                return $"{baseType}(max)";
+                return String.Format("{0}(max)", baseType);
             }
             else
             {
-                return $"{baseType}({_maxLength})";
+                return String.Format("{0}({1})", baseType, _maxLength);
             }
         }
     }

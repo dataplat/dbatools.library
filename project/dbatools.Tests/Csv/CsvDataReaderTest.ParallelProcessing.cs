@@ -55,7 +55,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             const int rowCount = 1000;
             for (int i = 0; i < rowCount; i++)
             {
-                sb.AppendLine($"{i},Name{i},{i * 10},Description for row {i}");
+                sb.AppendLine(String.Format("{0},Name{0},{1},Description for row {0}", i, i * 10));
             }
 
             var options = new CsvReaderOptions
@@ -72,7 +72,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 {
                     // Verify data integrity - check that records are delivered in order
                     Assert.AreEqual(count.ToString(), reader.GetString(0));
-                    Assert.AreEqual($"Name{count}", reader.GetString(1));
+                    Assert.AreEqual(String.Format("Name{0}", count), reader.GetString(1));
                     Assert.AreEqual((count * 10).ToString(), reader.GetString(2));
                     count++;
                 }

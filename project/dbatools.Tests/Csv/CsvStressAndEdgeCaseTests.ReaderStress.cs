@@ -46,7 +46,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
             });
 
-            Assert.AreEqual(0, errors.Count, $"Errors: {string.Join("; ", errors.Select(e => e.Message))}");
+            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join("; ", errors.Select(e => e.Message))));
         }
 
         [TestMethod]
@@ -58,7 +58,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             sb.AppendLine("A,B,C,D,E,F,G,H,I,J");
             for (int i = 0; i < 1000; i++)
             {
-                sb.AppendLine($"{i},B{i},C{i},D{i},E{i},F{i},G{i},H{i},I{i},J{i}");
+                sb.AppendLine(String.Format("{0},B{0},C{0},D{0},E{0},F{0},G{0},H{0},I{0},J{0}", i));
             }
             File.WriteAllText(csvPath, sb.ToString());
 
@@ -84,7 +84,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
             }
 
-            Assert.AreEqual(0, errors.Count, $"Errors: {string.Join("; ", errors.Select(e => e.Message))}");
+            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join("; ", errors.Select(e => e.Message))));
         }
 
         [TestMethod]
@@ -96,7 +96,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             sb.AppendLine("Id,Value");
             for (int i = 0; i < 10000; i++)
             {
-                sb.AppendLine($"{i},{i * 2}");
+                sb.AppendLine(String.Format("{0},{1}", i, i * 2));
             }
             File.WriteAllText(csvPath, sb.ToString());
 
@@ -138,7 +138,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
             }
 
-            Assert.AreEqual(0, errors.Count, $"Errors: {string.Join("; ", errors.Select(e => e.Message))}");
+            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join("; ", errors.Select(e => e.Message))));
         }
 
 

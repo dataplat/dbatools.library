@@ -150,7 +150,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             // Single field with extremely long value
             string csvPath = Path.Combine(_tempDir, "long_line.csv");
             string longValue = new string('x', 100000);
-            File.WriteAllText(csvPath, $"Value\n{longValue}\n");
+            File.WriteAllText(csvPath, String.Format("Value\n{0}\n", longValue));
 
             var columns = CsvSchemaInference.InferSchemaFromSample(csvPath);
 
@@ -185,7 +185,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             }
             catch (Exception ex)
             {
-                Assert.Fail($"Should handle binary data gracefully, but threw: {ex.Message}");
+                Assert.Fail(String.Format("Should handle binary data gracefully, but threw: {0}", ex.Message));
             }
         }
 

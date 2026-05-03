@@ -5,21 +5,22 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using System.Threading;
 
+// This source lives beside the module because dbatools.library.psm1 reads and compiles it at import time.
 public class CoreRedirector
 {
     private static string _libPath;
-    private static bool _registered = false;
+    private static int _registered = 0;
     private static readonly string _platformRid = ComputePlatformRid();
     private static readonly string _architectureRid = ComputeArchitectureRid();
 
     public static void Register(string libPath)
     {
-        if (_registered) return;
+        if (Interlocked.CompareExchange(ref _registered, 1, 0) != 0) return;
         _libPath = libPath;
         AssemblyLoadContext.Default.Resolving += OnResolving;
         AssemblyLoadContext.Default.ResolvingUnmanagedDll += OnResolvingUnmanagedDll;
-        _registered = true;
     }
 
     private static Assembly OnResolving(AssemblyLoadContext context, AssemblyName assemblyName)

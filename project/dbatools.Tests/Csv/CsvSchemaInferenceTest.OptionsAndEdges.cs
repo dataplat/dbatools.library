@@ -228,9 +228,9 @@ abc
             var columns = CsvSchemaInference.InferSchemaFromSample(csvPath);
 
             // Decimals without integer part (e.g., .5 instead of 0.5) should be handled
-            Assert.IsTrue(columns[0].SqlDataType.Contains("decimal"), $"Expected decimal, got {columns[0].SqlDataType}");
-            Assert.IsTrue(columns[1].SqlDataType.Contains("decimal"), $"Expected decimal, got {columns[1].SqlDataType}");
-            Assert.IsTrue(columns[2].SqlDataType.Contains("decimal"), $"Expected decimal, got {columns[2].SqlDataType}");
+            Assert.IsTrue(columns[0].SqlDataType.Contains("decimal"), String.Format("Expected decimal, got {0}", columns[0].SqlDataType));
+            Assert.IsTrue(columns[1].SqlDataType.Contains("decimal"), String.Format("Expected decimal, got {0}", columns[1].SqlDataType));
+            Assert.IsTrue(columns[2].SqlDataType.Contains("decimal"), String.Format("Expected decimal, got {0}", columns[2].SqlDataType));
 
             // Verify scale is tracked correctly
             Assert.AreEqual(3, columns[0].Scale); // .5, .25, .125 -> max 3 digits after decimal

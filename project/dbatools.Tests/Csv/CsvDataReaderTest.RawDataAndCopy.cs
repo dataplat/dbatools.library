@@ -41,7 +41,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 Assert.IsTrue(reader.Read());
                 string rawData = reader.GetCurrentRawData();
                 // The reconstructed data should quote the field containing comma
-                Assert.IsTrue(rawData.Contains("\"Value, with comma\""), $"Expected quoted field, got: {rawData}");
+                Assert.IsTrue(rawData.Contains("\"Value, with comma\""), String.Format("Expected quoted field, got: {0}", rawData));
 
                 Assert.IsTrue(reader.Read());
                 rawData = reader.GetCurrentRawData();

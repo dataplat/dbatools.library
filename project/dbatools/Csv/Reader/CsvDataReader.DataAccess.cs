@@ -106,7 +106,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                     return _columns.Count + i;
             }
 
-            throw new ArgumentException($"Column '{name}' not found", nameof(name));
+            throw new ArgumentException(String.Format("Column '{0}' not found", name), nameof(name));
         }
 
         /// <summary>

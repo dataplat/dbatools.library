@@ -75,11 +75,11 @@ public partial class CsvReaderBenchmarks
         _quotedCsvPath = Path.Combine(dataDir, "quoted.csv");
         GenerateCsv(_quotedCsvPath, 100_000, 10, quoteAll: true);
 
-        Console.WriteLine($"Small CSV: {new FileInfo(_smallCsvPath).Length / 1024.0:N0} KB");
-        Console.WriteLine($"Medium CSV: {new FileInfo(_mediumCsvPath).Length / 1024.0:N0} KB");
-        Console.WriteLine($"Large CSV: {new FileInfo(_largeCsvPath).Length / 1024.0 / 1024.0:N1} MB");
-        Console.WriteLine($"Wide CSV: {new FileInfo(_wideCsvPath).Length / 1024.0:N0} KB");
-        Console.WriteLine($"Quoted CSV: {new FileInfo(_quotedCsvPath).Length / 1024.0:N0} KB");
+        Console.WriteLine(String.Format("Small CSV: {0:N0} KB", new FileInfo(_smallCsvPath).Length / 1024.0));
+        Console.WriteLine(String.Format("Medium CSV: {0:N0} KB", new FileInfo(_mediumCsvPath).Length / 1024.0));
+        Console.WriteLine(String.Format("Large CSV: {0:N1} MB", new FileInfo(_largeCsvPath).Length / 1024.0 / 1024.0));
+        Console.WriteLine(String.Format("Wide CSV: {0:N0} KB", new FileInfo(_wideCsvPath).Length / 1024.0));
+        Console.WriteLine(String.Format("Quoted CSV: {0:N0} KB", new FileInfo(_quotedCsvPath).Length / 1024.0));
     }
 
     private void GenerateCsv(string path, int rows, int cols, bool quoteAll)
@@ -90,7 +90,7 @@ public partial class CsvReaderBenchmarks
         using var writer = new StreamWriter(path, false, Encoding.UTF8);
 
         // Header
-        writer.WriteLine(string.Join(",", Enumerable.Range(0, cols).Select(i => $"Column{i}")));
+        writer.WriteLine(string.Join(",", Enumerable.Range(0, cols).Select(i => String.Format("Column{0}", i))));
 
         var random = new Random(42);
         var sb = new StringBuilder();
@@ -105,16 +105,16 @@ public partial class CsvReaderBenchmarks
                 string value = col switch
                 {
                     0 => row.ToString(),
-                    1 => $"Name{row}",
+                    1 => String.Format("Name{0}", row),
                     2 => random.Next(1, 100).ToString(),
                     3 => random.NextDouble().ToString("F4"),
                     4 => DateTime.Now.AddDays(-random.Next(365)).ToString("yyyy-MM-dd"),
                     5 => random.Next(0, 2) == 0 ? "true" : "false",
-                    _ => $"Value{row}_{col}"
+                    _ => String.Format("Value{0}_{1}", row, col)
                 };
 
                 if (quoteAll)
-                    sb.Append($"\"{value}\"");
+                    sb.Append(String.Format("\"{0}\"", value));
                 else
                     sb.Append(value);
             }

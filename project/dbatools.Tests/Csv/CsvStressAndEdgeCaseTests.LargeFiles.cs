@@ -28,7 +28,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 string longDescription = new string('x', 1000); // 1KB per row
                 for (int i = 0; i < 10000; i++) // ~10MB total
                 {
-                    writer.WriteLine($"{i},Name{i},{i * 1.5m:F2},{longDescription}");
+                    writer.WriteLine(String.Format("{0},Name{0},{1:F2},{2}", i, i * 1.5m, longDescription));
                 }
             }
 
@@ -54,7 +54,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             Assert.AreEqual(4, columns.Count);
             // Relaxed assertion - just verify it doesn't explode
             Assert.IsTrue(memoryIncrease < 100 * 1024 * 1024,
-                $"Memory increase {memoryIncrease / (1024 * 1024)}MB seems too high for streaming");
+                String.Format("Memory increase {0}MB seems too high for streaming", memoryIncrease / (1024 * 1024)));
         }
 
         [TestMethod]
@@ -66,7 +66,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 writer.WriteLine("Id,Value");
                 for (int i = 0; i < 100000; i++)
                 {
-                    writer.WriteLine($"{i},{i * 2}");
+                    writer.WriteLine(String.Format("{0},{1}", i, i * 2));
                 }
             }
 
@@ -87,7 +87,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             for (int i = 1; i < progressValues.Count; i++)
             {
                 Assert.IsTrue(progressValues[i] >= progressValues[i - 1],
-                    $"Progress should increase: {progressValues[i - 1]} -> {progressValues[i]}");
+                    String.Format("Progress should increase: {0} -> {1}", progressValues[i - 1], progressValues[i]));
             }
         }
 
@@ -102,7 +102,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 writer.WriteLine("Id,Value");
                 for (int i = 0; i < expectedRows; i++)
                 {
-                    writer.WriteLine($"{i},{i * 2}");
+                    writer.WriteLine(String.Format("{0},{1}", i, i * 2));
                 }
             }
 
@@ -123,7 +123,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             wideRowCsv.Append("Col0");
             for (int i = 1; i < 500; i++)
             {
-                wideRowCsv.Append($",Col{i}");
+                wideRowCsv.Append(String.Format(",Col{0}", i));
             }
             wideRowCsv.AppendLine();
 
@@ -132,7 +132,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 wideRowCsv.Append("0");
                 for (int col = 1; col < 500; col++)
                 {
-                    wideRowCsv.Append($",{col * row}");
+                    wideRowCsv.Append(String.Format(",{0}", col * row));
                 }
                 wideRowCsv.AppendLine();
             }
@@ -146,7 +146,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             // All numeric columns
             foreach (var col in columns)
             {
-                Assert.AreEqual("int", col.SqlDataType, $"Column {col.ColumnName} should be int");
+                Assert.AreEqual("int", col.SqlDataType, String.Format("Column {0} should be int", col.ColumnName));
             }
         }
 
@@ -195,12 +195,12 @@ namespace Dataplat.Dbatools.Csv.Tests
                 // Start with 2 decimal places
                 for (int i = 0; i < 1000; i++)
                 {
-                    writer.WriteLine($"{i}.{i % 100:D2}");
+                    writer.WriteLine(String.Format("{0}.{1:D2}", i, i % 100));
                 }
                 // Then 5 decimal places (should expand precision)
                 for (int i = 0; i < 1000; i++)
                 {
-                    writer.WriteLine($"{i}.{i % 100000:D5}");
+                    writer.WriteLine(String.Format("{0}.{1:D5}", i, i % 100000));
                 }
             }
 

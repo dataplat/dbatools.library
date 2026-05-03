@@ -37,7 +37,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
                 if (_options.MaxParseErrors > 0 && _parseErrors.Count >= _options.MaxParseErrors)
                 {
-                    throw new CsvParseException($"Maximum parse errors ({_options.MaxParseErrors}) exceeded", error) { IsMaxErrorsExceeded = true };
+                    throw new CsvParseException(String.Format("Maximum parse errors ({0}) exceeded", _options.MaxParseErrors), error) { IsMaxErrorsExceeded = true };
                 }
             }
 
@@ -75,7 +75,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             {
                 case MismatchedFieldAction.ThrowException:
                     throw new FormatException(
-                        $"Row has {actualCount} field(s) but expected {expectedCount} based on header.");
+                        String.Format("Row has {0} field(s) but expected {1} based on header.", actualCount, expectedCount));
 
                 case MismatchedFieldAction.PadWithNulls:
                     if (_fieldsBuffer.Count < expectedCount)
@@ -120,8 +120,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             {
                 case MismatchedFieldAction.ThrowException:
                     throw new FormatException(
-                        $"Row has {actualCount} field(s) but expected {expectedCount} based on header. " +
-                        $"Row content: '{line}'");
+                        String.Format("Row has {0} field(s) but expected {1} based on header. Row content: '{2}'", actualCount, expectedCount, line));
 
                 case MismatchedFieldAction.PadWithNulls:
                     // Pad missing fields with empty values (will become null)
@@ -304,7 +303,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 {
                     return result;
                 }
-                throw new FormatException($"Cannot convert value '{value}' to type {column.DataType.Name} for column '{column.Name}'");
+                throw new FormatException(String.Format("Cannot convert value '{0}' to type {1} for column '{2}'", value, column.DataType.Name, column.Name));
             }
 
             // Fall back to Convert.ChangeType with culture
@@ -314,7 +313,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             }
             catch (Exception ex)
             {
-                throw new FormatException($"Cannot convert value '{value}' to type {column.DataType.Name} for column '{column.Name}'", ex);
+                throw new FormatException(String.Format("Cannot convert value '{0}' to type {1} for column '{2}'", value, column.DataType.Name, column.Name), ex);
             }
         }
 

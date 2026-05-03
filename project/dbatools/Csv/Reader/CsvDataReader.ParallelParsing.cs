@@ -194,8 +194,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             {
                 case MismatchedFieldAction.ThrowException:
                     throw new FormatException(
-                        $"Row has {actualCount} field(s) but expected {expectedCount} based on header. " +
-                        $"Row content: '{line}'");
+                        String.Format("Row has {0} field(s) but expected {1} based on header. Row content: '{2}'", actualCount, expectedCount, line));
 
                 case MismatchedFieldAction.PadWithNulls:
                     while (fieldsBuffer.Count < expectedCount)

@@ -45,12 +45,12 @@ namespace Dataplat.Dbatools.Csv.Tests
             var files = new List<string>();
             for (int i = 0; i < 10; i++)
             {
-                string csvPath = Path.Combine(_tempDir, $"concurrent_{i}.csv");
+                string csvPath = Path.Combine(_tempDir, String.Format("concurrent_{0}.csv", i));
                 var sb = new StringBuilder();
-                sb.AppendLine($"Id,Name,Value{i}");
+                sb.AppendLine(String.Format("Id,Name,Value{0}", i));
                 for (int j = 0; j < 100; j++)
                 {
-                    sb.AppendLine($"{j},Name{j},{j * 1.5m:F2}");
+                    sb.AppendLine(String.Format("{0},Name{0},{1:F2}", j, j * 1.5m));
                 }
                 File.WriteAllText(csvPath, sb.ToString());
                 files.Add(csvPath);
@@ -68,9 +68,9 @@ namespace Dataplat.Dbatools.Csv.Tests
                     results[i] = columns;
 
                     // Verify each file's schema is correct
-                    Assert.AreEqual(3, columns.Count, $"File {i} should have 3 columns");
-                    Assert.AreEqual("int", columns[0].SqlDataType, $"File {i} Id should be int");
-                    Assert.IsTrue(columns[2].SqlDataType.Contains("decimal"), $"File {i} Value{i} should be decimal");
+                    Assert.AreEqual(3, columns.Count, String.Format("File {0} should have 3 columns", i));
+                    Assert.AreEqual("int", columns[0].SqlDataType, String.Format("File {0} Id should be int", i));
+                    Assert.IsTrue(columns[2].SqlDataType.Contains("decimal"), String.Format("File {0} Value{0} should be decimal", i));
                 }
                 catch (Exception ex)
                 {
@@ -78,7 +78,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
             });
 
-            Assert.AreEqual(0, errors.Count, $"Errors occurred: {string.Join(", ", errors.Select(e => e.Message))}");
+            Assert.AreEqual(0, errors.Count, String.Format("Errors occurred: {0}", string.Join(", ", errors.Select(e => e.Message))));
             Assert.AreEqual(files.Count, results.Count, "All files should have been processed");
         }
 
@@ -91,7 +91,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             sb.AppendLine("Id,Name,Value,Date");
             for (int i = 0; i < 1000; i++)
             {
-                sb.AppendLine($"{i},Name{i},{i * 2.5m:F2},2024-{(i % 12) + 1:D2}-{(i % 28) + 1:D2}");
+                sb.AppendLine(String.Format("{0},Name{0},{1:F2},2024-{2:D2}-{3:D2}", i, i * 2.5m, (i % 12) + 1, (i % 28) + 1));
             }
             File.WriteAllText(csvPath, sb.ToString());
 
@@ -118,7 +118,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
             });
 
-            Assert.AreEqual(0, errors.Count, $"Errors: {string.Join("; ", errors.Select(e => e.Message))}");
+            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join("; ", errors.Select(e => e.Message))));
             Assert.AreEqual(20, results.Count);
 
             // Verify all results are consistent
@@ -128,7 +128,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 for (int i = 0; i < firstResult.Count; i++)
                 {
                     Assert.AreEqual(firstResult[i].SqlDataType, result[i].SqlDataType,
-                        $"Column {i} type mismatch between parallel runs");
+                        String.Format("Column {0} type mismatch between parallel runs", i));
                 }
             }
         }
@@ -142,7 +142,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             sb.AppendLine("Id,Value");
             for (int i = 0; i < 50000; i++)
             {
-                sb.AppendLine($"{i},{i * 1.5m:F2}");
+                sb.AppendLine(String.Format("{0},{1:F2}", i, i * 1.5m));
             }
             File.WriteAllText(csvPath, sb.ToString());
 

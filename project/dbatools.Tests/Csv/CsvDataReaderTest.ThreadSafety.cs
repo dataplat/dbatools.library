@@ -22,7 +22,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             const int rowCount = 500;
             for (int i = 0; i < rowCount; i++)
             {
-                sb.AppendLine($"{i},Name{i},{i * 10}");
+                sb.AppendLine(String.Format("{0},Name{0},{1}", i, i * 10));
             }
 
             var options = new CsvReaderOptions
@@ -75,7 +75,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
 
                 Assert.AreEqual(rowCount, recordsProcessed, "Should process all records");
-                Assert.AreEqual(0, errors.Count, $"Should have no errors, but got: {string.Join(", ", errors)}");
+                Assert.AreEqual(0, errors.Count, String.Format("Should have no errors, but got: {0}", string.Join(", ", errors)));
             }
         }
 
@@ -88,7 +88,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             const int rowCount = 1000;
             for (int i = 0; i < rowCount; i++)
             {
-                sb.AppendLine($"{i},{i+1},{i+2},{i+3},{i+4},{i+5},{i+6},{i+7},{i+8},{i+9}");
+                sb.AppendLine(String.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}", i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8, i + 9));
             }
 
             var options = new CsvReaderOptions
@@ -124,13 +124,13 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
 
                 Assert.AreEqual(rowCount, allValues.Count, "Should process all records");
-                Assert.AreEqual(0, errors.Count, $"Should have no errors: {string.Join("; ", errors)}");
+                Assert.AreEqual(0, errors.Count, String.Format("Should have no errors: {0}", string.Join("; ", errors)));
 
                 // Verify all record indices were captured (0 to rowCount-1)
                 var sortedIndices = allValues.OrderBy(x => x).ToList();
                 for (int i = 0; i < rowCount; i++)
                 {
-                    Assert.AreEqual(i, sortedIndices[i], $"Record index {i} should be present");
+                    Assert.AreEqual(i, sortedIndices[i], String.Format("Record index {0} should be present", i));
                 }
             }
         }
@@ -144,7 +144,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             const int rowCount = 200;
             for (int i = 0; i < rowCount; i++)
             {
-                sb.AppendLine($"{i},{i * 100}");
+                sb.AppendLine(String.Format("{0},{1}", i, i * 100));
             }
 
             var options = new CsvReaderOptions
@@ -163,7 +163,7 @@ namespace Dataplat.Dbatools.Csv.Tests
 
                     // Verify record indices are strictly increasing
                     Assert.IsTrue(currentIndex > lastIndex,
-                        $"Record index should increase: last={lastIndex}, current={currentIndex}");
+                        String.Format("Record index should increase: last={0}, current={1}", lastIndex, currentIndex));
 
                     // Read the index multiple times from different threads
                     var indices = new System.Collections.Concurrent.ConcurrentBag<long>();
@@ -175,7 +175,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                     // All reads should return the same index (no torn reads)
                     var uniqueIndices = indices.Distinct().ToList();
                     Assert.AreEqual(1, uniqueIndices.Count,
-                        $"All concurrent reads should return same index, got: {string.Join(", ", uniqueIndices)}");
+                        String.Format("All concurrent reads should return same index, got: {0}", string.Join(", ", uniqueIndices)));
 
                     lastIndex = currentIndex;
                 }
@@ -192,7 +192,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             sb.AppendLine("Id,Name,Value");
             for (int i = 0; i < 100; i++)
             {
-                sb.AppendLine($"{i},Name{i},{i * 10}");
+                sb.AppendLine(String.Format("{0},Name{0},{1}", i, i * 10));
             }
 
             var options = new CsvReaderOptions
@@ -234,7 +234,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             // Should not have unexpected errors (ObjectDisposedException is fine)
             foreach (var error in errors)
             {
-                Assert.Fail($"Unexpected error during dispose: {error}");
+                Assert.Fail(String.Format("Unexpected error during dispose: {0}", error));
             }
         }
 
@@ -247,7 +247,7 @@ namespace Dataplat.Dbatools.Csv.Tests
             const int rowCount = 300;
             for (int i = 0; i < rowCount; i++)
             {
-                sb.AppendLine($"A{i},B{i},C{i},D{i},E{i}");
+                sb.AppendLine(String.Format("A{0},B{0},C{0},D{0},E{0}", i));
             }
 
             var options = new CsvReaderOptions
@@ -264,7 +264,7 @@ namespace Dataplat.Dbatools.Csv.Tests
                 while (reader.Read())
                 {
                     recordCount++;
-                    string expectedPrefix = $"A{reader.CurrentRecordIndex}";
+                    string expectedPrefix = String.Format("A{0}", reader.CurrentRecordIndex);
 
                     // Multiple threads calling GetValues simultaneously
                     System.Threading.Tasks.Parallel.For(0, 10, iteration =>
@@ -284,7 +284,7 @@ namespace Dataplat.Dbatools.Csv.Tests
 
                             if (suffix0 != suffix1)
                             {
-                                inconsistencies.Add($"Inconsistent record: {val0} vs {val1}");
+                                inconsistencies.Add(String.Format("Inconsistent record: {0} vs {1}", val0, val1));
                             }
                         }
                     });
@@ -292,7 +292,7 @@ namespace Dataplat.Dbatools.Csv.Tests
 
                 Assert.AreEqual(rowCount, recordCount, "Should process all records");
                 Assert.AreEqual(0, inconsistencies.Count,
-                    $"Should have consistent snapshots: {string.Join("; ", inconsistencies.Take(5))}");
+                    String.Format("Should have consistent snapshots: {0}", string.Join("; ", inconsistencies.Take(5))));
             }
         }
 

@@ -199,7 +199,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                 }
             }
 
-            throw new ArgumentException($"Column '{columnName}' not found", nameof(columnName));
+            throw new ArgumentException(String.Format("Column '{0}' not found", columnName), nameof(columnName));
         }
 
         /// <summary>
@@ -309,7 +309,7 @@ namespace Dataplat.Dbatools.Csv.Reader
 
             int fieldCount = _columns.Count;
             if (array.Length - index < fieldCount)
-                throw new ArgumentException($"Destination array has insufficient capacity. Required: {fieldCount}, available: {array.Length - index}.", nameof(array));
+                throw new ArgumentException(String.Format("Destination array has insufficient capacity. Required: {0}, available: {1}.", fieldCount, array.Length - index), nameof(array));
 
             for (int i = 0; i < fieldCount; i++)
             {

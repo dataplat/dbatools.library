@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-file-length.sh",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.codex/hooks/stop-file-length.sh",
             "timeout": 15,
             "statusMessage": "Checking file lengths (400-line limit)..."
           }
