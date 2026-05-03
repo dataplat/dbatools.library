@@ -97,6 +97,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
         $coreSource = @"
             using System;
             using System.Collections.Generic;
+            using System.Diagnostics;
             using System.IO;
             using System.Reflection;
             using System.Runtime.InteropServices;
@@ -145,8 +146,9 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                             {
                                 return AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
                             }
-                            catch
+                            catch (Exception ex)
                             {
+                                Trace.TraceWarning("Failed to load managed assembly from '{0}': {1}", dllPath, ex.Message);
                                 // Failed to load, try the next candidate
                             }
                         }
@@ -172,8 +174,9 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                             {
                                 return NativeLibrary.Load(nativePath);
                             }
-                            catch
+                            catch (Exception ex)
                             {
+                                Trace.TraceWarning("Failed to load native library from '{0}': {1}", nativePath, ex.Message);
                                 // Failed to load, try the next candidate
                             }
                         }
@@ -189,19 +192,18 @@ if ($PSVersionTable.PSEdition -ne "Core") {
                     string architectureRid = GetArchitectureRid();
 
                     var paths = new List<string>();
-                    paths.Add(Path.Combine(_libPath, fileName));
 
                     if (!String.IsNullOrEmpty(platformRid))
                     {
                         paths.Add(Path.Combine(_libPath, "runtimes", platformRid, "lib", "net8.0", fileName));
-                        paths.Add(Path.Combine(_libPath, "runtimes", platformRid, "lib", "netstandard1.6", fileName));
                     }
 
                     if (!String.IsNullOrEmpty(architectureRid))
                     {
                         paths.Add(Path.Combine(_libPath, "runtimes", architectureRid, "lib", "net8.0", fileName));
-                        paths.Add(Path.Combine(_libPath, "runtimes", architectureRid, "lib", "netstandard1.6", fileName));
                     }
+
+                    paths.Add(Path.Combine(_libPath, fileName));
 
                     return paths.ToArray();
                 }
@@ -240,6 +242,8 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 
                 private static string GetPlatformRid()
                 {
+                    // Managed runtime assets used by the module, especially SqlClient, ship
+                    // win/unix folders. OS-specific native assets are handled by GetArchitectureRid.
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
                         return "win";
@@ -293,7 +297,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
 "@
 
         try {
-            $null = Add-Type -TypeDefinition $coreSource -ReferencedAssemblies 'System.Runtime.Loader','System.Runtime.InteropServices','System.Collections'
+            $null = Add-Type -TypeDefinition $coreSource -ReferencedAssemblies 'System.Runtime.Loader','System.Runtime.InteropServices','System.Collections','System.Diagnostics.TraceSource'
         } catch {
             Write-Verbose "Could not compile CoreRedirector: $_"
         }
@@ -354,7 +358,6 @@ function Add-DbatoolsNativeSearchPath {
     }
 
     $env:PATH = $nativePath + $pathSeparator + $env:PATH
-    [System.Environment]::SetEnvironmentVariable("PATH", $env:PATH, "Process")
 }
 
 Add-DbatoolsNativeSearchPath -LibraryRoot $script:libraryroot

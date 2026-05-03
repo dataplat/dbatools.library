@@ -131,14 +131,21 @@ jobs:
         }
 
         $location = $sqlClient.Location.Replace('/', '\')
-        $expected = "runtimes\win\lib\net8.0\Microsoft.Data.SqlClient.dll"
+        $expected = if ($IsWindows) {
+          "runtimes\win\lib\net8.0\Microsoft.Data.SqlClient.dll"
+        } else {
+          "runtimes\unix\lib\net8.0\Microsoft.Data.SqlClient.dll"
+        }
+
         if ($location -notlike "*$expected") {
           throw "Microsoft.Data.SqlClient loaded from unexpected path: $($sqlClient.Location)"
         }
 
-        $sniPath = "./artifacts/dbatools.library/core/lib/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll"
-        if (-not (Test-Path $sniPath)) {
-          throw "Missing Windows x64 SqlClient native SNI DLL at $sniPath"
+        if ($IsWindows) {
+          $sniPath = "./artifacts/dbatools.library/core/lib/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll"
+          if (-not (Test-Path $sniPath)) {
+            throw "Missing Windows x64 SqlClient native SNI DLL at $sniPath"
+          }
         }
 
         Write-Host "SqlClient runtime asset verified: $($sqlClient.Location)"
