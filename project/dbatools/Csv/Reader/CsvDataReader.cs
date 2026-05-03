@@ -2614,15 +2614,6 @@ namespace Dataplat.Dbatools.Csv.Reader
         }
 
         /// <summary>
-        /// Checks if a character is a smart double quote.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsSmartDoubleQuote(char c)
-        {
-            return c == LeftDoubleQuote || c == RightDoubleQuote;
-        }
-
-        /// <summary>
         /// Fast path for unquoted fields with single-character delimiter.
         /// Uses SIMD-accelerated search on .NET 8+.
         /// </summary>
@@ -2957,12 +2948,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                     return;
                 }
 
-                if (_options.NormalizeQuotes)
-                {
-                    c = NormalizeSmartQuoteChar(c);
-                }
-
-                _quotedFieldBuilder.Append(c);
+                _quotedFieldBuilder.Append(normalized);
                 _bufferPosition++;
                 quotedLength++;
                 CheckQuotedFieldLength(quotedLength);
