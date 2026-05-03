@@ -1,0 +1,48 @@
+name: Verify SqlClient runtime asset
+description: Verifies that Microsoft.Data.SqlClient loads from the platform-specific runtime asset.
+
+inputs:
+  module-path:
+    description: Path to the dbatools.library module manifest.
+    required: false
+    default: ./artifacts/dbatools.library/dbatools.library.psd1
+  core-lib-path:
+    description: Path to the built core/lib directory.
+    required: false
+    default: ./artifacts/dbatools.library/core/lib
+
+runs:
+  using: composite
+  steps:
+    - name: Verify SqlClient runtime asset selection
+      shell: pwsh
+      run: |
+        Import-Module "${{ inputs.module-path }}" -Force
+
+        $sqlClient = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+          Where-Object { $_.GetName().Name -eq 'Microsoft.Data.SqlClient' } |
+          Select-Object -First 1
+
+        if (-not $sqlClient) {
+          throw "Microsoft.Data.SqlClient was not loaded"
+        }
+
+        $location = $sqlClient.Location.Replace('/', '\')
+        $expected = if ($IsWindows) {
+          "runtimes\win\lib\net8.0\Microsoft.Data.SqlClient.dll"
+        } else {
+          "runtimes\unix\lib\net8.0\Microsoft.Data.SqlClient.dll"
+        }
+
+        if ($location -notlike "*$expected") {
+          throw "Microsoft.Data.SqlClient loaded from unexpected path: $($sqlClient.Location)"
+        }
+
+        if ($IsWindows) {
+          $sniPath = Join-Path "${{ inputs.core-lib-path }}" "runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll"
+          if (-not (Test-Path $sniPath)) {
+            throw "Missing Windows x64 SqlClient native SNI DLL at $sniPath"
+          }
+        }
+
+        Write-Host "SqlClient runtime asset verified: $($sqlClient.Location)"

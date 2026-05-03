@@ -201,6 +201,9 @@ jobs:
             New-Item -ItemType Directory -Path /tmp/DbatoolsExport -Force | Out-Null
           }
 
+      - name: Verify SqlClient runtime asset selection
+        uses: ./.github/actions/verify-sqlclient
+
       - name: Install SqlPackagetests
         shell: pwsh
         run: |

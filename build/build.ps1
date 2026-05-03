@@ -134,8 +134,6 @@ if (Test-Path $coreRuntimesPath) {
     }
 }
 
-Copy-Item (Join-Path $libPath "core\lib\runtimes\unix\lib\net8.0\Microsoft.Data.SqlClient.dll") -Destination (Join-Path $libPath "core/lib/") -Force
-
 if ($CoreOnly) {
     Write-Host "CoreOnly specified - returning after core build"
     return
@@ -296,6 +294,8 @@ $validationErrors = @()
 # Check for critical runtime dependencies
 $criticalFiles = @(
     @{Path = "core\lib\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll"; Description = ".NET Core SNI DLL (Windows x64)"},
+    @{Path = "core\lib\runtimes\win\lib\net8.0\Microsoft.Data.SqlClient.dll"; Description = ".NET Core SqlClient (Windows runtime asset)"},
+    @{Path = "core\lib\runtimes\unix\lib\net8.0\Microsoft.Data.SqlClient.dll"; Description = ".NET Core SqlClient (Unix runtime asset)"},
     @{Path = "core\lib\Microsoft.Data.SqlClient.dll"; Description = ".NET Core SqlClient"},
     @{Path = "desktop\lib\Microsoft.Data.SqlClient.dll"; Description = ".NET Framework SqlClient"},
     @{Path = "core\lib\dbatools.dll"; Description = ".NET Core dbatools assembly"},
@@ -309,6 +309,19 @@ foreach ($file in $criticalFiles) {
     } else {
         Write-Host "[ERROR] Missing: $($file.Description) at $($file.Path)" -ForegroundColor Red
         $validationErrors += "Missing: $($file.Description)"
+    }
+}
+
+$coreSqlClientPath = Join-Path $libPath "core\lib\Microsoft.Data.SqlClient.dll"
+$coreUnixSqlClientPath = Join-Path $libPath "core\lib\runtimes\unix\lib\net8.0\Microsoft.Data.SqlClient.dll"
+if ((Test-Path $coreSqlClientPath) -and (Test-Path $coreUnixSqlClientPath)) {
+    $coreSqlClientHash = (Get-FileHash -Path $coreSqlClientPath -Algorithm SHA256).Hash
+    $coreUnixSqlClientHash = (Get-FileHash -Path $coreUnixSqlClientPath -Algorithm SHA256).Hash
+    if ($coreSqlClientHash -eq $coreUnixSqlClientHash) {
+        Write-Host "[ERROR] core\lib\Microsoft.Data.SqlClient.dll matches the Unix runtime asset" -ForegroundColor Red
+        $validationErrors += "Core SqlClient was overwritten with the Unix runtime asset"
+    } else {
+        Write-Host "[OK] Core SqlClient root assembly was not overwritten with the Unix runtime asset" -ForegroundColor Green
     }
 }
 

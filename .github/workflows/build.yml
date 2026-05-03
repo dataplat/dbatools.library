@@ -117,6 +117,9 @@ jobs:
         Write-Host "Loaded dbatools.library version: $($module.Version)"
         Write-Host "Module path: $($module.Path)"
 
+    - name: Verify SqlClient runtime asset selection
+      uses: ./.github/actions/verify-sqlclient
+
     - name: Test AvoidConflicts with SqlServer module (Windows PowerShell 5.1)
       shell: powershell
       run: |
