@@ -171,7 +171,7 @@ Hooks enforce these rules — if a hook blocks you, fix the violation:
 - **C# rules** (`enforce-cs-rules.sh`): Base class, LangVersion 7.3, no Assembly.LoadFile, no direct Write*, no ThrowTerminatingError, XML docs on cmdlets, no string interpolation
 - **PSD1 rules** (`enforce-psd1-rules.sh`): No wildcard exports in module manifest
 - **Build check** (`check-build.sh`): Auto-builds after any `.cs` file edit
-- **File length check** (`build/check-file-lengths.ps1`): Tracked text/source/docs/scripts/config files must stay at or below 400 physical lines; split files structurally rather than growing them.
+- **File length check** (`stop-file-length.sh`, Stop hook): Tracked text/source/docs/scripts/config files must stay at or below 400 physical lines; split files structurally rather than growing them.
 
 All hooks use `set -eu` (not `pipefail` — unsupported on Windows sh).
 
