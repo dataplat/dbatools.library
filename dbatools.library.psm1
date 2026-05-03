@@ -96,7 +96,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
         $coreSourcePath = Join-Path $PSScriptRoot "dbatools.library.CoreRedirector.cs"
         $coreSource = Get-Content -Path $coreSourcePath -Raw
         try {
-            $null = Add-Type -TypeDefinition $coreSource -ReferencedAssemblies 'System.Runtime.Loader','System.Runtime.InteropServices','System.Collections','System.Diagnostics.TraceSource'
+            $null = Add-Type -TypeDefinition $coreSource -ReferencedAssemblies 'System.Runtime.Loader','System.Runtime.InteropServices','System.Collections','System.Diagnostics.TraceSource','System.Threading'
         } catch {
             Write-Verbose "Could not compile CoreRedirector: $_"
         }
