@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dbatools.computer", "dbatoo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dbatools.replication", "dbatools.replication\dbatools.replication.csproj", "{F4F88A91-556C-434F-BFF8-B8A33BB62CB0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dbatools.ssis", "dbatools.ssis\dbatools.ssis.csproj", "{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -330,6 +332,30 @@ Global
 		{F4F88A91-556C-434F-BFF8-B8A33BB62CB0}.Release|x64.Build.0 = Release|Any CPU
 		{F4F88A91-556C-434F-BFF8-B8A33BB62CB0}.Release|x86.ActiveCfg = Release|Any CPU
 		{F4F88A91-556C-434F-BFF8-B8A33BB62CB0}.Release|x86.Build.0 = Release|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Debug|x64.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Debug|x86.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps3|Any CPU.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps3|Any CPU.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps3|x64.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps3|x64.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps3|x86.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps3|x86.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps4|Any CPU.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps4|Any CPU.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps4|x64.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps4|x64.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps4|x86.ActiveCfg = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.ps4|x86.Build.0 = Debug|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Release|x64.ActiveCfg = Release|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Release|x64.Build.0 = Release|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Release|x86.ActiveCfg = Release|Any CPU
+		{50824DF0-DDE9-4FAB-B70A-978D2F33C22E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
