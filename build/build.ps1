@@ -146,8 +146,13 @@ if (Test-Path $coreRuntimesPath) {
 # one dll per module, both editions, into artifacts/modules/dbatools.<module>/{desktop,core}/.
 # These dlls ship INSIDE each satellite's package; the shared dbatools.dll and its SMO/SqlClient
 # dependency tree continue to ship only in dbatools.library.
+# NOTE: -Filter "dbatools.*" ALSO matches the extensionless "dbatools" runtime directory
+# (FindFirstFile-compatible wildcard semantics), so the runtime project must be excluded by
+# name - it publishes through artifacts/lib, never as a satellite. Uncaught until 2026-07-06:
+# stale project/dbatools/bin copies masked the mis-staging until a solution restore cleaned
+# them and the loop died on the copy.
 $satelliteProjects = Get-ChildItem -Path . -Directory -Filter "dbatools.*" | Where-Object {
-    $_.Name -ne "dbatools.Tests" -and (Test-Path (Join-Path $_.FullName "$($_.Name).csproj"))
+    $_.Name -ne "dbatools" -and $_.Name -ne "dbatools.Tests" -and (Test-Path (Join-Path $_.FullName "$($_.Name).csproj"))
 }
 foreach ($satellite in $satelliteProjects) {
     $satelliteName = $satellite.Name
