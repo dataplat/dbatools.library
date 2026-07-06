@@ -74,6 +74,10 @@ public sealed class GetDbaReplDistributorCommand : DbaInstanceCmdlet
                     ? $"Error occurred getting information about {instance}"
                     : "Failure";
                 StopFunction(message, target: instance, errorRecord: new ErrorRecord(ex, "dbatools_Get-DbaReplDistributor", ErrorCategory.ConnectionError, instance), category: ErrorCategory.ConnectionError, continueLoop: true);
+                // PS default mode still reaches the verbose line below after the inlined
+                // failure (Select-DefaultView then emits nothing for the null distributor);
+                // keep the message-stream parity (cross-model review 2026-07-06 finding 5).
+                WriteMessage(MessageLevel.Verbose, "Getting publisher for ");
                 continue;
             }
 

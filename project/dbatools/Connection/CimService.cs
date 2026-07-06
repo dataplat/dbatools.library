@@ -64,6 +64,12 @@ namespace Dataplat.Dbatools.Connection
                 connection.CimDComOptions = dcomOptions;
             }
 
+            // The PS parameter binder caches the connection at bind time, BEFORE the process
+            // block runs - so even a run that fails preflight leaves cache state behind.
+            // Mirror that here (cross-model review 2026-07-06 finding 2).
+            if (!ConnectionHost.DisableCache)
+                ConnectionHost.Connections[computer] = connection;
+
             PSCredential cred;
             try
             {
@@ -277,11 +283,38 @@ namespace Dataplat.Dbatools.Connection
                     verdict.Message = "[" + computer + "] The specified namespace " + cimNamespace + " is not empty.";
                     return verdict;
                 default:
-                    // PS region "0 = Non-CIM Issue not covered by the framework": anything
-                    // outside the table reads as a connection-level failure.
+                    // PS region "0 = Non-CIM Issue not covered by the framework": a provider
+                    // reporting __ExtendedStatus stops with the descriptive message instead of
+                    // falling to the next protocol; anything else reads as a connection-level
+                    // failure (cross-model review 2026-07-06 finding 1).
+                    if (HasExtendedStatusOriginalError(cimError))
+                    {
+                        verdict.Message = "[" + computer + "] Something went wrong when looking for " + className + ", in " + cimNamespace + ". This often indicates issues with the target system.";
+                        return verdict;
+                    }
                     verdict.BadConnection = true;
                     verdict.Message = "[" + computer + "] An otherwise unexpected error happened.";
                     return verdict;
+            }
+        }
+
+        private static bool HasExtendedStatusOriginalError(CimException cimError)
+        {
+            // PS: $ErrorRecord.Exception.InnerException.ErrorData.original_error -like "__ExtendedStatus"
+            // (loose member access; absent members simply fail the comparison).
+            try
+            {
+                CimInstance errorData = cimError.ErrorData;
+                if (errorData == null)
+                    return false;
+                CimProperty property = errorData.CimInstanceProperties["original_error"];
+                if (property == null || property.Value == null)
+                    return false;
+                return String.Equals(property.Value.ToString(), "__ExtendedStatus", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
             }
         }
 

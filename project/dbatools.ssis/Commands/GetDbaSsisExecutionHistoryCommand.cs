@@ -168,20 +168,35 @@ public sealed class GetDbaSsisExecutionHistoryCommand : DbaInstanceCmdlet
         {
             // PS: Invoke-DbaQuery -Database SSISDB ... called WITHOUT -EnableException, so a
             // failed instance surfaces as a friendly warning and the loop continues even when
-            // this command itself runs with -EnableException.
+            // this command itself runs with -EnableException. The two warning texts are
+            // Invoke-DbaQuery's verbatim connect/execute messages (cross-model review
+            // 2026-07-06 finding 6).
+            Server server;
             try
             {
                 SmoConnectionRequest request = new();
                 request.Instance = instance;
                 request.SqlCredential = SqlCredential;
                 request.Database = "SSISDB";
-                Server server = ConnectionService.GetServer(request);
+                server = ConnectionService.GetServer(request);
                 SetActiveConnection(server.ConnectionContext);
                 if (!server.ConnectionContext.IsOpen)
                 {
                     server.ConnectionContext.Connect();
                 }
+            }
+            catch (PipelineStoppedException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                WriteMessage(MessageLevel.Warning, "Failure", target: instance, exception: ex);
+                continue;
+            }
 
+            try
+            {
                 using SqlCommand command = new(_sql, server.ConnectionContext.SqlConnectionObject);
                 foreach (KeyValuePair<string, object> parameter in _queryParameters)
                 {
@@ -222,7 +237,7 @@ public sealed class GetDbaSsisExecutionHistoryCommand : DbaInstanceCmdlet
             }
             catch (Exception ex)
             {
-                WriteMessage(MessageLevel.Warning, $"[{instance}] Failure | {ex.Message}", target: instance, exception: ex);
+                WriteMessage(MessageLevel.Warning, $"[{instance}] Failed during execution", target: instance, exception: ex);
             }
         }
     }
