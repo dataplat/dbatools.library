@@ -60,6 +60,10 @@ Write-Host "Created publish directories at: $publishDir" -ForegroundColor Cyan
 # Publish .NET Framework (desktop) to temp directory first
 Write-Host "Publishing .NET Framework build..."
 dotnet publish dbatools/dbatools.csproj --configuration release --framework net472 --output $tempDesktopPublish --nologo --self-contained true | Out-String -OutVariable build
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: dotnet publish (net472) failed with exit code $LASTEXITCODE" -ForegroundColor Red
+    exit $LASTEXITCODE
+}
 
 # Copy desktop publish output preserving structure
 Write-Host "Copying .NET Framework output with preserved structure..."
@@ -73,6 +77,10 @@ Write-Host "Verifying desktop publish..."
 # Publish .NET 8 (core) to temp directory first
 Write-Host "Publishing .NET 8 build..."
 dotnet publish dbatools/dbatools.csproj --configuration release --framework net8.0 --output $tempCorePublish --nologo --self-contained true | Out-String -OutVariable build
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: dotnet publish (net8.0) failed with exit code $LASTEXITCODE" -ForegroundColor Red
+    exit $LASTEXITCODE
+}
 
 # Copy core publish output preserving structure
 Write-Host "Copying .NET 8 output with preserved structure..."
@@ -266,13 +274,6 @@ Write-Host "Creating dbatools.library.zip for testing..."
 $zipPath = Join-Path $artifactsDir "dbatools.library.zip"
 if (Test-Path $zipPath) {
     Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
-}
-
-# Copy third-party-licenses
-if (Test-Path (Join-Path $root "var\third-party-licenses")) {
-    Copy-Item -Path (Join-Path $root "var\third-party-licenses") -Destination $tempReleaseDir -Recurse -Force
-} elseif (Test-Path (Join-Path $artifactsDir "third-party-licenses")) {
-    Copy-Item -Path (Join-Path $artifactsDir "third-party-licenses") -Destination $tempReleaseDir -Recurse -Force
 }
 
 Write-Host "All build artifacts are centralized in: $artifactsDir" -ForegroundColor Green
