@@ -65,6 +65,135 @@ namespace Dataplat.Dbatools.Connection
         }
 
         /// <summary>
+        /// The Get-CimAssociatedInstance parameter surface for one CIM source instance.
+        /// Used by GetAssociatedCmObjects to traverse CIM/WMI associations (equivalent
+        /// to the PS pipe: $instance | Get-CimAssociatedInstance -ResultClassName X).
+        /// </summary>
+        public sealed class CmAssociationRequest
+        {
+            /// <summary>The target computer name (same as CmObjectRequest).</summary>
+            public string ComputerName;
+
+            /// <summary>Optional explicit credential; null = integrated auth.</summary>
+            public PSCredential Credential;
+
+            /// <summary>The source PSObject from a prior GetCmObject call.</summary>
+            public PSObject SourceObject;
+
+            /// <summary>The result class to enumerate associations for.</summary>
+            public string ResultClassName;
+
+            /// <summary>The namespace (defaults to root\cimv2).</summary>
+            public string Namespace;
+        }
+
+        /// <summary>
+        /// Retrieves instances associated with a source CIM/WMI instance.
+        /// Mirrors the PS pipe: $instance | Get-CimAssociatedInstance -ResultClassName X.
+        /// Protocol selection follows the source instance type: CimInstance -> CimRM then
+        /// CimDCOM; ManagementObject -> WMI GetRelated. Other base types return empty.
+        /// </summary>
+        /// <param name="request">The association request (computer, credential, source, result class).</param>
+        /// <returns>The associated instances, PSObject-wrapped; empty on any failure.</returns>
+        public static CmObjectResult GetAssociatedCmObjects(CmAssociationRequest request)
+        {
+            if (request == null)
+                throw new ArgumentNullException("request");
+            if (String.IsNullOrWhiteSpace(request.ComputerName))
+                throw new ArgumentNullException("request", "ComputerName is required");
+            if (request.SourceObject == null)
+                throw new ArgumentNullException("request", "SourceObject is required");
+            if (String.IsNullOrEmpty(request.ResultClassName))
+                throw new ArgumentException("ResultClassName is required", "request");
+
+            string computer = request.ComputerName.ToLowerInvariant();
+            string namespaceText = request.Namespace != null ? request.Namespace : @"root\cimv2";
+
+            // CIM path: source is a CimInstance (from CimRM or CimDCOM rung).
+            CimInstance sourceCim = request.SourceObject.BaseObject as CimInstance;
+            if (sourceCim != null)
+            {
+                ManagementConnection connection;
+                if (!ConnectionHost.Connections.TryGetValue(computer, out connection) || connection == null)
+                    connection = new ManagementConnection(computer);
+
+                PSCredential cred;
+                try { cred = connection.GetCredential(request.Credential); }
+                catch (Exception e) { throw new InvalidOperationException(ComposeBadCredentialMessage(connection, request.Credential, e), e); }
+
+                // Try CimRM first.
+                if (connection.CimRM != ManagementConnectionProtocolState.Disabled)
+                {
+                    try
+                    {
+                        object raw = connection.GetCimRMAssociatedInstances(cred, sourceCim, request.ResultClassName, namespaceText);
+                        CmObjectResult result = new CmObjectResult();
+                        IEnumerable<CimInstance> sequence = raw as IEnumerable<CimInstance>;
+                        if (sequence != null)
+                        {
+                            foreach (CimInstance instance in sequence)
+                                result.Instances.Add(PSObject.AsPSObject(instance));
+                        }
+                        connection.ReportSuccess(ManagementConnectionType.CimRM);
+                        connection.AddGoodCredential(cred);
+                        if (!ConnectionHost.DisableCache)
+                            ConnectionHost.Connections[computer] = connection;
+                        return result;
+                    }
+                    catch (PipelineStoppedException) { throw; }
+                    catch
+                    {
+                        connection.ReportFailure(ManagementConnectionType.CimRM);
+                    }
+                }
+
+                // Try CimDCOM as fallback.
+                if (connection.CimDCOM != ManagementConnectionProtocolState.Disabled)
+                {
+                    try
+                    {
+                        object raw = connection.GetCimDComAssociatedInstances(cred, sourceCim, request.ResultClassName, namespaceText);
+                        CmObjectResult result = new CmObjectResult();
+                        IEnumerable<CimInstance> sequence = raw as IEnumerable<CimInstance>;
+                        if (sequence != null)
+                        {
+                            foreach (CimInstance instance in sequence)
+                                result.Instances.Add(PSObject.AsPSObject(instance));
+                        }
+                        connection.ReportSuccess(ManagementConnectionType.CimDCOM);
+                        connection.AddGoodCredential(cred);
+                        if (!ConnectionHost.DisableCache)
+                            ConnectionHost.Connections[computer] = connection;
+                        return result;
+                    }
+                    catch (PipelineStoppedException) { throw; }
+                    catch { }
+                }
+
+                if (!ConnectionHost.DisableCache)
+                    ConnectionHost.Connections[computer] = connection;
+                return new CmObjectResult();
+            }
+
+            // WMI path: source is a ManagementObject (from the WMI rung).
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+#pragma warning disable CA1416
+                System.Management.ManagementObject sourceMgmt = request.SourceObject.BaseObject as System.Management.ManagementObject;
+                if (sourceMgmt != null)
+                {
+                    CmObjectResult result = new CmObjectResult();
+                    foreach (System.Management.ManagementObject related in sourceMgmt.GetRelated(request.ResultClassName))
+                        result.Instances.Add(PSObject.AsPSObject(related));
+                    return result;
+                }
+#pragma warning restore CA1416
+            }
+
+            return new CmObjectResult();
+        }
+
+        /// <summary>
         /// Retrieves management objects with Get-DbaCmObject's full protocol chain and
         /// cache discipline: rungs are tried in GetConnectionType order, successes and
         /// failures are reported onto the cached ManagementConnection, good/bad
