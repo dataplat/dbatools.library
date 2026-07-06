@@ -69,21 +69,15 @@ namespace Dataplat.Dbatools.Connection
                 return fromConnectionString;
             }
 
-            // Row 7: the string path with the auth matrix and the SMO cache.
-            string cacheKey = BuildCacheKey(instance, request);
-            if (!request.NonPooledConnection && ConnectionHost.SmoServerCache.ContainsKey(cacheKey))
-            {
-                Server cached = ConnectionHost.SmoServerCache[cacheKey];
-                ApplyGateChecks(cached, request, false);
-                return cached;
-            }
-
+            // Row 7: the string path with the auth matrix. The SmoServerCache READ path stays
+            // disabled until the P0-010c parallel change unifies the PS connection cache onto
+            // ConnectionHost: while PS functions and C# cmdlets hold SEPARATE SMO Server
+            // objects, a cached C# Server serves stale SMO property bags after a PS command
+            // mutates the instance (live-fired by Get-DbaMaxMemory's gate: Set-DbaMaxMemory
+            // then Get-DbaMaxMemory read the pre-Set value from cache). A fresh Server rides
+            // SqlClient connection pooling, so the reconnect cost is negligible.
             Server server = BuildServer(instance, request);
             VerifyAndDecorate(server, request, true);
-
-            if (!request.NonPooledConnection)
-                ConnectionHost.SmoServerCache[cacheKey] = server;
-
             return server;
         }
 
