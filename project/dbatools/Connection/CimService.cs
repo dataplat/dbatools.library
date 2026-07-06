@@ -121,6 +121,14 @@ namespace Dataplat.Dbatools.Connection
                 try { cred = connection.GetCredential(request.Credential); }
                 catch (Exception e) { throw new InvalidOperationException(ComposeBadCredentialMessage(connection, request.Credential, e), e); }
 
+                // ACCEPTED DEVIATION: the PS pipe (Get-CimAssociatedInstance) has no protocol
+                // fallback - the CimRM -> CimDCOM ladder below aligns association traversal with
+                // the family's GetCmObject rung discipline. On the lab (CimRM answers) behavior
+                // is identical to PS; when every rung fails, the failure surfaces through
+                // PassthroughErrors like the PS error stream instead of a silent empty result
+                // (cross-model review 2026-07-07 finding 2).
+                Exception lastAssociationError = null;
+
                 // Try CimRM first.
                 if (connection.CimRM != ManagementConnectionProtocolState.Disabled)
                 {
@@ -141,8 +149,9 @@ namespace Dataplat.Dbatools.Connection
                         return result;
                     }
                     catch (PipelineStoppedException) { throw; }
-                    catch
+                    catch (Exception cimRmError)
                     {
+                        lastAssociationError = cimRmError;
                         connection.ReportFailure(ManagementConnectionType.CimRM);
                     }
                 }
@@ -167,12 +176,21 @@ namespace Dataplat.Dbatools.Connection
                         return result;
                     }
                     catch (PipelineStoppedException) { throw; }
-                    catch { }
+                    catch (Exception cimDComError)
+                    {
+                        lastAssociationError = cimDComError;
+                    }
                 }
 
                 if (!ConnectionHost.DisableCache)
                     ConnectionHost.Connections[computer] = connection;
-                return new CmObjectResult();
+                CmObjectResult failedResult = new CmObjectResult();
+                if (lastAssociationError != null)
+                {
+                    failedResult.PassthroughErrors.Add(new ErrorRecord(
+                        lastAssociationError, "GetAssociatedCmObjects", ErrorCategory.ConnectionError, computer));
+                }
+                return failedResult;
             }
 
             // WMI path: source is a ManagementObject (from the WMI rung).

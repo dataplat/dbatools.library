@@ -119,7 +119,9 @@ public sealed class GetDbaWsfcResourceGroupCommand : DbaBaseCmdlet
             {
                 // PS: if ($Name) { $resources = $resources | Where-Object Name -in $Name }
                 // Filter by name when -Name is provided; case-insensitive (Where-Object -in uses OrdinalIgnoreCase).
-                if (Name is { Length: > 0 })
+                // FilterHelper.IsActive replicates PS array truthiness: a single empty/null element
+                // (e.g. -Name "") is falsy and must NOT filter (cross-model review 2026-07-07 finding 12).
+                if (Name is not null && FilterHelper.IsActive(Name))
                 {
                     string? resourceName = resource.Properties["Name"]?.Value?.ToString();
                     bool match = false;
@@ -143,17 +145,11 @@ public sealed class GetDbaWsfcResourceGroupCommand : DbaBaseCmdlet
                 // string NoteProperty (e.g. 0 -> "Online"). The characterization test pins that
                 // State is a NoteProperty of TypeNameOfValue "System.String".
                 object? rawStateObj = resource.Properties["State"]?.Value;
-                int rawState = -1;
-                if (rawStateObj != null)
-                {
-                    try { rawState = Convert.ToInt32(rawStateObj, CultureInfo.InvariantCulture); }
-                    catch { rawState = -1; }
-                }
                 if (resource.Properties["State"] is PSNoteProperty)
                 {
                     resource.Properties.Remove("State");
                 }
-                resource.Properties.Add(new PSNoteProperty("State", GetResourceGroupState(rawState)));
+                resource.Properties.Add(new PSNoteProperty("State", GetResourceGroupState(rawStateObj)));
 
                 // PS: $resource | Add-Member -Force -NotePropertyName ClusterName -NotePropertyValue $cluster.Name
                 if (resource.Properties["ClusterName"] is PSNoteProperty)
@@ -178,15 +174,38 @@ public sealed class GetDbaWsfcResourceGroupCommand : DbaBaseCmdlet
     }
 
     /// <summary>Converts MSCluster_ResourceGroup.State integer to a human-readable string.</summary>
-    /// <remarks>Faithfully ports the private Get-ResourceGroupState switch table from Get-DbaWsfcResourceGroup.ps1.</remarks>
-    private static string GetResourceGroupState(int state) => state switch
+    /// <remarks>
+    /// Faithfully ports the inline Get-ResourceGroupState from Get-DbaWsfcResourceGroup.ps1:
+    /// its switch HAS a default branch returning the ORIGINAL value (preserving the input
+    /// type, e.g. a uint16 7 stays uint16), and switch($null) runs no branch at all so null
+    /// yields null (cross-model review 2026-07-07 finding 13, semantics proven empirically).
+    /// </remarks>
+    private static object? GetResourceGroupState(object? rawState)
     {
-        -1 => "Unknown",
-        0  => "Online",
-        1  => "Offline",
-        2  => "Failed",
-        _  => state.ToString(CultureInfo.InvariantCulture)
-    };
+        if (rawState is null)
+        {
+            return null;
+        }
+
+        int state;
+        try
+        {
+            state = Convert.ToInt32(rawState, CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            return rawState;
+        }
+
+        return state switch
+        {
+            -1 => "Unknown",
+            0  => "Online",
+            1  => "Offline",
+            2  => "Failed",
+            _  => rawState
+        };
+    }
 
     private static DbaInstanceParameter[]? DefaultComputerName()
     {

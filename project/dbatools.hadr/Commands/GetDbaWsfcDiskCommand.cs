@@ -120,10 +120,35 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
                 string? resourceName = resource.Properties["Name"]?.Value?.ToString();
                 string? ownerGroup = resource.Properties["OwnerGroup"]?.Value?.ToString();
 
-                // PS: $resource | Add-Member -Force -NotePropertyName State -NotePropertyValue (Get-ResourceState $resource.State)
-                // Get-ResourceState converts the numeric State value to a human-readable string.
+                // PS: $resources = Get-DbaWsfcResource ... - the resources the PS original
+                // consumes are ALREADY augmented by Get-DbaWsfcResource (State string
+                // NoteProperty, ClusterName/ClusterFqdn NoteProperties, resource default
+                // display set), and that augmented object ships as the ClusterResource
+                // property. Replicate the augmentation here so `.ClusterResource.State` etc.
+                // match PS (cross-model review 2026-07-07 finding 5).
                 object? rawState = resource.Properties["State"]?.Value;
                 string? stateName = GetResourceState(rawState);
+                if (resource.Properties["State"] is PSNoteProperty)
+                {
+                    resource.Properties.Remove("State");
+                }
+                resource.Properties.Add(new PSNoteProperty("State", stateName));
+                if (resource.Properties["ClusterName"] is PSNoteProperty)
+                {
+                    resource.Properties.Remove("ClusterName");
+                }
+                resource.Properties.Add(new PSNoteProperty("ClusterName", clusterName));
+                if (resource.Properties["ClusterFqdn"] is PSNoteProperty)
+                {
+                    resource.Properties.Remove("ClusterFqdn");
+                }
+                resource.Properties.Add(new PSNoteProperty("ClusterFqdn", clusterFqdn));
+                OutputHelper.SetDefaultDisplayPropertySet(resource,
+                    "ClusterName", "ClusterFqdn", "Name", "State", "Type", "OwnerGroup", "OwnerNode",
+                    "PendingTimeout", "PersistentState", "QuorumCapable",
+                    "RequiredDependencyClasses", "RequiredDependencyTypes",
+                    "RestartAction", "RestartDelay", "RestartPeriod", "RestartThreshold",
+                    "RetryPeriodOnFailure", "SeparateMonitor");
 
                 // PS: $disks = $resource | Get-CimAssociatedInstance -ResultClassName MSCluster_Disk
                 List<PSObject> disks;
@@ -185,41 +210,57 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
                         continue;
                     }
 
-                    foreach (PSObject diskpart in partitions)
+                    // PS: $diskpart = $disk | Get-CimAssociatedInstance -ResultClassName MSCluster_DiskPartition
+                    // NO inner loop - the PS original emits exactly ONE object per DISK. $diskpart is
+                    // null (no partitions), a single instance, or an array (cross-model review
+                    // 2026-07-07 finding 6).
+                    if (partitions.Count > 1)
                     {
-                        // PS: [dbasize]($diskpart.TotalSize * 1MB)  — TotalSize is in MB, 1MB=1048576 bytes
-                        object? rawTotalSize = diskpart.Properties["TotalSize"]?.Value;
-                        object? rawFreeSpace = diskpart.Properties["FreeSpace"]?.Value;
-                        long totalSizeMb = rawTotalSize != null ? Convert.ToInt64(rawTotalSize) : 0L;
-                        long freeSpaceMb = rawFreeSpace != null ? Convert.ToInt64(rawFreeSpace) : 0L;
-                        Size sizeObj = new Size(totalSizeMb * 1048576L);
-                        Size freeObj = new Size(freeSpaceMb * 1048576L);
-
-                        // PS: [PSCustomObject]@{ ... } | Select-DefaultView -ExcludeProperty ClusterDisk, ClusterDiskPart, ClusterResource
-                        // new PSObject() TypeNames[0] = PSObject; insert PSCustomObject at 0 to match [PSCustomObject]@{} parity.
-                        PSObject output = new PSObject();
-                        output.TypeNames.Insert(0, "System.Management.Automation.PSCustomObject");
-                        output.Properties.Add(new PSNoteProperty("ClusterName", clusterName));
-                        output.Properties.Add(new PSNoteProperty("ClusterFqdn", clusterFqdn));
-                        output.Properties.Add(new PSNoteProperty("ResourceGroup", ownerGroup));
-                        output.Properties.Add(new PSNoteProperty("Disk", resourceName));
-                        output.Properties.Add(new PSNoteProperty("State", stateName));
-                        output.Properties.Add(new PSNoteProperty("FileSystem", diskpart.Properties["FileSystem"]?.Value));
-                        output.Properties.Add(new PSNoteProperty("Path", diskpart.Properties["Path"]?.Value));
-                        output.Properties.Add(new PSNoteProperty("Label", diskpart.Properties["VolumeLabel"]?.Value));
-                        output.Properties.Add(new PSNoteProperty("Size", sizeObj));
-                        output.Properties.Add(new PSNoteProperty("Free", freeObj));
-                        output.Properties.Add(new PSNoteProperty("MountPoints", diskpart.Properties["MountPoints"]?.Value));
-                        output.Properties.Add(new PSNoteProperty("SerialNumber", diskpart.Properties["SerialNumber"]?.Value));
-                        output.Properties.Add(new PSNoteProperty("ClusterDisk", disk));
-                        output.Properties.Add(new PSNoteProperty("ClusterDiskPart", diskpart));
-                        output.Properties.Add(new PSNoteProperty("ClusterResource", resource));
-
-                        // Select-DefaultView -ExcludeProperty ClusterDisk, ClusterDiskPart, ClusterResource
-                        OutputHelper.SetDefaultDisplayPropertySetExcluding(output, new string[] { "ClusterDisk", "ClusterDiskPart", "ClusterResource" });
-
-                        WriteObject(output);
+                        // PS: [dbasize]($diskpart.TotalSize * 1MB) - member enumeration over a
+                        // multi-partition array replicates the array 1MB times and the [dbasize]
+                        // cast then fails statement-terminating: the PS original surfaces an
+                        // ERROR and emits NO object for a multi-partition disk. Replicated
+                        // without the pathological array allocation.
+                        InvalidCastException multiPartError = new InvalidCastException(
+                            "Cannot convert the \"System.Object[]\" value of type \"System.Object[]\" to type \"Dataplat.Dbatools.Utility.Size\".");
+                        WriteError(new ErrorRecord(multiPartError, "ConvertToFinalInvalidCastException", ErrorCategory.InvalidArgument, null));
+                        continue;
                     }
+
+                    PSObject? diskpart = partitions.Count == 1 ? partitions[0] : null;
+
+                    // PS: [dbasize]($diskpart.TotalSize * 1MB) - a null $diskpart or null TotalSize
+                    // propagates null through the multiplication and the cast: the property lands
+                    // null, never Size(0).
+                    object? rawTotalSize = diskpart?.Properties["TotalSize"]?.Value;
+                    object? rawFreeSpace = diskpart?.Properties["FreeSpace"]?.Value;
+                    Size? sizeObj = rawTotalSize != null ? new Size(Convert.ToInt64(rawTotalSize) * 1048576L) : null;
+                    Size? freeObj = rawFreeSpace != null ? new Size(Convert.ToInt64(rawFreeSpace) * 1048576L) : null;
+
+                    // PS: [PSCustomObject]@{ ... } | Select-DefaultView -ExcludeProperty ClusterDisk, ClusterDiskPart, ClusterResource
+                    // new PSObject() TypeNames[0] = PSObject; insert PSCustomObject at 0 to match [PSCustomObject]@{} parity.
+                    PSObject output = new PSObject();
+                    output.TypeNames.Insert(0, "System.Management.Automation.PSCustomObject");
+                    output.Properties.Add(new PSNoteProperty("ClusterName", clusterName));
+                    output.Properties.Add(new PSNoteProperty("ClusterFqdn", clusterFqdn));
+                    output.Properties.Add(new PSNoteProperty("ResourceGroup", ownerGroup));
+                    output.Properties.Add(new PSNoteProperty("Disk", resourceName));
+                    output.Properties.Add(new PSNoteProperty("State", stateName));
+                    output.Properties.Add(new PSNoteProperty("FileSystem", diskpart?.Properties["FileSystem"]?.Value));
+                    output.Properties.Add(new PSNoteProperty("Path", diskpart?.Properties["Path"]?.Value));
+                    output.Properties.Add(new PSNoteProperty("Label", diskpart?.Properties["VolumeLabel"]?.Value));
+                    output.Properties.Add(new PSNoteProperty("Size", sizeObj));
+                    output.Properties.Add(new PSNoteProperty("Free", freeObj));
+                    output.Properties.Add(new PSNoteProperty("MountPoints", diskpart?.Properties["MountPoints"]?.Value));
+                    output.Properties.Add(new PSNoteProperty("SerialNumber", diskpart?.Properties["SerialNumber"]?.Value));
+                    output.Properties.Add(new PSNoteProperty("ClusterDisk", disk));
+                    output.Properties.Add(new PSNoteProperty("ClusterDiskPart", diskpart));
+                    output.Properties.Add(new PSNoteProperty("ClusterResource", resource));
+
+                    // Select-DefaultView -ExcludeProperty ClusterDisk, ClusterDiskPart, ClusterResource
+                    OutputHelper.SetDefaultDisplayPropertySetExcluding(output, new string[] { "ClusterDisk", "ClusterDiskPart", "ClusterResource" });
+
+                    WriteObject(output);
                 }
             }
         }

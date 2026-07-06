@@ -203,7 +203,10 @@ namespace Dataplat.Dbatools.Connection
         public object GetCimDComAssociatedInstances(PSCredential Credential, CimInstance source, string resultClassName, string Namespace)
         {
             CimSession tempSession = GetCimDComSession(Credential);
-            IEnumerable<CimInstance> result = tempSession.EnumerateAssociatedInstances(Namespace, source, resultClassName, null, null, null);
+            // Parameter order is (namespaceName, sourceInstance, associationClassName, resultClassName,
+            // sourceRole, resultRole): the result class filter rides in the FOURTH slot. Passing it as
+            // the association class returns zero instances (cross-model review 2026-07-07 finding 1).
+            IEnumerable<CimInstance> result = tempSession.EnumerateAssociatedInstances(Namespace, source, null, resultClassName, null, null);
 
             if (DisableCimPersistence)
             {

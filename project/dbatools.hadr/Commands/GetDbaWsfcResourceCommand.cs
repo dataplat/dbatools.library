@@ -120,17 +120,11 @@ public sealed class GetDbaWsfcResourceCommand : DbaBaseCmdlet
                 // string NoteProperty (e.g. 2 → "Online"). The characterization test pins that
                 // State is a NoteProperty of TypeNameOfValue "System.String".
                 object? rawStateObj = resource.Properties["State"]?.Value;
-                int rawState = -1;
-                if (rawStateObj != null)
-                {
-                    try { rawState = Convert.ToInt32(rawStateObj, CultureInfo.InvariantCulture); }
-                    catch { rawState = -1; }
-                }
                 if (resource.Properties["State"] is PSNoteProperty)
                 {
                     resource.Properties.Remove("State");
                 }
-                resource.Properties.Add(new PSNoteProperty("State", GetResourceState(rawState)));
+                resource.Properties.Add(new PSNoteProperty("State", GetResourceState(rawStateObj)));
 
                 // PS: $resource | Add-Member -Force -NotePropertyName ClusterName -NotePropertyValue $cluster.Name
                 if (resource.Properties["ClusterName"] is PSNoteProperty)
@@ -162,20 +156,42 @@ public sealed class GetDbaWsfcResourceCommand : DbaBaseCmdlet
     }
 
     /// <summary>Converts MSCluster_Resource.State integer to a human-readable string.</summary>
-    /// <remarks>Faithfully ports private/functions/Get-ResourceState.ps1 switch table.</remarks>
-    private static string GetResourceState(int state) => state switch
+    /// <remarks>
+    /// Faithfully ports private/functions/Get-ResourceState.ps1: the PS switch has NO default
+    /// branch, so null input and any unmatched value yield null - never "Unknown" and never
+    /// the original value (cross-model review 2026-07-07 finding 11).
+    /// </remarks>
+    private static string? GetResourceState(object? rawState)
     {
-        -1  => "Unknown",
-        0   => "Inherited",
-        1   => "Initializing",
-        2   => "Online",
-        3   => "Offline",
-        4   => "Failed",
-        128 => "Pending",
-        129 => "Online Pending",
-        130 => "Offline Pending",
-        _   => state.ToString(CultureInfo.InvariantCulture)
-    };
+        if (rawState is null)
+        {
+            return null;
+        }
+
+        int state;
+        try
+        {
+            state = Convert.ToInt32(rawState, CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            return null;
+        }
+
+        return state switch
+        {
+            -1  => "Unknown",
+            0   => "Inherited",
+            1   => "Initializing",
+            2   => "Online",
+            3   => "Offline",
+            4   => "Failed",
+            128 => "Pending",
+            129 => "Online Pending",
+            130 => "Offline Pending",
+            _   => null
+        };
+    }
 
     private static DbaInstanceParameter[]? DefaultComputerName()
     {
