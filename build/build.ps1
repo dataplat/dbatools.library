@@ -142,6 +142,29 @@ if (Test-Path $coreRuntimesPath) {
     }
 }
 
+# Build and stage satellite cmdlet assemblies (migration/specs/modules.md section 5.2):
+# one dll per module, both editions, into artifacts/modules/dbatools.<module>/{desktop,core}/.
+# These dlls ship INSIDE each satellite's package; the shared dbatools.dll and its SMO/SqlClient
+# dependency tree continue to ship only in dbatools.library.
+$satelliteProjects = Get-ChildItem -Path . -Directory -Filter "dbatools.*" | Where-Object {
+    $_.Name -ne "dbatools.Tests" -and (Test-Path (Join-Path $_.FullName "$($_.Name).csproj"))
+}
+foreach ($satellite in $satelliteProjects) {
+    $satelliteName = $satellite.Name
+    Write-Host "Building satellite cmdlet assembly: $satelliteName"
+    dotnet build "$satelliteName/$satelliteName.csproj" --configuration release --nologo | Out-String -OutVariable satelliteBuild
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: satellite build ($satelliteName) failed with exit code $LASTEXITCODE" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    $moduleStage = Join-Path $artifactsDir "modules/$satelliteName"
+    $null = New-Item -ItemType Directory -Path (Join-Path $moduleStage "desktop") -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $moduleStage "core") -Force
+    Copy-Item "$satelliteName/bin/release/net472/$satelliteName.dll" -Destination (Join-Path $moduleStage "desktop") -Force
+    Copy-Item "$satelliteName/bin/release/net8.0/$satelliteName.dll" -Destination (Join-Path $moduleStage "core") -Force
+    Write-Host "Staged satellite: $satelliteName (desktop + core)" -ForegroundColor Green
+}
+
 if ($CoreOnly) {
     Write-Host "CoreOnly specified - returning after core build"
     return
