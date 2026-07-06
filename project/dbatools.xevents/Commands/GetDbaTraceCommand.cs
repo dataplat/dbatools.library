@@ -140,8 +140,9 @@ public sealed class GetDbaTraceCommand : DbaInstanceCmdlet
 
     private static string JoinAdminUnc(string? servername, string filepath)
     {
-        // Inline of private/functions/Join-AdminUnc.ps1: \\server\c$\path admin share form
-        if (string.IsNullOrEmpty(filepath) || filepath.StartsWith("\\\\", StringComparison.Ordinal))
+        // Inline of private/functions/Join-AdminUnc.ps1: \\server\c$\path admin share form.
+        // The PS original returns the path unchanged on Linux/macOS ($IsLinux/$IsMacOs guard).
+        if (string.IsNullOrEmpty(filepath) || filepath.StartsWith("\\\\", StringComparison.Ordinal) || Environment.OSVersion.Platform != PlatformID.Win32NT)
         {
             return filepath;
         }
