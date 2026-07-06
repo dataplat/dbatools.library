@@ -57,7 +57,7 @@ public sealed class GetDbaAvailabilityGroupCommand : DbaInstanceCmdlet
 
             foreach (AvailabilityGroup ag in server.AvailabilityGroups)
             {
-                if (AvailabilityGroup is { Length: > 0 } && !ContainsName(AvailabilityGroup, ag.Name))
+                if (FilterHelper.IsActive(AvailabilityGroup) && !ContainsName(AvailabilityGroup!, ag.Name))
                 {
                     continue;
                 }

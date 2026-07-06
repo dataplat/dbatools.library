@@ -83,11 +83,11 @@ public sealed class GetDbaDbMailProfileCommand : DbaInstanceCmdlet
             {
                 foreach (MailProfile prof in mailserver.Profiles)
                 {
-                    if (Profile is { Length: > 0 } && !ContainsName(Profile, prof.Name))
+                    if (FilterHelper.IsActive(Profile) && !ContainsName(Profile!, prof.Name))
                     {
                         continue;
                     }
-                    if (ExcludeProfile is { Length: > 0 } && ContainsName(ExcludeProfile, prof.Name))
+                    if (FilterHelper.IsActive(ExcludeProfile) && ContainsName(ExcludeProfile!, prof.Name))
                     {
                         continue;
                     }

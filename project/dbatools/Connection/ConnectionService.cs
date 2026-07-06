@@ -38,6 +38,12 @@ namespace Dataplat.Dbatools.Connection
             if (request.Instance == null)
                 throw new ArgumentException("The request carries no target instance", "request");
 
+            // ApplicationIntent participates in the cache key but its connection-string
+            // application is P0-010b work; failing loud beats silently ignoring the request
+            // (cross-model review finding, 2026-07-06).
+            if (!String.IsNullOrEmpty(request.ApplicationIntent))
+                throw new NotSupportedException("ApplicationIntent is not implemented in ConnectionService yet (P0-010b)");
+
             DbaInstanceParameter instance = request.Instance;
             object inputObject = UnwrapInput(instance.InputObject);
 

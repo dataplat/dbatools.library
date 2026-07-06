@@ -76,11 +76,11 @@ public sealed class GetDbaDbCertificateCommand : DbaInstanceCmdlet
                 }
                 foreach (SmoDatabase db in server.Databases)
                 {
-                    if (Database is { Length: > 0 } && !ContainsName(Database, db.Name))
+                    if (FilterHelper.IsActive(Database) && !ContainsName(Database!, db.Name))
                     {
                         continue;
                     }
-                    if (ExcludeDatabase is { Length: > 0 } && ContainsName(ExcludeDatabase, db.Name))
+                    if (FilterHelper.IsActive(ExcludeDatabase) && ContainsName(ExcludeDatabase!, db.Name))
                     {
                         continue;
                     }
@@ -109,11 +109,11 @@ public sealed class GetDbaDbCertificateCommand : DbaInstanceCmdlet
 
             foreach (Certificate cert in certs)
             {
-                if (Certificate is { Length: > 0 } && !ContainsValue(Certificate, cert.Name))
+                if (FilterHelper.IsActive(Certificate) && !ContainsValue(Certificate!, cert.Name))
                 {
                     continue;
                 }
-                if (Subject is { Length: > 0 } && !ContainsName(Subject, cert.Subject))
+                if (FilterHelper.IsActive(Subject) && !ContainsName(Subject!, cert.Subject))
                 {
                     continue;
                 }

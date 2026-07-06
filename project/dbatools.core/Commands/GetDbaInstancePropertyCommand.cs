@@ -100,11 +100,11 @@ public sealed class GetDbaInstancePropertyCommand : DbaInstanceCmdlet
         foreach (Property prop in properties)
         {
             // PS: Where-Object Name -In $InstanceProperty (case-insensitive) when specified
-            if (InstanceProperty is { Length: > 0 } && !NameMatches(prop.Name, InstanceProperty))
+            if (FilterHelper.IsActive(InstanceProperty) && !NameMatches(prop.Name, InstanceProperty!))
             {
                 continue;
             }
-            if (ExcludeInstanceProperty is { Length: > 0 } && NameMatches(prop.Name, ExcludeInstanceProperty))
+            if (FilterHelper.IsActive(ExcludeInstanceProperty) && NameMatches(prop.Name, ExcludeInstanceProperty!))
             {
                 continue;
             }

@@ -57,11 +57,11 @@ public sealed class GetDbaTraceFlagCommand : DbaInstanceCmdlet
             foreach (DataRow tflag in tflags.Rows)
             {
                 // PS: if ($TraceFlag) { $tflags = $tflags | Where-Object TraceFlag -In $TraceFlag }
-                if (TraceFlag is { Length: > 0 })
+                if (FilterHelper.IsActive(TraceFlag))
                 {
                     int flagNumber = Convert.ToInt32(tflag["TraceFlag"]);
                     bool matched = false;
-                    foreach (int wanted in TraceFlag)
+                    foreach (int wanted in TraceFlag!)
                     {
                         if (wanted == flagNumber)
                         {

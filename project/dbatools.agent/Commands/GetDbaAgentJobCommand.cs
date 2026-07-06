@@ -144,15 +144,15 @@ public sealed class GetDbaAgentJobCommand : DbaInstanceCmdlet
                 {
                     continue;
                 }
-                if (Database is { Length: > 0 } && !HasStepInDatabase(agentJob, Database))
+                if (FilterHelper.IsActive(Database) && !HasStepInDatabase(agentJob, Database!))
                 {
                     continue;
                 }
-                if (Category is { Length: > 0 } && !ContainsName(Category, agentJob.Category))
+                if (FilterHelper.IsActive(Category) && !ContainsName(Category!, agentJob.Category))
                 {
                     continue;
                 }
-                if (ExcludeCategory is { Length: > 0 } && ContainsName(ExcludeCategory, agentJob.Category))
+                if (FilterHelper.IsActive(ExcludeCategory) && ContainsName(ExcludeCategory!, agentJob.Category))
                 {
                     continue;
                 }
