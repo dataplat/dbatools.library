@@ -68,14 +68,29 @@ namespace Dataplat.Dbatools.Connection
             return false;
         }
 
-        private static object GetNoteProperty(Server server, string name)
+        /// <summary>
+        /// Reads any PSObject-visible property (ETS note properties from PS decorations like
+        /// Get-DbaDatabase's ComputerName, or adapter-only SMO properties) off any SMO object.
+        /// Returns null when absent - callers supply their own SMO fallback.
+        /// </summary>
+        /// <param name="smoObject">The object to read from</param>
+        /// <param name="name">The property name</param>
+        /// <returns>The value, or null when the property is missing or unreadable</returns>
+        public static object GetPSProperty(object smoObject, string name)
         {
-            PSObject wrapped = PSObject.AsPSObject(server);
+            if (smoObject == null)
+                return null;
+            PSObject wrapped = PSObject.AsPSObject(smoObject);
             PSPropertyInfo property = wrapped.Properties[name];
             if (property == null)
                 return null;
             try { return property.Value; }
             catch { return null; }
+        }
+
+        private static object GetNoteProperty(Server server, string name)
+        {
+            return GetPSProperty(server, name);
         }
     }
 }
