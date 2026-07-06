@@ -68,13 +68,27 @@ public sealed class GetDbaPowerPlanCommand : DbaBaseCmdlet
 
             WriteMessage(MessageLevel.Verbose, $"Getting Power Plan information from {computer}.");
 
-            List<CimInstance> powerPlans;
+            List<PSObject> powerPlans;
             try
             {
                 // PS: $splatDbaCmObject = @{ ComputerName; EnableException = $true } (+ Credential
                 // when bound); EnableException means CIM failures THROW into this catch.
+                // Wave 5: the full Get-DbaCmObject protocol chain (the Wmi/PSRemoting-rung
+                // deferral of the original port is retired).
                 PSCredential? effectiveCredential = TestBound(nameof(Credential)) ? Credential : null;
-                powerPlans = CimService.EnumerateInstances(computerResolved!, effectiveCredential, "Win32_PowerPlan", @"root\cimv2\power");
+                CimService.CmObjectRequest planRequest = new()
+                {
+                    ComputerName = computerResolved!,
+                    Credential = effectiveCredential,
+                    ClassName = "Win32_PowerPlan",
+                    Namespace = @"root\cimv2\power"
+                };
+                CimService.CmObjectResult planResult = CimService.GetCmObject(planRequest);
+                foreach (ErrorRecord passthrough in planResult.PassthroughErrors)
+                {
+                    WriteError(passthrough);
+                }
+                powerPlans = planResult.Instances;
             }
             catch (PipelineStoppedException)
             {
@@ -103,7 +117,7 @@ public sealed class GetDbaPowerPlanCommand : DbaBaseCmdlet
 
             if (List.ToBool())
             {
-                foreach (CimInstance powerPlan in powerPlans)
+                foreach (PSObject powerPlan in powerPlans)
                 {
                     string? instanceId = ExtractInstanceGuid(GetInstanceProperty(powerPlan, "InstanceID") as string);
                     PSObject output = new();
@@ -120,8 +134,8 @@ public sealed class GetDbaPowerPlanCommand : DbaBaseCmdlet
             {
                 // PS: $powerPlans | Where-Object IsActive -eq 'True' (bool True survives the
                 // string comparison via PS conversion).
-                CimInstance? activePlan = null;
-                foreach (CimInstance powerPlan in powerPlans)
+                PSObject? activePlan = null;
+                foreach (PSObject powerPlan in powerPlans)
                 {
                     if (GetInstanceProperty(powerPlan, "IsActive") is bool isActive && isActive)
                     {
@@ -222,10 +236,9 @@ public sealed class GetDbaPowerPlanCommand : DbaBaseCmdlet
         return false;
     }
 
-    private static object? GetInstanceProperty(CimInstance instance, string name)
+    private static object? GetInstanceProperty(PSObject instance, string name)
     {
-        CimProperty? property = instance.CimInstanceProperties[name];
-        return property?.Value;
+        return instance.Properties[name]?.Value;
     }
 
     private static string RenderMessages(Exception exception)

@@ -48,10 +48,22 @@ public sealed class GetDbaWsfcClusterCommand : DbaBaseCmdlet
             // EnableException is NEVER forwarded, so a CIM failure surfaces as the inner
             // command's own warning and the computer is skipped - even when the caller
             // passed -EnableException (pinned by the characterization tests).
-            List<CimInstance> clusters;
+            List<PSObject> clusters;
             try
             {
-                clusters = CimService.EnumerateInstances(computer.ComputerName, Credential, "MSCluster_Cluster", @"root\MSCluster");
+                CimService.CmObjectRequest clusterRequest = new()
+                {
+                    ComputerName = computer.ComputerName,
+                    Credential = Credential,
+                    ClassName = "MSCluster_Cluster",
+                    Namespace = @"root\MSCluster"
+                };
+                CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
+                foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
+                {
+                    WriteError(passthrough);
+                }
+                clusters = clusterResult.Instances;
             }
             catch (PipelineStoppedException)
             {
@@ -63,9 +75,8 @@ public sealed class GetDbaWsfcClusterCommand : DbaBaseCmdlet
                 continue;
             }
 
-            foreach (CimInstance cluster in clusters)
+            foreach (PSObject output in clusters)
             {
-                PSObject output = PSObject.AsPSObject(cluster);
 
                 // PS: $cluster | Add-Member -Force -NotePropertyName State
                 //     -NotePropertyValue (Get-ResourceState $resource.State)

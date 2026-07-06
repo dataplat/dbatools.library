@@ -11,10 +11,11 @@ namespace Dataplat.Dbatools.Connection
     /// <summary>
     /// Compiled equivalent of public/Get-DbaCmObject.ps1 for ported computer-management
     /// commands. GetCmObject walks the full CimRM -> CimDCOM -> Wmi -> PowerShellRemoting
-    /// protocol chain (Wave 5); EnumerateInstances remains as the original two-rung CIM
-    /// path. Drives the same ManagementConnection / ConnectionHost machinery the PS
-    /// command uses, so protocol state, credential caches and CIM session reuse remain
-    /// shared between the PS and compiled halves during the hybrid period.
+    /// protocol chain (Wave 5; the interim two-rung EnumerateInstances was retired when
+    /// its consumers moved over). Drives the same ManagementConnection / ConnectionHost
+    /// machinery the PS command uses, so protocol state, credential caches and CIM
+    /// session reuse remain shared between the PS and compiled halves during the hybrid
+    /// period.
     /// </summary>
     public static class CimService
     {
@@ -90,6 +91,8 @@ namespace Dataplat.Dbatools.Connection
             if (!ConnectionHost.Connections.TryGetValue(computer, out connection) || connection == null)
                 connection = new ManagementConnection(computer);
 
+            // PS: New-DbaCimSessionOptionWithTimeout - session options carry the configured
+            // operation timeout (ComputerManagement.CimOperationTimeout, fallback 60s).
             TimeSpan operationTimeout = GetConfigTimeSpan("computermanagement.cimoperationtimeout", TimeSpan.FromSeconds(60));
             if (connection.CimWinRMOptions == null)
             {
@@ -99,6 +102,9 @@ namespace Dataplat.Dbatools.Connection
             }
             if (connection.CimDComOptions == null)
             {
+                // Mirror GetDefaultCimDcomOptions/New-CimSessionOption -Protocol Dcom: a raw
+                // DComSessionOptions without impersonation/packet settings makes local DCOM
+                // enumerations fail with NotFound (verified live 2026-07-06).
                 DComSessionOptions dcomOptions = new DComSessionOptions();
                 dcomOptions.PacketPrivacy = true;
                 dcomOptions.PacketIntegrity = true;
@@ -107,8 +113,9 @@ namespace Dataplat.Dbatools.Connection
                 connection.CimDComOptions = dcomOptions;
             }
 
-            // The PS parameter binder caches the connection at bind time, BEFORE the
-            // process block runs - mirror that here.
+            // The PS parameter binder caches the connection at bind time, BEFORE the process
+            // block runs - so even a run that fails preflight leaves cache state behind.
+            // Mirror that here (cross-model review 2026-07-06 finding 2).
             if (!ConnectionHost.DisableCache)
                 ConnectionHost.Connections[computer] = connection;
 
@@ -377,133 +384,6 @@ namespace Dataplat.Dbatools.Connection
                 message += "The windows credentials are known to work, however the connection is not configured to automatically use them. This can be done using 'Set-DbaCmConnection -ComputerName " + connection + " -OverrideExplicitCredential' ";
             message += e.Message;
             return message;
-        }
-
-        /// <summary>
-        /// Enumerates all CIM instances of a class on the target computer, trying CIM over
-        /// WinRM first and CIM over DCOM second (integrated auth first when no credential is
-        /// given), with Get-DbaCmObject's cache discipline: successes and failures are
-        /// reported onto the cached ManagementConnection, good/bad credentials are recorded,
-        /// and the connection is written back to ConnectionHost unless caching is disabled.
-        /// </summary>
-        /// <param name="computerName">The target computer name.</param>
-        /// <param name="credential">Optional explicit credential; null = integrated auth.</param>
-        /// <param name="className">The CIM class to enumerate.</param>
-        /// <param name="cimNamespace">The CIM namespace (Get-DbaCmObject defaults to root\cimv2).</param>
-        /// <returns>The materialized instances; enumeration happens inside the protocol loop so lazy CIM faults are triaged.</returns>
-        public static List<CimInstance> EnumerateInstances(string computerName, PSCredential credential, string className, string cimNamespace = @"root\cimv2")
-        {
-            if (String.IsNullOrWhiteSpace(computerName))
-                throw new ArgumentNullException("computerName");
-
-            // PS: all connection caching runs using lower-case strings.
-            string computer = computerName.ToLowerInvariant();
-
-            ManagementConnection connection;
-            if (!ConnectionHost.Connections.TryGetValue(computer, out connection) || connection == null)
-                connection = new ManagementConnection(computer);
-
-            // PS: New-DbaCimSessionOptionWithTimeout - session options carry the configured
-            // operation timeout (ComputerManagement.CimOperationTimeout, fallback 60s).
-            TimeSpan operationTimeout = GetConfigTimeSpan("computermanagement.cimoperationtimeout", TimeSpan.FromSeconds(60));
-            if (connection.CimWinRMOptions == null)
-            {
-                WSManSessionOptions wsmanOptions = new WSManSessionOptions();
-                wsmanOptions.Timeout = operationTimeout;
-                connection.CimWinRMOptions = wsmanOptions;
-            }
-            if (connection.CimDComOptions == null)
-            {
-                // Mirror GetDefaultCimDcomOptions/New-CimSessionOption -Protocol Dcom: a raw
-                // DComSessionOptions without impersonation/packet settings makes local DCOM
-                // enumerations fail with NotFound (verified live 2026-07-06).
-                DComSessionOptions dcomOptions = new DComSessionOptions();
-                dcomOptions.PacketPrivacy = true;
-                dcomOptions.PacketIntegrity = true;
-                dcomOptions.Impersonation = ImpersonationType.Impersonate;
-                dcomOptions.Timeout = operationTimeout;
-                connection.CimDComOptions = dcomOptions;
-            }
-
-            // The PS parameter binder caches the connection at bind time, BEFORE the process
-            // block runs - so even a run that fails preflight leaves cache state behind.
-            // Mirror that here (cross-model review 2026-07-06 finding 2).
-            if (!ConnectionHost.DisableCache)
-                ConnectionHost.Connections[computer] = connection;
-
-            PSCredential cred;
-            try
-            {
-                cred = connection.GetCredential(credential);
-            }
-            catch (Exception e)
-            {
-                throw new InvalidOperationException(ComposeBadCredentialMessage(connection, credential, e), e);
-            }
-
-            // The service drives only the two CIM rungs; the others are excluded up front so
-            // GetConnectionType sequences CimRM -> CimDCOM exactly like the PS loop does when
-            // both are viable.
-            ManagementConnectionType excluded = ManagementConnectionType.Wmi | ManagementConnectionType.PowerShellRemoting;
-
-            while (true)
-            {
-                ManagementConnectionType conType;
-                try
-                {
-                    conType = connection.GetConnectionType(excluded, false);
-                }
-                catch (Exception e)
-                {
-                    if (!ConnectionHost.DisableCache)
-                        ConnectionHost.Connections[computer] = connection;
-                    throw new PSInvalidOperationException("[" + computer + "] Unable to find a connection to the target system. Ensure the name is typed correctly, and the server allows any of the following protocols: CimRM, CimDCOM", e);
-                }
-
-                try
-                {
-                    object raw;
-                    if (conType == ManagementConnectionType.CimRM)
-                        raw = connection.GetCimRMInstance(cred, className, cimNamespace);
-                    else
-                        raw = connection.GetCimDComInstance(cred, className, cimNamespace);
-
-                    // Materialize inside the try: MMI enumerables fault lazily, and the PS
-                    // pipeline likewise enumerates the method result inside its try block.
-                    List<CimInstance> instances = new List<CimInstance>();
-                    IEnumerable<CimInstance> sequence = raw as IEnumerable<CimInstance>;
-                    if (sequence != null)
-                    {
-                        foreach (CimInstance instance in sequence)
-                            instances.Add(instance);
-                    }
-
-                    connection.ReportSuccess(conType);
-                    connection.AddGoodCredential(cred);
-                    if (!ConnectionHost.DisableCache)
-                        ConnectionHost.Connections[computer] = connection;
-                    return instances;
-                }
-                catch (Exception e)
-                {
-                    CimErrorVerdict verdict = ResolveCimError(e, computer, className, cimNamespace);
-
-                    if (verdict.BadCredentials)
-                    {
-                        connection.AddBadCredential(cred);
-                        if (!ConnectionHost.DisableCache)
-                            ConnectionHost.Connections[computer] = connection;
-                        throw new UnauthorizedAccessException("[" + computer + "] Invalid connection credentials", e);
-                    }
-                    if (verdict.BadConnection)
-                    {
-                        connection.ReportFailure(conType);
-                        excluded = excluded | conType;
-                        continue;
-                    }
-                    throw new InvalidOperationException(verdict.Message, e);
-                }
-            }
         }
 
         private sealed class CimErrorVerdict

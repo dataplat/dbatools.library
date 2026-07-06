@@ -300,9 +300,11 @@ public sealed class GetDbaOperatingSystemCommand : DbaBaseCmdlet
     {
         // PS: $splatDbaCmObject = @{ ComputerName; EnableException = $true } (+ Credential
         // when bound); EnableException means chain failures THROW into the caller's catch.
+        // The PS binder converts the resolved name through DbaCmConnectionParameter, which
+        // keeps only the host part - mirror that so bypass-shaped names still bind.
         CimService.CmObjectRequest request = new()
         {
-            ComputerName = computerResolved,
+            ComputerName = new DbaInstanceParameter(computerResolved).ComputerName,
             ClassName = className,
             Namespace = cimNamespace
         };

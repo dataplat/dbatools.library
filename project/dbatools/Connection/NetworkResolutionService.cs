@@ -68,19 +68,24 @@ namespace Dataplat.Dbatools.Connection
             if (computer == null)
                 throw new ArgumentNullException("computer");
 
-            // PS: commands.resolve-dbanetworkname.bypass echoes the input straight back.
+            // PS: commands.resolve-dbanetworkname.bypass echoes the input straight back -
+            // every field carries the input parameter, whose string form is the FullName
+            // (instance/port decorations included), not the bare host name (cross-model
+            // review 2026-07-06 pm2 finding 3). Callers that feed a field into a
+            // host-scoped consumer re-bind through DbaInstanceParameter, like the PS
+            // binder did.
             if (GetConfigTruthy("commands.resolve-dbanetworkname.bypass"))
             {
                 NetworkResolutionResult bypass = new NetworkResolutionResult();
                 bypass.InputName = computer;
-                bypass.ComputerName = computer.ComputerName;
-                bypass.IPAddress = computer.ComputerName;
-                bypass.DNSHostname = computer.ComputerName;
-                bypass.DNSDomain = computer.ComputerName;
-                bypass.Domain = computer.ComputerName;
-                bypass.DNSHostEntry = computer.ComputerName;
-                bypass.FQDN = computer.ComputerName;
-                bypass.FullComputerName = computer.ComputerName;
+                bypass.ComputerName = computer.FullName;
+                bypass.IPAddress = computer.FullName;
+                bypass.DNSHostname = computer.FullName;
+                bypass.DNSDomain = computer.FullName;
+                bypass.Domain = computer.FullName;
+                bypass.DNSHostEntry = computer.FullName;
+                bypass.FQDN = computer.FullName;
+                bypass.FullComputerName = computer.FullName;
                 return bypass;
             }
 

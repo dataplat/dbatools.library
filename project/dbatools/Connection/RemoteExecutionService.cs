@@ -196,9 +196,12 @@ namespace Dataplat.Dbatools.Connection
                 if (currentSession != null)
                     shell.AddParameter("Session", currentSession);
                 shell.AddParameter("ScriptBlock", scriptBlock);
-                if (request.ArgumentList != null && request.ArgumentList.Length > 0)
+                // PS: if ($ArgumentList) / if ($InputObject) - PowerShell array truthiness,
+                // so a single-element array holding $null/$false/0/"" is NOT passed
+                // (cross-model review 2026-07-06 pm2 finding 1).
+                if (request.ArgumentList != null && LanguagePrimitives.IsTrue(request.ArgumentList))
                     shell.AddParameter("ArgumentList", request.ArgumentList);
-                if (request.InputObject != null && request.InputObject.Length > 0)
+                if (request.InputObject != null && LanguagePrimitives.IsTrue(request.InputObject))
                     shell.AddParameter("InputObject", request.InputObject);
                 if (!request.Raw)
                 {
