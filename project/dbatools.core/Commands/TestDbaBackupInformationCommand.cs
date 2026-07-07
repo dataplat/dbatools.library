@@ -97,8 +97,9 @@ public sealed class TestDbaBackupInformationCommand : DbaBaseCmdlet
             return;
         }
 
-        Hashtable physicalFileParms = new() { ["SqlInstance"] = _restoreInstance };
-        Collection<PSObject> registeredFileCheck = NestedCommand.Invoke(this, "Get-DbaDbPhysicalFile", physicalFileParms);
+        // Get-DbaDbPhysicalFile is a PRIVATE dbatools function, invisible to nested command
+        // resolution from a binary module — ported as an internal helper instead.
+        System.Data.DataRow[] registeredFileCheck = RestoreUtility.GetDbaDbPhysicalFile(this, _restoreInstance!);
 
         // $InternalHistory.Database | Select-Object -Unique (case-sensitive, first-seen order)
         List<string> databases = new();
@@ -149,7 +150,7 @@ public sealed class TestDbaBackupInformationCommand : DbaBaseCmdlet
 
                 List<object?> dbFileCheck = new();
                 List<object?> otherFileCheck = new();
-                foreach (PSObject registered in registeredFileCheck)
+                foreach (System.Data.DataRow registered in registeredFileCheck)
                 {
                     if (PsOps.Eq(PsProperty.Get(registered, "Name"), database))
                         dbFileCheck.Add(PsProperty.Get(registered, "PhysicalName"));

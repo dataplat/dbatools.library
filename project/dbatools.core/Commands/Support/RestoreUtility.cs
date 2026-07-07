@@ -214,6 +214,40 @@ internal static class RestoreUtility
     }
 
     /// <summary>
+    /// Port of private/functions/Get-DbaDbPhysicalFile.ps1: fastest way to fetch just the
+    /// paths of the physical files for every database on the instance, also for offline
+    /// databases. The caller passes its live connected server (Connect pass-through).
+    /// </summary>
+    internal static System.Data.DataRow[] GetDbaDbPhysicalFile(PSCmdlet host, Server server)
+    {
+        string sql;
+        if (server.VersionMajor <= 8)
+        {
+            sql = "SELECT DB_NAME(dbid) AS name, Name AS LogicalName, filename AS PhysicalName, type FROM sysaltfiles";
+        }
+        else
+        {
+            sql = "SELECT DB_NAME(database_id) AS Name, name AS LogicalName, physical_name AS PhysicalName, type FROM sys.master_files";
+        }
+        InnerCommand.Message(host, "Get-DbaDbPhysicalFile", false, Dataplat.Dbatools.Message.MessageLevel.Debug, sql);
+        try
+        {
+            List<System.Data.DataRow> rows = new();
+            System.Data.DataSet results = server.ConnectionContext.ExecuteWithResults(sql);
+            foreach (System.Data.DataTable table in results.Tables)
+            {
+                foreach (System.Data.DataRow row in table.Rows)
+                    rows.Add(row);
+            }
+            return rows.ToArray();
+        }
+        catch
+        {
+            throw new InvalidOperationException("Error enumerating files");
+        }
+    }
+
+    /// <summary>
     /// PS parameter-binding parity: a [string] parameter that was not bound (or was bound
     /// $null) is an EMPTY string inside a PS function, and the restore ecosystem leans on
     /// '' -ne $x checks everywhere. Apply to every string parameter on entry.
