@@ -389,10 +389,13 @@ public sealed class SelectDbaBackupInformationCommand : DbaBaseCmdlet
                     }
                     PsProperty.Set(lastLog, "FullName", FlattenMember(sameSet, "FullName"));
                 }
-                // PS: $dbHistory += $lastLog appends even when $lastLog is $null, and the
-                // trailing $dbhistory emission writes that null to the pipeline. Preserved
-                // (deliberate deviation from the no-WriteObject(null) guidance for parity).
-                dbHistory.Add(lastLog);
+                // PS: $dbHistory += $lastLog — when no last log matched, Select-Object -First 1
+                // returned AutomationNull, and += with AutomationNull appends NOTHING
+                // (empirically verified on the lab, 2026-07-07). Only a real match appends.
+                if (lastLog is not null)
+                {
+                    dbHistory.Add(lastLog);
+                }
             }
             foreach (object? item in dbHistory)
                 WriteObject(item);
