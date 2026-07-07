@@ -1,0 +1,149 @@
+using System;
+using Dataplat.Dbatools.Connection;
+using Dataplat.Dbatools.Parameter;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace Dataplat.Dbatools.Connection.Test
+{
+    /// <summary>
+    /// Pure-logic coverage for the W1-001 Connect-DbaInstance engine helpers: connection
+    /// string normalization, retry edits, username normalization, error-message walking and
+    /// Azure detection. Live connection behavior is covered by the lab integration gate.
+    /// </summary>
+    [TestClass]
+    public class ConnectionServiceHelpersTest
+    {
+        [TestMethod]
+        public void ConvertConnectionString_RewritesLegacySynonyms()
+        {
+            string legacy = "Data Source=sql01;Application Intent=ReadOnly;Multiple Active Result Sets=True;Trust Server Certificate=True;Connect Retry Count=3";
+            string converted = ConnectionService.ConvertConnectionString(legacy);
+            StringAssert.Contains(converted, "ApplicationIntent=ReadOnly");
+            StringAssert.Contains(converted, "MultipleActiveResultSets=True");
+            StringAssert.Contains(converted, "TrustServerCertificate=True");
+            StringAssert.Contains(converted, "ConnectRetryCount=3");
+            Assert.IsFalse(converted.Contains("Application Intent"));
+        }
+
+        [TestMethod]
+        public void NormalizeFailoverPartnerKey_RewritesCompactSpelling()
+        {
+            string normalized = ConnectionService.NormalizeFailoverPartnerKey("Data Source=sqlmirror;FailoverPartner=mirrorpartner");
+            StringAssert.Contains(normalized, "Failover Partner=mirrorpartner");
+            Assert.IsFalse(normalized.Contains("FailoverPartner="));
+        }
+
+        [TestMethod]
+        public void EnsureInitialCatalogForFailoverPartner_AppendsMasterOnlyWithPartnerAndNoCatalog()
+        {
+            string withPartner = ConnectionService.EnsureInitialCatalogForFailoverPartner("Data Source=sqlmirror;Failover Partner=mirrorpartner");
+            StringAssert.Contains(withPartner, ";Initial Catalog=master;");
+
+            string trailingSemicolon = ConnectionService.EnsureInitialCatalogForFailoverPartner("Data Source=sqlmirror;Failover Partner=mirrorpartner;");
+            StringAssert.EndsWith(trailingSemicolon, "Failover Partner=mirrorpartner;Initial Catalog=master;");
+
+            string withCatalog = ConnectionService.EnsureInitialCatalogForFailoverPartner("Data Source=sqlmirror;Failover Partner=mirrorpartner;Initial Catalog=tempdb");
+            Assert.IsFalse(withCatalog.Contains("master"));
+
+            string noPartner = ConnectionService.EnsureInitialCatalogForFailoverPartner("Data Source=sql01");
+            Assert.AreEqual("Data Source=sql01", noPartner);
+        }
+
+        [TestMethod]
+        public void EnsureInitialCatalogMaster_AppendsWhenMissingRegardlessOfPartner()
+        {
+            string appended = ConnectionService.EnsureInitialCatalogMaster("Data Source=sqlmirror;Integrated Security=True");
+            StringAssert.EndsWith(appended, ";Initial Catalog=master;");
+
+            string keptDatabase = ConnectionService.EnsureInitialCatalogMaster("Data Source=sqlmirror;Database=tempdb");
+            Assert.IsFalse(keptDatabase.Contains("master"));
+        }
+
+        [TestMethod]
+        public void RemoveIntegratedSecurity_IsCaseInsensitive()
+        {
+            string removed = ConnectionService.RemoveIntegratedSecurity("Data Source=sql01;integrated security=true;Pooling=True");
+            Assert.AreEqual("Data Source=sql01;Pooling=True", removed);
+        }
+
+        [TestMethod]
+        public void ApplyTrustServerCertificate_FlipsFalseAndAppendsWhenAbsent()
+        {
+            string flipped = ConnectionService.ApplyTrustServerCertificate("Data Source=sql01;Trust Server Certificate=False");
+            StringAssert.Contains(flipped, "Trust Server Certificate=True");
+            Assert.IsFalse(flipped.Contains("Trust Server Certificate=False"));
+
+            string appended = ConnectionService.ApplyTrustServerCertificate("Data Source=sql01");
+            StringAssert.EndsWith(appended, ";Trust Server Certificate=True;");
+
+            string appendedTrailing = ConnectionService.ApplyTrustServerCertificate("Data Source=sql01;");
+            StringAssert.EndsWith(appendedTrailing, "Data Source=sql01;Trust Server Certificate=True;");
+        }
+
+        [TestMethod]
+        public void NormalizeConnectUserName_TrimsLeadingBackslash()
+        {
+            string normalized = ConnectionService.NormalizeConnectUserName("\\sqladmin", "WORKGROUPBOX", "WORKGROUPBOX");
+            Assert.AreEqual("sqladmin", normalized);
+        }
+
+        [TestMethod]
+        public void NormalizeConnectUserName_RewritesDomainUserWhenDomainJoined()
+        {
+            // USERDOMAIN differs from COMPUTERNAME, so ad\username becomes username@ad
+            string normalized = ConnectionService.NormalizeConnectUserName("LAB\\cl", "LAB", "WORKSTATION");
+            Assert.AreEqual("cl@LAB", normalized);
+        }
+
+        [TestMethod]
+        public void NormalizeConnectUserName_KeepsDomainUserOnWorkgroupHost()
+        {
+            // USERDOMAIN equals COMPUTERNAME (workgroup), so the name stays domain\user
+            string normalized = ConnectionService.NormalizeConnectUserName("LAB\\cl", "MYBOX", "MYBOX");
+            Assert.AreEqual("LAB\\cl", normalized);
+        }
+
+        [TestMethod]
+        public void NormalizeConnectUserName_KeepsUpnUntouched()
+        {
+            string normalized = ConnectionService.NormalizeConnectUserName("cl@lab.local", "LAB", "WORKSTATION");
+            Assert.AreEqual("cl@lab.local", normalized);
+        }
+
+        [TestMethod]
+        public void GetDeepErrorMessage_ReturnsDeepestMessageWithinSixLevels()
+        {
+            Exception deep = new Exception("outer",
+                new Exception("middle",
+                    new Exception("deepest")));
+            Assert.AreEqual("deepest", ConnectionService.GetDeepErrorMessage(deep));
+
+            Assert.AreEqual("only", ConnectionService.GetDeepErrorMessage(new Exception("only")));
+        }
+
+        [TestMethod]
+        public void HideConnectionString_MasksPassword()
+        {
+            string masked = ConnectionService.HideConnectionString("Data Source=sql01;User ID=sa;Password=dbatools.IO");
+            StringAssert.Contains(masked, "********");
+            Assert.IsFalse(masked.Contains("dbatools.IO"));
+        }
+
+        [TestMethod]
+        public void HideConnectionString_ReportsUnparseableStrings()
+        {
+            string masked = ConnectionService.HideConnectionString("this is not; a =connection;;string==");
+            Assert.AreEqual("Failed to mask the connection string", masked);
+        }
+
+        [TestMethod]
+        public void IsAzureInstance_MatchesEscapedDomainSuffix()
+        {
+            DbaInstanceParameter azure = new DbaInstanceParameter("mydb.database.windows.net");
+            Assert.IsTrue(ConnectionService.IsAzureInstance(azure, System.Text.RegularExpressions.Regex.Escape("database.windows.net")));
+
+            DbaInstanceParameter local = new DbaInstanceParameter("sql01");
+            Assert.IsFalse(ConnectionService.IsAzureInstance(local, System.Text.RegularExpressions.Regex.Escape("database.windows.net")));
+        }
+    }
+}

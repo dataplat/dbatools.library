@@ -1,33 +1,37 @@
 using System;
 using System.Collections.Generic;
-using System.Management.Automation;
 using System.Text.RegularExpressions;
 using Dataplat.Dbatools.Configuration;
 using Dataplat.Dbatools.Parameter;
 using Microsoft.Data.SqlClient;
-using Microsoft.SqlServer.Management.Common;
 using Microsoft.SqlServer.Management.Smo;
 
 namespace Dataplat.Dbatools.Connection
 {
     /// <summary>
-    /// The C# resolution of Connect-DbaInstance for ported cmdlets, written fresh from
-    /// public/Connect-DbaInstance.ps1 (migration/specs/architecture.md section 4). This is
-    /// the Phase 0 skeleton (P0-010a): live SMO Server passthrough, SqlConnection wrapping,
-    /// connection strings, and the string path with the integrated/SQL-login/Windows-credential
-    /// auth rows, config-driven defaults, the verify query, the TrustServerCertificate retry,
-    /// MinimumVersion/AzureUnsupported rejection and the SMO cache. Azure Entra flows, DAC and
-    /// AccessToken land with P0-010b.
+    /// The C# resolution of Connect-DbaInstance, written fresh from
+    /// public/Connect-DbaInstance.ps1 (migration/specs/architecture.md section 4). W1-001
+    /// completes the P0-010a skeleton: the full input resolution matrix (live Server
+    /// passthrough and context copy, SqlConnection, RegisteredServer, connection string,
+    /// String), the full auth matrix including the Entra flows and AccessToken shapes, the
+    /// dedicated admin connection rewrite, the verify query with the
+    /// AllowTrustServerCertificate and failover-partner retries, MinimumVersion and
+    /// AzureUnsupported rejection, PS-exact decoration, TEPP seeding, SetDefaultInitFields
+    /// priming, and the ActiveConnections registry (Add-ConnectionHashValue parity).
+    /// The Connect-DbaInstance cmdlet drives ResolveInstance directly so every Stop-Function
+    /// call site keeps its exact control flow; internal callers use the GetServer facade.
     /// </summary>
-    public static class ConnectionService
+    public static partial class ConnectionService
     {
-        /// <summary>The Azure SQL Database domain suffix used for Azure detection.</summary>
+        /// <summary>The Azure SQL Database domain suffix used for Azure detection when a request does not carry its own.</summary>
         public static string AzureDomain = "database.windows.net";
 
         /// <summary>
         /// Resolves a connection request to a connected SMO Server, per the input resolution
-        /// and auth matrices. Throws on failure; DbaInstanceCmdlet.ConnectInstance converts
-        /// failures into the canonical Stop-Function shape.
+        /// and auth matrices, then runs the new-connection registrations (TEPP seeding,
+        /// SetDefaultInitFields, connection hash). Throws on failure;
+        /// DbaInstanceCmdlet.ConnectInstance converts failures into the canonical
+        /// Stop-Function shape.
         /// </summary>
         /// <param name="request">The connection request</param>
         /// <returns>A connected, decorated SMO Server</returns>
@@ -38,53 +42,31 @@ namespace Dataplat.Dbatools.Connection
             if (request.Instance == null)
                 throw new ArgumentException("The request carries no target instance", "request");
 
-            // ApplicationIntent participates in the cache key but its connection-string
-            // application is P0-010b work; failing loud beats silently ignoring the request
-            // (cross-model review finding, 2026-07-06).
-            if (!String.IsNullOrEmpty(request.ApplicationIntent))
-                throw new NotSupportedException("ApplicationIntent is not implemented in ConnectionService yet (P0-010b)");
+            request.ApplyConfigurationDefaults();
+            ConnectionResolution resolution = ResolveInstance(request);
+            if (resolution.Server == null)
+                throw new InvalidOperationException("The request resolved to a bare SqlConnection; use GetSqlConnection for SqlConnectionOnly requests");
+            FinalizeConnection(resolution, request);
+            return resolution.Server;
+        }
 
-            DbaInstanceParameter instance = request.Instance;
-            object inputObject = UnwrapInput(instance.InputObject);
+        /// <summary>
+        /// The -SqlConnectionOnly path: resolves the request and returns
+        /// ConnectionContext.SqlConnectionObject, registered in the active-connection registry.
+        /// </summary>
+        /// <param name="request">The connection request</param>
+        /// <returns>The bare SqlConnection</returns>
+        public static SqlConnection GetSqlConnection(SmoConnectionRequest request)
+        {
+            if (request == null)
+                throw new ArgumentNullException("request");
+            if (request.Instance == null)
+                throw new ArgumentException("The request carries no target instance", "request");
 
-            // Row 1: a live SMO Server binds through unchanged - no reconnect, no re-auth.
-            Server liveServer = inputObject as Server;
-            if (liveServer != null)
-            {
-                Server contextResult = ResolveLiveServer(liveServer, request);
-                if (contextResult != null)
-                    return contextResult;
-            }
-
-            // Row 4: a raw SqlConnection is wrapped in place.
-            SqlConnection sqlConnection = inputObject as SqlConnection;
-            if (sqlConnection != null)
-            {
-                Server wrapped = new Server(new ServerConnection(sqlConnection));
-                VerifyAndDecorate(wrapped, request, true);
-                return wrapped;
-            }
-
-            // Row 6: connection strings flow through ServerConnection.ConnectionString.
-            if (instance.IsConnectionString)
-            {
-                ServerConnection stringConnection = new ServerConnection();
-                stringConnection.ConnectionString = instance.InputObject.ToString();
-                Server fromConnectionString = new Server(stringConnection);
-                VerifyAndDecorate(fromConnectionString, request, true);
-                return fromConnectionString;
-            }
-
-            // Row 7: the string path with the auth matrix. The SmoServerCache READ path stays
-            // disabled until the P0-010c parallel change unifies the PS connection cache onto
-            // ConnectionHost: while PS functions and C# cmdlets hold SEPARATE SMO Server
-            // objects, a cached C# Server serves stale SMO property bags after a PS command
-            // mutates the instance (live-fired by Get-DbaMaxMemory's gate: Set-DbaMaxMemory
-            // then Get-DbaMaxMemory read the pre-Set value from cache). A fresh Server rides
-            // SqlClient connection pooling, so the reconnect cost is negligible.
-            Server server = BuildServer(instance, request);
-            VerifyAndDecorate(server, request, true);
-            return server;
+            request.SqlConnectionOnly = true;
+            request.ApplyConfigurationDefaults();
+            ConnectionResolution resolution = ResolveInstance(request);
+            return resolution.SqlConnection;
         }
 
         /// <summary>
@@ -117,176 +99,269 @@ namespace Dataplat.Dbatools.Connection
             return String.Format("{0}|{1}|{2}|{3}", instance.FullSmoName.ToLowerInvariant(), database.ToLowerInvariant(), authority.ToLowerInvariant(), intent.ToLowerInvariant());
         }
 
-        private static Server ResolveLiveServer(Server liveServer, SmoConnectionRequest request)
+        #region String helpers (public for MSTest coverage)
+        /// <summary>
+        /// private/functions/Convert-ConnectionString.ps1: rewrites the legacy System.Data
+        /// keyword spellings onto the Microsoft.Data.SqlClient synonyms.
+        /// https://docs.microsoft.com/en-us/sql/connect/ado-net/introduction-microsoft-data-sqlclient-namespace?view=sql-server-ver15#new-connection-string-property-synonyms
+        /// </summary>
+        /// <param name="connectionString">The raw connection string</param>
+        /// <returns>The normalized connection string</returns>
+        public static string ConvertConnectionString(string connectionString)
         {
-            // Context-changing parameters (differing Database) would require a
-            // ConnectionContext.Copy per matrix row 2; none of the Phase 0 consumers pass
-            // one, so the live object flows through with the gate checks applied.
-            ApplyGateChecks(liveServer, request, false);
-            return liveServer;
+            if (connectionString == null)
+                return null;
+            string connstring = connectionString;
+            connstring = connstring.Replace("Application Intent", "ApplicationIntent");
+            connstring = connstring.Replace("Connect Retry Count", "ConnectRetryCount");
+            connstring = connstring.Replace("Connect Retry Interval", "ConnectRetryInterval");
+            connstring = connstring.Replace("Pool Blocking Period", "PoolBlockingPeriod");
+            connstring = connstring.Replace("Multiple Active Result Sets", "MultipleActiveResultSets");
+            connstring = connstring.Replace("Multiple Subnet Failover", "MultiSubnetFailover");
+            connstring = connstring.Replace("Trust Server Certificate", "TrustServerCertificate");
+            return connstring;
         }
 
-        private static Server BuildServer(DbaInstanceParameter instance, SmoConnectionRequest request)
+        /// <summary>PS: $connectionString -replace "(?i)\bFailoverPartner\s*=", "Failover Partner="</summary>
+        /// <param name="connectionString">The connection string</param>
+        /// <returns>The connection string with the spaced Failover Partner keyword</returns>
+        public static string NormalizeFailoverPartnerKey(string connectionString)
         {
-            ServerConnection connection = new ServerConnection();
-            connection.ServerInstance = instance.FullSmoName;
+            if (connectionString == null)
+                return null;
+            return Regex.Replace(connectionString, "(?i)\\bFailoverPartner\\s*=", "Failover Partner=");
+        }
 
-            int connectTimeout = GetConfigInt("sql.connection.timeout", 15);
-            connection.ConnectTimeout = connectTimeout;
-
-            string clientName = GetConfigString("sql.connection.clientname", null);
-            if (!String.IsNullOrEmpty(clientName))
-                connection.ApplicationName = clientName;
-
-            string database = request.Database;
-            if (String.IsNullOrEmpty(database))
-                database = GetConfigString("sql.connection.database", null);
-            if (!String.IsNullOrEmpty(database))
-                connection.DatabaseName = database;
-
-            // Encryption defaults follow the config system exactly (BP-103); the PS source
-            // skips EncryptConnection for (localdb) instances verbatim.
-            bool isLocalDb = instance.FullSmoName.IndexOf("(localdb)", StringComparison.OrdinalIgnoreCase) >= 0;
-            object encryptRaw = GetConfigRaw("sql.connection.encrypt");
-            if (encryptRaw != null && !isLocalDb)
-                connection.EncryptConnection = ToBool(encryptRaw);
-            object trustRaw = GetConfigRaw("sql.connection.trustcert");
-            if (trustRaw != null)
-                connection.TrustServerCertificate = ToBool(trustRaw);
-
-            int statementTimeout = GetConfigInt("sql.execution.timeout", -1);
-            if (statementTimeout >= 0)
-                connection.StatementTimeout = statementTimeout;
-
-            if (request.SqlCredential == null)
+        /// <summary>
+        /// When a Failover Partner is present without an Initial Catalog/Database, appends
+        /// Initial Catalog=master; (the .NET SqlClient pool requires a catalog with mirroring
+        /// targets). Mirrors Connect-DbaInstance.ps1 exactly, including the trailing-semicolon
+        /// handling.
+        /// </summary>
+        /// <param name="connectionString">The connection string</param>
+        /// <returns>The connection string, possibly with Initial Catalog=master; appended</returns>
+        public static string EnsureInitialCatalogForFailoverPartner(string connectionString)
+        {
+            if (connectionString == null)
+                return null;
+            string result = connectionString;
+            if (Regex.IsMatch(result, "(?i)\\bFailover Partner\\s*=") && !Regex.IsMatch(result, "(?i)\\b(?:Initial Catalog|Database)\\s*="))
             {
-                connection.LoginSecure = true;
-            }
-            else
-            {
-                string userName = NormalizeUserName(request.SqlCredential.UserName);
-                if (userName.Contains("\\") || userName.Contains("@"))
-                {
-                    if (Environment.OSVersion.Platform != PlatformID.Win32NT)
-                        throw new InvalidOperationException("Cannot use Windows credentials to connect when host is Linux or OS X. Use kinit instead. See https://github.com/dataplat/dbatools/issues/7602 for more info.");
-                    connection.LoginSecure = true;
-                    connection.ConnectAsUser = true;
-                    connection.ConnectAsUserName = userName;
-                    connection.ConnectAsUserPassword = request.SqlCredential.GetNetworkCredential().Password;
-                }
+                if (Regex.IsMatch(result, ";$"))
+                    result += "Initial Catalog=master;";
                 else
-                {
-                    connection.LoginSecure = false;
-                    connection.Login = userName;
-                    connection.SecurePassword = request.SqlCredential.Password;
-                }
+                    result += ";Initial Catalog=master;";
             }
-
-            return new Server(connection);
+            return result;
         }
 
-        private static void VerifyAndDecorate(Server server, SmoConnectionRequest request, bool isNewConnection)
+        /// <summary>
+        /// Appends Initial Catalog=master; for the failover-partner retry when no catalog is
+        /// present (the retry path variant that does not require the Failover Partner keyword,
+        /// because the SERVER reported the requirement).
+        /// </summary>
+        /// <param name="connectionString">The connection string</param>
+        /// <returns>The connection string with a catalog guaranteed</returns>
+        public static string EnsureInitialCatalogMaster(string connectionString)
+        {
+            if (connectionString == null)
+                return null;
+            string result = connectionString;
+            if (!Regex.IsMatch(result, "(?i)\\b(?:Initial Catalog|Database)\\s*="))
+            {
+                if (Regex.IsMatch(result, ";$"))
+                    result += "Initial Catalog=master;";
+                else
+                    result += ";Initial Catalog=master;";
+            }
+            return result;
+        }
+
+        /// <summary>PS: $connectionString -replace 'Integrated Security=True;', '' (case-insensitive).</summary>
+        /// <param name="connectionString">The connection string</param>
+        /// <returns>The connection string without the integrated-security keyword</returns>
+        public static string RemoveIntegratedSecurity(string connectionString)
+        {
+            if (connectionString == null)
+                return null;
+            return Regex.Replace(connectionString, "Integrated Security=True;", "", RegexOptions.IgnoreCase);
+        }
+
+        /// <summary>
+        /// The AllowTrustServerCertificate retry edit: flips Trust Server Certificate=False to
+        /// True (case-insensitive, like the PS -replace) or appends the keyword when absent.
+        /// </summary>
+        /// <param name="connectionString">The failing connection string</param>
+        /// <returns>The trusted connection string</returns>
+        public static string ApplyTrustServerCertificate(string connectionString)
+        {
+            if (connectionString == null)
+                return null;
+            string result = Regex.Replace(connectionString, "Trust Server Certificate=False", "Trust Server Certificate=True", RegexOptions.IgnoreCase);
+            if (!Regex.IsMatch(result, "Trust Server Certificate", RegexOptions.IgnoreCase))
+            {
+                if (Regex.IsMatch(result, ";$"))
+                    result += "Trust Server Certificate=True;";
+                else
+                    result += ";Trust Server Certificate=True;";
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// The String-path username normalization of Connect-DbaInstance.ps1:
+        /// a leading backslash is trimmed, and domain\user is rewritten to user@domain when
+        /// the environment looks domain-joined (USERDOMAIN differs from COMPUTERNAME).
+        /// </summary>
+        /// <param name="userName">The credential user name</param>
+        /// <param name="userDomain">The USERDOMAIN environment value</param>
+        /// <param name="computerName">The COMPUTERNAME environment value</param>
+        /// <returns>The normalized user name</returns>
+        public static string NormalizeConnectUserName(string userName, string userDomain, string computerName)
+        {
+            if (userName == null)
+                return null;
+            string username = userName.TrimStart('\\');
+            // support both ad\username and username@ad
+            // username@ad works only for domain joined and workgroup
+            // nobody remembers why, but username@ad is preferred
+            // so we switch ad\username to username@ad only doing a raw guess
+            // when USERDOMAIN -ne COMPUTERNAME, we're probably joined to ad
+            if (!String.Equals(userDomain, computerName, StringComparison.OrdinalIgnoreCase))
+            {
+                if (username.Contains("\\"))
+                {
+                    string[] parts = username.Split('\\');
+                    string domain = parts[0];
+                    string login;
+                    if (parts.Length == 2)
+                        login = parts[1];
+                    else
+                        // PS multiple-assignment parity: $domain, $login = $username.Split("\")
+                        // leaves $login as the remaining array, which stringifies space-joined.
+                        login = String.Join(" ", parts, 1, parts.Length - 1);
+                    username = String.Format("{0}@{1}", login, domain);
+                }
+            }
+            return username;
+        }
+
+        /// <summary>
+        /// private/functions/utility/Hide-ConnectionString.ps1: masks the password for debug
+        /// display, or returns the verbatim failure text when the string cannot be parsed.
+        /// </summary>
+        /// <param name="connectionString">The connection string to mask</param>
+        /// <returns>The masked connection string</returns>
+        public static string HideConnectionString(string connectionString)
         {
             try
             {
-                // Verify with a real query - never ConnectionContext.Connect() (it forces a
-                // non-pooled connection) and never trust IsOpen.
-                server.ConnectionContext.ExecuteWithResults("SELECT 'dbatools is opening a new connection'");
+                SqlConnectionStringBuilder connStringBuilder = new SqlConnectionStringBuilder(connectionString);
+                if (!String.IsNullOrEmpty(connStringBuilder.Password))
+                    connStringBuilder.Password = "".PadLeft(8, '*');
+                return connStringBuilder.ConnectionString;
             }
-            catch (Exception initialFailure)
+            catch
             {
-                // AllowTrustServerCertificate single retry on certificate trust failures.
-                bool allowTrustRetry = ToBool(GetConfigRaw("sql.connection.allowtrustcert"));
-                bool alreadyTrusting = false;
-                try { alreadyTrusting = server.ConnectionContext.TrustServerCertificate; }
-                catch { /* older connection shapes may not expose the setting */ }
-                string failureText = CollectMessages(initialFailure);
-                if (allowTrustRetry && isNewConnection && !alreadyTrusting && Regex.IsMatch(failureText, "certificate|SSL|TLS|trust", RegexOptions.IgnoreCase))
-                {
-                    server.ConnectionContext.TrustServerCertificate = true;
-                    server.ConnectionContext.ExecuteWithResults("SELECT 'dbatools is opening a new connection'");
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            ApplyGateChecks(server, request, isNewConnection);
-            Decorate(server, request.Instance);
-            RegisterActiveConnection(server);
-        }
-
-        private static void ApplyGateChecks(Server server, SmoConnectionRequest request, bool isNewConnection)
-        {
-            bool isAzure = IsAzureTarget(request.Instance);
-
-            if (request.AzureUnsupported && (isAzure || server.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase))
-            {
-                if (isNewConnection)
-                    TryDisconnect(server);
-                throw new InvalidOperationException("Azure SQL Database not supported");
-            }
-
-            if (request.MinimumVersion > 0 && server.VersionMajor < request.MinimumVersion)
-            {
-                if (isNewConnection)
-                    TryDisconnect(server);
-                throw new InvalidOperationException(String.Format("SQL Server version {0} required - {1} not supported.", request.MinimumVersion, server));
+                return "Failed to mask the connection string";
             }
         }
 
-        private static void Decorate(Server server, DbaInstanceParameter instance)
+        /// <summary>
+        /// private/functions/Get-ErrorMessage.ps1: the deepest non-empty exception message
+        /// within the first six levels of the chain (the PS walk checks InnerException depth
+        /// five first, then shallower, then the exception itself).
+        /// </summary>
+        /// <param name="exception">The failure</param>
+        /// <returns>The deepest meaningful message</returns>
+        public static string GetDeepErrorMessage(Exception exception)
         {
-            PSObject wrapped = PSObject.AsPSObject(server);
-            bool isAzure = IsAzureTarget(instance);
-
-            string computerName;
-            if (isAzure)
-                computerName = instance.ComputerName;
-            else
+            if (exception == null)
+                return null;
+            string deepest = null;
+            Exception current = exception;
+            int depth = 0;
+            while (current != null && depth <= 5)
             {
-                string netName = null;
-                try { netName = server.NetName; }
-                catch { /* NetName is not available on all targets */ }
-                if (!String.IsNullOrEmpty(netName))
-                    computerName = netName;
-                else
-                    computerName = instance.ComputerName;
+                if (!String.IsNullOrEmpty(current.Message))
+                    deepest = current.Message;
+                current = current.InnerException;
+                depth++;
             }
-
-            AddNoteProperty(wrapped, "ComputerName", computerName);
-            AddNoteProperty(wrapped, "IsAzure", isAzure);
-            AddNoteProperty(wrapped, "DbaInstanceName", instance.InstanceName);
-            AddNoteProperty(wrapped, "SqlInstance", SmoServerExtensions.GetDomainInstanceName(server));
-            AddNoteProperty(wrapped, "NetPort", instance.Port);
-            string trueLogin = null;
-            try { trueLogin = server.ConnectionContext.TrueLogin; }
-            catch { /* TrueLogin needs an open connection; decoration stays best-effort */ }
-            AddNoteProperty(wrapped, "ConnectedAs", trueLogin);
+            return deepest;
         }
 
-        private static void RegisterActiveConnection(Server server)
+        /// <summary>
+        /// The Azure detection of Connect-DbaInstance.ps1:
+        /// $instance.ComputerName -match $AzureDomain -or $instance.InputObject.ComputerName -match $AzureDomain
+        /// with the domain regex-escaped in the begin block.
+        /// </summary>
+        /// <param name="instance">The target instance</param>
+        /// <param name="escapedAzureDomainPattern">The Regex.Escape()d azure domain</param>
+        /// <returns>Whether the target is Azure</returns>
+        public static bool IsAzureInstance(DbaInstanceParameter instance, string escapedAzureDomainPattern)
         {
-            string connectionString = null;
-            try { connectionString = server.ConnectionContext.ConnectionString; }
-            catch { /* no connection string means nothing to register */ }
-            if (String.IsNullOrEmpty(connectionString))
-                return;
-            lock (ConnectionHost.ActiveConnections)
-            {
-                if (!ConnectionHost.ActiveConnections.ContainsKey(connectionString))
-                    ConnectionHost.ActiveConnections[connectionString] = new List<object>();
-                if (!ConnectionHost.ActiveConnections[connectionString].Contains(server))
-                    ConnectionHost.ActiveConnections[connectionString].Add(server);
-            }
-        }
-
-        private static bool IsAzureTarget(DbaInstanceParameter instance)
-        {
-            if (instance == null || String.IsNullOrEmpty(instance.ComputerName))
+            if (instance == null)
                 return false;
-            return Regex.IsMatch(instance.ComputerName, Regex.Escape(AzureDomain), RegexOptions.IgnoreCase);
+            string computerName = instance.ComputerName;
+            if (computerName == null)
+                computerName = "";
+            if (Regex.IsMatch(computerName, escapedAzureDomainPattern, RegexOptions.IgnoreCase))
+                return true;
+            object inputComputerName = SmoServerExtensions.GetPSProperty(instance.InputObject, "ComputerName");
+            string inputComputerText = inputComputerName == null ? "" : inputComputerName.ToString();
+            return Regex.IsMatch(inputComputerText, escapedAzureDomainPattern, RegexOptions.IgnoreCase);
+        }
+        #endregion String helpers (public for MSTest coverage)
+
+        #region Configuration readers
+        /// <summary>Raw ConfigurationHost value for a config key, or null when unset.</summary>
+        /// <param name="key">The lowercase config key</param>
+        /// <returns>The raw value</returns>
+        public static object GetConfigurationValue(string key)
+        {
+            Config config;
+            if (ConfigurationHost.Configurations.TryGetValue(key, out config) && config != null)
+                return config.Value;
+            return null;
+        }
+
+        internal static string GetConfigString(string key, string fallback)
+        {
+            object raw = GetConfigurationValue(key);
+            if (raw == null)
+                return fallback;
+            return raw.ToString();
+        }
+
+        internal static int GetConfigInt(string key, int fallback)
+        {
+            object raw = GetConfigurationValue(key);
+            if (raw == null)
+                return fallback;
+            try { return Convert.ToInt32(raw); }
+            catch { return fallback; }
+        }
+
+        internal static bool GetConfigBool(string key)
+        {
+            object raw = GetConfigurationValue(key);
+            if (raw == null)
+                return false;
+            if (raw is bool)
+                return (bool)raw;
+            try { return Convert.ToBoolean(raw); }
+            catch { return false; }
+        }
+        #endregion Configuration readers
+
+        #region Internal plumbing
+        private static void Msg(SmoConnectionRequest request, Dataplat.Dbatools.Message.MessageLevel level, string message)
+        {
+            // PipelineStoppedException from the cmdlet's WriteMessage must propagate, so no
+            // swallowing here.
+            if (request != null && request.MessageCallback != null)
+                request.MessageCallback(level, message);
         }
 
         private static string NormalizeUserName(string userName)
@@ -300,21 +375,29 @@ namespace Dataplat.Dbatools.Connection
             return normalized;
         }
 
-        private static void AddNoteProperty(PSObject wrapped, string name, object value)
+        private static void AddNoteProperty(System.Management.Automation.PSObject wrapped, string name, object value)
         {
+            // Add-Member -Force semantics: replace when present.
             if (wrapped.Properties[name] != null)
                 wrapped.Properties.Remove(name);
-            wrapped.Properties.Add(new PSNoteProperty(name, value));
+            wrapped.Properties.Add(new System.Management.Automation.PSNoteProperty(name, value));
         }
 
-        private static void TryDisconnect(Server server)
+        private static object UnwrapInput(object inputObject)
         {
-            try { server.ConnectionContext.Disconnect(); }
-            catch { /* teardown of a failed gate check is best-effort */ }
+            System.Management.Automation.PSObject wrapped = inputObject as System.Management.Automation.PSObject;
+            if (wrapped != null)
+                return wrapped.BaseObject;
+            return inputObject;
         }
 
         private static string CollectMessages(Exception exception)
         {
+            // PS triaged $_.Exception.Message; SMO wraps the SqlClient message as the
+            // ConnectionFailureException message so the immediate message usually carries the
+            // keywords. Matching over the (bounded) message chain keeps the retry triggers
+            // robust to wrapper differences between the PS and compiled invocation paths
+            // (libmigration rule: match the exception MESSAGE CHAIN, never ToString()).
             List<string> messages = new List<string>();
             Exception current = exception;
             while (current != null && messages.Count < 10)
@@ -322,50 +405,8 @@ namespace Dataplat.Dbatools.Connection
                 messages.Add(current.Message);
                 current = current.InnerException;
             }
-            return String.Join(" | ", messages);
+            return String.Join(" | ", messages.ToArray());
         }
-
-        private static object GetConfigRaw(string key)
-        {
-            Config config;
-            if (ConfigurationHost.Configurations.TryGetValue(key, out config) && config != null)
-                return config.Value;
-            return null;
-        }
-
-        private static string GetConfigString(string key, string fallback)
-        {
-            object raw = GetConfigRaw(key);
-            if (raw == null)
-                return fallback;
-            return raw.ToString();
-        }
-
-        private static int GetConfigInt(string key, int fallback)
-        {
-            object raw = GetConfigRaw(key);
-            if (raw == null)
-                return fallback;
-            try { return Convert.ToInt32(raw); }
-            catch { return fallback; }
-        }
-
-        private static bool ToBool(object raw)
-        {
-            if (raw == null)
-                return false;
-            if (raw is bool)
-                return (bool)raw;
-            try { return Convert.ToBoolean(raw); }
-            catch { return false; }
-        }
-
-        private static object UnwrapInput(object inputObject)
-        {
-            PSObject wrapped = inputObject as PSObject;
-            if (wrapped != null)
-                return wrapped.BaseObject;
-            return inputObject;
-        }
+        #endregion Internal plumbing
     }
 }
