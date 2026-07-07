@@ -4,14 +4,18 @@ The .NET library that powers [dbatools](https://github.com/dataplat/dbatools), t
 
 **Tech Stack**: C# (.NET Framework 4.7.2 + .NET 8.0), PowerShell module loader, MSTest.
 
-## CRITICAL LANGUAGE VERSION RULE
+## CRITICAL LANGUAGE VERSION RULES (scoped per project)
 
-### LangVersion 7.3 — NO C# 8+ FEATURES
+The repo has TWO language regimes. Which one applies depends on the project directory —
+normative source: `dbatools/migration/specs/architecture.md` section 11.
 
-**ABSOLUTE RULE**: This project targets `LangVersion 7.3`. NEVER use C# 8+ syntax.
+### Shared runtime and CSV package: LangVersion 7.3 — NO C# 8+ FEATURES
+
+**Applies to:** `project/dbatools/` (shared runtime, builds `dbatools.dll`) and
+`project/Dataplat.Dbatools.Csv/`. NEVER use C# 8+ syntax there.
 
 ```csharp
-// FORBIDDEN — C# 8+ features
+// FORBIDDEN in project/dbatools/ and project/Dataplat.Dbatools.Csv/ — C# 8+ features
 var x = obj?.Property ?? "default";   // null-coalescing assignment ??= is C# 8
 string? nullable = null;              // nullable reference types (C# 8)
 var range = array[1..^1];             // ranges/indices (C# 8)
@@ -19,12 +23,28 @@ using var stream = new FileStream(); // using declarations (C# 8)
 var result = obj switch { ... };      // switch expressions (C# 8)
 static int Add(int a, int b) => a+b; // static local functions (C# 8)
 
-// FORBIDDEN — String interpolation (any version)
-var msg = $"Hello {name}";            // NO — not allowed in this project
+// FORBIDDEN there — String interpolation (any version)
+var msg = $"Hello {name}";            // NO — not allowed in the shared runtime
 
 // CORRECT — Use String.Format
 var msg = String.Format("Hello {0}", name);
 ```
+
+### Satellite cmdlet assemblies: modern C# 12 — deliberately NOT 7.3
+
+**Applies to:** every `project/dbatools.<module>/` satellite (agent, computer, core,
+database, hadr, maintenance, performance, replication, security, ssis, xevents). These
+intentionally set `<LangVersion>12</LangVersion>` + `TreatWarningsAsErrors` per the
+migration architecture spec — do NOT "fix" them back to 7.3, and do NOT flag modern
+syntax there as a style violation.
+
+- **Allowed:** file-scoped namespaces, `#nullable enable` (mandatory first line of every
+  `Commands/` file), string interpolation, pattern matching, target-typed `new`,
+  `using` declarations, switch expressions.
+- **Still banned** (net472 + SMA 3.0.0.0 compatibility, see architecture.md §11):
+  `async`/`await`/`Task.Run`, `record`, `init`/`required` members, ranges/indices,
+  `ArgumentCompleterAttribute`, class-level `[Alias]` on cmdlets, `Console.*`/`Host.UI.*`,
+  static mutable state in cmdlet classes, LINQ in hot loops, `Assembly.LoadFile`.
 
 ## CRITICAL CMDLET RULES
 
@@ -104,6 +124,10 @@ dbatools.library/
 │   │   ├── TabExpansion/          # Tab completion (TEPP)
 │   │   ├── TypeConversion/        # Type converters
 │   │   └── Utility/               # DbaDateTime, DbaTimeSpan, etc.
+│   ├── dbatools.<module>/         # Satellite cmdlet assemblies (C# 12): agent, computer,
+│   │                              #   core, database, hadr, maintenance, performance,
+│   │                              #   replication, security, ssis, xevents — ports of
+│   │                              #   dbatools PS commands per dbatools/migration/ specs
 │   ├── Dataplat.Dbatools.Csv/     # Standalone NuGet package (links to Csv/ source)
 │   └── dbatools.Tests/            # MSTest unit tests
 ├── dbatools.library.psd1          # PowerShell module manifest
@@ -168,7 +192,7 @@ When modifying CSV code, changes apply to both. The standalone package has its o
 
 Hooks enforce these rules — if a hook blocks you, fix the violation:
 
-- **C# rules** (`enforce-cs-rules.sh`): Base class, LangVersion 7.3, no Assembly.LoadFile, no direct Write*, no ThrowTerminatingError, XML docs on cmdlets, no string interpolation
+- **C# rules** (`enforce-cs-rules.sh`): Base class, LangVersion 7.3 + no string interpolation (shared runtime and Csv package ONLY — satellites are C# 12 by design), no Assembly.LoadFile, no direct Write*, no ThrowTerminatingError, XML docs on cmdlets. NOTE: this hook is not currently present in `.claude/hooks/` — the rules still apply and are reviewer-enforced until it is restored with per-project scoping.
 - **PSD1 rules** (`enforce-psd1-rules.sh`): No wildcard exports in module manifest
 - **Build check** (`check-build.sh`): Auto-builds after any `.cs` file edit
 - **File length check** (`stop-file-length.sh`, Stop hook): Tracked text/source/docs/scripts/config files must stay at or below 400 physical lines; split files structurally rather than growing them.
@@ -185,8 +209,9 @@ All hooks use `set -eu` (not `pipefail` — unsupported on Windows sh).
 ## VERIFICATION CHECKLIST
 
 **Before submitting any C# change:**
-- [ ] No C# 8+ syntax (no `??=`, no nullable refs, no ranges, no `using` declarations, no switch expressions)
-- [ ] No `$"..."` string interpolation — use `String.Format`
+- [ ] Shared runtime + Csv package only: no C# 8+ syntax (no `??=`, no nullable refs, no ranges, no `using` declarations, no switch expressions)
+- [ ] Shared runtime + Csv package only: no `$"..."` string interpolation — use `String.Format`
+- [ ] Satellites (`project/dbatools.<module>/`): modern C# 12 is correct; only the §11 banned list applies (no async, no `record`/`init`/`required`, no ranges/indices, no ArgumentCompleter)
 - [ ] Cmdlets inherit `DbaBaseCmdlet` or `DbaInstanceCmdlet`
 - [ ] No direct `WriteVerbose`/`WriteWarning`/`WriteDebug` — use `WriteMessage`
 - [ ] No `ThrowTerminatingError` — use `StopFunction`
