@@ -32,12 +32,13 @@ internal static class XpDirTreeScanner
         InnerCommand.Message(host, functionName, enableException, MessageLevel.InternalComment, "Starting");
 
         // Determine the correct path separator based on whether this is a URL or file system path
+        // PS -match is case-insensitive (cross-model review 2026-07-07 finding A3).
         string? pathSep;
-        if (System.Text.RegularExpressions.Regex.IsMatch(path, "^https?://"))
+        if (System.Text.RegularExpressions.Regex.IsMatch(path, "^https?://", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
         {
             pathSep = "/";
         }
-        else if (System.Text.RegularExpressions.Regex.IsMatch(path, "^s3://"))
+        else if (System.Text.RegularExpressions.Regex.IsMatch(path, "^s3://", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
         {
             // S3 paths cannot be enumerated via T-SQL (xp_dirtree/dm_os_enumerate_filesystem don't support S3)
             // SQL Server 2022+ supports S3 for BACKUP/RESTORE but has no built-in function to list S3 objects

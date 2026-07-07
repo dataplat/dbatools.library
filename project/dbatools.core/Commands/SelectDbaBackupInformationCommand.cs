@@ -52,11 +52,15 @@ public sealed class SelectDbaBackupInformationCommand : DbaBaseCmdlet
 
     private readonly List<object?> _internalHistory = new();
     private bool _ignoreFull;
+    // PS mutates the function-scope $IgnoreDiffs inside the continue block, and the mutated
+    // value LEAKS into later database iterations (cross-model review 2026-07-07 finding A6).
+    private bool _ignoreDiffs;
     private bool _continue;
 
     protected override void BeginProcessing()
     {
         _ignoreFull = false;
+        _ignoreDiffs = IgnoreDiffs.ToBool();
         if (TestBound("ContinuePoints") && ContinuePoints is not null)
         {
             WriteMessage(MessageLevel.Verbose, "ContinuePoints provided so setting up for a continue");
@@ -200,7 +204,6 @@ public sealed class SelectDbaBackupInformationCommand : DbaBaseCmdlet
                 databaseFilter = database;
             }
 
-            bool ignoreDiffs = IgnoreDiffs.ToBool();
             if (_continue)
             {
                 //Test if Database is in a continuing state and the LSN to continue from:
@@ -213,12 +216,12 @@ public sealed class SelectDbaBackupInformationCommand : DbaBaseCmdlet
                     if (PsOps.Eq(lastType, "log"))
                     {
                         //log Backup last restored, so diffs cannot be used
-                        ignoreDiffs = true;
+                        _ignoreDiffs = true;
                     }
                     else
                     {
                         //Last restore was a diff or full, so can restore diffs or logs
-                        ignoreDiffs = false;
+                        _ignoreDiffs = false;
                     }
                 }
                 else
@@ -251,7 +254,7 @@ public sealed class SelectDbaBackupInformationCommand : DbaBaseCmdlet
                 }
                 dbHistory.Add(full);
             }
-            else if (_ignoreFull && !ignoreDiffs)
+            else if (_ignoreFull && !_ignoreDiffs)
             {
                 //Fake the Full backup
                 WriteMessage(MessageLevel.Verbose, "Continuing, so setting a fake full backup from the existing database");
@@ -260,7 +263,7 @@ public sealed class SelectDbaBackupInformationCommand : DbaBaseCmdlet
                 full = fake;
             }
 
-            if (!ignoreDiffs)
+            if (!_ignoreDiffs)
             {
                 WriteMessage(MessageLevel.Verbose, "processing diffs");
                 List<object?> diffCandidates = new();

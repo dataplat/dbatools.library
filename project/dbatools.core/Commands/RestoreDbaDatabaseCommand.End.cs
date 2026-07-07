@@ -51,6 +51,8 @@ public sealed partial class RestoreDbaDatabaseCommand
         if (TestBound("GetBackupInformation"))
         {
             WriteMessage(MessageLevel.Verbose, $"Setting {GetBackupInformation} to BackupHistory");
+            // PS builds this one with += accumulation, so it is ALWAYS an array (unlike the
+            // pipeline-assigned globals below — cross-model review 2026-07-07 finding B5).
             SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__name, $__value) Set-Variable -Name $__name -Value $__value -Scope Global"), null, GetBackupInformation, _backupHistory.ToArray());
         }
         if (StopAfterGetBackupInformation.ToBool())
@@ -80,7 +82,7 @@ public sealed partial class RestoreDbaDatabaseCommand
 
         if (TestBound("FormatBackupInformation"))
         {
-            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__name, $__value) Set-Variable -Name $__name -Value $__value -Scope Global"), null, FormatBackupInformation, _backupHistory.ToArray());
+            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__name, $__value) Set-Variable -Name $__name -Value $__value -Scope Global"), null, FormatBackupInformation, ShapeForGlobal(_backupHistory));
         }
         if (StopAfterFormatBackupInformation.ToBool())
         {
@@ -112,7 +114,7 @@ public sealed partial class RestoreDbaDatabaseCommand
         if (TestBound("SelectBackupInformation"))
         {
             WriteMessage(MessageLevel.Verbose, $"Setting {SelectBackupInformation} to FilteredBackupHistory");
-            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__name, $__value) Set-Variable -Name $__name -Value $__value -Scope Global"), null, SelectBackupInformation, filteredBackupHistory.ToArray());
+            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__name, $__value) Set-Variable -Name $__name -Value $__value -Scope Global"), null, SelectBackupInformation, ShapeForGlobal(filteredBackupHistory));
         }
         if (StopAfterSelectBackupInformation.ToBool())
         {
@@ -140,7 +142,7 @@ public sealed partial class RestoreDbaDatabaseCommand
         }
         if (TestBound("TestBackupInformation"))
         {
-            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__name, $__value) Set-Variable -Name $__name -Value $__value -Scope Global"), null, TestBackupInformation, filteredBackupHistory.ToArray());
+            SessionState.InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__name, $__value) Set-Variable -Name $__name -Value $__value -Scope Global"), null, TestBackupInformation, ShapeForGlobal(filteredBackupHistory));
         }
         if (StopAfterTestBackupInformation.ToBool())
         {
@@ -217,14 +219,7 @@ public sealed partial class RestoreDbaDatabaseCommand
                 ["Restart"] = Restart.ToBool(),
                 ["EnableException"] = true
             };
-            if (TestBound("WhatIf"))
-            {
-                restoreParms["WhatIf"] = true;
-            }
-            if (TestBound("Confirm"))
-            {
-                restoreParms["Confirm"] = MyInvocation.BoundParameters["Confirm"];
-            }
+            ForwardShouldProcessSwitches(restoreParms);
             NestedCommand.InvokeStreamed(this, "Invoke-DbaAdvancedRestore", restoreParms, verified);
         }
         catch (Exception ex)
@@ -252,10 +247,7 @@ public sealed partial class RestoreDbaDatabaseCommand
                 ["BufferCount"] = BufferCount,
                 ["Continue"] = true
             };
-            if (TestBound("WhatIf"))
-            {
-                tailRestoreParms["WhatIf"] = true;
-            }
+            ForwardShouldProcessSwitches(tailRestoreParms);
             NestedCommand.InvokeStreamed(this, "Restore-DbaDatabase", tailRestoreParms, _tailBackup ?? new List<object?>());
 
             Hashtable recoverParms = new()
@@ -265,10 +257,7 @@ public sealed partial class RestoreDbaDatabaseCommand
                 ["DatabaseName"] = _databaseName,
                 ["OutputScriptOnly"] = OutputScriptOnly.ToBool()
             };
-            if (TestBound("WhatIf"))
-            {
-                recoverParms["WhatIf"] = true;
-            }
+            ForwardShouldProcessSwitches(recoverParms);
             foreach (PSObject recovered in NestedCommand.Invoke(this, "Restore-DbaDatabase", recoverParms))
                 WriteObject(recovered);
         }
@@ -292,13 +281,40 @@ public sealed partial class RestoreDbaDatabaseCommand
             ["NoRecovery"] = true,
             ["CopyOnly"] = true
         };
-        if (TestBound("WhatIf"))
-        {
-            backupParms["WhatIf"] = true;
-        }
+        ForwardShouldProcessSwitches(backupParms);
         _tailBackup = new List<object?>();
         foreach (PSObject item in NestedCommand.Invoke(this, "Backup-DbaDatabase", backupParms))
             _tailBackup.Add(item);
+    }
+
+    // PS relied on $WhatIfPreference/$ConfirmPreference propagating into nested calls; the
+    // compiled boundary forwards the caller's bound switch VALUES explicitly instead (accepted
+    // deviation; cross-model review 2026-07-07 finding B4 made all nested sites consistent).
+    private void ForwardShouldProcessSwitches(Hashtable parms)
+    {
+        if (TestBound("WhatIf"))
+        {
+            parms["WhatIf"] = MyInvocation.BoundParameters["WhatIf"];
+        }
+        if (TestBound("Confirm"))
+        {
+            parms["Confirm"] = MyInvocation.BoundParameters["Confirm"];
+        }
+    }
+
+    // PS pipeline assignment shape: empty -> null (AutomationNull), one -> the scalar,
+    // many -> object[] (cross-model review 2026-07-07 finding B5).
+    private static object? ShapeForGlobal(List<object?> items)
+    {
+        if (items.Count == 0)
+        {
+            return null;
+        }
+        if (items.Count == 1)
+        {
+            return items[0];
+        }
+        return items.ToArray();
     }
 
     private static string JoinUniqueDatabases(List<object?> histories)

@@ -21,6 +21,10 @@ public sealed partial class ReadDbaBackupHeaderCommand
         public string DeviceTypeText = "FILE";
         public DataTable? Result;
         public readonly List<ErrorRecord> Errors = new();
+        // Volatile: set by the worker thread after Result/Errors are written; the emission
+        // loop below polls it from the pipeline thread.
+        public volatile bool Completed;
+        public bool Emitted;
     }
 
     protected override void ProcessRecord()
@@ -105,7 +109,6 @@ public sealed partial class ReadDbaBackupHeaderCommand
         // PS used a runspace pool (min 1, max 10): there is internal SQL Server queue for the
         // restore operations. 10 threads seem to perform best. Same cap here.
         ConcurrentQueue<HeaderWorkItem> queue = new(workItems);
-        using BlockingCollection<HeaderWorkItem> completedItems = new();
         int workerCount = Math.Min(10, workItems.Count);
         for (int n = 0; n < workerCount; n++)
         {
@@ -121,7 +124,7 @@ public sealed partial class ReadDbaBackupHeaderCommand
                     {
                         item.Errors.Add(new ErrorRecord(ex, "dbatools_Read-DbaBackupHeader", ErrorCategory.NotSpecified, item.File));
                     }
-                    completedItems.Add(item);
+                    item.Completed = true;
                 }
             })
             {
@@ -130,6 +133,9 @@ public sealed partial class ReadDbaBackupHeaderCommand
             worker.Start();
         }
 
+        // PS emission order: poll $threads in LAUNCH order every 500ms and process whatever
+        // completed by then — completed-in-launch-order per poll window, NOT completion order
+        // (cross-model review 2026-07-07 finding A1).
         int total = workItems.Count;
         int retrieved = 0;
         while (retrieved < total)
@@ -139,68 +145,75 @@ public sealed partial class ReadDbaBackupHeaderCommand
                 currentOperation: $"Scanning Restore headers: {retrieved}/{total}",
                 percentComplete: (int)(retrieved / (double)total * 100));
 
-            if (!completedItems.TryTake(out HeaderWorkItem? completed, 500))
+            foreach (HeaderWorkItem completed in workItems)
             {
-                if (CancellationToken.IsCancellationRequested)
-                    return;
-                continue;
-            }
-            retrieved++;
-
-            // Check if thread had any errors
-            if (completed.Errors.Count > 0)
-            {
-                if (completed.DeviceTypeText == "FILE")
-                {
-                    StopFunction($"Problem found with {completed.File}.", target: completed.File, errorRecord: completed.Errors[0], continueLoop: true);
+                if (completed.Emitted || !completed.Completed)
                     continue;
+                completed.Emitted = true;
+                retrieved++;
+
+                // Check if thread had any errors
+                if (completed.Errors.Count > 0)
+                {
+                    if (completed.DeviceTypeText == "FILE")
+                    {
+                        StopFunction($"Problem found with {completed.File}.", target: completed.File, errorRecord: completed.Errors[0], continueLoop: true);
+                        continue;
+                    }
+                    else
+                    {
+                        StopFunction($"Unable to read {completed.File}, check credential {StorageCredential} and network connectivity.", target: completed.File, errorRecord: completed.Errors[0], continueLoop: true);
+                        continue;
+                    }
+                }
+                // Process the result of this thread
+
+                DataTable? dataTable = completed.Result;
+                if (dataTable is null)
+                    continue;
+
+                object? dbVersionRaw = dataTable.Rows.Count > 0 ? dataTable.Rows[0]["DatabaseVersion"] : null;
+                string sqlVersion = RestoreUtility.ConvertDbVersionToSqlVersion(RestoreUtility.PsStringify(dbVersionRaw is DBNull ? null : dbVersionRaw));
+                foreach (DataRow row in dataTable.Rows)
+                {
+                    row["SqlVersion"] = sqlVersion;
+                    if (PsString.Eq(RestoreUtility.PsStringify(row["BackupName"] is DBNull ? null : row["BackupName"]), "*** INCOMPLETE ***"))
+                    {
+                        // PS: Stop-Function ... -Continue inside the row loop — it skips to the next
+                        // row; the table below still emits. Preserved.
+                        StopFunction($"{completed.File} appears to be from a new version of SQL Server than {RestoreUtility.PsStringify(SqlInstance)}, skipping", target: completed.File, continueLoop: true);
+                        continue;
+                    }
+                }
+                if (Simple.ToBool())
+                {
+                    foreach (DataRow row in dataTable.Rows)
+                        WriteObject(SelectProperties(row, "DatabaseName", "BackupFinishDate", "RecoveryModel", "BackupSize", "CompressedBackupSize", "DatabaseCreationDate", "UserName", "ServerName", "SqlVersion", "BackupPath"));
+                }
+                else if (FileList.ToBool())
+                {
+                    // PS: $dataTable.filelist — member enumeration flattens the per-row arrays.
+                    foreach (DataRow row in dataTable.Rows)
+                    {
+                        if (row["FileList"] is IEnumerable files and not string)
+                        {
+                            foreach (object file in files)
+                                WriteObject(file);
+                        }
+                    }
                 }
                 else
                 {
-                    StopFunction($"Unable to read {completed.File}, check credential {StorageCredential} and network connectivity.", target: completed.File, errorRecord: completed.Errors[0], continueLoop: true);
-                    continue;
+                    foreach (DataRow row in dataTable.Rows)
+                        WriteObject(row);
                 }
             }
-            // Process the result of this thread
 
-            DataTable? dataTable = completed.Result;
-            if (dataTable is null)
-                continue;
-
-            object? dbVersionRaw = dataTable.Rows.Count > 0 ? dataTable.Rows[0]["DatabaseVersion"] : null;
-            string sqlVersion = RestoreUtility.ConvertDbVersionToSqlVersion(RestoreUtility.PsStringify(dbVersionRaw is DBNull ? null : dbVersionRaw));
-            foreach (DataRow row in dataTable.Rows)
+            if (retrieved < total)
             {
-                row["SqlVersion"] = sqlVersion;
-                if (PsString.Eq(RestoreUtility.PsStringify(row["BackupName"] is DBNull ? null : row["BackupName"]), "*** INCOMPLETE ***"))
-                {
-                    // PS: Stop-Function ... -Continue inside the row loop — it skips to the next
-                    // row; the table below still emits. Preserved.
-                    StopFunction($"{completed.File} appears to be from a new version of SQL Server than {RestoreUtility.PsStringify(SqlInstance)}, skipping", target: completed.File, continueLoop: true);
-                    continue;
-                }
-            }
-            if (Simple.ToBool())
-            {
-                foreach (DataRow row in dataTable.Rows)
-                    WriteObject(SelectProperties(row, "DatabaseName", "BackupFinishDate", "RecoveryModel", "BackupSize", "CompressedBackupSize", "DatabaseCreationDate", "UserName", "ServerName", "SqlVersion", "BackupPath"));
-            }
-            else if (FileList.ToBool())
-            {
-                // PS: $dataTable.filelist — member enumeration flattens the per-row arrays.
-                foreach (DataRow row in dataTable.Rows)
-                {
-                    if (row["FileList"] is IEnumerable files and not string)
-                    {
-                        foreach (object file in files)
-                            WriteObject(file);
-                    }
-                }
-            }
-            else
-            {
-                foreach (DataRow row in dataTable.Rows)
-                    WriteObject(row);
+                if (CancellationToken.IsCancellationRequested)
+                    return;
+                Thread.Sleep(500);
             }
         }
         // The PS source closes its runspace pool and restores the default runspace here; the
@@ -262,6 +275,9 @@ public sealed partial class ReadDbaBackupHeaderCommand
         {
             PSObject source = PSObject.AsPSObject(row);
             PSObject copy = new();
+            // Select-Object inserts "Selected.<input type>" ahead of the PSCustomObject names
+            // (cross-model review 2026-07-07 finding A2).
+            copy.TypeNames.Insert(0, "Selected.System.Data.DataRow");
             foreach (PSPropertyInfo property in source.Properties)
             {
                 object? value;
@@ -277,6 +293,8 @@ public sealed partial class ReadDbaBackupHeaderCommand
     private static PSObject SelectProperties(DataRow row, params string[] names)
     {
         PSObject projected = new();
+        // Select-Object inserts "Selected.<input type>" (finding A2).
+        projected.TypeNames.Insert(0, "Selected.System.Data.DataRow");
         foreach (string name in names)
         {
             object? value = row.Table.Columns.Contains(name) ? row[name] : null;

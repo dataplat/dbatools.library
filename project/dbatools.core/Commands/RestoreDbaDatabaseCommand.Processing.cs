@@ -305,7 +305,8 @@ public sealed partial class RestoreDbaDatabaseCommand
                             {
                                 matchInput = backupPathText;
                             }
-                            System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(matchInput, "(http|https|s3)://[^/]*/[^/]*");
+                            // PS -match is case-insensitive (cross-model review 2026-07-07 finding B3).
+                            System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(matchInput, "(http|https|s3)://[^/]*/[^/]*", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                             Hashtable credParms = new()
                             {
                                 ["SqlInstance"] = _restoreInstance,

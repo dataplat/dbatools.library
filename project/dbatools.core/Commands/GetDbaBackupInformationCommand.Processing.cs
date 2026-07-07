@@ -57,7 +57,8 @@ public sealed partial class GetDbaBackupInformationCommand
 
             // Detect cloud storage URLs (Azure http:// or S3 s3://)
             string firstPath = Path.Length > 0 ? RestoreUtility.PsStringify(Path[0]) : "";
-            if (System.Text.RegularExpressions.Regex.IsMatch(firstPath, "^https?://") || System.Text.RegularExpressions.Regex.IsMatch(firstPath, "^s3://"))
+            // PS -match is case-insensitive (cross-model review 2026-07-07 finding A3).
+            if (System.Text.RegularExpressions.Regex.IsMatch(firstPath, "^https?://", System.Text.RegularExpressions.RegexOptions.IgnoreCase) || System.Text.RegularExpressions.Regex.IsMatch(firstPath, "^s3://", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
             {
                 _noXpDirTreeEffective = true;
             }
@@ -206,7 +207,7 @@ public sealed partial class GetDbaBackupInformationCommand
                         if (MaintenanceSolution.ToBool())
                         {
                             // Use forward slashes for URLs (Azure https:// or S3 s3://), backslashes for file system paths
-                            string separator = System.Text.RegularExpressions.Regex.IsMatch(fText, "^https?://") || System.Text.RegularExpressions.Regex.IsMatch(fText, "^s3://") ? "/" : "\\";
+                            string separator = System.Text.RegularExpressions.Regex.IsMatch(fText, "^https?://", System.Text.RegularExpressions.RegexOptions.IgnoreCase) || System.Text.RegularExpressions.Regex.IsMatch(fText, "^s3://", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? "/" : "\\";
                             files.AddRange(XpDirTreeScanner.Scan(this, _server!, $"{fText}{separator}FULL", noRecurse: true, enableException: false));
                             files.AddRange(XpDirTreeScanner.Scan(this, _server!, $"{fText}{separator}DIFF", noRecurse: true, enableException: false));
                             files.AddRange(XpDirTreeScanner.Scan(this, _server!, $"{fText}{separator}LOG", noRecurse: true, enableException: false));
@@ -421,6 +422,8 @@ public sealed partial class GetDbaBackupInformationCommand
                     foreach (object? file in fileList)
                     {
                         PSObject entry = new();
+                        // Select-Object inserts "Selected.<input type>" (cross-model review finding A4).
+                        entry.TypeNames.Insert(0, "Selected.System.Management.Automation.PSCustomObject");
                         entry.Properties.Add(new PSNoteProperty("FileType", PsProperty.Get(file, "FileType")));
                         entry.Properties.Add(new PSNoteProperty("LogicalName", GetHashString(RestoreUtility.PsStringify(PsProperty.Get(file, "LogicalName")))));
                         entry.Properties.Add(new PSNoteProperty("PhysicalName", GetHashString(RestoreUtility.PsStringify(PsProperty.Get(file, "PhysicalName")))));
@@ -483,6 +486,8 @@ public sealed partial class GetDbaBackupInformationCommand
                 if (!seen.Add(dedupeKey))
                     continue;
                 PSObject entry = new();
+                // Select-Object inserts "Selected.<input type>" (cross-model review finding A4).
+                entry.TypeNames.Insert(0, "Selected.System.Management.Automation.PSCustomObject");
                 entry.Properties.Add(new PSNoteProperty("FileType", fileType));
                 entry.Properties.Add(new PSNoteProperty("LogicalName", logicalName));
                 entry.Properties.Add(new PSNoteProperty("PhysicalName", physicalName));
