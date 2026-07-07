@@ -503,8 +503,10 @@ namespace Dataplat.Dbatools.Connection
                 else
                     authType += "sql";
             }
-            else if (request.AccessToken != null)
+            else if (LanguagePrimitives.IsTrue(request.AccessToken))
             {
+                // PS: elseif ($AccessToken) - truthiness, so an empty-string token counts as
+                // absent (cross-model review 2026-07-07 finding 3).
                 authType += "token";
             }
             else
@@ -512,7 +514,9 @@ namespace Dataplat.Dbatools.Connection
                 authType += "integrated";
             }
             Msg(request, MessageLevel.Verbose, String.Format("authentication method is '{0}'", authType));
-            bool authenticationTypeUsesSqlCredential = String.Equals(request.AuthenticationType, "ActiveDirectoryPassword", StringComparison.Ordinal) || String.Equals(request.AuthenticationType, "ActiveDirectoryServicePrincipal", StringComparison.Ordinal);
+            // PS: -in is case-insensitive and ValidateSet passes the user's casing through
+            // (cross-model review 2026-07-07 finding 1).
+            bool authenticationTypeUsesSqlCredential = String.Equals(request.AuthenticationType, "ActiveDirectoryPassword", StringComparison.OrdinalIgnoreCase) || String.Equals(request.AuthenticationType, "ActiveDirectoryServicePrincipal", StringComparison.OrdinalIgnoreCase);
 
             // Best way to get connection pooling to work is to use SqlConnectionInfo -> ServerConnection -> Server
             SqlConnectionInfo sqlConnectionInfo = new SqlConnectionInfo(state.ServerName);
@@ -570,7 +574,9 @@ namespace Dataplat.Dbatools.Connection
             if (!String.IsNullOrEmpty(request.AuthenticationType))
             {
                 Msg(request, MessageLevel.Debug, String.Format("Authentication will be set to '{0}' (from AuthenticationType parameter)", request.AuthenticationType));
-                sqlConnectionInfo.Authentication = (SqlConnectionInfo.AuthenticationMethod)Enum.Parse(typeof(SqlConnectionInfo.AuthenticationMethod), request.AuthenticationType);
+                // PS: [AuthenticationMethod]::$AuthenticationType - static member access by
+                // string is case-insensitive (cross-model review 2026-07-07 finding 1).
+                sqlConnectionInfo.Authentication = (SqlConnectionInfo.AuthenticationMethod)Enum.Parse(typeof(SqlConnectionInfo.AuthenticationMethod), request.AuthenticationType, true);
                 Msg(request, MessageLevel.Debug, String.Format("UseIntegratedSecurity will be set to '{0}' for {1}", false, request.AuthenticationType));
                 sqlConnectionInfo.UseIntegratedSecurity = false;
             }
@@ -592,7 +598,8 @@ namespace Dataplat.Dbatools.Connection
             if (!String.IsNullOrEmpty(request.NetworkProtocol))
             {
                 Msg(request, MessageLevel.Debug, String.Format("ConnectionProtocol will be set to '{0}'", request.NetworkProtocol));
-                sqlConnectionInfo.ConnectionProtocol = (NetworkProtocol)Enum.Parse(typeof(NetworkProtocol), request.NetworkProtocol);
+                // PS enum conversion on assignment is case-insensitive (finding 1).
+                sqlConnectionInfo.ConnectionProtocol = (NetworkProtocol)Enum.Parse(typeof(NetworkProtocol), request.NetworkProtocol, true);
             }
 
             //ConnectionString       Property   string ConnectionString {get;}
@@ -674,7 +681,10 @@ namespace Dataplat.Dbatools.Connection
             if (authenticationTypeUsesSqlCredential || authType == "azure ad" || authType == "azure sql" || authType == "local sql")
             {
                 Msg(request, MessageLevel.Debug, "SecurePassword will be set");
-                sqlConnectionInfo.SecurePassword = request.SqlCredential.Password;
+                // PS: $SqlCredential.Password on a $null credential yields $null (the Desktop
+                // Tenant branch clears SqlCredential after token acquisition) - never throw
+                // (cross-model review 2026-07-07 finding 2).
+                sqlConnectionInfo.SecurePassword = request.SqlCredential == null ? null : request.SqlCredential.Password;
             }
 
             //ServerCaseSensitivity  Property   Microsoft.SqlServer.Management.Common.ServerCaseSensitivity ServerCaseSensitivity {get;set;}
@@ -711,7 +721,8 @@ namespace Dataplat.Dbatools.Connection
 
             ServerConnection serverConnection;
             // If we have an AccessToken, we will build a SqlConnection
-            if (request.AccessToken != null)
+            // PS: if ($AccessToken) - truthiness (finding 3)
+            if (LanguagePrimitives.IsTrue(request.AccessToken))
             {
                 string tokenText = UnwrapAccessToken(state);
                 Msg(request, MessageLevel.Debug, "We have an AccessToken and build a SqlConnection with that token");

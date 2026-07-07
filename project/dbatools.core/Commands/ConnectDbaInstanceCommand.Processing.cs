@@ -27,14 +27,18 @@ public sealed partial class ConnectDbaInstanceCommand
             return;
         }
 
-        if ((AuthenticationType == "ActiveDirectoryPassword" || AuthenticationType == "ActiveDirectoryServicePrincipal") && SqlCredential is null)
+        // PS: -in is case-insensitive and ValidateSet passes the user's casing through
+        // (cross-model review 2026-07-07 finding 1).
+        if ((string.Equals(AuthenticationType, "ActiveDirectoryPassword", StringComparison.OrdinalIgnoreCase) || string.Equals(AuthenticationType, "ActiveDirectoryServicePrincipal", StringComparison.OrdinalIgnoreCase)) && SqlCredential is null)
         {
             StopFunction($"AuthenticationType {AuthenticationType} requires SqlCredential.");
             return;
         }
 
         // if tenant is specified with a GUID username such as 21f5633f-6776-4bab-b878-bbd5e3e5ed72 (for clientid)
-        if (!string.IsNullOrEmpty(Tenant) && AccessToken is null && SqlCredential is not null && Regex.IsMatch(SqlCredential.UserName, "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))
+        // PS: -not $AccessToken is truthiness, so an empty-string token counts as absent
+        // (cross-model review 2026-07-07 finding 3).
+        if (!string.IsNullOrEmpty(Tenant) && !LanguagePrimitives.IsTrue(AccessToken) && SqlCredential is not null && Regex.IsMatch(SqlCredential.UserName, "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))
         {
             try
             {
