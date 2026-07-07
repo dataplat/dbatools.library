@@ -23,8 +23,13 @@ internal static class PsProperty
         PSPropertyInfo? property = wrapped.Properties[name];
         if (property is null)
             return null;
-        object? value = property.Value;
-        if (value is PSObject psValue)
+        object? value;
+        try { value = property.Value; }
+        catch { return null; }
+        // Deserialized complex values (CliXml property bags, e.g. BigInteger LSNs) keep the
+        // PSObject wrapper: its overriding ToString survives deserialization while the bare
+        // PSCustomObject base renders empty. Everything else unwraps like the PS dot operator.
+        if (value is PSObject psValue && psValue.BaseObject is not PSCustomObject)
             value = psValue.BaseObject;
         if (value is DBNull)
             return null;
@@ -60,16 +65,19 @@ internal static class PsProperty
 /// <summary>LSN readings, replicating the PS [BigInt]$value.ToString() cast chain.</summary>
 internal static class PsLsn
 {
-    /// <summary>Converts an LSN-carrying value (decimal, BigInteger, string, DBNull) to BigInteger.</summary>
+    /// <summary>Converts an LSN-carrying value (decimal, BigInteger, string, DBNull, or a
+    /// deserialized BigInteger property bag) to BigInteger, like [BigInt]$value.ToString().</summary>
     internal static BigInteger ToBigInt(object? value)
     {
-        if (value is PSObject psValue)
+        if (value is PSObject psValue && psValue.BaseObject is not PSCustomObject)
             value = psValue.BaseObject;
         if (value is null || value is DBNull)
             return BigInteger.Zero;
         if (value is BigInteger big)
             return big;
-        string text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "0";
+        // LanguagePrimitives honors the deserialized ToString override; Convert.ToString on
+        // the bare property bag would render empty.
+        string text = (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
         if (text.Length == 0)
             return BigInteger.Zero;
         // Decimal-typed LSNs can stringify with a trailing ".0"-less integral form already;
