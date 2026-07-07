@@ -66,24 +66,17 @@ public sealed class SelectDbaBackupInformationCommand : DbaBaseCmdlet
             {
                 List<object?> continueDatabases = CollectMember(ContinuePoints, "Database");
                 List<string> kept = new();
-                List<string> dropped = new();
                 foreach (string name in DatabaseName ?? Array.Empty<string>())
                 {
                     if (PsOps.In(name, continueDatabases))
                         kept.Add(name);
-                    else
-                        dropped.Add(name);
                 }
                 DatabaseName = kept.Count == 0 ? null : kept.ToArray();
 
-                if (dropped.Count > 0)
-                {
-                    // PS parity: $DroppedDatabases.join(',') — neither String nor Object[] has a
-                    // join() method, so the PS source THROWS here whenever a name is filtered
-                    // out. Preserved until the owner approves a fix.
-                    string typeName = dropped.Count == 1 ? "System.String" : "System.Object[]";
-                    throw new RuntimeException($"Method invocation failed because [{typeName}] does not contain a method named 'join'.");
-                }
+                // PS computes $DroppedDatabases FROM THE ALREADY-FILTERED $DatabaseName
+                // (assignment order), so it is provably always $null: the guarded
+                // "$DroppedDatabases.join(',')" verbose line — which WOULD crash, join()
+                // not being a method — is unreachable dead code. Nothing to emit or throw.
             }
             else
             {
