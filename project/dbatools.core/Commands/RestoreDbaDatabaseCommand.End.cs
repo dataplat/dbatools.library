@@ -96,8 +96,11 @@ public sealed partial class RestoreDbaDatabaseCommand
             {
                 ["RestoreTime"] = RestoreTime,
                 // PS passes the never-assigned $IgnoreLogBackups here (note the trailing s) —
-                // the switch binds $null and reads as false. Preserved.
-                ["IgnoreLogs"] = null,
+                // -IgnoreLogs:$null on the SCRIPT function bound FALSE. Compiled cmdlets bind
+                // null-to-SwitchParameter as TRUE (engine inconsistency, lab-proven: null
+                // dropped every log from composed restores), so the faithful translation of
+                // the observable PS behavior is an explicit false.
+                ["IgnoreLogs"] = false,
                 ["IgnoreDiffs"] = IgnoreDiffBackup.ToBool(),
                 ["ContinuePoints"] = _continuePoints,
                 ["LastRestoreType"] = _lastRestoreType,
