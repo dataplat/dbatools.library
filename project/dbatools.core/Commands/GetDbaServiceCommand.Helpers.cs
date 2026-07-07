@@ -144,22 +144,26 @@ public sealed partial class GetDbaServiceCommand
         return "Unknown";
     }
 
-    private static string MapState(int state) => state switch
+    // PS: switch ($service.State) { 1{...} 2{...} 3{...} 4{...} } — NO default, so an unmapped
+    // state (e.g. 7 = Paused) yields $null, not a fallback string. Replicate exactly.
+    internal static string? MapState(int state) => state switch
     {
         1 => "Stopped",
         2 => "Start Pending",
         3 => "Stop Pending",
         4 => "Running",
-        _ => "Unknown"
+        _ => null
     };
 
-    private static string MapStartMode(int mode) => mode switch
+    // PS: switch ($service.StartMode) { 1{'Unknown'} 2{...} 3{...} 4{...} } — NO default, so an
+    // unmapped mode yields $null. Note 1 explicitly maps to 'Unknown'; the null is for the rest.
+    internal static string? MapStartMode(int mode) => mode switch
     {
         1 => "Unknown",
         2 => "Automatic",
         3 => "Manual",
         4 => "Disabled",
-        _ => "Unknown"
+        _ => null
     };
 
     private static string DeriveInstanceName(string serviceName, string serviceType)
@@ -168,8 +172,9 @@ public sealed partial class GetDbaServiceCommand
             return "MSSQLSERVER";
         if (InstancedServiceTypes.Contains(serviceType))
         {
-            int dollarIdx = serviceName.IndexOf('$');
-            return dollarIdx >= 0 ? serviceName.Substring(dollarIdx + 1) : "Unknown";
+            // PS: $service.ServiceName.split('$')[1] — the segment between the first and second '$',
+            // not everything after the first '$'. Matters only for multi-'$' names.
+            return serviceName.IndexOf('$') >= 0 ? serviceName.Split('$')[1] : "Unknown";
         }
         return string.Empty;
     }
@@ -275,7 +280,13 @@ public sealed partial class GetDbaServiceCommand
                         svcStartMode    = string.Equals(sm, "Auto", StringComparison.OrdinalIgnoreCase) ? "Automatic" : (sm ?? string.Empty);
                     }
                 }
-                catch { /* best-effort */ }
+                catch (Exception ex)
+                {
+                    // PS: catch { Stop-Function -Message "Failed to acquire services32" -Continue } — the
+                    // service is skipped (not emitted, not deduped), not emitted with default fields.
+                    StopFunction("Failed to acquire services32", target: computer, exception: ex, continueLoop: true);
+                    continue;
+                }
 
                 string? startName = svc["WindowsServiceIdentityActual"] as string;
 

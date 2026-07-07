@@ -134,9 +134,9 @@ public sealed partial class GetDbaNetworkConfigurationCommand : DbaBaseCmdlet
                         using ManagementClass stdReg = GetStdRegProv(computerName);
                         string? acceptedSPNs = GetRegStringValue(stdReg, superSocketPath, "AcceptedSPNs");
                         string? thumbprint = GetRegStringValue(stdReg, superSocketPath, "Certificate");
-                        bool extendedProtection = ConvertDWordToBool(GetRegDWordValue(stdReg, superSocketPath, "ExtendedProtection"));
-                        bool forceEncryption = ConvertDWordToBool(GetRegDWordValue(stdReg, superSocketPath, "ForceEncryption"));
-                        bool hideInstance = ConvertDWordToBool(GetRegDWordValue(stdReg, superSocketPath, "HideInstance"));
+                        bool? extendedProtection = ConvertDWordToBool(GetRegDWordValue(stdReg, superSocketPath, "ExtendedProtection"));
+                        bool? forceEncryption = ConvertDWordToBool(GetRegDWordValue(stdReg, superSocketPath, "ForceEncryption"));
+                        bool? hideInstance = ConvertDWordToBool(GetRegDWordValue(stdReg, superSocketPath, "HideInstance"));
 
                         X509Certificate2? cert = null;
                         if (!string.IsNullOrEmpty(thumbprint))
@@ -198,7 +198,19 @@ public sealed partial class GetDbaNetworkConfigurationCommand : DbaBaseCmdlet
     {
         string sqlInstance = instance.SqlFullName.TrimStart('[').TrimEnd(']');
 
-        if (OutputType == "Full")
+        // PS compares $OutputType with -eq (case-insensitive) and ValidateSet accepts any case,
+        // so e.g. -OutputType certificate must work. Normalize to the canonical set value once.
+        string outputType = OutputType;
+        foreach (string canonical in new[] { "Full", "ServerProtocols", "TcpIpProperties", "TcpIpAddresses", "Certificate" })
+        {
+            if (string.Equals(OutputType, canonical, StringComparison.OrdinalIgnoreCase))
+            {
+                outputType = canonical;
+                break;
+            }
+        }
+
+        if (outputType == "Full")
         {
             PSObject result = new();
             result.Properties.Add(new PSNoteProperty("ComputerName", instance.ComputerName));
@@ -214,7 +226,7 @@ public sealed partial class GetDbaNetworkConfigurationCommand : DbaBaseCmdlet
             result.Properties.Add(new PSNoteProperty("Advanced", outputAdvanced));
             WriteObject(result);
         }
-        else if (OutputType == "ServerProtocols")
+        else if (outputType == "ServerProtocols")
         {
             PSObject result = new();
             result.Properties.Add(new PSNoteProperty("ComputerName", instance.ComputerName));
@@ -225,7 +237,7 @@ public sealed partial class GetDbaNetworkConfigurationCommand : DbaBaseCmdlet
             result.Properties.Add(new PSNoteProperty("TcpIpEnabled", wmiSpTcp.IsEnabled));
             WriteObject(result);
         }
-        else if (OutputType == "TcpIpProperties")
+        else if (outputType == "TcpIpProperties")
         {
             PSObject result = new();
             result.Properties.Add(new PSNoteProperty("ComputerName", instance.ComputerName));
@@ -236,7 +248,7 @@ public sealed partial class GetDbaNetworkConfigurationCommand : DbaBaseCmdlet
             result.Properties.Add(new PSNoteProperty("ListenAll", tcpIpProperties.Properties["ListenAll"]?.Value));
             WriteObject(result);
         }
-        else if (OutputType == "TcpIpAddresses")
+        else if (outputType == "TcpIpAddresses")
         {
             bool listenAll = tcpIpProperties.Properties["ListenAll"]?.Value as bool? ?? false;
             if (listenAll)
@@ -280,7 +292,7 @@ public sealed partial class GetDbaNetworkConfigurationCommand : DbaBaseCmdlet
                 }
             }
         }
-        else if (OutputType == "Certificate")
+        else if (outputType == "Certificate")
         {
             // PS: if ($netConf.Certificate -like 'Failed*')
             if (outputCertificate is string certStr && certStr.StartsWith("Failed", StringComparison.Ordinal))

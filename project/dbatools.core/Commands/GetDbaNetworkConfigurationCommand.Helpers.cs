@@ -204,7 +204,9 @@ public sealed partial class GetDbaNetworkConfigurationCommand
         return null;
     }
 
-    private PSObject[] GetSuitableCertificates(ManagementClass stdReg, string networkName)
+    // PS: $suitableCertificate = Get-ChildItem ... | Where-Object {...} — an empty pipeline result
+    // is $null, not an empty array. Return null (never object[0]) so the emitted property matches.
+    private PSObject[]? GetSuitableCertificates(ManagementClass stdReg, string networkName)
     {
         List<PSObject> suitable = new();
 
@@ -218,7 +220,7 @@ public sealed partial class GetDbaNetworkConfigurationCommand
         try
         {
             string[]? thumbprints = GetRegSubKeyNames(stdReg, @"SOFTWARE\Microsoft\SystemCertificates\MY\Certificates");
-            if (thumbprints is null) return suitable.ToArray();
+            if (thumbprints is null) return null;
 
             foreach (string tp in thumbprints)
             {
@@ -292,12 +294,16 @@ public sealed partial class GetDbaNetworkConfigurationCommand
             WriteMessage(MessageLevel.Verbose, $"Failed to enumerate suitable certificates: {ex}");
         }
 
-        return suitable.ToArray();
+        return suitable.Count == 0 ? null : suitable.ToArray();
     }
 
     private static IEnumerable<string> GetDnsNames(X509Certificate2 cert)
     {
-        // Check SAN extension (2.5.29.17) for DNS names; fall back to Subject CN
+        // PS: $dnsNames = $_.DnsNameList.Unicode; if (-not $dnsNames -and $_.Subject -match 'CN=([^,]+)')
+        // { $dnsNames = @($Matches[1]) }. Collect SAN (2.5.29.17) DNS names; fall back to the Subject
+        // CN only when NONE were found (a SAN present but carrying no DNS names must still fall back),
+        // and match CN case-insensitively like -match.
+        List<string> names = new();
         foreach (X509Extension ext in cert.Extensions)
         {
             if (ext.Oid?.Value == "2.5.29.17")
@@ -307,14 +313,17 @@ public sealed partial class GetDbaNetworkConfigurationCommand
                 {
                     string trimmed = part.Trim();
                     if (trimmed.IndexOf("DNS Name=", StringComparison.OrdinalIgnoreCase) == 0)
-                        yield return trimmed.Substring(9).Trim(); // "DNS Name=".Length == 9
+                        names.Add(trimmed.Substring(9).Trim()); // "DNS Name=".Length == 9
                 }
-                yield break;
+                break;
             }
         }
-        // $_.Subject -match 'CN=([^,]+)'
-        Match m = Regex.Match(cert.Subject, @"CN=([^,]+)");
-        if (m.Success) yield return m.Groups[1].Value.Trim();
+        if (names.Count == 0)
+        {
+            Match m = Regex.Match(cert.Subject, "CN=([^,]+)", RegexOptions.IgnoreCase);
+            if (m.Success) names.Add(m.Groups[1].Value.Trim());
+        }
+        return names;
     }
 
     private static string[] GetDnsNamesArray(X509Certificate2 cert)
@@ -324,9 +333,15 @@ public sealed partial class GetDbaNetworkConfigurationCommand
         return names.ToArray();
     }
 
-    private static bool ConvertDWordToBool(uint? value)
+    private static bool? ConvertDWordToBool(uint? value)
     {
-        // PS: switch (val) { 0 { $false } 1 { $true } }
-        return value == 1u;
+        // PS: switch (val) { 0 { $false } 1 { $true } } — NO default branch, so a missing DWORD or
+        // any other value (e.g. ExtendedProtection = 2 "Required") yields $null, not $false.
+        return value switch
+        {
+            0u => false,
+            1u => true,
+            _ => (bool?)null
+        };
     }
 }

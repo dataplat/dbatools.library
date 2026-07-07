@@ -32,6 +32,41 @@ namespace Dataplat.Dbatools.Commands.Test
         }
 
         [TestMethod]
+        public void MapState_KnownValues_ReturnMappedStrings()
+        {
+            Assert.AreEqual("Stopped",       GetDbaServiceCommand.MapState(1));
+            Assert.AreEqual("Start Pending", GetDbaServiceCommand.MapState(2));
+            Assert.AreEqual("Stop Pending",  GetDbaServiceCommand.MapState(3));
+            Assert.AreEqual("Running",       GetDbaServiceCommand.MapState(4));
+        }
+
+        [TestMethod]
+        public void MapState_UnmappedValue_ReturnsNull()
+        {
+            // PS switch has no default: an unmapped state (e.g. 7 = Paused, 5/6, 0) yields $null.
+            Assert.IsNull(GetDbaServiceCommand.MapState(7));
+            Assert.IsNull(GetDbaServiceCommand.MapState(5));
+            Assert.IsNull(GetDbaServiceCommand.MapState(0));
+        }
+
+        [TestMethod]
+        public void MapStartMode_KnownValues_ReturnMappedStrings()
+        {
+            Assert.AreEqual("Unknown",   GetDbaServiceCommand.MapStartMode(1));
+            Assert.AreEqual("Automatic", GetDbaServiceCommand.MapStartMode(2));
+            Assert.AreEqual("Manual",    GetDbaServiceCommand.MapStartMode(3));
+            Assert.AreEqual("Disabled",  GetDbaServiceCommand.MapStartMode(4));
+        }
+
+        [TestMethod]
+        public void MapStartMode_UnmappedValue_ReturnsNull()
+        {
+            // PS switch has no default: an unmapped start mode (e.g. 0, 5) yields $null.
+            Assert.IsNull(GetDbaServiceCommand.MapStartMode(0));
+            Assert.IsNull(GetDbaServiceCommand.MapStartMode(5));
+        }
+
+        [TestMethod]
         public void ServiceIdMap_ContainsAllExpectedEntries()
         {
             // Verify the map covers all expected SQL service types

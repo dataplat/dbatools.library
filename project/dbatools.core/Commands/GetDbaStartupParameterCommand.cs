@@ -139,12 +139,14 @@ public sealed class GetDbaStartupParameterCommand : DbaBaseCmdlet
 
                     foreach (string p in startupParams)
                     {
-                        if (p == "-c") commandPromptParm = p;
-                        else if (p == "-f") minimalStartParm = p;
+                        // PS matches -c/-f/-n/-s/-x with -eq (case-insensitive); -E with -ceq (case-sensitive);
+                        // -g/-m with .StartsWith (case-sensitive). Preserve each exactly.
+                        if (string.Equals(p, "-c", StringComparison.OrdinalIgnoreCase)) commandPromptParm = p;
+                        else if (string.Equals(p, "-f", StringComparison.OrdinalIgnoreCase)) minimalStartParm = p;
                         else if (p.StartsWith("-g", StringComparison.Ordinal)) memoryToReserveParm = p;
-                        else if (p == "-n") noEventLogsParm = p;
-                        else if (p == "-s") instanceStartParm = p;
-                        else if (p == "-x") disableMonitoringParm = p;
+                        else if (string.Equals(p, "-n", StringComparison.OrdinalIgnoreCase)) noEventLogsParm = p;
+                        else if (string.Equals(p, "-s", StringComparison.OrdinalIgnoreCase)) instanceStartParm = p;
+                        else if (string.Equals(p, "-x", StringComparison.OrdinalIgnoreCase)) disableMonitoringParm = p;
                         else if (p == "-E") increasedExtentsParm = p;  // case-sensitive: $_ -ceq '-E'
                         else if (p.StartsWith("-m", StringComparison.Ordinal)) singleUserParm = p;
                     }

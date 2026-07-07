@@ -261,8 +261,8 @@ public sealed partial class GetDbaServiceCommand : DbaBaseCmdlet
         int    modeVal     = Convert.ToInt32(svc["StartMode"]      ?? 0);
 
         string serviceType = MapServiceType(sqlType);
-        string state       = MapState(stateVal);
-        string startMode   = MapStartMode(modeVal);
+        string? state      = MapState(stateVal);
+        string? startMode  = MapStartMode(modeVal);
         string instance    = DeriveInstanceName(serviceName, serviceType);
         int    priority    = serviceType == "Engine" ? 200 : 100;
 
