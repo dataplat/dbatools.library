@@ -128,16 +128,21 @@ internal static class PsOps
         return LanguagePrimitives.Compare(Unwrap(left), Unwrap(right), true);
     }
 
-    /// <summary>The PS -in operator over any collection.</summary>
+    /// <summary>
+    /// The PS -in operator over any collection. $value -in $collection is evaluated as
+    /// "any element -eq $value" with the ELEMENT as the left operand — so a single-element
+    /// array value coerces to the element's type and can match (verified against the
+    /// Select-DbaBackupInformation Continue Points behavior).
+    /// </summary>
     internal static bool In(object? value, object? collection)
     {
         if (Unwrap(collection) is not System.Collections.IEnumerable items || collection is string)
         {
-            return Eq(value, collection);
+            return Eq(collection, value);
         }
         foreach (object? item in items)
         {
-            if (Eq(value, item))
+            if (Eq(item, value))
                 return true;
         }
         return false;
