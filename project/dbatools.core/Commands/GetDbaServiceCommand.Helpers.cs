@@ -76,7 +76,7 @@ public sealed partial class GetDbaServiceCommand
             var scope = new ManagementScope($@"\\{computer}\root\Microsoft\SQLServer\{ns}", _wmiOptions);
             scope.Connect();
             using var searcher = new ManagementObjectSearcher(scope,
-                new ObjectQuery($"SELECT * FROM SqlServiceAdvancedProperty WHERE ServiceName = '{serviceName}'"));
+                new ObjectQuery($"SELECT * FROM SqlServiceAdvancedProperty WHERE ServiceName = '{WqlHelper.EscapeValue(serviceName)}'"));
             advProps = searcher.Get().Cast<ManagementObject>().ToList();
         }
         catch { /* best-effort */ }
@@ -184,7 +184,7 @@ public sealed partial class GetDbaServiceCommand
         //If filtering by service name create a dynamic WHERE clause
         string searchClause = string.Empty;
         if (serviceNameFilter != null && serviceNameFilter.Length > 0)
-            searchClause = $" WHERE ServiceName = '{string.Join("' OR ServiceName = '", serviceNameFilter)}'";
+            searchClause = " WHERE " + string.Join(" OR ", serviceNameFilter.Select(sn => $"ServiceName = '{WqlHelper.EscapeValue(sn)}'"));
 
         IEnumerable<ManagementObject> namespaces;
         try
@@ -263,7 +263,7 @@ public sealed partial class GetDbaServiceCommand
                     var cimScope = new ManagementScope($@"\\{computer}\root\cimv2", _wmiOptions);
                     cimScope.Connect();
                     using var cimSearcher = new ManagementObjectSearcher(cimScope,
-                        new ObjectQuery($"SELECT * FROM Win32_Service WHERE Name = '{svcServiceName}'"));
+                        new ObjectQuery($"SELECT * FROM Win32_Service WHERE Name = '{WqlHelper.EscapeValue(svcServiceName)}'"));
                     ManagementObject? svc32 = cimSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
                     if (svc32 != null)
                     {

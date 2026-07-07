@@ -122,7 +122,7 @@ public sealed partial class GetDbaServiceCommand : DbaBaseCmdlet
         else // ServiceName parameter set
         {
             if (TestBound(nameof(ServiceName)) && ServiceName != null && ServiceName.Length > 0)
-                _searchClause = string.Join(" OR ", ServiceName.Select(sn => $"ServiceName = '{sn}'"));
+                _searchClause = string.Join(" OR ", ServiceName.Select(sn => $"ServiceName = '{WqlHelper.EscapeValue(sn)}'"));
             else
                 _searchClause = "SQLServiceType > 0";
         }
