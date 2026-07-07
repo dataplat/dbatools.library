@@ -17,6 +17,11 @@
     <ProjectReference Include="..\dbatools\dbatools.csproj" />
   </ItemGroup>
 
+  <!-- System.Management for WMI registry access (StdRegProv) in Get-DbaNetworkConfiguration and similar -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
   <!-- Windows-specific GAC reference for net472: SMA 3.0.0.0 so one assembly serves PS 3.0-5.1 -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net472' AND '$(OS)' == 'Windows_NT'">
     <Reference Include="System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
