@@ -192,9 +192,9 @@ When modifying CSV code, changes apply to both. The standalone package has its o
 
 Hooks enforce these rules — if a hook blocks you, fix the violation:
 
-- **C# rules** (`enforce-cs-rules.sh`): Base class, LangVersion 7.3 + no string interpolation (shared runtime and Csv package ONLY — satellites are C# 12 by design), no Assembly.LoadFile, no direct Write*, no ThrowTerminatingError, XML docs on cmdlets. NOTE: this hook is not currently present in `.claude/hooks/` — the rules still apply and are reviewer-enforced until it is restored with per-project scoping.
-- **PSD1 rules** (`enforce-psd1-rules.sh`): No wildcard exports in module manifest
-- **Build check** (`check-build.sh`): Auto-builds after any `.cs` file edit
+- **C# rules** (`enforce-cs-rules.sh`, Stop hook): cmdlet base class, no `Assembly.LoadFile`, no direct `WriteVerbose`/`WriteWarning`/`WriteDebug`, no `ThrowTerminatingError`, XML docs on `[Cmdlet]` classes, satellite bans (async/await/`Task.Run`, `ArgumentCompleter`), and NEW string interpolation in the LangVersion 7.3 projects (pre-existing occurrences are grandfathered; satellites are C# 12 by design and interpolation is fine there)
+- **PSD1 rules** (`enforce-psd1-rules.sh`, Stop hook): No wildcard exports in module manifests
+- **Builds**: no auto-build hook — enforcement is `TreatWarningsAsErrors` in the satellite csproj files plus the migration gate's build step; always run `dotnet build project/dbatools.sln` before finishing a C# change
 - **File length check** (`stop-file-length.sh`, Stop hook): Tracked text/source/docs/scripts/config files must stay at or below 400 physical lines; split files structurally rather than growing them.
 
 All hooks use `set -eu` (not `pipefail` — unsupported on Windows sh).

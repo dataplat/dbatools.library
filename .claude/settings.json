@@ -5,6 +5,18 @@
         "hooks": [
           {
             "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/enforce-cs-rules.sh",
+            "timeout": 30,
+            "statusMessage": "Checking C# rules (per-project language regimes, cmdlet rules)..."
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/enforce-psd1-rules.sh",
+            "timeout": 15,
+            "statusMessage": "Checking module manifests (no wildcard exports)..."
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-file-length.sh",
             "timeout": 15,
             "statusMessage": "Checking file lengths (400-line limit)..."
