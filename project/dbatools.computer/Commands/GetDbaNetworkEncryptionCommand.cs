@@ -142,7 +142,16 @@ public sealed class GetDbaNetworkEncryptionCommand : DbaBaseCmdlet
         }
         try
         {
-            ScriptBlock script = ScriptBlock.Create("param($__parameters) & (Get-Module dbatools) { param($p) Get-SqlServerTlsCertificate @p } $__parameters 3>&1");
+            // Under Invoke-ManualPester the shared engine dbatools.dll gets registered as a
+            // SECOND module also named 'dbatools' (Binary), and `& (Get-Module dbatools)` then
+            // either splats the array ("the term 'dbatools dbatools' is not recognized") or
+            // refuses the binary instance ("Cannot use '&' to invoke in the context of binary
+            // module"). Private functions live in the SCRIPT module - select it explicitly
+            // (live-diagnosed through an instrumented IMP run in the W5-017 gate).
+            ScriptBlock script = ScriptBlock.Create(
+                "param($__parameters) " +
+                "$__module = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; " +
+                "& $__module { param($p) Get-SqlServerTlsCertificate @p } $__parameters 3>&1");
             Collection<PSObject> raw = InvokeCommand.InvokeScript(false, script, null, parameters);
             Collection<PSObject> output = new();
             foreach (PSObject item in raw)
