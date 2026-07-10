@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
@@ -38,24 +39,16 @@ public sealed class GetDbaNetworkCertificateCommand : DbaBaseCmdlet
 
         // PS: $PSBoundParameters["OutputType"] = "Certificate"
         //     Get-DbaNetworkConfiguration @PSBoundParameters | Where-Object Thumbprint
-        // Forward only the BOUND parameters (so Get-DbaNetworkConfiguration applies its own
-        // defaults for anything unbound, exactly like the splat did) plus OutputType.
-        Hashtable splat = new()
+        // @PSBoundParameters forwards EVERY bound parameter - including bound COMMON parameters
+        // (-ErrorAction, -Verbose, -WarningAction, ...), which change the nested command's
+        // behavior (codex round finding: a bound -ErrorAction Stop must stop the nested command
+        // on its first error). Copy the whole bound dictionary, then overwrite OutputType.
+        Hashtable splat = new();
+        foreach (KeyValuePair<string, object> bound in MyInvocation.BoundParameters)
         {
-            { "OutputType", "Certificate" }
-        };
-        if (TestBound(nameof(SqlInstance)))
-        {
-            splat["SqlInstance"] = SqlInstance;
+            splat[bound.Key] = bound.Value;
         }
-        if (TestBound(nameof(Credential)))
-        {
-            splat["Credential"] = Credential;
-        }
-        if (TestBound(nameof(EnableException)))
-        {
-            splat["EnableException"] = EnableException;
-        }
+        splat["OutputType"] = "Certificate";
 
         Collection<PSObject> results = NestedCommand.Invoke(this, "Get-DbaNetworkConfiguration", splat);
         foreach (PSObject output in results)

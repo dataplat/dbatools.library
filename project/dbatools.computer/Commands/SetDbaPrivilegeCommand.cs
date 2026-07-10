@@ -412,11 +412,13 @@ $strSID.Value
         {
             return true;
         }
-        // ACCEPTED DEVIATION: PS on non-Windows faults inside WindowsIdentity.GetCurrent();
-        // the port passes the requirement through instead (elevation is meaningless there).
+        // PS on non-Windows faults inside [Security.Principal.WindowsIdentity]::GetCurrent();
+        // the throw lands in the caller's catch -> Stop-Function "Failure" + continue (codex
+        // round finding: passing the requirement through instead let the command proceed into
+        // remoting on Linux where PS never even probes).
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            return true;
+            throw new PlatformNotSupportedException("Windows Principal functionality is not supported on this platform.");
         }
         using WindowsIdentity identity = WindowsIdentity.GetCurrent();
         WindowsPrincipal principal = new(identity);

@@ -143,7 +143,9 @@ internal static class ForceEncryptionResolver
         {
             return null;
         }
-        string[] parts = value.Split(new[] { "Value=" }, StringSplitOptions.None);
+        // PS: ($x -Split 'Value\=')[1] - the -Split OPERATOR is case-insensitive (SMO emits
+        // "Value=" with a capital V in practice, so this is non-physical, but match PS exactly).
+        string[] parts = System.Text.RegularExpressions.Regex.Split(value, "Value=", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         return parts.Length > 1 ? parts[1] : null;
     }
 
