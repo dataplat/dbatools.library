@@ -166,12 +166,14 @@ public sealed class GetDbaComputerCertificateCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (DbaInstanceParameter computer in ComputerName)
+        foreach (DbaInstanceParameter rawComputer in ComputerName)
         {
-            if (computer is null)
-            {
-                continue;
-            }
+            // PS: `foreach ($computer in $computername)` iterates the array DIRECTLY (not
+            // member-enumeration), so a null slot is NOT skipped - PS passes $null to
+            // Invoke-Command2, whose [DbaInstanceParameter]$ComputerName cast turns null into the
+            // localhost machine name. Mirror that so `-ComputerName @($null)` runs the localhost
+            // path (codex parity fix 2026-07-10). Null-array-slot survival proven on the lab.
+            DbaInstanceParameter computer = rawComputer ?? new DbaInstanceParameter(Environment.MachineName);
 
             // PS: if ($Store -eq "All") - array -eq filters, so this means "contains All"; the
             // reassignment replaces the PARAMETER variable, [string[]]-constrained, for all

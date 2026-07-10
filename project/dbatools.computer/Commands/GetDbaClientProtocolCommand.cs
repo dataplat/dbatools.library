@@ -46,6 +46,11 @@ public sealed class GetDbaClientProtocolCommand : DbaBaseCmdlet
         // BEFORE the FullComputerName reassignment inside the success branch.
         foreach (DbaInstanceParameter computer in ComputerName)
         {
+            // PS member enumeration ($ComputerName.ComputerName) skips null array slots.
+            if (computer is null)
+            {
+                continue;
+            }
             string originalName = computer.ComputerName;
 
             // PS: $server = Resolve-DbaNetworkName -ComputerName $computer -Credential $credential
@@ -155,10 +160,8 @@ public sealed class GetDbaClientProtocolCommand : DbaBaseCmdlet
                 Namespace = @"root\Microsoft\SQLServer",
                 Query = "Select * FROM __NAMESPACE WHERE Name LIke 'ComputerManagement%'"
             };
-            if (TestBound(nameof(Credential)))
-            {
-                request.Credential = Credential;
-            }
+            // PS: the two Get-DbaCmObject CIM calls run under the CURRENT security context - only
+            // Resolve-DbaNetworkName gets -Credential (codex parity fix 2026-07-10).
             CimService.CmObjectResult result = CimService.GetCmObject(request);
             return result.Instances;
         }
@@ -186,10 +189,7 @@ public sealed class GetDbaClientProtocolCommand : DbaBaseCmdlet
                 Namespace = cimNamespace,
                 ClassName = "ClientNetworkProtocol"
             };
-            if (TestBound(nameof(Credential)))
-            {
-                request.Credential = Credential;
-            }
+            // PS runs this CIM call under the current security context, no -Credential (codex fix).
             CimService.CmObjectResult result = CimService.GetCmObject(request);
             return result.Instances;
         }
@@ -205,9 +205,10 @@ public sealed class GetDbaClientProtocolCommand : DbaBaseCmdlet
     }
 
     // PS: | Sort-Object Name -Descending | Select-Object -First 1  then  $namespace.Name.
-    // Descending lexical order over the __NAMESPACE Name property picks the highest
-    // ComputerManagement<NN> (newest SQL). No single-digit ComputerManagement namespace exists,
-    // so an ordinal compare matches Sort-Object's ordering for these ASCII names.
+    // Descending order over the __NAMESPACE Name property picks the highest ComputerManagement<NN>
+    // (newest SQL). Sort-Object's default comparer is CASE-INSENSITIVE, so use OrdinalIgnoreCase
+    // (codex parity fix 2026-07-10: a mixed-case namespace pair would have flipped an Ordinal
+    // compare).
     private static string? SelectHighestNamespaceName(List<PSObject> namespaces)
     {
         string? best = null;
@@ -218,7 +219,7 @@ public sealed class GetDbaClientProtocolCommand : DbaBaseCmdlet
             {
                 continue;
             }
-            if (best is null || string.Compare(name, best, StringComparison.Ordinal) > 0)
+            if (best is null || string.Compare(name, best, StringComparison.OrdinalIgnoreCase) > 0)
             {
                 best = name;
             }
