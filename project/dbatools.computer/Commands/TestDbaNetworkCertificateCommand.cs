@@ -299,7 +299,8 @@ public sealed class TestDbaNetworkCertificateCommand : DbaBaseCmdlet
         if (LanguagePrimitives.IsTrue(configuredThumbprint) && LanguagePrimitives.IsTrue(configuredExpires)
             && TryDate(configuredExpires, out DateTime expiresDt))
         {
-            configuredDaysValid = (int)(expiresDt - currentDate).TotalDays;
+            // PS [int] rounds to nearest (banker's); a C# cast truncates toward zero.
+            configuredDaysValid = LanguagePrimitives.ConvertTo<int>((expiresDt - currentDate).TotalDays);
         }
 
         bool configuredCertificateValid = false;
@@ -328,7 +329,7 @@ public sealed class TestDbaNetworkCertificateCommand : DbaBaseCmdlet
             obj.Properties.Add(new PSNoteProperty("FriendlyName", sc.Properties["FriendlyName"]?.Value));
             obj.Properties.Add(new PSNoteProperty("NotBefore", sc.Properties["NotBefore"]?.Value));
             obj.Properties.Add(new PSNoteProperty("NotAfter", sc.Properties["NotAfter"]?.Value));
-            object? daysValid = TryDate(sc.Properties["NotAfter"]?.Value, out DateTime na) ? (int)(na - DateTime.Now).TotalDays : (object?)null;
+            object? daysValid = TryDate(sc.Properties["NotAfter"]?.Value, out DateTime na) ? LanguagePrimitives.ConvertTo<int>((na - DateTime.Now).TotalDays) : (object?)null;
             obj.Properties.Add(new PSNoteProperty("DaysValid", daysValid));
             suitableCertObjects.Add(obj);
         }
@@ -343,7 +344,12 @@ public sealed class TestDbaNetworkCertificateCommand : DbaBaseCmdlet
         result.Properties.Add(new PSNoteProperty("ConfiguredCertificateDaysValid", configuredDaysValid));
         result.Properties.Add(new PSNoteProperty("SuitableCertificateAvailable", suitableCertCount > 0));
         result.Properties.Add(new PSNoteProperty("SuitableCertificateCount", suitableCertCount));
-        result.Properties.Add(new PSNoteProperty("SuitableCertificates", suitableCertObjects.ToArray()));
+        // PS: $suitableCertObjects = foreach (...) {...} - the assignment shape is null for zero
+        // iterations, the scalar object for one, and Object[] for many; never an empty array.
+        object? suitableValue = suitableCertObjects.Count == 0
+            ? null
+            : suitableCertObjects.Count == 1 ? suitableCertObjects[0] : (object)suitableCertObjects.ToArray();
+        result.Properties.Add(new PSNoteProperty("SuitableCertificates", suitableValue));
         WriteObject(result);
     }
 
@@ -351,8 +357,11 @@ public sealed class TestDbaNetworkCertificateCommand : DbaBaseCmdlet
     private string ResolveComputerName(DbaInstanceParameter instance)
     {
         Hashtable splat = new Hashtable { { "ComputerName", instance.ComputerName }, { "Credential", Credential } };
+        // 3>&1 rides the helper's WarningRecords on the output stream so InvokeModuleScoped can
+        // re-emit them through the outer cmdlet (WarningAction/WarningVariable parity with the PS
+        // function's direct call); without it they hit the host and bypass both.
         Collection<PSObject> res = InvokeModuleScoped(
-            "param($__p) $__m = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; & $__m { param($p) Resolve-DbaComputerName -ComputerName $p.ComputerName -Credential $p.Credential } $__p",
+            "param($__p) $__m = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; & $__m { param($p) Resolve-DbaComputerName -ComputerName $p.ComputerName -Credential $p.Credential } $__p 3>&1",
             splat);
         return res.Count > 0 ? res[0]?.ToString() ?? instance.ComputerName : instance.ComputerName;
     }

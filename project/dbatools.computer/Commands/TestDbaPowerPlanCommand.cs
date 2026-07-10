@@ -112,7 +112,10 @@ public sealed class TestDbaPowerPlanCommand : DbaBaseCmdlet
             {
                 WriteMessage(MessageLevel.Verbose, $"Using Power Plan '{PowerPlan}' as best practice.");
                 _bpPowerPlan = PowerPlan;
-                _bpInstanceId = LanguagePrimitives.ConvertTo<string>(GetMemberValueWhere(powerPlans, "PowerPlan", PowerPlan, "InstanceID"));
+                // PS: $bpPowerPlan.InstanceID stays $null on no match ($null -eq check fires);
+                // ConvertTo<string>(null) is "" and silently killed the unavailable-plan branch.
+                object? bpInstanceIdMatch = GetMemberValueWhere(powerPlans, "PowerPlan", PowerPlan, "InstanceID");
+                _bpInstanceId = bpInstanceIdMatch is null ? null : LanguagePrimitives.ConvertTo<string>(bpInstanceIdMatch);
                 if (_bpInstanceId is null)
                 {
                     WriteMessage(MessageLevel.Verbose, $"Unable to find Power Plan '{PowerPlan}' on {computerText}.");

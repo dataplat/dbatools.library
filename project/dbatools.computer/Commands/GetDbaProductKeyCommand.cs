@@ -312,10 +312,28 @@ public sealed class GetDbaProductKeyCommand : DbaBaseCmdlet
     {
         if (source is null)
         {
-            throw new RuntimeException("You cannot call a method on a null-valued expression.");
+            // PS record shape: FQID InvokeMethodOnNull, category InvalidOperation. A bare
+            // RuntimeException lazily fabricates a NotSpecified/RuntimeException record, so the
+            // record must be attached at construction for the caller's WriteError to match PS.
+            RuntimeException nullFailure = new("You cannot call a method on a null-valued expression.");
+            throw new RuntimeException(
+                nullFailure.Message,
+                null,
+                new ErrorRecord(nullFailure, "InvokeMethodOnNull", ErrorCategory.InvalidOperation, null));
         }
         PSMethodInfo? method = PSObject.AsPSObject(source).Methods[methodName];
-        return method?.Invoke();
+        if (method is null)
+        {
+            // PS: a missing method is a statement-terminating MethodNotFound error (no row emitted),
+            // never a silent null (which emitted a bogus null-Version row).
+            string typeName = PSObject.AsPSObject(source).BaseObject?.GetType().FullName ?? "System.Object";
+            RuntimeException missingFailure = new($"Method invocation failed because [{typeName}] does not contain a method named '{methodName}'.");
+            throw new RuntimeException(
+                missingFailure.Message,
+                null,
+                new ErrorRecord(missingFailure, "MethodNotFound", ErrorCategory.InvalidOperation, source));
+        }
+        return method.Invoke();
     }
 
     // PS unwraps PSObject method/parameter arguments to their base object before a .NET call.
