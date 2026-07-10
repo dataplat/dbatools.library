@@ -285,8 +285,7 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
                 storedCert = FindStoredCertBySerial(serial);
                 if (computer.IsLocalHost && storedCert is not null)
                 {
-                    OutputHelper.SetDefaultDisplayPropertySet(storedCert, DisplaySet);
-                    WriteObject(storedCert);
+                    WriteObject(ProjectForDisplay(storedCert));
                 }
             }
             else
@@ -354,16 +353,32 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
         return input.Split(new[] { sep }, StringSplitOptions.None);
     }
 
-    // PS: Get-ChildItem Cert:\LocalMachine\My -Recurse | Where SerialNumber -eq $serial |
-    //     Select-Object * - retrieved via the Cert: provider so the ETS surface matches PS.
+    // PS: $storedCert = Get-ChildItem Cert:\LocalMachine\My -Recurse | Where SerialNumber -eq $serial
+    // Returns the REAL X509Certificate2 (NOT a Select-Object * projection) so the non-localhost path
+    // can call $storedCert.Export(PFX, ...) - a projection has no Export / private key (the localhost
+    // path projects separately for its display output).
     private PSObject? FindStoredCertBySerial(string serial)
     {
         Collection<PSObject> results = InvokeCommand.InvokeScript(
             false,
-            ScriptBlock.Create("param($s) Get-ChildItem Cert:\\LocalMachine\\My -Recurse | Where-Object SerialNumber -eq $s | Select-Object -Property *"),
+            ScriptBlock.Create("param($s) Get-ChildItem Cert:\\LocalMachine\\My -Recurse | Where-Object SerialNumber -eq $s"),
             null,
             serial);
         return results.Count > 0 ? results[0] : null;
+    }
+
+    // PS localhost branch: $storedCert | Select-Object * | Select-DefaultView -Property <7>.
+    // Project the real cert to the Selected.X509Certificate2 surface then attach the display set.
+    private PSObject ProjectForDisplay(PSObject storedCert)
+    {
+        Collection<PSObject> projected = InvokeCommand.InvokeScript(
+            false,
+            ScriptBlock.Create("param($c) $c | Select-Object -Property *"),
+            null,
+            storedCert);
+        PSObject result = projected.Count > 0 ? projected[0] : storedCert;
+        OutputHelper.SetDefaultDisplayPropertySet(result, DisplaySet);
+        return result;
     }
 
     private void RemoteImport(DbaInstanceParameter computer, PSObject storedCert)
