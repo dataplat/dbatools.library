@@ -269,25 +269,50 @@ public sealed class GetDbaProductKeyCommand : DbaBaseCmdlet
 
                 // PS: [PSCustomObject]@{ ... } - 6 fixed-order properties off the connected server
                 // plus the decoded key. GetSqlServerVersionName() resolves through the PSObject
-                // adapter (a real SMO method on Server).
-                PSObject output = new();
-                output.Properties.Add(new PSNoteProperty("ComputerName", GetMemberValue(server, "ComputerName")));
-                output.Properties.Add(new PSNoteProperty("InstanceName", GetMemberValue(server, "ServiceName")));
-                output.Properties.Add(new PSNoteProperty("SqlInstance", GetMemberValue(server, "DomainInstanceName")));
-                output.Properties.Add(new PSNoteProperty("Version", InvokeMember(server, "GetSqlServerVersionName")));
-                output.Properties.Add(new PSNoteProperty("Edition", GetMemberValue(server, "Edition")));
-                output.Properties.Add(new PSNoteProperty("Key", GetMemberValue(results, "Key")));
-                WriteObject(output);
+                // adapter (a real SMO method on Server). The [PSCustomObject] statement is UNGUARDED
+                // in the PS function, so an error while evaluating any value expression is
+                // STATEMENT-terminating (verified): the object is NOT emitted and the foreach
+                // continues to the next instance. In particular, on the non-terminating connect
+                // failure that leaves $server null, $server.ComputerName etc. read as null WITHOUT
+                // error but $server.GetSqlServerVersionName() (a METHOD call on null) raises
+                // "You cannot call a method on a null-valued expression" - so PS emits NO row. The
+                // prior code returned null from InvokeMember, wrongly emitting a null-Version row.
+                try
+                {
+                    PSObject output = new();
+                    output.Properties.Add(new PSNoteProperty("ComputerName", GetMemberValue(server, "ComputerName")));
+                    output.Properties.Add(new PSNoteProperty("InstanceName", GetMemberValue(server, "ServiceName")));
+                    output.Properties.Add(new PSNoteProperty("SqlInstance", GetMemberValue(server, "DomainInstanceName")));
+                    output.Properties.Add(new PSNoteProperty("Version", InvokeMember(server, "GetSqlServerVersionName")));
+                    output.Properties.Add(new PSNoteProperty("Edition", GetMemberValue(server, "Edition")));
+                    output.Properties.Add(new PSNoteProperty("Key", GetMemberValue(results, "Key")));
+                    WriteObject(output);
+                }
+                catch (PipelineStoppedException)
+                {
+                    throw;
+                }
+                catch (RuntimeException rex)
+                {
+                    // Statement-terminating error building the row (method-on-null on the connect-
+                    // failure path, or any value-expression failure): report it and emit nothing for
+                    // this instance, then continue the loop - exactly the PS statement-terminating shape.
+                    WriteError(rex.ErrorRecord ?? new ErrorRecord(rex, "InvokeMethodOnNull", ErrorCategory.InvalidOperation, server));
+                }
             }
         }
     }
 
-    // PS: $server.GetSqlServerVersionName() - method invocation through the PSObject adapter.
+    // PS: $server.GetSqlServerVersionName() - method invocation through the PSObject adapter. A method
+    // call on a NULL source throws "You cannot call a method on a null-valued expression"
+    // (InvokeMethodOnNull), exactly as PS does; the caller catches it as a statement-terminating error
+    // and emits no row. Returning null here (the prior behavior) silently produced a bogus null-Version
+    // row on the reachable-registry + unreachable-SQL-instance failure path.
     private static object? InvokeMember(object? source, string methodName)
     {
         if (source is null)
         {
-            return null;
+            throw new RuntimeException("You cannot call a method on a null-valued expression.");
         }
         PSMethodInfo? method = PSObject.AsPSObject(source).Methods[methodName];
         return method?.Invoke();
