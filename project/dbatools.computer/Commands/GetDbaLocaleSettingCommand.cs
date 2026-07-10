@@ -131,7 +131,18 @@ public sealed class GetDbaLocaleSettingCommand : DbaBaseCmdlet
                     // Every value is read as a string (all Control Panel\International values are
                     // REG_SZ); a null read lands as a $null-valued property, matching $props.add.
                     string? value = GetRegStringValue(stdReg, KeyName, name);
-                    props.Add(name, value);
+                    // PS: $props.add($Name, $sValue) - a duplicate key raises a NON-terminating
+                    // MethodInvocationException, keeps the first value, and the loop continues to
+                    // still emit the object. Hashtable.Add throws ArgumentException; catch it and
+                    // WriteError so the cmdlet does not terminate (codex parity fix 2026-07-10).
+                    try
+                    {
+                        props.Add(name, value);
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        WriteError(new ErrorRecord(ex, "dbatools_Get-DbaLocaleSetting", ErrorCategory.NotSpecified, name));
+                    }
                 }
 
                 // PS: [PSCustomObject]$props
@@ -227,7 +238,9 @@ public sealed class GetDbaLocaleSettingCommand : DbaBaseCmdlet
         return output;
     }
 
-    // PS begin: $_.split("\")[0] then Select-Object -Unique (case-insensitive, first occurrence kept).
+    // PS begin: $_.split("\")[0] then Select-Object -Unique. Select-Object -Unique is
+    // CASE-SENSITIVE (lab-proven both editions: 'SQL1','sql1' -> both kept), so use an ordinal
+    // (case-sensitive) set, first occurrence kept (codex parity fix 2026-07-10).
     private static string[] NormalizeComputerNames(string[]? names)
     {
         if (names is null)
@@ -235,7 +248,7 @@ public sealed class GetDbaLocaleSettingCommand : DbaBaseCmdlet
             return Array.Empty<string>();
         }
         List<string> ordered = new List<string>();
-        HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (string raw in names)
         {
             string head = (raw ?? string.Empty).Split('\\')[0];
