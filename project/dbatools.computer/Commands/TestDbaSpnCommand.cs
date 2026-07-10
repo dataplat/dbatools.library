@@ -31,8 +31,23 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     // PS begin block: spare the cmdlet to search for the same account over and over. The @{}
-    // literal is a case-insensitive Hashtable shared across all pipeline records.
-    private readonly Hashtable _resultCache = new(StringComparer.CurrentCultureIgnoreCase);
+    // literal is a case-insensitive Hashtable shared across all pipeline records; its key comparer
+    // is EDITION-DEPENDENT (net472 current-culture, net8.0 ordinal - the W5-030 empirical fact).
+    private readonly Hashtable _resultCache = new(NewCacheComparer());
+
+    private static System.Collections.IEqualityComparer NewCacheComparer() =>
+#if NET8_0_OR_GREATER
+        StringComparer.OrdinalIgnoreCase;
+#else
+        StringComparer.CurrentCultureIgnoreCase;
+#endif
+
+    // PS: $result is FUNCTION-scope - a failed AD lookup leaves the value from ANY previous
+    // iteration (even a previous computer) in place, and the stale object is then inspected for
+    // the current spn (quirk preserved; a per-computer local only spanned one computer). Holds
+    // the pipeline-SHAPED value like the PS variable (a not-found lookup emits an explicit $null,
+    // which PS collapses to scalar null with Count 0).
+    private object? _adLookupResult;
 
     // The SQL WMI scriptblock, verbatim from the PS source. Invoke-ManagedComputerCommand
     // re-creates it from TEXT (unbound) and prepends its own $wmi setup, so passing the text
@@ -246,10 +261,6 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
                 continue;
             }
 
-            // PS: $result persists across iterations - a failed AD lookup leaves the previous
-            // value in place (quirk preserved).
-            Collection<PSObject>? result = null;
-
             foreach (PSObject spn in spns)
             {
                 if (spn is null)
@@ -286,12 +297,12 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
                             { "Type", searchfor },
                             { "Credential", Credential }
                         };
-                        result = InvokeModuleScoped(
+                        _adLookupResult = ShapeForScript(InvokeModuleScoped(
                             "param($__p) " +
                             "$__module = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; " +
                             "& $__module { param($p) Get-DbaADObject -ADObject $p.ADObject -Type $p.Type -Credential $p.Credential -EnableException } $__p 3>&1",
-                            adPayload);
-                        _resultCache[account] = result;
+                            adPayload));
+                        _resultCache[account] = _adLookupResult;
                     }
                     catch (PipelineStoppedException)
                     {
@@ -307,10 +318,10 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
                 }
                 else
                 {
-                    result = _resultCache[account] as Collection<PSObject>;
+                    _adLookupResult = _resultCache[account];
                 }
 
-                if (result is not null && result.Count > 0)
+                if (PsCount(_adLookupResult) > 0)
                 {
                     bool isSet;
                     try
@@ -323,7 +334,7 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
                             false,
                             ScriptBlock.Create("param($__r, $__spn) $__results = $__r.GetUnderlyingObject(); $__results.Properties.servicePrincipalName -contains $__spn"),
                             null,
-                            ShapeForScript(result), spn.Properties["RequiredSPN"]?.Value);
+                            _adLookupResult, spn.Properties["RequiredSPN"]?.Value);
                         isSet = check.Count > 0 && LanguagePrimitives.IsTrue(check[0]);
                     }
                     catch (PipelineStoppedException)
@@ -374,6 +385,23 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
 
     // NestedCommand discipline for module-scoped private-function calls: PSDPV shield plus 3>&1
     // warning re-emit through this cmdlet's stream.
+
+    // PS .Count on a pipeline-shaped value: null (a not-found lookup EMITS an explicit $null,
+    // which PS collapses to a scalar null whose Count is 0) -> 0, array -> length, scalar -> 1.
+    private static int PsCount(object? value)
+    {
+        if (value is null)
+        {
+            return 0;
+        }
+        object unwrapped = value is PSObject wrapped ? wrapped.BaseObject : value;
+        if (unwrapped is object?[] many)
+        {
+            return many.Length;
+        }
+        return 1;
+    }
+
     private Collection<PSObject> InvokeModuleScoped(string scriptText, object payload)
     {
         object? effective = SessionState.PSVariable.GetValue("PSDefaultParameterValues");

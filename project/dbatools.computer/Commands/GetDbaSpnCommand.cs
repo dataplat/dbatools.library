@@ -151,7 +151,10 @@ public sealed class GetDbaSpnCommand : DbaBaseCmdlet
             return;
         }
 
-        if (adResult.Count == 0)
+        // PS: if ($result.Count -gt 0) - a not-found lookup EMITS an explicit $null, which PS
+        // collapses to scalar null (Count 0); shape before counting or the null counts as one.
+        object? adShaped = ShapeForScript(adResult);
+        if (PsCount(adShaped) == 0)
         {
             WriteMessage(MessageLevel.Warning, $"The SQL Service account ({account}) has not been found");
             return;
@@ -165,7 +168,7 @@ public sealed class GetDbaSpnCommand : DbaBaseCmdlet
                 false,
                 ScriptBlock.Create("param($__r) $__u = $__r.GetUnderlyingObject(); $__u.Properties.servicePrincipalName"),
                 null,
-                ShapeForScript(adResult));
+                adShaped);
             spnsValue = spnResults.Count == 0 ? null : (spnResults.Count == 1 ? (object?)spnResults[0] : ToArray(spnResults));
         }
         catch (PipelineStoppedException)
@@ -204,6 +207,23 @@ public sealed class GetDbaSpnCommand : DbaBaseCmdlet
         obj.Properties.Add(new PSNoteProperty("Port", port));
         obj.Properties.Add(new PSNoteProperty("SPN", spn));
         return obj;
+    }
+
+
+    // PS .Count on a pipeline-shaped value: null (a not-found lookup EMITS an explicit $null,
+    // which PS collapses to a scalar null whose Count is 0) -> 0, array -> length, scalar -> 1.
+    private static int PsCount(object? value)
+    {
+        if (value is null)
+        {
+            return 0;
+        }
+        object unwrapped = value is PSObject wrapped ? wrapped.BaseObject : value;
+        if (unwrapped is object?[] many)
+        {
+            return many.Length;
+        }
+        return 1;
     }
 
     private Collection<PSObject> InvokeModuleScoped(string scriptText, object payload)
