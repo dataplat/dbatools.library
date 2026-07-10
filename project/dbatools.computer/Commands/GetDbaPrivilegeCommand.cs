@@ -200,9 +200,17 @@ public sealed class GetDbaPrivilegeCommand : DbaBaseCmdlet
             {
                 throw;
             }
+            catch (RuntimeException rex)
+            {
+                // PS: Stop-Function -Message "Failure on $computer" -ErrorRecord $_ - pass the ORIGINAL
+                // Test-PSRemoting error record so its Test-WSMan detail is preserved in the message
+                // (codex parity fix 2026-07-10).
+                StopFunction($"Failure on {computerText}", target: computer, errorRecord: rex.ErrorRecord, continueLoop: true);
+                continue;
+            }
             catch (Exception ex)
             {
-                StopFunction($"Failure on {computerText}", errorRecord: null, exception: ex, continueLoop: true);
+                StopFunction($"Failure on {computerText}", target: computer, exception: ex, continueLoop: true);
                 continue;
             }
 
@@ -344,11 +352,12 @@ public sealed class GetDbaPrivilegeCommand : DbaBaseCmdlet
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            // PS: Stop-Function -Message "Testing $computername" ... -EnableException:$true throws
-            // the composed record; the message becomes the outer error's inner text.
-            throw new Exception($"Testing {computerName}", ex);
+            // Re-throw the ORIGINAL Test-PSRemoting failure (a RuntimeException carrying the
+            // Test-WSMan error record) so the caller's Stop-Function preserves its detail; wrapping
+            // it replaced that detail with generic text (codex parity fix 2026-07-10).
+            throw;
         }
     }
 
@@ -384,12 +393,17 @@ public sealed class GetDbaPrivilegeCommand : DbaBaseCmdlet
         return list;
     }
 
-    // Select-Object -Unique: case-sensitive, first occurrence wins, order preserved.
+    // Select-Object -Unique: case-sensitive, first occurrence wins, order preserved. It also DROPS
+    // $null pipeline inputs (codex parity fix 2026-07-10: keep parity with the PS pipeline).
     private static List<object?> SelectUnique(List<object?> items)
     {
         List<object?> unique = new();
         foreach (object? item in items)
         {
+            if (item is null)
+            {
+                continue;
+            }
             bool seen = false;
             foreach (object? kept in unique)
             {
