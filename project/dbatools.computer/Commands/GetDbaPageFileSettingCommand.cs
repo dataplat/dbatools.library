@@ -111,10 +111,12 @@ public sealed class GetDbaPageFileSettingCommand : DbaBaseCmdlet
             else
             {
                 // pagefile is automatic managed, so there are no settings
-                // PS: ComputerName = $computer here (the input object), which string-converts
-                // to the parameter's FullName - not the bare ComputerName.
+                // PS: ComputerName = $computer (the input object) string-converts via
+                // DbaInstanceParameter.ToString() to FullSmoName, NOT FullName (codex parity fix
+                // 2026-07-10: identical for a bare host name, differs for connection-string forms
+                // like "TCP:sql01,51433").
                 PageFileSetting row = new();
-                row.ComputerName = computer.FullName;
+                row.ComputerName = computer.ToString();
                 row.AutoPageFile = IsTrue(automaticManaged);
                 row.FileName = null;
                 row.Status = null;

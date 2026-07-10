@@ -79,7 +79,10 @@ public sealed class GetDbaMsdtcCommand : DbaBaseCmdlet
             // whole observable contract.
             object? reg = null;
             object? cids = null;
-            Hashtable cidHash = new(StringComparer.CurrentCultureIgnoreCase);
+            // PS hashtable literals are ORDINAL case-insensitive (not current-culture); use
+            // OrdinalIgnoreCase so CID lookups match under any culture (e.g. Turkish 'I'/'i')
+            // (codex parity fix 2026-07-10).
+            Hashtable cidHash = new(StringComparer.OrdinalIgnoreCase);
 
             // PS: if ($Credential) { Test-PSRemoting -ComputerName $computer -Credential $Credential }
             //     else { Test-PSRemoting -ComputerName $computer } - both shapes collapse to the same
