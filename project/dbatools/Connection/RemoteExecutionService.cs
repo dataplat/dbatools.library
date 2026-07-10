@@ -59,6 +59,14 @@ namespace Dataplat.Dbatools.Connection
 
             /// <summary>Verifies the remote PowerShell version meets this requirement before running.</summary>
             public Version RequiredPSVersion;
+
+            /// <summary>
+            /// Replicates an explicit `Invoke-Command2 -Verbose` at a call site: passes -Verbose to
+            /// the nested Invoke-Command so the scriptblock's Write-Verbose records are generated
+            /// (locally the preference propagates into the invoked script; remotely the records are
+            /// transported) and land in the result's Verbose list for the caller to re-emit.
+            /// </summary>
+            public bool ForceVerbose;
         }
 
         /// <summary>
@@ -75,6 +83,9 @@ namespace Dataplat.Dbatools.Connection
 
             /// <summary>Non-terminating errors the nested pipeline surfaced.</summary>
             public List<ErrorRecord> Errors = new List<ErrorRecord>();
+
+            /// <summary>Verbose messages the nested pipeline surfaced (populated for ForceVerbose runs).</summary>
+            public List<string> Verbose = new List<string>();
         }
 
         /// <summary>
@@ -192,30 +203,68 @@ namespace Dataplat.Dbatools.Connection
             RemoteCommandResult resultBag = new RemoteCommandResult();
             using (PowerShell shell = PowerShell.Create(RunspaceMode.CurrentRunspace))
             {
-                shell.AddCommand("Invoke-Command");
+                System.Collections.Hashtable invokeParams = new System.Collections.Hashtable();
                 if (currentSession != null)
-                    shell.AddParameter("Session", currentSession);
-                shell.AddParameter("ScriptBlock", scriptBlock);
+                    invokeParams["Session"] = currentSession;
+                invokeParams["ScriptBlock"] = scriptBlock;
                 // PS: if ($ArgumentList) / if ($InputObject) - PowerShell array truthiness,
                 // so a single-element array holding $null/$false/0/"" is NOT passed
                 // (cross-model review 2026-07-06 pm2 finding 1).
                 if (request.ArgumentList != null && LanguagePrimitives.IsTrue(request.ArgumentList))
-                    shell.AddParameter("ArgumentList", request.ArgumentList);
+                    invokeParams["ArgumentList"] = request.ArgumentList;
                 if (request.InputObject != null && LanguagePrimitives.IsTrue(request.InputObject))
-                    shell.AddParameter("InputObject", request.InputObject);
-                if (!request.Raw)
+                    invokeParams["InputObject"] = request.InputObject;
+                if (request.ForceVerbose)
                 {
-                    // PS: Invoke-Command ... | Select-Object -Property * -ExcludeProperty
-                    //     PSComputerName, RunspaceId, PSShowComputerName
-                    shell.AddCommand("Select-Object")
-                        .AddParameter("Property", new string[] { "*" })
-                        .AddParameter("ExcludeProperty", new string[] { "PSComputerName", "RunspaceId", "PSShowComputerName" });
+                    // An explicit `Invoke-Command2 -Verbose` call site set $VerbosePreference =
+                    // Continue in the function's scope, which the IN-PROCESS scriptblock's dynamic
+                    // preference lookup walks to; -Verbose on the Invoke-Command CMDLET alone only
+                    // flips its own runtime flag, which that lookup never consults. Run the
+                    // invocation from a wrapper scope carrying the preference (in-process path,
+                    // useLocalScope so the assignment cannot leak into the caller's scope), keep
+                    // -Verbose for the remote transport path, and merge the verbose records into
+                    // the output stream (4>&1) - written to the host directly they would neither
+                    // reach this result bag nor survive a caller-side redirect.
+                    string wrapper = "param($__params) $VerbosePreference = [System.Management.Automation.ActionPreference]::Continue; Invoke-Command @__params -Verbose 4>&1";
+                    if (!request.Raw)
+                    {
+                        // PS: Invoke-Command ... | Select-Object -Property * -ExcludeProperty
+                        //     PSComputerName, RunspaceId, PSShowComputerName
+                        // (verbose records bypass Select-Object in PS because they are not
+                        // pipeline objects; here they ride the output stream, so project only
+                        // the real output objects around them).
+                        wrapper += " | ForEach-Object { if ($_ -is [System.Management.Automation.VerboseRecord]) { $_ } else { $_ | Select-Object -Property * -ExcludeProperty PSComputerName, RunspaceId, PSShowComputerName } }";
+                    }
+                    shell.AddScript(wrapper, true);
+                    shell.AddParameter("__params", invokeParams);
+                }
+                else
+                {
+                    shell.AddCommand("Invoke-Command");
+                    foreach (System.Collections.DictionaryEntry entry in invokeParams)
+                        shell.AddParameter((string)entry.Key, entry.Value);
+                    if (!request.Raw)
+                    {
+                        // PS: Invoke-Command ... | Select-Object -Property * -ExcludeProperty
+                        //     PSComputerName, RunspaceId, PSShowComputerName
+                        shell.AddCommand("Select-Object")
+                            .AddParameter("Property", new string[] { "*" })
+                            .AddParameter("ExcludeProperty", new string[] { "PSComputerName", "RunspaceId", "PSShowComputerName" });
+                    }
                 }
 
                 foreach (PSObject output in shell.Invoke())
-                    resultBag.Output.Add(output);
+                {
+                    VerboseRecord verboseOutput = output == null ? null : output.BaseObject as VerboseRecord;
+                    if (verboseOutput != null)
+                        resultBag.Verbose.Add(verboseOutput.Message);
+                    else
+                        resultBag.Output.Add(output);
+                }
                 foreach (ErrorRecord error in shell.Streams.Error)
                     resultBag.Errors.Add(error);
+                foreach (VerboseRecord verbose in shell.Streams.Verbose)
+                    resultBag.Verbose.Add(verbose.Message);
             }
 
             if (!computer.IsLocalHost)
