@@ -117,7 +117,7 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
         public string Type = string.Empty;
         public object? InstanceName;
         public object? SqlInstance;
-        public Hashtable Config = new Hashtable(StringComparer.CurrentCultureIgnoreCase);
+        public Hashtable Config = new Hashtable(NewDbaFirewallRuleCommand.ConfigComparer);   // edition-appropriate; always replaced via NewConfig()
     }
 
     protected override void BeginProcessing()
@@ -588,7 +588,18 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
         }
     }
 
-    private static Hashtable NewConfig() => new Hashtable(StringComparer.CurrentCultureIgnoreCase);
+    // @{}'s key comparer is EDITION-DEPENDENT (empirically verified): net472/WinPS 5.1 = a CultureAware
+    // comparer (current-culture), net8.0/PS7 = OrdinalIgnoreCase. Use the edition-appropriate one so a
+    // Configuration-key REPLACEMENT (rule.Config[key] = value) matches @{} on each edition - notably under
+    // Turkish/Azeri casing where I/i differ (CurrentCultureIgnoreCase would add a 2nd key on net8.0 where @{}
+    // replaces). CurrentCultureIgnoreCase is ALSO required for net472 @{} bag-order parity (W5-014).
+    private static readonly System.Collections.IEqualityComparer ConfigComparer =
+#if NET8_0_OR_GREATER
+        StringComparer.OrdinalIgnoreCase;
+#else
+        StringComparer.CurrentCultureIgnoreCase;
+#endif
+    private static Hashtable NewConfig() => new Hashtable(ConfigComparer);
 
     private bool ContainsType(string candidate)
     {
