@@ -100,7 +100,9 @@ public sealed class SetDbaSpnCommand : DbaBaseCmdlet
                 // PS: $adentry = $Result.GetUnderlyingObject() - the method resolves on the
                 // pipeline-shaped value (scalar for one result; a multi-result array has no such
                 // method and fails the statement exactly like PS).
-                Collection<PSObject> fetched = InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__r) $__r.GetUnderlyingObject()"), null, _lookupResult);
+                // Wrapped so a multi-result (array-shaped) lookup binds as ONE $__r argument
+                // instead of being unpacked by the params-array binding.
+                Collection<PSObject> fetched = InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__r) $__r.GetUnderlyingObject()"), null, new object?[] { _lookupResult });
                 _adEntry = ShapeOutput(fetched);
             }
             catch (PipelineStoppedException)

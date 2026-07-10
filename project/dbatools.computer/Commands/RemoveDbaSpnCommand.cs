@@ -92,7 +92,9 @@ public sealed class RemoveDbaSpnCommand : DbaBaseCmdlet
             try
             {
                 // PS: $adentry = $Result.GetUnderlyingObject()
-                Collection<PSObject> fetched = InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__r) $__r.GetUnderlyingObject()"), null, _lookupResult);
+                // Wrapped so a multi-result (array-shaped) lookup binds as ONE $__r argument
+                // instead of being unpacked by the params-array binding.
+                Collection<PSObject> fetched = InvokeCommand.InvokeScript(false, ScriptBlock.Create("param($__r) $__r.GetUnderlyingObject()"), null, new object?[] { _lookupResult });
                 _adEntry = ShapeOutput(fetched);
             }
             catch (PipelineStoppedException)
