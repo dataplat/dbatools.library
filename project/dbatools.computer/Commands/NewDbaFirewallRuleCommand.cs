@@ -550,20 +550,20 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
                     object? warnAppend = GetProp(commandResult, "Warning");
                     if (LanguagePrimitives.IsTrue(warnAppend))
                     {
-                        WriteMessage(MessageLevel.Verbose, $"commandResult.Warning: {warnAppend}.");
-                        status += $" Warning: {warnAppend}.";
+                        WriteMessage(MessageLevel.Verbose, $"commandResult.Warning: {PsStr(warnAppend)}.");
+                        status += $" Warning: {PsStr(warnAppend)}.";
                     }
                     object? errAppend = GetProp(commandResult, "Error");
                     if (LanguagePrimitives.IsTrue(errAppend))
                     {
-                        WriteMessage(MessageLevel.Verbose, $"commandResult.Error: {errAppend}.");
-                        status += $" Error: {errAppend}.";
+                        WriteMessage(MessageLevel.Verbose, $"commandResult.Error: {PsStr(errAppend)}.");
+                        status += $" Error: {PsStr(errAppend)}.";
                     }
                     object? excAppend = GetProp(commandResult, "Exception");
                     if (LanguagePrimitives.IsTrue(excAppend))
                     {
-                        WriteMessage(MessageLevel.Verbose, $"commandResult.Exception: {excAppend}.");
-                        status += $" Exception: {excAppend}.";
+                        WriteMessage(MessageLevel.Verbose, $"commandResult.Exception: {PsStr(excAppend)}.");
+                        status += $" Exception: {PsStr(excAppend)}.";
                     }
 
                     // Output information.
@@ -605,6 +605,24 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
         if (obj is null) { return null; }
         PSObject pso = obj as PSObject ?? new PSObject(obj);
         return pso.Properties[name]?.Value;
+    }
+
+    // PS "$value" string interpolation: a COLLECTION joins its elements with $OFS (default single space),
+    // NOT the collection's ToString (which a C# interpolated string would call - e.g. "System.Object[]").
+    // Matches the PS function's "$($commandResult.Warning)"/Error for the ArrayList that -WarningVariable/
+    // -ErrorVariable yields; a scalar (Exception's ErrorRecord) stringifies via ToString either way.
+    private static string PsStr(object? value)
+    {
+        if (value is null) { return string.Empty; }
+        object baseObject = value is PSObject wrapped ? wrapped.BaseObject : value;
+        if (baseObject is string s) { return s; }
+        if (baseObject is System.Collections.IEnumerable enumerable)
+        {
+            List<string> parts = new();
+            foreach (object? item in enumerable) { parts.Add(item?.ToString() ?? string.Empty); }
+            return string.Join(" ", parts);
+        }
+        return baseObject.ToString() ?? string.Empty;
     }
 
     private static void SetProp(PSObject? obj, string name, object? value)
