@@ -38,8 +38,15 @@ public sealed class RemoveDbaFirewallRuleCommand : DbaBaseCmdlet
     [Parameter(ParameterSetName = "Pipeline", Mandatory = true, ValueFromPipeline = true)]
     public object[]? InputObject { get; set; }
 
-    // EnableException is inherited from DbaBaseCmdlet - it has no ParameterSetName so it belongs to
-    // both sets, matching the baseline.
+    /// <summary>By default, dbatools handles errors as friendly warnings. This switch enables terminating exceptions instead.</summary>
+    // The PS function declares EnableException explicitly PER SET ([Parameter(ParameterSetName)] x2),
+    // so the baseline records it in {NonPipeline, Pipeline} - the inherited set-less declaration lands
+    // in __AllParameterSets and fails the surface diff. The override carries the per-set attributes
+    // (the binder reads the most-derived declaration) while the base StopFunction/WriteMessage read
+    // the bound value through virtual dispatch.
+    [Parameter(ParameterSetName = "NonPipeline")]
+    [Parameter(ParameterSetName = "Pipeline")]
+    public override SwitchParameter EnableException { get; set; }
 
     // Verbatim Invoke-Command2 scriptblock: Remove-NetFirewallRule by name, returns an envelope.
     private const string RemoveScript = @"

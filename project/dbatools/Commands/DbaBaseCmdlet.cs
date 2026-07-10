@@ -18,9 +18,12 @@ namespace Dataplat.Dbatools.Commands
     /// </summary>
     public abstract class DbaBaseCmdlet : PSCmdlet
     {
-        /// <summary>By default, dbatools handles errors as friendly warnings. This switch enables terminating exceptions instead.</summary>
+        /// <summary>By default, dbatools handles errors as friendly warnings. This switch enables terminating exceptions instead.
+        /// Virtual so a port whose PS function declares EnableException PER PARAMETER SET can override
+        /// it with the per-set [Parameter] attributes (the binder reads the most-derived declaration's
+        /// attributes) while StopFunction/WriteMessage keep reading the bound value via virtual dispatch.</summary>
         [Parameter]
-        public SwitchParameter EnableException { get; set; }
+        public virtual SwitchParameter EnableException { get; set; }
 
         /// <summary>Set when StopFunction decided the cmdlet must stop. Guard ProcessRecord/EndProcessing with it. Never reset.</summary>
         protected bool Interrupted { get; private set; }
