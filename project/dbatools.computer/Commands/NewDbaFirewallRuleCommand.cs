@@ -117,7 +117,7 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
         public string Type = string.Empty;
         public object? InstanceName;
         public object? SqlInstance;
-        public Hashtable Config = new Hashtable(NewDbaFirewallRuleCommand.ConfigComparer);   // edition-appropriate; always replaced via NewConfig()
+        public Hashtable Config = new Hashtable(NewDbaFirewallRuleCommand.NewConfigComparer());   // edition-appropriate, current-culture per instance; always replaced via NewConfig()
     }
 
     protected override void BeginProcessing()
@@ -589,17 +589,20 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
     }
 
     // @{}'s key comparer is EDITION-DEPENDENT (empirically verified): net472/WinPS 5.1 = a CultureAware
-    // comparer (current-culture), net8.0/PS7 = OrdinalIgnoreCase. Use the edition-appropriate one so a
-    // Configuration-key REPLACEMENT (rule.Config[key] = value) matches @{} on each edition - notably under
-    // Turkish/Azeri casing where I/i differ (CurrentCultureIgnoreCase would add a 2nd key on net8.0 where @{}
-    // replaces). CurrentCultureIgnoreCase is ALSO required for net472 @{} bag-order parity (W5-014).
-    private static readonly System.Collections.IEqualityComparer ConfigComparer =
+    // comparer bound to the CURRENT culture, net8.0/PS7 = OrdinalIgnoreCase. Build the edition-appropriate
+    // comparer PER CALL (NOT a cached static): on net472 StringComparer.CurrentCultureIgnoreCase snapshots
+    // CultureInfo.CurrentCulture at READ time, so a config bag built now matches an @{} built now even when
+    // the thread culture changed since type-load (Turkish/Azeri I/i: a static comparer captured under en-US
+    // would keep collapsing DIRECTION/Direction after a switch to tr-TR, where a fresh @{} keeps them
+    // distinct). On net8.0 OrdinalIgnoreCase is a culture-independent singleton, so per-call == static.
+    // CurrentCultureIgnoreCase is ALSO required for net472 @{} bag-order parity (W5-014).
+    private static System.Collections.IEqualityComparer NewConfigComparer() =>
 #if NET8_0_OR_GREATER
         StringComparer.OrdinalIgnoreCase;
 #else
         StringComparer.CurrentCultureIgnoreCase;
 #endif
-    private static Hashtable NewConfig() => new Hashtable(ConfigComparer);
+    private static Hashtable NewConfig() => new Hashtable(NewConfigComparer());
 
     private bool ContainsType(string candidate)
     {
@@ -618,11 +621,13 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
         return pso.Properties[name]?.Value;
     }
 
-    // PS "$value" string interpolation: a COLLECTION joins its elements with $OFS (default single space),
-    // NOT the collection's ToString (which a C# interpolated string would call - e.g. "System.Object[]").
-    // Matches the PS function's "$($commandResult.Warning)"/Error for the ArrayList that -WarningVariable/
-    // -ErrorVariable yields; a scalar (Exception's ErrorRecord) stringifies via ToString either way.
-    private static string PsStr(object? value)
+    // PS "$value" string interpolation: a COLLECTION joins its elements with $OFS, NOT the collection's
+    // ToString (which a C# interpolated string would call - e.g. "System.Object[]"). Matches the PS
+    // function's "$($commandResult.Warning)"/Error for the ArrayList that -WarningVariable/-ErrorVariable
+    // yields; a scalar (Exception's ErrorRecord) stringifies via ToString either way. Instance (not static)
+    // so it can read the caller's $OFS from session state - the separator is the caller's $OFS, not a
+    // hardcoded space, to match PS exactly when the session overrides $OFS.
+    private string PsStr(object? value)
     {
         if (value is null) { return string.Empty; }
         object baseObject = value is PSObject wrapped ? wrapped.BaseObject : value;
@@ -631,9 +636,19 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
         {
             List<string> parts = new();
             foreach (object? item in enumerable) { parts.Add(item?.ToString() ?? string.Empty); }
-            return string.Join(" ", parts);
+            return string.Join(Ofs(), parts);
         }
         return baseObject.ToString() ?? string.Empty;
+    }
+
+    // The session's $OFS (Output Field Separator) used to join a collection in "$collection". PS
+    // (ParserOps.GetSeparator): an UNSET or $null $OFS means the default single space; any other value
+    // (including "") is used verbatim via PS string conversion. Reading it per call - not caching - so a
+    // mid-pipeline $OFS change is honored exactly as PS would.
+    private string Ofs()
+    {
+        object? ofs = SessionState?.PSVariable?.GetValue("OFS");
+        return ofs is null ? " " : (LanguagePrimitives.ConvertTo<string>(ofs) ?? string.Empty);
     }
 
     private static void SetProp(PSObject? obj, string name, object? value)
