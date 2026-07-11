@@ -35,6 +35,12 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         }
 
         Dictionary<string, List<object>> connections = ConnectionHost.ActiveConnections;
+        if (connections is null)
+        {
+            // PS: $null.Keys null-propagates and the foreach runs zero times (only reachable
+            // by externally nulling the public static store).
+            return;
+        }
         foreach (string key in connections.Keys)
         {
             List<object> entry = connections[key];
@@ -158,24 +164,26 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         PSPropertyInfo? direct = wrapped.Properties[name];
         if (direct is not null)
         {
-            object? value;
             try
             {
-                value = direct.Value;
+                // Returned as-is (PSObject wrapper kept): chained access must still see
+                // instance ETS members on a decorated value (codex W1-010 r3 finding 3).
+                return direct.Value;
             }
             catch
             {
                 return null;
             }
-            if (value is PSObject valueWrapped && valueWrapped.BaseObject is not PSCustomObject)
-            {
-                return valueWrapped.BaseObject;
-            }
-            return value;
         }
         object? baseValue = wrapped.BaseObject;
         if (baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable elements)
         {
+            // Lab-proven both editions (codex W1-010 r1 finding 1 + r3 finding 2):
+            // member-access enumeration has PIPELINE-WRITE semantics per element - a found
+            // value that is enumerable (non-string) flattens ONE level, an empty array
+            // contributes nothing, a null value contributes null; a property-bag element
+            // MISSING the property contributes null (permissive bag adapter) while a raw
+            // .NET element missing it contributes nothing.
             List<object?> collected = new List<object?>();
             foreach (object? element in elements)
             {
@@ -187,21 +195,31 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
                 PSPropertyInfo? elementProperty = elementWrapped.Properties[name];
                 if (elementProperty is not null)
                 {
+                    object? elementValue;
                     try
                     {
-                        collected.Add(elementProperty.Value);
+                        elementValue = elementProperty.Value;
                     }
                     catch
                     {
                         collected.Add(null);
+                        continue;
+                    }
+                    object? elementBase = elementValue is PSObject valueWrapped ? valueWrapped.BaseObject : elementValue;
+                    if (elementBase is not string && LanguagePrimitives.GetEnumerable(elementBase) is IEnumerable valueItems)
+                    {
+                        foreach (object? valueItem in valueItems)
+                        {
+                            collected.Add(valueItem);
+                        }
+                    }
+                    else
+                    {
+                        collected.Add(elementValue);
                     }
                 }
                 else if (elementWrapped.BaseObject is PSCustomObject)
                 {
-                    // Lab-proven both editions (codex W1-010 r1 finding 1): member-access
-                    // enumeration contributes NULL for a property-bag element MISSING the
-                    // property (the bag adapter is permissive), while a raw .NET element
-                    // missing it contributes nothing.
                     collected.Add(null);
                 }
             }
