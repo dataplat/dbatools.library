@@ -143,9 +143,33 @@ namespace Dataplat.Dbatools.Message
 
             if (request.Level == MessageLevel.Warning)
             {
-                if (!silent && !request.SuppressWarningDisplay)
+                if (!silent)
                 {
-                    cmdlet.WriteWarning(messageStreams);
+                    if (request.SuppressWarningDisplay)
+                    {
+                        // Stop-Function under EnableException calls Write-Message with 3>$null:
+                        // the record never DISPLAYS, but every enclosing -WarningVariable still
+                        // captures it (lab-proven, ConvertTo-DbaDataTable S10 smoke). Writing
+                        // under a temporary WarningPreference swap reproduces both halves; a
+                        // caller-bound -WarningAction overrides the variable either way, which
+                        // matches the record being suppressed-but-captured there too.
+                        object oldWarningPreference = cmdlet.SessionState.PSVariable.GetValue("WarningPreference");
+                        try
+                        {
+                            cmdlet.SessionState.PSVariable.Set("WarningPreference", ActionPreference.SilentlyContinue);
+                            cmdlet.WriteWarning(messageStreams);
+                        }
+                        finally
+                        {
+                            cmdlet.SessionState.PSVariable.Set("WarningPreference", oldWarningPreference);
+                        }
+                    }
+                    else
+                    {
+                        cmdlet.WriteWarning(messageStreams);
+                    }
+                    // The PS Write-Message cannot see the caller's redirect, so the Warning
+                    // channel is logged in both modes.
                     channels = channels | LogEntryType.Warning;
                 }
                 cmdlet.WriteDebug(messageStreams);
