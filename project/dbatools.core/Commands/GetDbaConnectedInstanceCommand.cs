@@ -43,21 +43,24 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         }
         foreach (string key in connections.Keys)
         {
-            List<object> entry = connections[key];
+            // PS re-reads $connections[$key] at EVERY occurrence (four sites) - keep the
+            // per-site indexer reads so a side-effecting member that swaps the stored list
+            // is observed exactly like the function observed it (the W1-004 per-site
+            // re-read convention; codex W1-010 r4 finding 1).
 
             // PS: if ($connections[$key].DataSource) - member-access enumeration over the
             // list, PS truthiness on the collected projection.
             object? instance;
-            if (LanguagePrimitives.IsTrue(DotAccess(entry, "DataSource")))
+            if (LanguagePrimitives.IsTrue(DotAccess(connections[key], "DataSource")))
             {
-                instance = SelectFirstExpand(entry, "DataSource");
+                instance = SelectFirstExpand(connections[key], "DataSource");
             }
             else
             {
-                instance = SelectFirstExpand(entry, "Name");
+                instance = SelectFirstExpand(connections[key], "Name");
             }
 
-            object? value = SelectFirst(entry);
+            object? value = SelectFirst(connections[key]);
 
             // PS: if ($value.ConnectionContext.NonPooledConnection -or $value.NonPooledConnection)
             bool nonPooled = LanguagePrimitives.IsTrue(DotAccess(DotAccess(value, "ConnectionContext"), "NonPooledConnection"))
@@ -71,7 +74,7 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
                 // (hashtable entries evaluate in declaration order).
                 PSObject output = new();
                 output.Properties.Add(new PSNoteProperty("SqlInstance", instance));
-                output.Properties.Add(new PSNoteProperty("ConnectionObject", entry));
+                output.Properties.Add(new PSNoteProperty("ConnectionObject", connections[key]));
                 output.Properties.Add(new PSNoteProperty("ConnectionType", GetTypePs(value).FullName));
                 output.Properties.Add(new PSNoteProperty("Pooled", pooling));
                 output.Properties.Add(new PSNoteProperty("ConnectionString", HideConnectionString(key)));
@@ -203,6 +206,13 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
                     catch
                     {
                         collected.Add(null);
+                        continue;
+                    }
+                    if (ReferenceEquals(elementValue, System.Management.Automation.Internal.AutomationNull.Value))
+                    {
+                        // A no-output property (empty ScriptProperty body) yields
+                        // AutomationNull, which a pipeline write DROPS - unlike an explicit
+                        // $null, which it emits (codex W1-010 r4 finding 2).
                         continue;
                     }
                     object? elementBase = elementValue is PSObject valueWrapped ? valueWrapped.BaseObject : elementValue;
