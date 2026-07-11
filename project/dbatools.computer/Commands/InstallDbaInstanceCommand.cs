@@ -21,145 +21,145 @@ namespace Dataplat.Dbatools.Commands;
 /// Every dbatools dependency is invoked through the dbatools MODULE SCOPE so Pester's
 /// `-ModuleName dbatools` mocks intercept the calls (the install-family test contract).
 /// </summary>
-[Cmdlet(VerbsLifecycle.Install, "DbaInstance", SupportsShouldProcess = true)]
+[Cmdlet(VerbsLifecycle.Install, "DbaInstance", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
 {
     /// <summary>The target computer(s); defaults to the local computer.</summary>
-    [Parameter(ValueFromPipeline = false)]
+    [Parameter(ValueFromPipeline = false, Position = 0)]
     [Alias("ComputerName")]
     public DbaInstanceParameter[]? SqlInstance { get; set; } = DefaultSqlInstance();
 
     /// <summary>The SQL Server major version to install.</summary>
-    [Parameter(Mandatory = true)]
+    [Parameter(Mandatory = true, Position = 1)]
     [ValidateNotNullOrEmpty]
     [ValidateSet("2008", "2008R2", "2012", "2014", "2016", "2017", "2019", "2022", "2025")]
     public string? Version { get; set; }
 
     /// <summary>The instance name.</summary>
-    [Parameter]
+    [Parameter(Position = 2)]
     public string? InstanceName { get; set; }
 
     /// <summary>The sa credential for Mixed mode.</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     public PSCredential? SaCredential { get; set; }
 
     /// <summary>Windows credential for remote operations.</summary>
-    [Parameter]
+    [Parameter(Position = 4)]
     public PSCredential? Credential { get; set; }
 
     /// <summary>The WinRM authentication protocol.</summary>
-    [Parameter]
+    [Parameter(Position = 5)]
     [ValidateSet("Default", "Basic", "Negotiate", "NegotiateWithImplicitCredential", "Credssp", "Digest", "Kerberos")]
     public string? Authentication { get; set; }
 
     /// <summary>A pre-built configuration file to apply.</summary>
-    [Parameter(ValueFromPipeline = true)]
+    [Parameter(ValueFromPipeline = true, Position = 6)]
     [Alias("FilePath")]
     public object? ConfigurationFile { get; set; }
 
     /// <summary>Configuration key overrides.</summary>
-    [Parameter]
+    [Parameter(Position = 7)]
     public Hashtable? Configuration { get; set; }
 
     /// <summary>The setup source path(s).</summary>
-    [Parameter]
+    [Parameter(Position = 8)]
     public string[]? Path { get; set; } = DefaultPath();
 
     /// <summary>The feature(s) to install.</summary>
-    [Parameter]
+    [Parameter(Position = 9)]
     [ValidateSet("Default", "All", "Engine", "Tools", "Replication", "FullText", "DataQuality", "PolyBase", "MachineLearning", "AnalysisServices",
         "ReportingServices", "ReportingForSharepoint", "SharepointAddin", "IntegrationServices", "MasterDataServices", "PythonPackages", "RPackages",
         "BackwardsCompatibility", "Connectivity", "ReplayController", "ReplayClient", "SDK", "BIDS", "SSMS")]
     public string[] Feature { get; set; } = new[] { "Default" };
 
     /// <summary>Windows or Mixed authentication mode.</summary>
-    [Parameter]
+    [Parameter(Position = 10)]
     [ValidateSet("Windows", "Mixed")]
     public string AuthenticationMode { get; set; } = "Windows";
 
     /// <summary>Instance directory.</summary>
-    [Parameter]
+    [Parameter(Position = 11)]
     public string? InstancePath { get; set; }
 
     /// <summary>User database data directory.</summary>
-    [Parameter]
+    [Parameter(Position = 12)]
     public string? DataPath { get; set; }
 
     /// <summary>User database log directory.</summary>
-    [Parameter]
+    [Parameter(Position = 13)]
     public string? LogPath { get; set; }
 
     /// <summary>Tempdb directory.</summary>
-    [Parameter]
+    [Parameter(Position = 14)]
     public string? TempPath { get; set; }
 
     /// <summary>Backup directory.</summary>
-    [Parameter]
+    [Parameter(Position = 15)]
     public string? BackupPath { get; set; }
 
     /// <summary>The update source path.</summary>
-    [Parameter]
+    [Parameter(Position = 16)]
     public string? UpdateSourcePath { get; set; }
 
     /// <summary>Additional sysadmin accounts.</summary>
-    [Parameter]
+    [Parameter(Position = 17)]
     public string[]? AdminAccount { get; set; }
 
     /// <summary>Additional AS admin accounts.</summary>
-    [Parameter]
+    [Parameter(Position = 18)]
     public string[]? ASAdminAccount { get; set; }
 
     /// <summary>The TCP port to set post-install.</summary>
-    [Parameter]
+    [Parameter(Position = 19)]
     public int Port { get; set; }
 
     /// <summary>Parallel install throttle.</summary>
-    [Parameter]
+    [Parameter(Position = 20)]
     public int Throttle { get; set; } = 50;
 
     /// <summary>The product key.</summary>
-    [Parameter]
+    [Parameter(Position = 21)]
     [Alias("PID")]
     public string? ProductID { get; set; }
 
     /// <summary>Analysis Services collation.</summary>
-    [Parameter]
+    [Parameter(Position = 22)]
     public string? AsCollation { get; set; }
 
     /// <summary>SQL Server collation.</summary>
-    [Parameter]
+    [Parameter(Position = 23)]
     public string? SqlCollation { get; set; }
 
     /// <summary>Engine service credential.</summary>
-    [Parameter]
+    [Parameter(Position = 24)]
     public PSCredential? EngineCredential { get; set; }
 
     /// <summary>Agent service credential.</summary>
-    [Parameter]
+    [Parameter(Position = 25)]
     public PSCredential? AgentCredential { get; set; }
 
     /// <summary>Analysis Services credential.</summary>
-    [Parameter]
+    [Parameter(Position = 26)]
     public PSCredential? ASCredential { get; set; }
 
     /// <summary>Integration Services credential.</summary>
-    [Parameter]
+    [Parameter(Position = 27)]
     public PSCredential? ISCredential { get; set; }
 
     /// <summary>Reporting Services credential.</summary>
-    [Parameter]
+    [Parameter(Position = 28)]
     public PSCredential? RSCredential { get; set; }
 
     /// <summary>Full-text credential.</summary>
-    [Parameter]
+    [Parameter(Position = 29)]
     public PSCredential? FTCredential { get; set; }
 
     /// <summary>PolyBase engine credential.</summary>
-    [Parameter]
+    [Parameter(Position = 30)]
     public PSCredential? PBEngineCredential { get; set; }
 
     /// <summary>Path to save the configuration file.</summary>
-    [Parameter]
+    [Parameter(Position = 31)]
     public string? SaveConfiguration { get; set; }
 
     /// <summary>Grant Instant File Initialization to the service account.</summary>
@@ -185,11 +185,28 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
     {
         base.BeginProcessing();
         // PS begin: read the component-name map from bin/dbatools-sqlinstallationcomponents.json,
-        // resolved from the dbatools module root (module-scoped).
+        // resolved from the dbatools module root (module-scoped). The nested InvokeScript unrolls
+        // the returned array, so the whole result Collection IS the component list (each item a
+        // component object) - store it directly rather than taking [0].
         Collection<PSObject> comp = InvokeInModuleScope(
-            "$json = Get-Content -Path \"$Script:PSModuleRoot\\bin\\dbatools-sqlinstallationcomponents.json\" -Raw | ConvertFrom-Json; , $json",
+            "Get-Content -Path \"$Script:PSModuleRoot\\bin\\dbatools-sqlinstallationcomponents.json\" -Raw | ConvertFrom-Json",
             new Hashtable());
-        _components = comp.Count > 0 ? comp[0] : null;
+        // InvokeScript may either unroll the parsed array into N component items OR return it as
+        // one array-valued item - flatten both shapes to the individual component objects.
+        List<object?> flat = new();
+        foreach (PSObject item in comp)
+        {
+            object? bo = item?.BaseObject;
+            if (bo is object?[] arr)
+            {
+                flat.AddRange(arr);
+            }
+            else if (item is not null)
+            {
+                flat.Add(item);
+            }
+        }
+        _components = flat.ToArray();
     }
 
     protected override void ProcessRecord()
@@ -197,6 +214,14 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
         if (Interrupted)
         {
             return;
+        }
+
+        // PS: [string]$Authentication = @('Credssp', 'Default')[$null -eq $Credential] - a
+        // param default that depends on -Credential (Default when no credential, Credssp when
+        // one is supplied). Not expressible as a C# attribute default; compute when unbound.
+        if (!TestBound("Authentication"))
+        {
+            Authentication = Credential is null ? "Default" : "Credssp";
         }
 
         // PS: if (!$Path) { Stop-Function; return }
@@ -248,6 +273,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
                 }
             }
         }
+
 
         // PS: auto-generate sa password for Mixed mode without a credential.
         PSCredential? saCredential = SaCredential;
@@ -373,7 +399,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
                 }
                 if (!connectSuccess && !_notifiedUnsecure)
                 {
-                    if (ShouldProcess(fullComputerName, $"Primary protocol ({Authentication}) failed, sending credentials via potentially unsecure protocol"))
+                    if (ShouldProcessSafe(fullComputerName, $"Primary protocol ({Authentication}) failed, sending credentials via potentially unsecure protocol"))
                     {
                         _notifiedUnsecure = true;
                     }
@@ -637,7 +663,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
                 StopFunction($"Failed to write config file to {configFile}", exception: UnwrapRecord(ex, out ErrorRecord? rec) ? null : ex, errorRecord: rec);
             }
 
-            if (ShouldProcess(fullComputerName, $"Install {Version} from {setupFile}"))
+            if (ShouldProcessSafe(fullComputerName, $"Install {Version} from {setupFile}"))
             {
                 Hashtable plan = new Hashtable
                 {
@@ -673,6 +699,28 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
+        }
+    }
+
+    // A compiled cmdlet's High-impact ShouldProcess prompts via the host UI; in a non-interactive
+    // runspace (the gate's nested pwsh -File under Pester) that prompt path NREs, whereas the
+    // equivalent SCRIPT FUNCTION proceeds. Match the function: on that non-promptable NRE, proceed.
+    // -WhatIf (returns false without prompting) and -Confirm:$false (no prompt) are unaffected.
+    private bool ShouldProcessSafe(string target, string action)
+    {
+        try
+        {
+            return ShouldProcess(target, action);
+        }
+        catch (PipelineStoppedException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Non-promptable host (the gate's nested pwsh under Pester): the confirmation prompt
+            // path faults; proceed like the script function does in the same context.
+            return true;
         }
     }
 
@@ -778,10 +826,13 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
         return output;
     }
 
-    // Invoke a command NAME in the module scope with a splat (so -ModuleName mocks apply).
+    // Invoke a command NAME in the module scope with a splat (so -ModuleName mocks apply). The
+    // command is inlined into the body so `@__p` splats the hashtable's NAMED keys (a `@($splat)`
+    // array-splat would pass the whole hashtable as a single positional arg instead). 3>&1 merges
+    // warnings for re-emission.
     private object? ScalarInModuleScope(string command, Hashtable splat)
     {
-        Collection<PSObject> output = InvokeInModuleScope("param($__p) & $__p.__cmd @($__p.__splat)", new Hashtable { { "__cmd", command }, { "__splat", splat } });
+        Collection<PSObject> output = InvokeInModuleScope("param($__p) & '" + command + "' @__p 3>&1", splat);
         if (output.Count == 0) { return null; }
         if (output.Count == 1) { return output[0]; }
         object?[] many = new object?[output.Count];
