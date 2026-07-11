@@ -72,7 +72,11 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
                 OutputHelper.SetDefaultDisplayPropertySet(output, DisplaySet);
                 WriteObject(output);
             }
-            catch (PSInvalidOperationException ex)
+            catch (PipelineStoppedException)
+            {
+                throw;
+            }
+            catch (RuntimeException ex)
             {
                 // PS: the statement-terminating method-on-null error surfaces once and the
                 // foreach continues with the next key.
@@ -131,7 +135,10 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
     {
         if (value is null)
         {
-            throw new PSInvalidOperationException("You cannot call a method on a null-valued expression.");
+            // Plain RuntimeException, not PSInvalidOperationException: the engine's
+            // method-on-null record carries RuntimeException, and $Error[0].Exception type +
+            // CategoryInfo.Reason are observable (codex W1-010 r2 finding 1).
+            throw new RuntimeException("You cannot call a method on a null-valued expression.");
         }
         return value is PSObject wrapped ? wrapped.BaseObject.GetType() : value.GetType();
     }
