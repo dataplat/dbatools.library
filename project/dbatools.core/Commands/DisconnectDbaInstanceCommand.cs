@@ -228,18 +228,45 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
         method.Invoke();
     }
 
-    /// <summary>PS expandable-string rendering of a value (null becomes empty).</summary>
-    private static string PsText(object? value)
+    /// <summary>
+    /// PS expandable-string rendering of a value: LanguagePrimitives conversion (invariant
+    /// numerics, bag rendering), enumerables joined with the session $OFS, null empty — the
+    /// campaign interpolation semantics (ConvertTo-DbaTimeline precedent).
+    /// </summary>
+    private string PsText(object? value)
     {
         if (value is null)
         {
             return string.Empty;
         }
-        return PSObject.AsPSObject(value).ToString();
+        object? baseValue = value is PSObject wrapped ? wrapped.BaseObject : value;
+        if (baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable elements)
+        {
+            List<string> parts = new List<string>();
+            foreach (object? element in elements)
+            {
+                parts.Add(PsText(element));
+            }
+            string separator = " ";
+            try
+            {
+                object? ofsValue = SessionState.PSVariable.GetValue("OFS");
+                if (ofsValue is not null)
+                {
+                    separator = (string)LanguagePrimitives.ConvertTo(ofsValue, typeof(string), CultureInfo.InvariantCulture);
+                }
+            }
+            catch
+            {
+                // keep the default single space
+            }
+            return string.Join(separator, parts);
+        }
+        return (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
     }
 
     /// <summary>PS "$object" interpolation for the Stop-Function message.</summary>
-    private static string PsInterpolate(object? value)
+    private string PsInterpolate(object? value)
     {
         return PsText(value);
     }
