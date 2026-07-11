@@ -1,3 +1,4 @@
+#nullable enable
 #pragma warning disable CA1416 // Windows-oriented discovery: SQL Browser UDP, TCP probes, AD/LDAP, WMI services
 
 using System;
@@ -39,7 +40,7 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
 {
     /// <summary>Target computers to scan. Only the computer-name portion is used.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, ParameterSetName = "Computer")]
-    public DbaInstanceParameter[] ComputerName { get; set; }
+    public DbaInstanceParameter[]? ComputerName { get; set; }
 
     /// <summary>Automatic discovery method(s) used to find SQL Server targets across the network.</summary>
     [Parameter(Mandatory = true, ParameterSetName = "Discover")]
@@ -47,11 +48,11 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
 
     /// <summary>Windows credential for domain-controller SPN lookups and CIM/WMI service scans.</summary>
     [Parameter]
-    public PSCredential Credential { get; set; }
+    public PSCredential? Credential { get; set; }
 
     /// <summary>SQL credential used by the SqlConnect scan.</summary>
     [Parameter]
-    public PSCredential SqlCredential { get; set; }
+    public PSCredential? SqlCredential { get; set; }
 
     /// <summary>Verification methods used to detect and validate instances on each target.</summary>
     [Parameter]
@@ -60,11 +61,11 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
 
     /// <summary>Custom IP ranges to scan under IPRange discovery.</summary>
     [Parameter(ParameterSetName = "Discover")]
-    public string[] IpAddress { get; set; }
+    public string[]? IpAddress { get; set; }
 
     /// <summary>Specific domain controller for the AD SPN / DomainServer queries.</summary>
     [Parameter]
-    public string DomainController { get; set; }
+    public string? DomainController { get; set; }
 
     /// <summary>TCP ports probed for SQL Server connectivity (default 1433).</summary>
     [Parameter]
@@ -221,13 +222,13 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
         WriteMessage(MessageLevel.Verbose, $"Processing: {computer}");
 
         // Null variables to prevent scope lookup on conditional existence
-        IPHostEntry resolution = null;
-        PingReply pingReply = null;
+        IPHostEntry? resolution = null;
+        PingReply? pingReply = null;
         string[] sPNs = new string[0];
         List<DbaPortReport> ports = new List<DbaPortReport>();
         List<int> browserFallbackPorts = new List<int>();
-        List<DbaBrowserReply> browseResult = null;
-        Collection<PSObject> services = null;
+        List<DbaBrowserReply>? browseResult = null;
+        Collection<PSObject>? services = null;
 
         #region Gather data
         if (HasFlag(_scanType, DbaInstanceScanType.DNSResolve))
@@ -237,6 +238,10 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
                 Progress($"Processing: {computer}", "Performing DNS resolution");
                 resolution = Dns.GetHostEntry(computer.ComputerName);
             }
+            catch (PipelineStoppedException)
+            {
+                throw;
+            }
             catch
             {
                 // here to avoid an empty catch
@@ -245,15 +250,21 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
 
         if (HasFlag(_scanType, DbaInstanceScanType.Ping))
         {
-            Ping ping = new Ping();
-            try
+            using (Ping ping = new Ping())
             {
-                Progress($"Processing: {computer}", "Waiting for ping response");
-                pingReply = ping.Send(computer.ComputerName);
-            }
-            catch
-            {
-                // here to avoid an empty catch
+                try
+                {
+                    Progress($"Processing: {computer}", "Waiting for ping response");
+                    pingReply = ping.Send(computer.ComputerName);
+                }
+                catch (PipelineStoppedException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // here to avoid an empty catch
+                }
             }
         }
 
@@ -268,6 +279,10 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
                 {
                     Progress($"Processing: {computer}", "Finding SPNs");
                     sPNs = GetDomainSpn(DomainController, Credential, computerByName, getSpn: true).ToArray();
+                }
+                catch (PipelineStoppedException)
+                {
+                    throw;
                 }
                 catch
                 {
@@ -348,9 +363,9 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
         {
             foreach (PSObject service in services)
             {
-                string inm = PropStr(service, "InstanceName");
+                string? inm = PropStr(service, "InstanceName");
                 if (!string.IsNullOrEmpty(inm) && !ContainsIgnoreCase(instanceNames, inm))
-                    instanceNames.Add(inm);
+                    instanceNames.Add(inm!);
             }
         }
         if (browseResult != null && browseResult.Count > 0)
@@ -435,7 +450,7 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
 
             if (browseResult != null)
             {
-                DbaBrowserReply match = browseResult.FirstOrDefault(b => string.Equals(b.InstanceName, instance, StringComparison.OrdinalIgnoreCase));
+                DbaBrowserReply? match = browseResult.FirstOrDefault(b => string.Equals(b.InstanceName, instance, StringComparison.OrdinalIgnoreCase));
                 if (match != null)
                     report.BrowseReply = match;
             }
@@ -466,7 +481,7 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
                     List<DbaPortReport> defaultPortResults = EnumeratePortsScanned(report)
                         .Where(pr => browserFallbackPorts.Contains(pr.Port)).ToList();
                     WriteMessage(MessageLevel.Verbose, $"Browser has no TCPPort (default instance), checking fallback PortsScanned for any open port: {string.Join(", ", defaultPortResults.Select(pr => $"Port {pr.Port}={pr.IsOpen}"))}");
-                    DbaPortReport firstOpen = defaultPortResults.FirstOrDefault(pr => pr.IsOpen);
+                    DbaPortReport? firstOpen = defaultPortResults.FirstOrDefault(pr => pr.IsOpen);
                     if (firstOpen != null)
                     {
                         report.Port = firstOpen.Port;
@@ -479,10 +494,10 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
             {
                 report.Confidence = DbaInstanceConfidenceLevel.High;
 
-                object engine = report.Services.FirstOrDefault(s => string.Equals(PropStr(s, "ServiceType"), "Engine", StringComparison.OrdinalIgnoreCase));
+                object? engine = report.Services.FirstOrDefault(s => string.Equals(PropStr(s, "ServiceType"), "Engine", StringComparison.OrdinalIgnoreCase));
                 if (engine != null)
                 {
-                    string state = PropStr(engine, "State");
+                    string? state = PropStr(engine, "State");
                     if (string.Equals(state, "Running", StringComparison.OrdinalIgnoreCase))
                         report.Availability = DbaInstanceAvailability.Available;
                     else if (string.Equals(state, "Stopped", StringComparison.OrdinalIgnoreCase))
@@ -541,7 +556,8 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
 
         if (HasFlag(_scanType, DbaInstanceScanType.SqlConnect))
         {
-            Dictionary<string, DbaInstanceReport> instanceHash = new Dictionary<string, DbaInstanceReport>();
+            // PS hashtables key case-insensitively; match that so DomainInstanceName dedup parity holds.
+            Dictionary<string, DbaInstanceReport> instanceHash = new Dictionary<string, DbaInstanceReport>(StringComparer.OrdinalIgnoreCase);
             List<DbaInstanceReport> toDelete = new List<DbaInstanceReport>();
             foreach (DbaInstanceReport dataSet in masterList)
             {
@@ -551,12 +567,12 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
                     splatConnect["SqlInstance"] = dataSet.SqlInstance;
                     splatConnect["SqlCredential"] = SqlCredential;
                     Collection<PSObject> connectResult = NestedCommand.Invoke(this, "Connect-DbaInstance", splatConnect);
-                    object server = connectResult.Count > 0 ? connectResult[0] : null;
+                    object? server = connectResult.Count > 0 ? connectResult[0] : null;
                     dataSet.SqlConnected = true;
                     dataSet.Confidence = DbaInstanceConfidenceLevel.High;
 
                     // Remove duplicates
-                    string domainInstanceName = server != null ? PropStr(server, "DomainInstanceName") : null;
+                    string? domainInstanceName = server != null ? PropStr(server, "DomainInstanceName") : null;
                     if (domainInstanceName != null && instanceHash.ContainsKey(domainInstanceName))
                     {
                         toDelete.Add(dataSet);
@@ -620,7 +636,7 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
     private List<DbaBrowserReply> GetSqlInstanceBrowserUdp(DbaInstanceParameter computer, bool enableException, int udpTimeout = 2)
     {
         List<DbaBrowserReply> result = new List<DbaBrowserReply>();
-        UdpClient udpClient = null;
+        UdpClient? udpClient = null;
         try
         {
             udpClient = new UdpClient();
@@ -634,7 +650,8 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
             // Response contains the full SSRP payload; the retired code strips nothing.
             string response = Encoding.ASCII.GetString(bytesReceived);
 
-            foreach (Match match in Regex.Matches(response, "(ServerName;([a-zA-Z0-9_-]+);InstanceName;(\\w+);IsClustered;(\\w+);Version;(\\d+\\.\\d+\\.\\d+\\.\\d+);(tcp;(\\d+)){0,1})"))
+            // Select-String in the retired function is case-insensitive; match that.
+            foreach (Match match in Regex.Matches(response, "(ServerName;([a-zA-Z0-9_-]+);InstanceName;(\\w+);IsClustered;(\\w+);Version;(\\d+\\.\\d+\\.\\d+\\.\\d+);(tcp;(\\d+)){0,1})", RegexOptions.IgnoreCase))
             {
                 DbaBrowserReply reply = new DbaBrowserReply();
                 reply.MachineName = computer.ComputerName;
@@ -698,83 +715,90 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
     #endregion Native scan helpers
 
     #region IP range math (native)
-    private List<string> ResolveIpRange(string ipAddress)
+    // Streams addresses (yield) exactly like the retired Get-IPrange/Resolve-IPRange: a large
+    // range must never be materialized into a list at once (a /8 is 16M addresses), and a stop
+    // request can break the enumeration between addresses.
+    private IEnumerable<string> ResolveIpRange(string? ipAddress)
     {
-        List<string> results = new List<string>();
-
         if (!string.IsNullOrEmpty(ipAddress))
         {
+            // net472's PowerShellStandard reference lacks the [NotNullWhen] on IsNullOrEmpty,
+            // so pin non-nullness here; ipAddress is non-null inside this branch.
+            string ipAddress0 = ipAddress!;
             string mode = "Unknown";
-            string address = null;
-            string mask = null;
+            string? address = null;
+            string? mask = null;
             int cidr = 0;
-            string rangeStart = null;
-            string rangeEnd = null;
+            string? rangeStart = null;
+            string? rangeEnd = null;
 
-            if (ipAddress.Contains("/"))
+            if (ipAddress0.Contains("/"))
             {
-                string[] parts = ipAddress.Split('/');
+                string[] parts = ipAddress0.Split('/');
                 address = parts[0];
                 if (parts.Length > 1 && Regex.IsMatch(parts[1], RegexHelper.IPv4))
                 {
                     mask = parts[1];
                     mode = "Mask";
                 }
-                else if (parts.Length > 1 && int.TryParse(parts[1], out int parsedCidr))
+                // PS: "0" -as [int] is falsy, so a zero cidr is NOT a cidr - it falls through
+                // to the "not a valid IP range" branch, not the cidr-mask branch.
+                else if (parts.Length > 1 && int.TryParse(parts[1], out int parsedCidr) && parsedCidr != 0)
                 {
                     cidr = parsedCidr;
                     if (cidr < 8 || cidr > 31)
                     {
-                        StopFunction($"{ipAddress} does not contain a valid cidr mask");
-                        return results;
+                        StopFunction($"{ipAddress0} does not contain a valid cidr mask");
+                        yield break;
                     }
                     mode = "CIDR";
                 }
                 else
                 {
-                    StopFunction($"{ipAddress} is not a valid IP range");
+                    StopFunction($"{ipAddress0} is not a valid IP range");
                 }
             }
-            else if (ipAddress.Contains("-"))
+            else if (ipAddress0.Contains("-"))
             {
-                rangeStart = ipAddress.Split('-')[0];
-                rangeEnd = ipAddress.Split('-')[1];
+                rangeStart = ipAddress0.Split('-')[0];
+                rangeEnd = ipAddress0.Split('-')[1];
 
                 if (!Regex.IsMatch(rangeStart, RegexHelper.IPv4))
                 {
-                    StopFunction($"{ipAddress} is not a valid IP range");
-                    return results;
+                    StopFunction($"{ipAddress0} is not a valid IP range");
+                    yield break;
                 }
                 if (!Regex.IsMatch(rangeEnd, RegexHelper.IPv4))
                 {
-                    StopFunction($"{ipAddress} is not a valid IP range");
-                    return results;
+                    StopFunction($"{ipAddress0} is not a valid IP range");
+                    yield break;
                 }
 
                 mode = "Range";
             }
             else
             {
-                if (!Regex.IsMatch(ipAddress, RegexHelper.IPv4))
+                if (!Regex.IsMatch(ipAddress0, RegexHelper.IPv4))
                 {
-                    StopFunction($"{ipAddress} is not a valid IP address");
-                    return results;
+                    StopFunction($"{ipAddress0} is not a valid IP address");
+                    yield break;
                 }
-                results.Add(ipAddress);
-                return results;
+                yield return ipAddress0;
+                yield break;
             }
 
-            switch (mode)
+            IEnumerable<string> generated = mode switch
             {
-                case "CIDR":
-                    results.AddRange(GetIpRange(address, null, null, cidr));
-                    break;
-                case "Mask":
-                    results.AddRange(GetIpRange(address, null, mask, 0));
-                    break;
-                case "Range":
-                    results.AddRange(GetIpRange(null, null, null, 0, rangeStart, rangeEnd));
-                    break;
+                "CIDR" => GetIpRange(address, null, null, cidr),
+                "Mask" => GetIpRange(address, null, mask, 0),
+                "Range" => GetIpRange(null, null, null, 0, rangeStart, rangeEnd),
+                _ => new string[0]
+            };
+            foreach (string ip in generated)
+            {
+                if (CancellationToken.IsCancellationRequested)
+                    yield break;
+                yield return ip;
             }
         }
         else
@@ -785,18 +809,21 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
                     continue;
                 foreach (UnicastIPAddressInformation property in iface.GetIPProperties().UnicastAddresses)
                 {
-                    if (property.Address.AddressFamily == AddressFamily.InterNetwork)
-                        results.AddRange(GetIpRange(property.Address.ToString(), null, null, property.PrefixLength));
+                    if (property.Address.AddressFamily != AddressFamily.InterNetwork)
+                        continue;
+                    foreach (string ip in GetIpRange(property.Address.ToString(), null, null, property.PrefixLength))
+                    {
+                        if (CancellationToken.IsCancellationRequested)
+                            yield break;
+                        yield return ip;
+                    }
                 }
             }
         }
-
-        return results;
     }
 
-    private static List<string> GetIpRange(string ipAddress, string start, string mask, int cidr, string rangeStart = null, string rangeEnd = null)
+    private static IEnumerable<string> GetIpRange(string? ipAddress, string? start, string? mask, int cidr, string? rangeStart = null, string? rangeEnd = null)
     {
-        List<string> range = new List<string>();
         long startAddr;
         long endAddr;
 
@@ -806,7 +833,7 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
             if (cidr > 0)
                 maskAddr = IPAddress.Parse(Int64ToIp(Convert.ToInt64(new string('1', cidr) + new string('0', 32 - cidr), 2)));
             else
-                maskAddr = IPAddress.Parse(mask);
+                maskAddr = IPAddress.Parse(mask!);
 
             IPAddress ipAddr = IPAddress.Parse(ipAddress);
             long maskLong = IpToInt64(maskAddr.ToString());
@@ -818,14 +845,12 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
         }
         else
         {
-            startAddr = IpToInt64(start ?? rangeStart);
-            endAddr = IpToInt64(rangeEnd);
+            startAddr = IpToInt64((start ?? rangeStart)!);
+            endAddr = IpToInt64(rangeEnd!);
         }
 
         for (long i = startAddr; i <= endAddr; i++)
-            range.Add(Int64ToIp(i));
-
-        return range;
+            yield return Int64ToIp(i);
     }
 
     private static long IpToInt64(string ip)
@@ -851,7 +876,7 @@ public sealed class FindDbaInstanceCommand : DbaBaseCmdlet
     // Returns all computernames with registered MSSQL SPNs (or the service SPNs when getSpn).
     // Runs the retired Get-DomainSPN body verbatim so the System.DirectoryServices adapter
     // semantics hold; dbatools.core takes no System.DirectoryServices dependency.
-    private List<string> GetDomainSpn(string domainController, PSCredential credential, string computerName, bool getSpn)
+    private List<string> GetDomainSpn(string? domainController, PSCredential? credential, string computerName, bool getSpn)
     {
         const string script = @"
 param($DomainController, $Credential, $ComputerName, $GetSPN)
@@ -897,7 +922,7 @@ try {
     }
 
     // Returns all enabled Windows Server computer objects in the domain.
-    private List<string> GetDomainServer(string domainController, PSCredential credential)
+    private List<string> GetDomainServer(string? domainController, PSCredential? credential)
     {
         const string script = @"
 param($DomainController, $Credential)
@@ -946,7 +971,7 @@ foreach ($instance in ([System.Data.Sql.SqlDataSourceEnumerator]::Instance.GetDa
         return InvokeStringScript(script);
     }
 
-    private List<string> InvokeStringScript(string script, params object[] args)
+    private List<string> InvokeStringScript(string script, params object?[] args)
     {
         ScriptBlock scriptBlock = ScriptBlock.Create(script);
         Collection<PSObject> raw = InvokeCommand.InvokeScript(false, scriptBlock, null, args);
@@ -958,7 +983,7 @@ foreach ($instance in ([System.Data.Sql.SqlDataSourceEnumerator]::Instance.GetDa
             object value = item.BaseObject;
             if (value == null)
                 continue;
-            output.Add(value.ToString());
+            output.Add(value.ToString() ?? string.Empty);
         }
         return output;
     }
@@ -986,7 +1011,7 @@ foreach ($instance in ([System.Data.Sql.SqlDataSourceEnumerator]::Instance.GetDa
         return result;
     }
 
-    private static bool ContainsIgnoreCase(List<string> list, string value)
+    private static bool ContainsIgnoreCase(List<string> list, string? value)
     {
         foreach (string item in list)
         {
@@ -1004,7 +1029,7 @@ foreach ($instance in ([System.Data.Sql.SqlDataSourceEnumerator]::Instance.GetDa
         return spn.EndsWith(":" + port.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static object[] FilterServices(Collection<PSObject> services, Func<PSObject, bool> predicate)
+    private static object[]? FilterServices(Collection<PSObject>? services, Func<PSObject, bool> predicate)
     {
         if (services == null)
             return null;
@@ -1031,39 +1056,39 @@ foreach ($instance in ([System.Data.Sql.SqlDataSourceEnumerator]::Instance.GetDa
             yield return $"Port {pr.Port}={pr.IsOpen}";
     }
 
-    private static string PropStr(object obj, string name)
+    private static string? PropStr(object? obj, string name)
     {
         if (obj == null)
             return null;
         PSObject pso = obj as PSObject ?? new PSObject(obj);
-        PSPropertyInfo property = pso.Properties[name];
-        object value = property != null ? property.Value : null;
+        PSPropertyInfo? property = pso.Properties[name];
+        object? value = property != null ? property.Value : null;
         return value != null ? value.ToString() : null;
     }
 
     // PS: catch { if ($_.Exception.InnerException.Errors.Class -lt 25) {...} }
     // A missing Errors collection maps to PS's ($null -lt 25) => $true; a present one is $true when
     // ANY error Class is below the threshold.
-    private static bool SqlErrorClassBelow(Exception exception, int threshold)
+    private static bool SqlErrorClassBelow(Exception? exception, int threshold)
     {
         bool foundErrors = false;
-        Exception cursor = exception;
+        Exception? cursor = exception;
         while (cursor != null)
         {
-            System.Reflection.PropertyInfo errorsProperty = cursor.GetType().GetProperty("Errors");
+            System.Reflection.PropertyInfo? errorsProperty = cursor.GetType().GetProperty("Errors");
             if (errorsProperty != null)
             {
-                object errors = errorsProperty.GetValue(cursor);
+                object? errors = errorsProperty.GetValue(cursor);
                 if (errors is IEnumerable enumerable && !(errors is string))
                 {
-                    foreach (object error in enumerable)
+                    foreach (object? error in enumerable)
                     {
                         if (error == null)
                             continue;
-                        System.Reflection.PropertyInfo classProperty = error.GetType().GetProperty("Class");
+                        System.Reflection.PropertyInfo? classProperty = error.GetType().GetProperty("Class");
                         if (classProperty == null)
                             continue;
-                        object classValue = classProperty.GetValue(error);
+                        object? classValue = classProperty.GetValue(error);
                         if (classValue == null)
                             continue;
                         foundErrors = true;
