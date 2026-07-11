@@ -394,26 +394,19 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
                     foreach (object? inputElement in _inputObjects)
                     {
                         // PS: $values = foreach ($prop in $properties) { $obj.$prop } — the
-                        // loop-expression collects PIPELINE-STYLE: null results are dropped,
-                        // enumerable results flatten one level, and zero collected results
-                        // leave $values null (the writer receives null).
+                        // loop-expression collects EXPLICIT nulls (lab-proven both editions),
+                        // flattens enumerable results one level KEEPING inner nulls, and only
+                        // zero iterations (no properties) leave $values null for the writer.
                         List<object?> values = new List<object?>();
                         foreach (string propertyName in properties)
                         {
                             object? propertyValue = GetPropertyValue(inputElement, propertyName);
-                            if (propertyValue is null)
-                            {
-                                continue;
-                            }
                             object? baseValue = propertyValue is PSObject valueWrapped ? valueWrapped.BaseObject : propertyValue;
-                            if (baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable valueElements)
+                            if (propertyValue is not null && baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable valueElements)
                             {
                                 foreach (object? valueElement in valueElements)
                                 {
-                                    if (valueElement is not null)
-                                    {
-                                        values.Add(valueElement);
-                                    }
+                                    values.Add(valueElement);
                                 }
                             }
                             else
@@ -533,7 +526,8 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
 
     /// <summary>
     /// PS: Test-Path — runs through the provider so WILDCARD characters ([a], *, ?) match
-    /// like Test-Path does, not like a literal File.Exists.
+    /// like Test-Path does, not like a literal File.Exists. Provider failures (unknown
+    /// drive) surface as a non-terminating error and read false, exactly like Test-Path.
     /// </summary>
     private bool FileOrDirectoryExists(string path)
     {
@@ -541,8 +535,9 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
         {
             return SessionState.InvokeProvider.Item.Exists(path);
         }
-        catch
+        catch (Exception ex)
         {
+            WriteError(new ErrorRecord(ex, "Export-DbaCsv", ErrorCategory.ObjectNotFound, path));
             return false;
         }
     }
