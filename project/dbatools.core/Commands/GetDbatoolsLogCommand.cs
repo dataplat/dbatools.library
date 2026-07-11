@@ -107,13 +107,18 @@ public sealed class GetDbatoolsLogCommand : DbaBaseCmdlet
 
         if (TestBound("Target"))
         {
-            messages = messages.FindAll(m => PsEquals(DotProperty(m, "TargetObject"), Target));
+            // PS: Where-Object TargetObject -eq $Target - an ARRAY LHS filters its elements
+            // and the FILTERED RESULT's truthiness decides (codex W1-016 r1 finding 1; the
+            // campaign PsEqTruthy class).
+            messages = messages.FindAll(m => PsEqTruthy(DotProperty(m, "TargetObject"), Target));
         }
 
         if (TestBound("Tag"))
         {
-            // PS: Where-Object { $_.Tags | Where-Object { $_ -in $Tag } } - any entry tag in $Tag
-            messages = messages.FindAll(m => AnyTagMatches(DotProperty(m, "Tags")));
+            // PS: Where-Object { $_.Tags | Where-Object { $_ -in $Tag } } - the MATCHED TAG
+            // VALUES drive the outer truthiness, so one matched empty-string tag is falsy
+            // (codex W1-016 r1 finding 2).
+            messages = messages.FindAll(m => MatchedTagsTruthy(DotProperty(m, "Tags")));
         }
 
         if (TestBound("Runspace"))
@@ -284,24 +289,69 @@ public sealed class GetDbatoolsLogCommand : DbaBaseCmdlet
         return value is PSObject wrapped ? wrapped.BaseObject : value;
     }
 
-    private bool AnyTagMatches(object? tags)
+    // PS: Where-Object TargetObject -eq $Target - an enumerable (non-string) LHS filters
+    // its elements by scalar -eq and the FILTERED RESULT's truthiness decides: none ->
+    // false, one -> the element's own truthiness, many -> true.
+    private static bool PsEqTruthy(object? left, object? right)
+    {
+        object? leftBase = Unwrap(left);
+        if (leftBase is not string && LanguagePrimitives.GetEnumerable(leftBase) is IEnumerable items)
+        {
+            List<object?> matched = new List<object?>();
+            foreach (object? item in items)
+            {
+                if (PsEquals(item, right))
+                {
+                    matched.Add(item);
+                }
+            }
+            if (matched.Count == 0)
+            {
+                return false;
+            }
+            if (matched.Count == 1)
+            {
+                return LanguagePrimitives.IsTrue(matched[0]);
+            }
+            return true;
+        }
+        return PsEquals(left, right);
+    }
+
+    // PS: { $_.Tags | Where-Object { $_ -in $Tag } } - the inner filter EMITS the matching
+    // tag values and the outer Where-Object applies PS truthiness to that pipeline result:
+    // none -> false, one -> the tag's own truthiness (an empty string is falsy), many ->
+    // true.
+    private bool MatchedTagsTruthy(object? tags)
     {
         if (tags is null)
         {
             return false;
         }
+        List<object?> matched = new List<object?>();
         if (LanguagePrimitives.GetEnumerable(Unwrap(tags)) is IEnumerable items)
         {
             foreach (object? item in items)
             {
                 if (TagInSet(item))
                 {
-                    return true;
+                    matched.Add(item);
                 }
             }
+        }
+        else if (TagInSet(tags))
+        {
+            matched.Add(tags);
+        }
+        if (matched.Count == 0)
+        {
             return false;
         }
-        return TagInSet(tags);
+        if (matched.Count == 1)
+        {
+            return LanguagePrimitives.IsTrue(matched[0]);
+        }
+        return true;
     }
 
     // PS: $_ -in $Tag - case-insensitive membership
