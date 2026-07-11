@@ -316,7 +316,7 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
                     }
                 }
 
-                if (ShouldProcess(Environment.GetEnvironmentVariable("COMPUTERNAME") ?? Environment.MachineName, $"Exporting {PsText(element)} from {PsText(server)} to {scriptPath}"))
+                if (ShouldProcess(Environment.GetEnvironmentVariable("COMPUTERNAME") ?? "", $"Exporting {PsText(element)} from {PsText(server)} to {scriptPath}"))
                 {
                     WriteMessage(MessageLevel.Verbose, $"Exporting {PsText(element)}");
 
@@ -414,8 +414,20 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
                     if (!Passthru.ToBool())
                     {
                         WriteMessage(MessageLevel.Verbose, $"Exported {PsText(element)} on {PsText(GetPsValue(server, "Name"))} to {scriptPath}");
-                        // PS: Get-ChildItem -Path $scriptPath — emits the FileInfo.
-                        WriteObject(new FileInfo(scriptPath));
+                        // PS: Get-ChildItem -Path $scriptPath — emits the PROVIDER-DECORATED
+                        // FileInfo (PSPath/PSDrive/... note properties); a missing path is a
+                        // NON-terminating ObjectNotFound error, not a catch-bound failure.
+                        try
+                        {
+                            foreach (PSObject childItem in SessionState.InvokeProvider.ChildItem.Get(scriptPath, false))
+                            {
+                                WriteObject(childItem);
+                            }
+                        }
+                        catch (ItemNotFoundException notFound)
+                        {
+                            WriteError(new ErrorRecord(notFound, "PathNotFound", ErrorCategory.ObjectNotFound, scriptPath));
+                        }
                     }
                 }
             }
@@ -475,11 +487,22 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
     /// </summary>
     private void TestExportDirectory(string? path)
     {
+        // PS provider semantics: relative paths resolve against the POWERSHELL location, not
+        // the process working directory.
+        string resolved;
+        try
+        {
+            resolved = SessionState.Path.GetUnresolvedProviderPathFromPSPath(path ?? "");
+        }
+        catch
+        {
+            resolved = path ?? "";
+        }
         if (!ProviderPathExists(path))
         {
             try
             {
-                Directory.CreateDirectory(path ?? "");
+                Directory.CreateDirectory(resolved);
             }
             catch (Exception ex)
             {
@@ -493,7 +516,7 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
             bool isDirectory;
             try
             {
-                isDirectory = Directory.Exists(path);
+                isDirectory = Directory.Exists(resolved);
             }
             catch
             {
@@ -586,7 +609,16 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
     private void WriteOutFile(string? path, List<string?> lines, bool append, bool noClobber)
     {
         Encoding encoding = ResolveOutFileEncoding(Encoding);
-        string target = path ?? "";
+        // PS: Out-File -FilePath resolves relative paths against the PowerShell location.
+        string target;
+        try
+        {
+            target = SessionState.Path.GetUnresolvedProviderPathFromPSPath(path ?? "");
+        }
+        catch
+        {
+            target = path ?? "";
+        }
         // PS: Out-File itself supports ShouldProcess — under -WhatIf it prints
         // 'What if: Performing the operation "Output to File" on target "<path>".' and
         // writes nothing (lab-proven: the prefix write outside the main gate no-ops).
