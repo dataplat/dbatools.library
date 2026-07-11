@@ -53,11 +53,13 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
 
         // PS: if ($InputObject[0].SqlInstance -notin $servers) { $servers += ... } — array
         // addition FLATTENS an enumerable value (a collection-valued SqlInstance registers
-        // every element), while the -notin test compares the value as a whole.
-        object? firstSqlInstance = PsProperty.Get(first, "SqlInstance");
-        if (!ListContainsPs(_servers, firstSqlInstance))
+        // every element), while the -notin test compares the value as a whole. The membership
+        // test and the append READ THE PROPERTY INDEPENDENTLY, exactly like the two PS
+        // $InputObject[0].SqlInstance expressions (a volatile getter can differ between them).
+        if (!ListContainsPs(_servers, PsProperty.Get(first, "SqlInstance")))
         {
-            object? sqlInstanceBase = firstSqlInstance is PSObject sqlWrapped ? sqlWrapped.BaseObject : firstSqlInstance;
+            object? appendSqlInstance = PsProperty.Get(first, "SqlInstance");
+            object? sqlInstanceBase = appendSqlInstance is PSObject sqlWrapped ? sqlWrapped.BaseObject : appendSqlInstance;
             if (sqlInstanceBase is not string && LanguagePrimitives.GetEnumerable(sqlInstanceBase) is IEnumerable sqlElements)
             {
                 foreach (object? sqlElement in sqlElements)
@@ -67,14 +69,14 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
             }
             else
             {
-                _servers.Add(firstSqlInstance);
+                _servers.Add(appendSqlInstance);
             }
         }
 
         List<TimelineRow> rows;
         object? firstBase = first is PSObject firstWrapped ? firstWrapped.BaseObject : first;
 
-        if (PsOps.Eq(PsProperty.Get(first, "TypeName"), "AgentJobHistory"))
+        if (PsEqTruthy(PsProperty.Get(first, "TypeName"), "AgentJobHistory"))
         {
             _callerName = "Get-DbaAgentJobHistory";
             rows = MapRows(MapAgentJobHistory);
@@ -135,10 +137,12 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
             }
         }
 
+        // PS: $servers -join ', ' — elements stringify through the language conversion
+        // (invariant numerics, bag rendering), same as expandable-string interpolation.
         List<string> serverParts = new List<string>();
         foreach (object? server in _servers)
         {
-            serverParts.Add(server is null ? string.Empty : PSObject.AsPSObject(server).ToString());
+            serverParts.Add(PsText(server));
         }
 
         // The raw-string constant ends at "showRowLabels:" (a trailing space would be too
@@ -180,7 +184,7 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         return rows;
     }
 
-    private static TimelineRow MapAgentJobHistory(object? element)
+    private TimelineRow MapAgentJobHistory(object? element)
     {
         TimelineRow row = new TimelineRow();
         // PS: { "[" + $($_.SqlInstance -replace "\\", "\\\") + "] " + $_.Job -replace "\'", '' }
@@ -194,7 +198,7 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         return row;
     }
 
-    private static TimelineRow MapBackupHistory(object? element)
+    private TimelineRow MapBackupHistory(object? element)
     {
         TimelineRow row = new TimelineRow();
         // PS: no quote strip here, and no Style column at all (renders as an empty field).
@@ -206,7 +210,7 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         return row;
     }
 
-    private static TimelineRow MapGrowthEvent(object? element)
+    private TimelineRow MapGrowthEvent(object? element)
     {
         TimelineRow row = new TimelineRow();
         // PS: ("[" + escapedInstance + "] " + ($_.DatabaseName -replace "\\", "\\\")).Replace("'", "\'")
@@ -290,14 +294,51 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         return Regex.Replace(value, "\\\\", "\\\\\\", RegexOptions.IgnoreCase);
     }
 
-    /// <summary>PS expandable-string rendering of a property value (null becomes empty).</summary>
-    private static string PsText(object? value)
+    /// <summary>
+    /// PS: if ($value -eq "literal") — the -eq operator FILTERS an enumerable left operand
+    /// (result = matching elements) and the if applies PS truthiness, so @("X") -eq "X" is
+    /// truthy while a scalar compares directly (the W5-027 PsEqTruthy pattern).
+    /// </summary>
+    private static bool PsEqTruthy(object? left, object? right)
+    {
+        object? baseLeft = left is PSObject wrapped ? wrapped.BaseObject : left;
+        if (baseLeft is not string && LanguagePrimitives.GetEnumerable(baseLeft) is IEnumerable elements)
+        {
+            foreach (object? element in elements)
+            {
+                if (PsOps.Eq(element, right))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return PsOps.Eq(left, right);
+    }
+
+    /// <summary>
+    /// PS expandable-string rendering of a property value: LanguagePrimitives string
+    /// conversion (numerics render invariant — 1.5 stays "1.5" under fr-FR), property bags
+    /// render "@{...}", enumerables join their converted elements with the session $OFS, and
+    /// null becomes empty.
+    /// </summary>
+    private string PsText(object? value)
     {
         if (value is null)
         {
             return string.Empty;
         }
-        return PSObject.AsPSObject(value).ToString();
+        object? baseValue = value is PSObject wrapped ? wrapped.BaseObject : value;
+        if (baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable elements)
+        {
+            List<string> parts = new List<string>();
+            foreach (object? element in elements)
+            {
+                parts.Add(PsText(element));
+            }
+            return string.Join(GetOfsSeparator(), parts);
+        }
+        return (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -306,9 +347,16 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
     /// [string]$Status rejects a null/empty binding — the calculated property errors (statement
     /// class) and the Style field renders EMPTY, not magenta.
     /// </summary>
-    private static string ConvertTimelineStatusColor(object? status)
+    private string ConvertTimelineStatusColor(object? status)
     {
         if (status is null)
+        {
+            return string.Empty;
+        }
+        // PS parameter binding REJECTS a collection for a scalar [string] parameter (lab-proven
+        // both editions, even single-element arrays) — the helper call errors and Style is empty.
+        object? statusBase = status is PSObject statusWrapped ? statusWrapped.BaseObject : status;
+        if (statusBase is not string && LanguagePrimitives.GetEnumerable(statusBase) is not null)
         {
             return string.Empty;
         }
@@ -356,14 +404,29 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         {
             monthComponent = string.Empty;
         }
+        // EVERY component is its own $(Get-Date ...) subexpression in the PS template: a
+        // formatting failure (e.g. a pre-calendar-minimum date under ar-SA/UmAlQura) empties
+        // just that component and the row continues.
         return string.Format(CultureInfo.InvariantCulture,
             "new Date({0}, {1}, {2}, {3}, {4}, {5})",
-            date.ToString("yyyy", culture),
+            FormatComponent(date, "yyyy", culture),
             monthComponent,
-            date.ToString("dd", culture),
-            date.ToString("HH", culture),
-            date.ToString("mm", culture),
-            date.ToString("ss", culture));
+            FormatComponent(date, "dd", culture),
+            FormatComponent(date, "HH", culture),
+            FormatComponent(date, "mm", culture),
+            FormatComponent(date, "ss", culture));
+    }
+
+    private static string FormatComponent(DateTime date, string format, CultureInfo culture)
+    {
+        try
+        {
+            return date.ToString(format, culture);
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     /// <summary>PS: $value -notin $servers (case-insensitive -eq semantics per element).</summary>
