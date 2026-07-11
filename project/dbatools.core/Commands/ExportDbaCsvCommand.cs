@@ -111,6 +111,7 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
     private CsvWriterOptions _writerOptions = null!;
     private CsvWriter? _writer;
     private long _rowsWritten;
+    private bool _rowsWidened;
     private List<object?> _inputObjects = null!;
     private Stopwatch _elapsed = null!;
 
@@ -182,17 +183,15 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
 #endif
         _writerOptions.CompressionLevel = (System.IO.Compression.CompressionLevel)Enum.Parse(typeof(System.IO.Compression.CompressionLevel), effectiveCompressionLevel, true);
 
-        switch (Encoding)
-        {
-            case "ASCII": _writerOptions.Encoding = System.Text.Encoding.ASCII; break;
-            case "BigEndianUnicode": _writerOptions.Encoding = System.Text.Encoding.BigEndianUnicode; break;
-            case "Unicode": _writerOptions.Encoding = System.Text.Encoding.Unicode; break;
+        // PS: switch ($Encoding) — case-INSENSITIVE like the ValidateSet binding.
+        if (PsString.Eq(Encoding, "ASCII")) { _writerOptions.Encoding = System.Text.Encoding.ASCII; }
+        else if (PsString.Eq(Encoding, "BigEndianUnicode")) { _writerOptions.Encoding = System.Text.Encoding.BigEndianUnicode; }
+        else if (PsString.Eq(Encoding, "Unicode")) { _writerOptions.Encoding = System.Text.Encoding.Unicode; }
 #pragma warning disable SYSLIB0001
-            case "UTF7": _writerOptions.Encoding = System.Text.Encoding.UTF7; break;
+        else if (PsString.Eq(Encoding, "UTF7")) { _writerOptions.Encoding = System.Text.Encoding.UTF7; }
 #pragma warning restore SYSLIB0001
-            case "UTF8": _writerOptions.Encoding = new UTF8Encoding(false); break;
-            case "UTF32": _writerOptions.Encoding = System.Text.Encoding.UTF32; break;
-        }
+        else if (PsString.Eq(Encoding, "UTF8")) { _writerOptions.Encoding = new UTF8Encoding(false); }
+        else if (PsString.Eq(Encoding, "UTF32")) { _writerOptions.Encoding = System.Text.Encoding.UTF32; }
 
         // PS: suppress the header when appending to an existing file.
         if (Append.ToBool() && FileOrDirectoryExists(Path))
@@ -202,6 +201,7 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
 
         _writer = null;
         _rowsWritten = 0;
+        _rowsWidened = false;
         _inputObjects = new List<object?>();
         _elapsed = Stopwatch.StartNew();
     }
@@ -308,6 +308,8 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
                     }
 
                     _rowsWritten += _writer.WriteFromReader(reader);
+                    // PS: += with the reader's Int64 return widens $rowsWritten to Int64.
+                    _rowsWidened = true;
 
                     reader.Close();
                     reader.Dispose();
@@ -373,25 +375,60 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
                         // object[] property-name array to the params string[] by STRINGIFYING
                         // THE WHOLE ARRAY into one $OFS-joined cell (lab-observed: the function
                         // writes "Id Label Stamp" as a single header column). A lone name
-                        // passes through unchanged either way.
+                        // passes through unchanged either way, and a PROPERTY-LESS first object
+                        // leaves $properties null in PS — the writer receives null.
                         if (properties.Count > 1)
                         {
                             _writer.WriteHeader(string.Join(GetOfsSeparator(), properties));
                         }
-                        else
+                        else if (properties.Count == 1)
                         {
                             _writer.WriteHeader(properties.ToArray());
+                        }
+                        else
+                        {
+                            _writer.WriteHeader((string[]?)null!);
                         }
                     }
 
                     foreach (object? inputElement in _inputObjects)
                     {
+                        // PS: $values = foreach ($prop in $properties) { $obj.$prop } — the
+                        // loop-expression collects PIPELINE-STYLE: null results are dropped,
+                        // enumerable results flatten one level, and zero collected results
+                        // leave $values null (the writer receives null).
                         List<object?> values = new List<object?>();
                         foreach (string propertyName in properties)
                         {
-                            values.Add(GetPropertyValue(inputElement, propertyName));
+                            object? propertyValue = GetPropertyValue(inputElement, propertyName);
+                            if (propertyValue is null)
+                            {
+                                continue;
+                            }
+                            object? baseValue = propertyValue is PSObject valueWrapped ? valueWrapped.BaseObject : propertyValue;
+                            if (baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable valueElements)
+                            {
+                                foreach (object? valueElement in valueElements)
+                                {
+                                    if (valueElement is not null)
+                                    {
+                                        values.Add(valueElement);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                values.Add(propertyValue);
+                            }
                         }
-                        _writer.WriteRow(values.ToArray());
+                        if (values.Count == 0)
+                        {
+                            _writer.WriteRow((object[]?)null!);
+                        }
+                        else
+                        {
+                            _writer.WriteRow(values.ToArray());
+                        }
                         _rowsWritten++;
                     }
                 }
@@ -438,8 +475,11 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
 
             PSObject result = new PSObject();
             result.Properties.Add(new PSNoteProperty("Path", Path));
-            result.Properties.Add(new PSNoteProperty("RowsExported", _rowsWritten));
-            result.Properties.Add(new PSNoteProperty("FileSizeBytes", fileInfo is not null ? fileInfo.Length : 0L));
+            // PS: $rowsWritten starts as Int32 and only WIDENS to Int64 when the reader path's
+            // long return joins the sum (+=); pure piped-object ++ keeps Int32.
+            result.Properties.Add(new PSNoteProperty("RowsExported", _rowsWidened ? _rowsWritten : (object)(int)_rowsWritten));
+            // PS: else-branch 0 literals are Int32 while $fileInfo.Length is Int64.
+            result.Properties.Add(new PSNoteProperty("FileSizeBytes", fileInfo is not null ? fileInfo.Length : (object)0));
             result.Properties.Add(new PSNoteProperty("FileSizeMB", fileInfo is not null ? Math.Round(fileInfo.Length / 1048576.0, 2) : (object)0));
             result.Properties.Add(new PSNoteProperty("CompressionType", CompressionType));
             result.Properties.Add(new PSNoteProperty("Elapsed", _elapsed.Elapsed));
@@ -467,7 +507,11 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
         return (string)LanguagePrimitives.ConvertTo(ofsValue, typeof(string), CultureInfo.InvariantCulture);
     }
 
-    /// <summary>PS: $obj.$prop — dot access with a null-safe read (binder unwrap for bags).</summary>
+    /// <summary>
+    /// PS: $obj.$prop — dot access with the binder unwrap for bags. A THROWING getter
+    /// propagates (the enclosing try turns it into the Stop-Function failure, exactly like
+    /// the PS statement inside the export try).
+    /// </summary>
     private static object? GetPropertyValue(object? item, string name)
     {
         if (item is null)
@@ -479,15 +523,7 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
         {
             return null;
         }
-        object? value;
-        try
-        {
-            value = property.Value;
-        }
-        catch
-        {
-            return null;
-        }
+        object? value = property.Value;
         if (value is PSObject wrapped && wrapped.BaseObject is not PSCustomObject)
         {
             return wrapped.BaseObject;
@@ -495,12 +531,15 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
         return value;
     }
 
-    /// <summary>PS: Test-Path — matches files AND directories like the PS provider check.</summary>
-    private static bool FileOrDirectoryExists(string path)
+    /// <summary>
+    /// PS: Test-Path — runs through the provider so WILDCARD characters ([a], *, ?) match
+    /// like Test-Path does, not like a literal File.Exists.
+    /// </summary>
+    private bool FileOrDirectoryExists(string path)
     {
         try
         {
-            return File.Exists(path) || Directory.Exists(path);
+            return SessionState.InvokeProvider.Item.Exists(path);
         }
         catch
         {
