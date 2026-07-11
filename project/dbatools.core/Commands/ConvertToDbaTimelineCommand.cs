@@ -56,9 +56,9 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         // every element), while the -notin test compares the value as a whole. The membership
         // test and the append READ THE PROPERTY INDEPENDENTLY, exactly like the two PS
         // $InputObject[0].SqlInstance expressions (a volatile getter can differ between them).
-        if (!ListContainsPs(_servers, PsProperty.Get(first, "SqlInstance")))
+        if (!ListContainsPs(_servers, DotAccess(first, "SqlInstance")))
         {
-            object? appendSqlInstance = PsProperty.Get(first, "SqlInstance");
+            object? appendSqlInstance = DotAccess(first, "SqlInstance");
             object? sqlInstanceBase = appendSqlInstance is PSObject sqlWrapped ? sqlWrapped.BaseObject : appendSqlInstance;
             if (sqlInstanceBase is not string && LanguagePrimitives.GetEnumerable(sqlInstanceBase) is IEnumerable sqlElements)
             {
@@ -76,7 +76,7 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         List<TimelineRow> rows;
         object? firstBase = first is PSObject firstWrapped ? firstWrapped.BaseObject : first;
 
-        if (PsEqTruthy(PsProperty.Get(first, "TypeName"), "AgentJobHistory"))
+        if (PsEqTruthy(DotAccess(first, "TypeName"), "AgentJobHistory"))
         {
             _callerName = "Get-DbaAgentJobHistory";
             rows = MapRows(MapAgentJobHistory);
@@ -175,58 +175,134 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
     private List<TimelineRow> MapRows(Func<object?, TimelineRow> mapper)
     {
         // PS: $data = $InputObject | Select-Object @{...} — every element of the block's array
-        // is mapped with the branch chosen from element [0].
+        // is mapped with the branch chosen from element [0]. The pipeline SKIPS null elements,
+        // so Select-Object never sees them and no row is produced for a null.
         List<TimelineRow> rows = new List<TimelineRow>();
         foreach (object? element in InputObject)
         {
+            if (element is null)
+            {
+                continue;
+            }
             rows.Add(mapper(element));
         }
         return rows;
     }
 
+    /// <summary>
+    /// PS dot-access on a property: a real (adapted/ETS) property wins; otherwise an
+    /// enumerable base gets MEMBER-ACCESS ENUMERATION (per-element property values collected
+    /// into object[], null when nothing matched). DBNull values flow through unwashed —
+    /// [int]DBNull must fail like the PS cast does.
+    /// </summary>
+    private static object? DotAccess(object? item, string name)
+    {
+        if (item is null)
+        {
+            return null;
+        }
+        PSObject wrapped = PSObject.AsPSObject(item);
+        PSPropertyInfo? direct = wrapped.Properties[name];
+        if (direct is not null)
+        {
+            object? value;
+            try
+            {
+                value = direct.Value;
+            }
+            catch
+            {
+                return null;
+            }
+            if (value is PSObject valueWrapped && valueWrapped.BaseObject is not PSCustomObject)
+            {
+                return valueWrapped.BaseObject;
+            }
+            return value;
+        }
+        object? baseValue = wrapped.BaseObject;
+        if (baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable elements)
+        {
+            List<object?> collected = new List<object?>();
+            foreach (object? element in elements)
+            {
+                if (element is null)
+                {
+                    continue;
+                }
+                PSPropertyInfo? elementProperty = PSObject.AsPSObject(element).Properties[name];
+                if (elementProperty is not null)
+                {
+                    try
+                    {
+                        collected.Add(elementProperty.Value);
+                    }
+                    catch
+                    {
+                        collected.Add(null);
+                    }
+                }
+            }
+            if (collected.Count == 0)
+            {
+                return null;
+            }
+            return collected.ToArray();
+        }
+        return null;
+    }
+
     private TimelineRow MapAgentJobHistory(object? element)
     {
         TimelineRow row = new TimelineRow();
+        // PS Select-Object evaluates the calculated properties IN ORDER; the SqlInstance and
+        // InstanceName columns are computed (and discarded by the body row) before vLabel.
+        _ = DotAccess(element, "SqlInstance");
+        _ = DotAccess(element, "InstanceName");
         // PS: { "[" + $($_.SqlInstance -replace "\\", "\\\") + "] " + $_.Job -replace "\'", '' }
         // — the trailing -replace binds to the WHOLE concatenation and strips single quotes.
-        string vLabel = "[" + EscapeInstance(PsText(PsProperty.Get(element, "SqlInstance"))) + "] " + PsText(PsProperty.Get(element, "Job"));
+        string vLabel = "[" + EscapeInstance(PsText(DotAccess(element, "SqlInstance"))) + "] " + PsText(DotAccess(element, "Job"));
         row.VLabel = Regex.Replace(vLabel, "\\'", "", RegexOptions.IgnoreCase);
-        row.HLabel = PsText(PsProperty.Get(element, "Status"));
-        row.Style = ConvertTimelineStatusColor(PsProperty.Get(element, "Status"));
-        row.StartDate = ConvertToJsDate(PsProperty.Get(element, "StartDate"));
-        row.EndDate = ConvertToJsDate(PsProperty.Get(element, "EndDate"));
+        row.HLabel = PsText(DotAccess(element, "Status"));
+        row.Style = ConvertTimelineStatusColor(DotAccess(element, "Status"));
+        row.StartDate = ConvertToJsDate(DotAccess(element, "StartDate"));
+        row.EndDate = ConvertToJsDate(DotAccess(element, "EndDate"));
         return row;
     }
 
     private TimelineRow MapBackupHistory(object? element)
     {
         TimelineRow row = new TimelineRow();
+        _ = DotAccess(element, "SqlInstance");
+        _ = DotAccess(element, "InstanceName");
         // PS: no quote strip here, and no Style column at all (renders as an empty field).
-        row.VLabel = "[" + EscapeInstance(PsText(PsProperty.Get(element, "SqlInstance"))) + "] " + PsText(PsProperty.Get(element, "Database"));
-        row.HLabel = PsText(PsProperty.Get(element, "Type"));
+        row.VLabel = "[" + EscapeInstance(PsText(DotAccess(element, "SqlInstance"))) + "] " + PsText(DotAccess(element, "Database"));
+        row.HLabel = PsText(DotAccess(element, "Type"));
         row.Style = "";
-        row.StartDate = ConvertToJsDate(PsProperty.Get(element, "Start"));
-        row.EndDate = ConvertToJsDate(PsProperty.Get(element, "End"));
+        row.StartDate = ConvertToJsDate(DotAccess(element, "Start"));
+        row.EndDate = ConvertToJsDate(DotAccess(element, "End"));
         return row;
     }
 
     private TimelineRow MapGrowthEvent(object? element)
     {
         TimelineRow row = new TimelineRow();
+        _ = DotAccess(element, "SqlInstance");
+        _ = DotAccess(element, "InstanceName");
         // PS: ("[" + escapedInstance + "] " + ($_.DatabaseName -replace "\\", "\\\")).Replace("'", "\'")
         // — the .NET Replace METHOD (ordinal, case-sensitive) ESCAPES quotes instead of stripping.
-        string vLabel = "[" + EscapeInstance(PsText(PsProperty.Get(element, "SqlInstance"))) + "] " + EscapeInstance(PsText(PsProperty.Get(element, "DatabaseName")));
+        string vLabel = "[" + EscapeInstance(PsText(DotAccess(element, "SqlInstance"))) + "] " + EscapeInstance(PsText(DotAccess(element, "DatabaseName")));
         row.VLabel = vLabel.Replace("'", "\\'");
 
-        // PS: switch ([int]$_.EventClass) { 92..95 } default "Unknown"; a failing [int] cast is
-        // statement-terminating in the calculated property and leaves the value empty. The
-        // hLabel and Style expressions each read and convert EventClass INDEPENDENTLY (a
-        // volatile getter can legitimately give them different values).
+        // PS: switch ([int]$_.EventClass) { 92..95 } default "Unknown"; a failing [int] cast
+        // (non-numeric, DBNull) is statement-terminating in the calculated property and leaves
+        // the value empty. The hLabel and Style expressions each read and convert EventClass
+        // INDEPENDENTLY (a volatile getter can legitimately give them different values).
         int hLabelClass;
         bool hLabelClassKnown;
         try
         {
-            hLabelClass = (int)LanguagePrimitives.ConvertTo(PsProperty.Get(element, "EventClass"), typeof(int), CultureInfo.InvariantCulture);
+            hLabelClass = (int)LanguagePrimitives.ConvertTo(DotAccess(element, "EventClass"), typeof(int), CultureInfo.InvariantCulture);
             hLabelClassKnown = true;
         }
         catch
@@ -255,7 +331,7 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         bool styleClassKnown;
         try
         {
-            styleClass = (int)LanguagePrimitives.ConvertTo(PsProperty.Get(element, "EventClass"), typeof(int), CultureInfo.InvariantCulture);
+            styleClass = (int)LanguagePrimitives.ConvertTo(DotAccess(element, "EventClass"), typeof(int), CultureInfo.InvariantCulture);
             styleClassKnown = true;
         }
         catch
@@ -264,8 +340,8 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
             styleClassKnown = false;
         }
         row.Style = styleClassKnown && (styleClass == 92 || styleClass == 93) ? "#36B300" : "#FF8C00";
-        row.StartDate = ConvertToJsDate(PsProperty.Get(element, "StartTime"));
-        row.EndDate = ConvertToJsDate(PsProperty.Get(element, "EndTime"));
+        row.StartDate = ConvertToJsDate(DotAccess(element, "StartTime"));
+        row.EndDate = ConvertToJsDate(DotAccess(element, "EndTime"));
         return row;
     }
 
@@ -353,10 +429,12 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         {
             return string.Empty;
         }
-        // PS parameter binding REJECTS a collection for a scalar [string] parameter (lab-proven
-        // both editions, even single-element arrays) — the helper call errors and Style is empty.
+        // PS parameter binding REJECTS an ARRAY for a scalar [string] parameter (lab-proven
+        // both editions, even single-element arrays) — the helper call errors and Style is
+        // empty. NON-array collections (ArrayList, List<string>) DO bind, converting with the
+        // $OFS join (also lab-proven), which PsText below reproduces.
         object? statusBase = status is PSObject statusWrapped ? statusWrapped.BaseObject : status;
-        if (statusBase is not string && LanguagePrimitives.GetEnumerable(statusBase) is not null)
+        if (statusBase is Array)
         {
             return string.Empty;
         }
@@ -395,14 +473,27 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
             return string.Empty;
         }
         CultureInfo culture = CultureInfo.CurrentCulture;
+        // PS month semantics (lab-proven under ar-SA/UmAlQura with an out-of-calendar date):
+        // if Get-Date -Format "MM" FAILS, the inner subexpression yields nothing and the
+        // arithmetic still runs — $null - 1 renders "-1"; if the FORMAT succeeds but the
+        // "MM"-1 string-int conversion fails (non-parsable digits), the whole $(x-1)
+        // subexpression dies and the component renders EMPTY.
         string monthComponent;
         try
         {
-            monthComponent = (int.Parse(date.ToString("MM", culture), NumberStyles.Integer, CultureInfo.InvariantCulture) - 1).ToString(CultureInfo.InvariantCulture);
+            string monthText = date.ToString("MM", culture);
+            try
+            {
+                monthComponent = (int.Parse(monthText, NumberStyles.Integer, CultureInfo.InvariantCulture) - 1).ToString(CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                monthComponent = string.Empty;
+            }
         }
         catch
         {
-            monthComponent = string.Empty;
+            monthComponent = "-1";
         }
         // EVERY component is its own $(Get-Date ...) subexpression in the PS template: a
         // formatting failure (e.g. a pre-calendar-minimum date under ar-SA/UmAlQura) empties
