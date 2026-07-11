@@ -28,7 +28,7 @@ namespace Dataplat.Dbatools.Commands;
 /// query, the TCP port probes and the DbaInstanceReport assembly are native C# here (the retired
 /// function's -Tag UnitTests New-Object mock lives outside the IntegrationTests gate). The cold,
 /// Windows-only discovery paths (AD/LDAP SPN and DomainServer searches, SSMS DataSource
-/// enumeration) run their verbatim PS expressions through the engine — the sanctioned pattern for
+/// enumeration) run their verbatim PS expressions through the engine - the sanctioned pattern for
 /// System.DirectoryServices / SqlDataSourceEnumerator (Test-DbaSpn precedent), so dbatools.core
 /// takes no new package dependency. Nested *-Dba* calls (Get-DbaService, Connect-DbaInstance) go
 /// through NestedCommand so they resolve to whichever implementation is live during the hybrid
