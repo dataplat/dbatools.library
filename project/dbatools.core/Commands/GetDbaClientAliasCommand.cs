@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections;
 using System.Management.Automation;
 using Dataplat.Dbatools.Connection;
 using Dataplat.Dbatools.Parameter;
@@ -100,13 +101,41 @@ public sealed class GetDbaClientAliasCommand : DbaBaseCmdlet
 
         foreach (DbaInstanceParameter computer in ComputerName)
         {
-            if (computer is null)
-            {
-                continue;
-            }
-
             try
             {
+                if (computer is null)
+                {
+                    // PS: an explicit null element binds to Invoke-Command2's class-typed
+                    // [DbaInstanceParameter] parameter, walks the remote branch and dies at
+                    // New-PSSession's ComputerName ValidateNotNullOrEmpty under -ErrorAction
+                    // Stop. Reproduce the exact failing engine statement so the catch
+                    // composes the same "Failure | The argument is null or empty..." record
+                    // (lab-proven both editions).
+                    Hashtable splatSession = new();
+                    splatSession["ComputerName"] = null;
+                    splatSession["ErrorAction"] = "Stop";
+                    try
+                    {
+                        NestedCommand.Invoke(this, "New-PSSession", splatSession);
+                    }
+                    catch (PipelineStoppedException)
+                    {
+                        throw;
+                    }
+                    catch (RuntimeException rex)
+                    {
+                        // ParameterBindingException.ErrorRecord flattens to a
+                        // ParentContainsErrorRecordException (composite message, no inner
+                        // chain); rebuild the record around the REAL exception so the
+                        // deepest-first message walk lands on the inner
+                        // ValidationMetadataException text exactly like the function's catch.
+                        string errorId = rex.ErrorRecord is null ? "dbatools_Get-DbaClientAlias" : rex.ErrorRecord.FullyQualifiedErrorId;
+                        ErrorCategory category = rex.ErrorRecord is null ? ErrorCategory.NotSpecified : rex.ErrorRecord.CategoryInfo.Category;
+                        StopFunction("Failure", target: computer, errorRecord: new ErrorRecord(rex, errorId, category, computer), continueLoop: true);
+                    }
+                    continue;
+                }
+
                 RemoteExecutionService.RemoteCommandRequest request = new()
                 {
                     ComputerName = computer,
