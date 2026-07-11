@@ -3,6 +3,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Management.Automation;
 using Dataplat.Dbatools.Connection;
 using Dataplat.Dbatools.Message;
@@ -50,31 +51,41 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
         foreach (object? inputItem in _objects)
         {
             // PS: if ($object.ConnectionObject) { $servers = $object.ConnectionObject } else { $servers = $object }
-            object? connectionObject = PsProperty.Get(inputItem, "ConnectionObject");
-            object? servers = PsOps.IsTrue(connectionObject) ? connectionObject : inputItem;
+            // — the truthiness test and the assignment are two INDEPENDENT property reads
+            // (a volatile getter can differ between them).
+            object? servers = PsOps.IsTrue(PsProperty.Get(inputItem, "ConnectionObject"))
+                ? PsProperty.Get(inputItem, "ConnectionObject")
+                : inputItem;
 
             foreach (object? server in EnumeratePs(servers))
             {
                 try
                 {
                     // PS: if ($server.ConnectionContext) — SMO Server (and friends) branch.
-                    object? connectionContext = PsProperty.Get(server, "ConnectionContext");
-                    if (PsOps.IsTrue(connectionContext))
+                    // Every $server.ConnectionContext / .ConnectionString below is its own
+                    // fresh property read, exactly like the PS dot-access expressions.
+                    if (PsOps.IsTrue(PsProperty.Get(server, "ConnectionContext")))
                     {
                         string serverName = PsText(PsProperty.Get(server, "Name"));
                         if (ShouldProcess(serverName, "Disconnecting SQL Connection"))
                         {
                             // PS: $null = $server.ConnectionContext.Disconnect() — dynamic
-                            // method invocation on whatever the property holds.
-                            InvokePsMethod(connectionContext!, "Disconnect");
+                            // method invocation on the freshly read property value; a null
+                            // re-read fails the method call into the catch like PS does.
+                            InvokePsMethod(PsProperty.Get(server, "ConnectionContext"), "Disconnect");
 
-                            string? connectionString = PsProperty.Get(connectionContext, "ConnectionString") as string;
-                            RemoveFromConnectionHash(connectionString);
+                            // PS: registry lookup, removal, and the masked output each read
+                            // $server.ConnectionContext.ConnectionString AGAIN.
+                            if (RegistryEntryIsTruthy(ToPsString(PsProperty.Get(PsProperty.Get(server, "ConnectionContext"), "ConnectionString"))))
+                            {
+                                WriteMessage(MessageLevel.Verbose, "removing from connection hash");
+                                RemoveRegistryEntry(ToPsString(PsProperty.Get(PsProperty.Get(server, "ConnectionContext"), "ConnectionString")));
+                            }
 
                             PSObject result = new PSObject();
                             result.Properties.Add(new PSNoteProperty("SqlInstance", PsProperty.Get(server, "Name")));
-                            result.Properties.Add(new PSNoteProperty("ConnectionString", ConnectionService.HideConnectionString(connectionString)));
-                            result.Properties.Add(new PSNoteProperty("ConnectionType", BaseTypeOf(server)?.FullName));
+                            result.Properties.Add(new PSNoteProperty("ConnectionString", ConnectionService.HideConnectionString(ToPsString(PsProperty.Get(PsProperty.Get(server, "ConnectionContext"), "ConnectionString")))));
+                            result.Properties.Add(new PSNoteProperty("ConnectionType", GetTypePs(server).FullName));
                             result.Properties.Add(new PSNoteProperty("State", "Disconnected"));
                             OutputHelper.SetDefaultDisplayPropertySet(result, "SqlInstance", "ConnectionType", "State");
                             WriteObject(result);
@@ -83,8 +94,9 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
 
                     // PS: if ($server.GetType().Name -eq "SqlConnection") — NAME match, so both
                     // System.Data.SqlClient and Microsoft.Data.SqlClient connections qualify.
-                    Type? serverType = BaseTypeOf(server);
-                    if (serverType is not null && PsString.Eq(serverType.Name, "SqlConnection"))
+                    // GetType() on a null $server throws into the catch (PS method-on-null).
+                    Type serverType = GetTypePs(server);
+                    if (PsString.Eq(serverType.Name, "SqlConnection"))
                     {
                         string dataSource = PsText(PsProperty.Get(server, "DataSource"));
                         if (ShouldProcess(dataSource, "Closing SQL Connection"))
@@ -92,15 +104,18 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
                             // PS: if ($server.State -eq "Open") { $null = $server.Close() }
                             if (PsOps.Eq(PsProperty.Get(server, "State"), "Open"))
                             {
-                                InvokePsMethod(server!, "Close");
+                                InvokePsMethod(server, "Close");
                             }
 
-                            string? connectionString = PsProperty.Get(server, "ConnectionString") as string;
-                            RemoveFromConnectionHash(connectionString);
+                            if (RegistryEntryIsTruthy(ToPsString(PsProperty.Get(server, "ConnectionString"))))
+                            {
+                                WriteMessage(MessageLevel.Verbose, "removing from connection hash");
+                                RemoveRegistryEntry(ToPsString(PsProperty.Get(server, "ConnectionString")));
+                            }
 
                             PSObject result = new PSObject();
                             result.Properties.Add(new PSNoteProperty("SqlInstance", PsProperty.Get(server, "DataSource")));
-                            result.Properties.Add(new PSNoteProperty("ConnectionString", ConnectionService.HideConnectionString(connectionString)));
+                            result.Properties.Add(new PSNoteProperty("ConnectionString", ConnectionService.HideConnectionString(ToPsString(PsProperty.Get(server, "ConnectionString")))));
                             result.Properties.Add(new PSNoteProperty("ConnectionType", serverType.FullName));
                             // PS reads State AFTER the close, so the live enum value is emitted.
                             result.Properties.Add(new PSNoteProperty("State", PsProperty.Get(server, "State")));
@@ -122,6 +137,56 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
         }
     }
 
+    /// <summary>
+    /// PS: $server.GetType() — throws the method-on-null error into the enclosing catch when
+    /// the enumerated element is null (property access on null is fine; the method call is not).
+    /// </summary>
+    private static Type GetTypePs(object? server)
+    {
+        if (server is null)
+        {
+            throw new PSInvalidOperationException("You cannot call a method on a null-valued expression.");
+        }
+        return server is PSObject wrapped ? wrapped.BaseObject.GetType() : server.GetType();
+    }
+
+    /// <summary>
+    /// PS string conversion for the dictionary indexer / [string] helper binding: a non-string
+    /// ConnectionString value (StringBuilder etc.) converts like LanguagePrimitives does; null
+    /// stays null.
+    /// </summary>
+    private static string? ToPsString(object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+        return (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// PS: [Dataplat.Dbatools.Connection.ConnectionHost]::ActiveConnections[$key] truthiness —
+    /// a missing key reads null (falsy), a present-but-empty list is falsy and left in place.
+    /// A null key returns falsy without the indexer's error record (statement residual).
+    /// </summary>
+    private static bool RegistryEntryIsTruthy(string? connectionString)
+    {
+        if (connectionString is null)
+        {
+            return false;
+        }
+        return ConnectionHost.ActiveConnections.TryGetValue(connectionString, out List<object>? registered) && PsOps.IsTrue(registered);
+    }
+
+    private static void RemoveRegistryEntry(string? connectionString)
+    {
+        if (connectionString is null)
+        {
+            return;
+        }
+        ConnectionHost.ActiveConnections.Remove(connectionString);
+    }
+
     /// <summary>PS foreach semantics: null iterates zero times, a collection enumerates, a scalar iterates once.</summary>
     private static IEnumerable<object?> EnumeratePs(object? value)
     {
@@ -141,9 +206,16 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
         yield return value;
     }
 
-    /// <summary>PS dynamic method invocation (member binder resolution over the PSObject).</summary>
-    private static void InvokePsMethod(object target, string methodName)
+    /// <summary>
+    /// PS dynamic method invocation (member binder resolution over the PSObject). A null
+    /// target throws the PS method-on-null error into the enclosing catch.
+    /// </summary>
+    private static void InvokePsMethod(object? target, string methodName)
     {
+        if (target is null)
+        {
+            throw new PSInvalidOperationException("You cannot call a method on a null-valued expression.");
+        }
         PSMethodInfo? method = PSObject.AsPSObject(target).Methods[methodName];
         if (method is null)
         {
@@ -154,35 +226,6 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
             throw new PSInvalidOperationException($"Method invocation failed because [{baseTarget.GetType().FullName}] does not contain a method named '{methodName}'.");
         }
         method.Invoke();
-    }
-
-    /// <summary>
-    /// PS: if ([Dataplat.Dbatools.Connection.ConnectionHost]::ActiveConnections[$connString]) {
-    ///     remove } — a missing key reads $null (falsy); a present-but-empty list is falsy too
-    /// and is left in place.
-    /// </summary>
-    private void RemoveFromConnectionHash(string? connectionString)
-    {
-        if (connectionString is null)
-        {
-            // PS: a null indexer key throws (statement-terminating into the catch); the
-            // realistic connections always carry a string.
-            return;
-        }
-        if (ConnectionHost.ActiveConnections.TryGetValue(connectionString, out List<object>? registered) && PsOps.IsTrue(registered))
-        {
-            WriteMessage(MessageLevel.Verbose, "removing from connection hash");
-            ConnectionHost.ActiveConnections.Remove(connectionString);
-        }
-    }
-
-    private static Type? BaseTypeOf(object? value)
-    {
-        if (value is null)
-        {
-            return null;
-        }
-        return value is PSObject wrapped ? wrapped.BaseObject.GetType() : value.GetType();
     }
 
     /// <summary>PS expandable-string rendering of a value (null becomes empty).</summary>
