@@ -185,12 +185,22 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
     {
         base.BeginProcessing();
         // PS begin: read the component-name map from bin/dbatools-sqlinstallationcomponents.json,
-        // resolved from the dbatools module root (module-scoped). The nested InvokeScript unrolls
-        // the returned array, so the whole result Collection IS the component list (each item a
-        // component object) - store it directly rather than taking [0].
-        Collection<PSObject> comp = InvokeInModuleScope(
-            "Get-Content -Path \"$Script:PSModuleRoot\\bin\\dbatools-sqlinstallationcomponents.json\" -Raw | ConvertFrom-Json",
-            new Hashtable());
+        // resolved from the dbatools module root. Resolve that root via the module object's
+        // ModuleBase PROPERTY rather than `& $module { $Script:PSModuleRoot }`: Pester 5.x empties
+        // the module's $Script:PSModuleRoot in the module scope after many mocked Its (the gate's
+        // Invoke-ManualPester run churns the session state), which made the path collapse to
+        // "\bin\..." so the JSON loaded zero components and every -Feature Default/Tools install
+        // returned empty FEATURES. ModuleBase is intrinsic to the module object and stays stable.
+        // The nested InvokeScript unrolls the returned array, so the whole result Collection IS the
+        // component list (each item a component object) - store it directly rather than taking [0].
+        Collection<PSObject> baseResult = InvokeCommand.InvokeScript(false, ScriptBlock.Create(
+            "(Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1).ModuleBase"),
+            null);
+        string moduleBase = baseResult.Count > 0 ? PsStr(baseResult[0]) : "";
+        string componentsPath = System.IO.Path.Combine(moduleBase, "bin", "dbatools-sqlinstallationcomponents.json");
+        Collection<PSObject> comp = InvokeCommand.InvokeScript(false, ScriptBlock.Create(
+            "param($__p) Get-Content -Path $__p -Raw | ConvertFrom-Json"),
+            null, componentsPath);
         // InvokeScript may either unroll the parsed array into N component items OR return it as
         // one array-valued item - flatten both shapes to the individual component objects.
         List<object?> flat = new();

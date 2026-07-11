@@ -295,7 +295,13 @@ public sealed class InvokeDbaAdvancedInstallCommand : DbaBaseCmdlet
             // PS: Get-SqlInstallSummary (tolerant - a failure warns and leaves the props empty).
             try
             {
-                PSObject summary = PSObject.AsPSObject(ScalarModuleScoped("Invoke-Command2", new Hashtable
+                // When the remote returns no summary object the PS source just reads $null-valued
+                // properties (no warning). Guard the null so AsPSObject(null) does not NRE here:
+                // that NRE was caught below and re-emitted as a warning whose EnableException
+                // error-record write terminated the nested worker, masking the real "Installation
+                // failed with exit code N" StopFunction. Only a genuine throw warns, per the
+                // function's try/catch tolerance.
+                object? summaryRaw = ScalarModuleScoped("Invoke-Command2", new Hashtable
                 {
                     { "ComputerName", ComputerName },
                     { "Credential", Credential },
@@ -303,11 +309,15 @@ public sealed class InvokeDbaAdvancedInstallCommand : DbaBaseCmdlet
                     { "ArgumentList", new object?[] { Version?.ToString() } },
                     { "ErrorAction", "Stop" },
                     { "Raw", true }
-                }));
-                SetNote(output, "ExitMessage", GetNote(summary, "ExitMessage"));
-                SetNote(output, "Log", GetNote(summary, "Content"));
-                SetNote(output, "LogFile", GetNote(summary, "Path"));
-                SetNote(output, "ConfigurationFile", GetNote(summary, "ConfigurationFile"));
+                });
+                if (summaryRaw is not null)
+                {
+                    PSObject summary = PSObject.AsPSObject(summaryRaw);
+                    SetNote(output, "ExitMessage", GetNote(summary, "ExitMessage"));
+                    SetNote(output, "Log", GetNote(summary, "Content"));
+                    SetNote(output, "LogFile", GetNote(summary, "Path"));
+                    SetNote(output, "ConfigurationFile", GetNote(summary, "ConfigurationFile"));
+                }
             }
             catch (PipelineStoppedException)
             {
