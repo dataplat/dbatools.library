@@ -89,7 +89,10 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         splatSelect["First"] = 1;
         splatSelect["ExpandProperty"] = name;
         Collection<PSObject> output = NestedCommand.Invoke(this, "Select-Object", splatSelect, pipelineInput: list);
-        return output.Count > 0 ? (object?)output[0] : null;
+        // An array-valued property MULTI-EMITS through -ExpandProperty (lab-proven both
+        // editions), so the assignment takes the PS pipeline shape: empty -> null, one ->
+        // the scalar, many -> object[] (codex W1-010 r1 finding 2).
+        return ShapePipelineAssignment(output);
     }
 
     // PS: $list | Select-Object -First 1
@@ -98,7 +101,26 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         Hashtable splatSelect = new();
         splatSelect["First"] = 1;
         Collection<PSObject> output = NestedCommand.Invoke(this, "Select-Object", splatSelect, pipelineInput: list);
-        return output.Count > 0 ? (object?)output[0] : null;
+        return ShapePipelineAssignment(output);
+    }
+
+    // PS pipeline-assignment shape: empty -> null, one -> the scalar, many -> object[].
+    private static object? ShapePipelineAssignment(Collection<PSObject> output)
+    {
+        if (output.Count == 0)
+        {
+            return null;
+        }
+        if (output.Count == 1)
+        {
+            return output[0];
+        }
+        object?[] shaped = new object?[output.Count];
+        for (int i = 0; i < output.Count; i++)
+        {
+            shaped[i] = output[i];
+        }
+        return shaped;
     }
 
     /// <summary>
@@ -154,7 +176,8 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
                 {
                     continue;
                 }
-                PSPropertyInfo? elementProperty = PSObject.AsPSObject(element).Properties[name];
+                PSObject elementWrapped = PSObject.AsPSObject(element);
+                PSPropertyInfo? elementProperty = elementWrapped.Properties[name];
                 if (elementProperty is not null)
                 {
                     try
@@ -165,6 +188,14 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
                     {
                         collected.Add(null);
                     }
+                }
+                else if (elementWrapped.BaseObject is PSCustomObject)
+                {
+                    // Lab-proven both editions (codex W1-010 r1 finding 1): member-access
+                    // enumeration contributes NULL for a property-bag element MISSING the
+                    // property (the bag adapter is permissive), while a raw .NET element
+                    // missing it contributes nothing.
+                    collected.Add(null);
                 }
             }
             if (collected.Count == 0)
