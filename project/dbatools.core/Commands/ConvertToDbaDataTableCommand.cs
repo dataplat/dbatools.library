@@ -88,8 +88,13 @@ public sealed class ConvertToDbaDataTableCommand : DbaBaseCmdlet
         _datatable = new DataTable();
         _columns = new List<string>();
         _specialColumns = new List<string>();
-        // PS: @{ } hashtable literals key case-insensitively by the current culture.
+        // PS: @{ } hashtable literals key case-insensitively with an EDITION-DEPENDENT comparer:
+        // current-culture on Windows PowerShell (net472), ordinal on PowerShell 7 (net8.0).
+#if NETFRAMEWORK
         _specialColumnsType = new Dictionary<string, string>(StringComparer.CurrentCultureIgnoreCase);
+#else
+        _specialColumnsType = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+#endif
         _shouldCreateColumns = true;
     }
 
@@ -439,13 +444,55 @@ public sealed class ConvertToDbaDataTableCommand : DbaBaseCmdlet
             {
                 return false;
             }
-            return PsOps.Compare(lengthValue, 0) > 0;
+            return PsGreaterThanZero(lengthValue);
         }
 #if NETFRAMEWORK
         return wrapped.BaseObject is not PSCustomObject;
 #else
         return true;
 #endif
+    }
+
+    /// <summary>
+    /// PS: $length -gt 0 — comparison operators FILTER an enumerable left operand (the result
+    /// is the matching elements, truthy when any match); a scalar compares directly with the
+    /// left operand's type driving conversion.
+    /// </summary>
+    private static bool PsGreaterThanZero(object? lengthValue)
+    {
+        object? unwrapped = lengthValue is PSObject wrapped ? wrapped.BaseObject : lengthValue;
+        if (unwrapped is not string && LanguagePrimitives.GetEnumerable(unwrapped) is IEnumerable elements)
+        {
+            foreach (object? element in elements)
+            {
+                bool greater;
+                try
+                {
+                    greater = PsOps.Compare(element, 0) > 0;
+                }
+                catch
+                {
+                    // A non-comparable element errors per-element in the PS filter and simply
+                    // contributes no match.
+                    greater = false;
+                }
+                if (greater)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        try
+        {
+            return PsOps.Compare(unwrapped, 0) > 0;
+        }
+        catch
+        {
+            // PS: a failing scalar comparison is statement-terminating inside the length try —
+            // the caught path treats the length as 0.
+            return false;
+        }
     }
 
     /// <summary>
@@ -502,7 +549,7 @@ public sealed class ConvertToDbaDataTableCommand : DbaBaseCmdlet
     /// Shared join core: enumerate the value and stringify each element with the supplied
     /// per-element semantics; a non-enumerable value (including a string) stringifies whole.
     /// </summary>
-    private static string JoinCore(object? value, string separator, Func<object?, string> stringify)
+    private static string JoinCore(object? value, string separator, Func<object?, string> stringify, bool skipNullElements)
     {
         if (value is null)
         {
@@ -521,21 +568,33 @@ public sealed class ConvertToDbaDataTableCommand : DbaBaseCmdlet
         List<string> parts = new List<string>();
         foreach (object? element in enumerable)
         {
-            parts.Add(element is null ? string.Empty : stringify(element));
+            if (element is null)
+            {
+                if (!skipNullElements)
+                {
+                    parts.Add(string.Empty);
+                }
+                continue;
+            }
+            parts.Add(stringify(element));
         }
         return string.Join(separator, parts);
     }
 
-    /// <summary>PS: $value -join ", " — the operator stringifies elements like interpolation.</summary>
+    /// <summary>PS: $value -join ", " — the operator renders a null element as an empty string.</summary>
     private static string JoinOperator(object? value, string separator)
     {
-        return JoinCore(value, separator, PsInterpolate);
+        return JoinCore(value, separator, PsInterpolate, skipNullElements: false);
     }
 
-    /// <summary>PS: ($Value | ForEach-Object { $_.ToString() }) -Join ', ' — method-call per element.</summary>
+    /// <summary>
+    /// PS: ($Value | ForEach-Object { $_.ToString() }) -Join ', ' — method-call per element;
+    /// a NULL element's ToString() errors inside ForEach-Object and contributes NO element to
+    /// the join (the error record itself is the statement-terminating residual class).
+    /// </summary>
     private static string JoinMethod(object? value, string separator)
     {
-        return JoinCore(value, separator, PsToStringCall);
+        return JoinCore(value, separator, PsToStringCall, skipNullElements: true);
     }
 
     /// <summary>PS: $name -in $list (case-insensitive membership).</summary>
