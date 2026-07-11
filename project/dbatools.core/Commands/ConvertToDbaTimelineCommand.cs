@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Management.Automation;
@@ -50,11 +51,24 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
 
         object? first = InputObject[0];
 
-        // PS: if ($InputObject[0].SqlInstance -notin $servers) { $servers += ... }
+        // PS: if ($InputObject[0].SqlInstance -notin $servers) { $servers += ... } — array
+        // addition FLATTENS an enumerable value (a collection-valued SqlInstance registers
+        // every element), while the -notin test compares the value as a whole.
         object? firstSqlInstance = PsProperty.Get(first, "SqlInstance");
         if (!ListContainsPs(_servers, firstSqlInstance))
         {
-            _servers.Add(firstSqlInstance);
+            object? sqlInstanceBase = firstSqlInstance is PSObject sqlWrapped ? sqlWrapped.BaseObject : firstSqlInstance;
+            if (sqlInstanceBase is not string && LanguagePrimitives.GetEnumerable(sqlInstanceBase) is IEnumerable sqlElements)
+            {
+                foreach (object? sqlElement in sqlElements)
+                {
+                    _servers.Add(sqlElement);
+                }
+            }
+            else
+            {
+                _servers.Add(firstSqlInstance);
+            }
         }
 
         List<TimelineRow> rows;
@@ -84,7 +98,8 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         }
 
         // PS: $body += "$($data | ForEach-Object { "['..'],," })" — the outer expandable string
-        // joins the per-row strings with the default $OFS space; ONE body string per block.
+        // joins the per-row strings with the SESSION $OFS (default single space, read per
+        // call like PS resolves it); ONE body string per block.
         List<string> rowStrings = new List<string>();
         foreach (TimelineRow row in rows)
         {
@@ -92,7 +107,7 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
                 "['{0}','{1}','{2}',{3}, {4}],",
                 row.VLabel, row.HLabel, row.Style, row.StartDate, row.EndDate));
         }
-        _body.Add(string.Join(" ", rowStrings));
+        _body.Add(string.Join(GetOfsSeparator(), rowStrings));
     }
 
     protected override void EndProcessing()
@@ -200,22 +215,24 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         row.VLabel = vLabel.Replace("'", "\\'");
 
         // PS: switch ([int]$_.EventClass) { 92..95 } default "Unknown"; a failing [int] cast is
-        // statement-terminating in the calculated property and leaves the value empty.
-        int eventClass;
-        bool eventClassKnown;
+        // statement-terminating in the calculated property and leaves the value empty. The
+        // hLabel and Style expressions each read and convert EventClass INDEPENDENTLY (a
+        // volatile getter can legitimately give them different values).
+        int hLabelClass;
+        bool hLabelClassKnown;
         try
         {
-            eventClass = (int)LanguagePrimitives.ConvertTo(PsProperty.Get(element, "EventClass"), typeof(int), CultureInfo.InvariantCulture);
-            eventClassKnown = true;
+            hLabelClass = (int)LanguagePrimitives.ConvertTo(PsProperty.Get(element, "EventClass"), typeof(int), CultureInfo.InvariantCulture);
+            hLabelClassKnown = true;
         }
         catch
         {
-            eventClass = 0;
-            eventClassKnown = false;
+            hLabelClass = 0;
+            hLabelClassKnown = false;
         }
-        if (eventClassKnown)
+        if (hLabelClassKnown)
         {
-            switch (eventClass)
+            switch (hLabelClass)
             {
                 case 92: row.HLabel = "Data Grow"; break;
                 case 93: row.HLabel = "Log Grow"; break;
@@ -229,11 +246,42 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
             row.HLabel = "";
         }
 
-        // PS: if ([int]$_.EventClass -in 92, 93) { "#36B300" } else { "#FF8C00" }
-        row.Style = eventClassKnown && (eventClass == 92 || eventClass == 93) ? "#36B300" : "#FF8C00";
+        // PS: if ([int]$_.EventClass -in 92, 93) { "#36B300" } else { "#FF8C00" } — own read.
+        int styleClass;
+        bool styleClassKnown;
+        try
+        {
+            styleClass = (int)LanguagePrimitives.ConvertTo(PsProperty.Get(element, "EventClass"), typeof(int), CultureInfo.InvariantCulture);
+            styleClassKnown = true;
+        }
+        catch
+        {
+            styleClass = 0;
+            styleClassKnown = false;
+        }
+        row.Style = styleClassKnown && (styleClass == 92 || styleClass == 93) ? "#36B300" : "#FF8C00";
         row.StartDate = ConvertToJsDate(PsProperty.Get(element, "StartTime"));
         row.EndDate = ConvertToJsDate(PsProperty.Get(element, "EndTime"));
         return row;
+    }
+
+    /// <summary>The session $OFS as PS expandable-string joins resolve it (default one space).</summary>
+    private string GetOfsSeparator()
+    {
+        object? ofsValue;
+        try
+        {
+            ofsValue = SessionState.PSVariable.GetValue("OFS");
+        }
+        catch
+        {
+            ofsValue = null;
+        }
+        if (ofsValue is null)
+        {
+            return " ";
+        }
+        return (string)LanguagePrimitives.ConvertTo(ofsValue, typeof(string), CultureInfo.InvariantCulture);
     }
 
     /// <summary>PS: $value -replace "\\", "\\\" — every backslash becomes three.</summary>
@@ -254,11 +302,21 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
 
     /// <summary>
     /// Private helper Convert-DbaTimelineStatusColor absorbed: SQL Agent status literal to html
-    /// color, PS switch case-insensitivity preserved, default "#FF00CC".
+    /// color, PS switch case-insensitivity preserved, default "#FF00CC". The helper's MANDATORY
+    /// [string]$Status rejects a null/empty binding — the calculated property errors (statement
+    /// class) and the Style field renders EMPTY, not magenta.
     /// </summary>
     private static string ConvertTimelineStatusColor(object? status)
     {
+        if (status is null)
+        {
+            return string.Empty;
+        }
         string text = PsText(status);
+        if (text.Length == 0)
+        {
+            return string.Empty;
+        }
         if (PsString.Eq(text, "Failed")) { return "#FF3D3D"; }
         if (PsString.Eq(text, "Succeeded")) { return "#36B300"; }
         if (PsString.Eq(text, "Retry")) { return "#FFFF00"; }
@@ -269,9 +327,13 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
 
     /// <summary>
     /// Private helper ConvertTo-JsDate absorbed: "new Date(yyyy, MM-1, dd, HH, mm, ss)" — the
-    /// month is 0-based int arithmetic on the "MM" string (unpadded), the other parts keep
-    /// their leading zeros. A null/unconvertible input fails the [datetime] cast in PS
-    /// (statement-terminating in the calculated property, empty value) — rendered empty here.
+    /// month is 0-based int arithmetic on the Get-Date -Format "MM" string (unpadded), the
+    /// other parts keep their leading zeros. Get-Date -Format renders with the CURRENT culture
+    /// (calendar included), so the formatting culture is preserved; the "MM"-1 arithmetic is
+    /// PS string-to-int conversion (invariant numeric parse). A null/unconvertible input fails
+    /// the [datetime] cast in PS (statement-terminating in the calculated property, empty
+    /// value) — rendered empty here; a non-numeric month string leaves that component empty
+    /// exactly like the failing subexpression would.
     /// </summary>
     private static string ConvertToJsDate(object? inputDate)
     {
@@ -284,14 +346,24 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
         {
             return string.Empty;
         }
+        CultureInfo culture = CultureInfo.CurrentCulture;
+        string monthComponent;
+        try
+        {
+            monthComponent = (int.Parse(date.ToString("MM", culture), NumberStyles.Integer, CultureInfo.InvariantCulture) - 1).ToString(CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            monthComponent = string.Empty;
+        }
         return string.Format(CultureInfo.InvariantCulture,
             "new Date({0}, {1}, {2}, {3}, {4}, {5})",
-            date.ToString("yyyy", CultureInfo.InvariantCulture),
-            date.Month - 1,
-            date.ToString("dd", CultureInfo.InvariantCulture),
-            date.ToString("HH", CultureInfo.InvariantCulture),
-            date.ToString("mm", CultureInfo.InvariantCulture),
-            date.ToString("ss", CultureInfo.InvariantCulture));
+            date.ToString("yyyy", culture),
+            monthComponent,
+            date.ToString("dd", culture),
+            date.ToString("HH", culture),
+            date.ToString("mm", culture),
+            date.ToString("ss", culture));
     }
 
     /// <summary>PS: $value -notin $servers (case-insensitive -eq semantics per element).</summary>
