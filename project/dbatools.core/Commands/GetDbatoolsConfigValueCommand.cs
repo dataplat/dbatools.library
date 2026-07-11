@@ -23,11 +23,11 @@ public sealed class GetDbatoolsConfigValueCommand : DbaBaseCmdlet
 {
     /// <summary>The full name (module.name) of the configured value.</summary>
     [Alias("Name")]
-    [Parameter(Mandatory = true)]
+    [Parameter(Mandatory = true, Position = 0)]
     public string? FullName { get; set; }
 
     /// <summary>A fallback value returned when the setting holds no value.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public object? Fallback { get; set; }
 
     /// <summary>Throws instead of returning null when no value is available.</summary>
