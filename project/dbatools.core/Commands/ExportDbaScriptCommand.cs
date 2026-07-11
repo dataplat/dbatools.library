@@ -255,7 +255,14 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
             string serverNameForCatch = "";
             try
             {
-                serverNameForCatch = PsText(GetPsValue(server, "Name"));
+                // PS: $server.Name.Replace('\', '$') — a null Name (parentless ScriptCreate
+                // fallback) is a method-on-null failure into the catch, not an empty string.
+                object? serverNameValue = GetPsValue(server, "Name");
+                if (serverNameValue is null)
+                {
+                    throw new PSInvalidOperationException("You cannot call a method on a null-valued expression.");
+                }
+                serverNameForCatch = PsText(serverNameValue);
                 string serverName = serverNameForCatch.Replace('\\', '$');
 
                 object? serverBase = server is PSObject serverWrapped ? serverWrapped.BaseObject : server;
@@ -513,10 +520,14 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
         }
         else
         {
-            bool isDirectory;
+            // PS: (Get-Item $Path -ErrorAction Ignore) -isnot [System.IO.DirectoryInfo] —
+            // Get-Item expands wildcards; a single directory match passes, anything else
+            // (file, multi-match array, failed get) stops.
+            bool isDirectory = false;
             try
             {
-                isDirectory = Directory.Exists(resolved);
+                System.Collections.ObjectModel.Collection<PSObject> matches = SessionState.InvokeProvider.Item.Get(path);
+                isDirectory = matches.Count == 1 && matches[0].BaseObject is DirectoryInfo;
             }
             catch
             {
@@ -694,7 +705,13 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
     private string? GetConfigString(string key)
     {
         object? raw = ConnectionService.GetConfigurationValue(key);
-        return raw?.ToString();
+        if (raw is null)
+        {
+            return null;
+        }
+        // PS: the [string] parameter conversion is the language conversion (invariant
+        // numerics), not a current-culture ToString.
+        return (string)LanguagePrimitives.ConvertTo(raw, typeof(string), CultureInfo.InvariantCulture);
     }
 
     /// <summary>PS dot-access (null-safe, binder unwrap for non-bag PSObjects).</summary>
