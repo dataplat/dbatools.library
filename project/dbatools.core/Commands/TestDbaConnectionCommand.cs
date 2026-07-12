@@ -43,17 +43,18 @@ public sealed class TestDbaConnectionCommand : DbaBaseCmdlet
     [Parameter]
     public SwitchParameter SkipPSRemoting { get; set; }
 
+    // The function's loop-reset block names ONLY authType/tcpport/authscheme (#9066);
+    // $server and $username are FUNCTION-SCOPE locals that persist across the instance
+    // loop AND across pipeline process-block invocations, so a later instance whose
+    // connect fails emits the PREVIOUS row's SqlVersion and ConnectingAsUser (codex
+    // r1+r2 - faithful quirk carried as cmdlet fields, not fixed).
+    private object? username;
+    private Server? server;
+
     protected override void ProcessRecord()
     {
         if (SqlInstance is null)
             return;
-
-        // The function's loop-reset block names ONLY authType/tcpport/authscheme (#9066);
-        // $server and $username are function-locals that PERSIST across loop iterations, so
-        // a later instance whose connect fails emits the PREVIOUS row's SqlVersion and
-        // ConnectingAsUser (codex r1 - faithful quirk, not fixed).
-        object? username = null;
-        Server? server = null;
 
         foreach (DbaInstanceParameter instance in SqlInstance)
         {
