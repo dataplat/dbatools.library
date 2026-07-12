@@ -33,7 +33,7 @@ internal static class NestedCommand
     /// the duration of the nested invocation and restores it afterwards; no-op when
     /// effective and global already match (no caller-local dictionary — the common case).
     /// </summary>
-    private static IDisposable? ShieldDefaultParameterValues(PSCmdlet host)
+    internal static IDisposable? ShieldDefaultParameterValues(PSCmdlet host)
     {
         object? effective = host.SessionState.PSVariable.GetValue("PSDefaultParameterValues");
         if (effective is null)
