@@ -186,11 +186,17 @@ namespace Dataplat.Dbatools.Commands
         /// </summary>
         private string _ValidationErrorMessage;
 
-        private static string _scriptErrorValidationFullName = "$__dbatools_Module = Get-Module dbatools\n& $__dbatools_Module { Stop-Function -Message \"Invalid Name: {0} ! At least one '.' is required, to separate module from name\" -EnableException ${1} -Category InvalidArgument -FunctionName 'Set-DbatoolsConfig' }";
-        private static string _scriptErrorValidationName = "$__dbatools_Module = Get-Module dbatools\n& $__dbatools_Module { Stop-Function -Message \"Invalid Name: {0} ! Need to specify a legally namespaced name!\" -EnableException ${1} -Category InvalidArgument -FunctionName 'Set-DbatoolsConfig' }";
-        private static string _scriptErrorValidationValidation = "$__dbatools_Module = Get-Module dbatools\n& $__dbatools_Module { Stop-Function -Message \"Invalid validation name: {0}. Supported validations: {1}\" -EnableException ${2} -Category InvalidArgument -FunctionName 'Set-DbatoolsConfig' }";
-        private static string _updateError = "param ($Exception)\n$__dbatools_Module = Get-Module dbatools\n& $__dbatools_Module { Stop-Function -Message \"Could not update configuration: {0}\" -EnableException ${1} -Category InvalidArgument -Exception $Exception -FunctionName 'Set-DbatoolsConfig' }";
-        private static string _updatePolicyForbids = "$__dbatools_Module = Get-Module dbatools\n& $__dbatools_Module { Stop-Function -Message \"Could not update configuration: {0} - The current settings have been enforced by policy!\" -EnableException ${1} -Category PermissionDenied -FunctionName 'Set-DbatoolsConfig' }";
+        // These templates run through String.Format: the scriptblock braces MUST be escaped
+        // as {{ }} (an unescaped "{ Stop-Function" made EVERY error path here die with
+        // FormatException instead of the real message - latent until the W1-037 gate hit the
+        // update-error path under the test harness), and the module lookup takes the Script
+        // instance explicitly (under Invoke-ManualPester the shared engine dll registers as a
+        // SECOND module also named dbatools, and `& <two modules>` is a BadExpression).
+        private static string _scriptErrorValidationFullName = "$__dbatools_Module = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1\n& $__dbatools_Module {{ Stop-Function -Message \"Invalid Name: {0} ! At least one '.' is required, to separate module from name\" -EnableException ${1} -Category InvalidArgument -FunctionName 'Set-DbatoolsConfig' }}";
+        private static string _scriptErrorValidationName = "$__dbatools_Module = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1\n& $__dbatools_Module {{ Stop-Function -Message \"Invalid Name: {0} ! Need to specify a legally namespaced name!\" -EnableException ${1} -Category InvalidArgument -FunctionName 'Set-DbatoolsConfig' }}";
+        private static string _scriptErrorValidationValidation = "$__dbatools_Module = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1\n& $__dbatools_Module {{ Stop-Function -Message \"Invalid validation name: {0}. Supported validations: {1}\" -EnableException ${2} -Category InvalidArgument -FunctionName 'Set-DbatoolsConfig' }}";
+        private static string _updateError = "param ($Exception)\n$__dbatools_Module = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1\n& $__dbatools_Module {{ Stop-Function -Message \"Could not update configuration: {0}\" -EnableException ${1} -Category InvalidArgument -Exception $Exception -FunctionName 'Set-DbatoolsConfig' }}";
+        private static string _updatePolicyForbids = "$__dbatools_Module = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1\n& $__dbatools_Module {{ Stop-Function -Message \"Could not update configuration: {0} - The current settings have been enforced by policy!\" -EnableException ${1} -Category PermissionDenied -FunctionName 'Set-DbatoolsConfig' }}";
 
         /// <summary>
         /// Implements the begin action of Set-PSFConfig
