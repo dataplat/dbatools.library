@@ -172,7 +172,9 @@ public sealed class TestDbaPathCommand : DbaBaseCmdlet
 
     /// <summary>PS: $value -eq $true - the RHS converts to the LHS runtime type (a Byte
     /// column compares as 1; a STRING column compares case-insensitively against "True" -
-    /// codex r1); inconvertible values (DBNull) compare false.</summary>
+    /// codex r1); an ENUMERABLE left operand filters its elements and is truthy on any
+    /// match (the array-LHS operator class; a varbinary column arrives as byte[] - codex
+    /// r3); inconvertible values (DBNull) compare false.</summary>
     private static bool EqTrue(object? value)
     {
         if (value is null)
@@ -181,6 +183,16 @@ public sealed class TestDbaPathCommand : DbaBaseCmdlet
             return boolean;
         if (value is string text)
             return PsString.Eq(text, "True");
+        System.Collections.IEnumerable? enumerable = LanguagePrimitives.GetEnumerable(value);
+        if (enumerable is not null)
+        {
+            foreach (object? element in enumerable)
+            {
+                if (EqTrue(element))
+                    return true;
+            }
+            return false;
+        }
         try
         {
             object converted = LanguagePrimitives.ConvertTo(true, value.GetType(), CultureInfo.InvariantCulture);
