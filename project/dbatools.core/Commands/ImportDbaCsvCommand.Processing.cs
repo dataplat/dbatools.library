@@ -239,7 +239,9 @@ public sealed partial class ImportDbaCsvCommand
             return InstanceOutcome.Next;
         }
 
-        _transaction = null;
+        // PS never resets $transaction between iterations: when a later iteration's
+        // "Starting transaction" prompt is DECLINED, the stale committed transaction rides
+        // into the SqlCommands and faults them (codex r1 F1) - so no reset here either.
         if (!NoTransaction.IsPresent)
         {
             if (ShouldProcess(instance.ToString(), "Starting transaction in " + Database))
@@ -477,7 +479,9 @@ public sealed partial class ImportDbaCsvCommand
                             List<string?> firstlineItems = GetContentLines(file, 1);
                             string firstline = (firstlineItems.Count > 0 ? firstlineItems[0] : null) ?? "";
                             bool isFirst = true;
-                            foreach (string cell in firstline.Split(new[] { Delimiter }, StringSplitOptions.None))
+                            // PS: -split "$Delimiter", 0, "SimpleMatch" - literal but
+                            // CASE-INSENSITIVE like every -split (codex r1 F3).
+                            foreach (string cell in Regex.Split(firstline, Regex.Escape(Delimiter), RegexOptions.IgnoreCase))
                             {
                                 string trimmed = cell.Trim('"');
                                 // Remove UTF-8 BOM from first column if present (U+FEFF)

@@ -192,14 +192,15 @@ public sealed partial class ImportDbaCsvCommand
     }
 
     /// <summary>Replicates the PS method binder's ColumnMappings.Add overload selection:
-    /// int-typed keys/values pick the ordinal overloads, everything else converts to string.</summary>
+    /// integral keys/values that implicitly widen to int (byte/sbyte/short/ushort/int -
+    /// codex r1 F2) pick the ordinal overloads, everything else converts to string.</summary>
     private static void AddColumnMapping(SqlBulkCopy bulkcopy, object? key, object? value)
     {
         object? unwrappedKey = key is PSObject wrappedKey ? wrappedKey.BaseObject : key;
         object? unwrappedValue = value is PSObject wrappedValue ? wrappedValue.BaseObject : value;
-        if (unwrappedKey is int keyOrdinal)
+        if (TryWidenToInt(unwrappedKey, out int keyOrdinal))
         {
-            if (unwrappedValue is int valueOrdinal)
+            if (TryWidenToInt(unwrappedValue, out int valueOrdinal))
                 bulkcopy.ColumnMappings.Add(keyOrdinal, valueOrdinal);
             else
                 bulkcopy.ColumnMappings.Add(keyOrdinal, (string)LanguagePrimitives.ConvertTo(unwrappedValue, typeof(string), CultureInfo.InvariantCulture));
@@ -207,10 +208,36 @@ public sealed partial class ImportDbaCsvCommand
         else
         {
             string keyName = (string)LanguagePrimitives.ConvertTo(unwrappedKey, typeof(string), CultureInfo.InvariantCulture);
-            if (unwrappedValue is int valueOrdinal)
+            if (TryWidenToInt(unwrappedValue, out int valueOrdinal))
                 bulkcopy.ColumnMappings.Add(keyName, valueOrdinal);
             else
                 bulkcopy.ColumnMappings.Add(keyName, (string)LanguagePrimitives.ConvertTo(unwrappedValue, typeof(string), CultureInfo.InvariantCulture));
+        }
+    }
+
+    /// <summary>The implicit-widening set the PS binder routes to the Add(int, ...) overloads.</summary>
+    private static bool TryWidenToInt(object? value, out int ordinal)
+    {
+        switch (value)
+        {
+            case int i:
+                ordinal = i;
+                return true;
+            case byte b:
+                ordinal = b;
+                return true;
+            case sbyte sb:
+                ordinal = sb;
+                return true;
+            case short s:
+                ordinal = s;
+                return true;
+            case ushort us:
+                ordinal = us;
+                return true;
+            default:
+                ordinal = 0;
+                return false;
         }
     }
 
@@ -374,12 +401,25 @@ public sealed partial class ImportDbaCsvCommand
         }
         finally
         {
-            // PS: the finally calls $reader.Close() unconditionally - when the constructor
-            // threw, the null-valued call replaces the original exception, exactly as here.
-            if (reader is null)
+            // PS: the finally calls $reader.Close() unconditionally. When the constructor
+            // threw, dynamic scoping resolves $reader from the FUNCTION scope: a previous
+            // iteration's disposed import reader (harmless double-close, the constructor
+            // exception propagates), or - first iteration - $null, where the null-valued
+            // call replaces the original exception (codex r1 F4).
+            if (reader is not null)
+            {
+                reader.Close();
+                reader.Dispose();
+            }
+            else if (_reader is not null)
+            {
+                _reader.Close();
+                _reader.Dispose();
+            }
+            else
+            {
                 throw new RuntimeException("You cannot call a method on a null-valued expression.");
-            reader.Close();
-            reader.Dispose();
+            }
         }
 
         List<string> sqldatatypes = new();
