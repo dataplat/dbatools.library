@@ -121,10 +121,26 @@ public sealed class TestDbaPathCommand : DbaBaseCmdlet
 
                 if (scalarMode)
                 {
-                    // PS: $batchresult.Tables.rows[0]/[1] - the single row flattens to the
-                    // DataRow ITSELF, so the indexes read its COLUMNS (lab-proven).
-                    DataRow row = rows[0];
-                    WriteObject(EqTrue(row[0]) || EqTrue(row[1]));
+                    if (rows.Count == 0)
+                    {
+                        // PS: member enumeration over no rows is $null and $null[0] raises
+                        // the engine's statement-terminating null-array error; the -or
+                        // short-circuits the expression to ONE record and the function
+                        // continues past the if with no output (codex r2 edge).
+                        WriteError(new ErrorRecord(new PSInvalidOperationException("Cannot index into a null array."), "NullArray", ErrorCategory.InvalidOperation, null));
+                        continue;
+                    }
+                    if (rows.Count == 1)
+                    {
+                        // PS: $batchresult.Tables.rows[0]/[1] - a SINGLE row flattens to the
+                        // DataRow ITSELF, so the indexes read its COLUMNS (lab-proven).
+                        DataRow row = rows[0];
+                        WriteObject(EqTrue(row[0]) || EqTrue(row[1]));
+                        return;
+                    }
+                    // Several rows (an injected path): rows[0]/rows[1] stay DataRow OBJECTS,
+                    // which never compare -eq $true (codex r2).
+                    WriteObject(false);
                     return;
                 }
 
