@@ -88,7 +88,10 @@ public sealed partial class InvokeDbaQueryCommand
                 }
                 catch (Exception ex)
                 {
-                    err = ex;
+                    // PS: [void]$da.fill($ds) is a METHOD invocation - the caught $_ carries
+                    // a MethodInvocationException wrapping the provider exception, so
+                    // Resolve-SqlError's SqlException branch never matches (codex r2 F2).
+                    err = WrapAsMethodInvocation(ex, "Fill", 1);
                 }
                 finally
                 {
@@ -128,7 +131,11 @@ public sealed partial class InvokeDbaQueryCommand
         {
             foreach (PSObject sqlparam in SqlParameter)
             {
-                cmd.Parameters.Add((Microsoft.Data.SqlClient.SqlParameter)sqlparam.BaseObject);
+                // PS: $cmd.Parameters.Add($sqlparam) - validation deliberately checks only
+                // the FIRST element, so a later non-parameter element must reach the
+                // collection's own type check (its InvalidCastException text), not a C#
+                // cast (codex r2 F3). The object overload matches the PS binder's pick.
+                cmd.Parameters.Add((object)sqlparam.BaseObject);
             }
         }
         else
@@ -184,7 +191,9 @@ public sealed partial class InvokeDbaQueryCommand
             }
             catch (Exception ex)
             {
-                fillError = ex;
+                // Same MethodInvocationException wrap as the non-streaming path: the PS
+                // runspace worker's catch also observed the method-invocation record.
+                fillError = WrapAsMethodInvocation(ex, "Fill", 1);
             }
             finally
             {
@@ -206,9 +215,22 @@ public sealed partial class InvokeDbaQueryCommand
         ResolveSqlError(fillError);
     }
 
+    /// <summary>
+    /// Rebuilds the MethodInvocationException the PS method binder raised for a failed
+    /// .NET call: 'Exception calling "Name" with "N" argument(s): "inner"' (the reflected
+    /// member name, casing-independent of the call site - lab probe-miecase, both editions).
+    /// </summary>
+    private static MethodInvocationException WrapAsMethodInvocation(Exception inner, string methodName, int argumentCount)
+    {
+        string text = "Exception calling \"" + methodName + "\" with \"" + argumentCount + "\" argument(s): \"" + inner.Message + "\"";
+        return new MethodInvocationException(text, inner);
+    }
+
     /// <summary>The absorbed Resolve-SqlError helper: swallows under
     /// SilentlyContinue/Ignore, rethrows otherwise (the caller catch turns it into the
-    /// "[target] Failed during execution" Stop-Function).</summary>
+    /// "[target] Failed during execution" Stop-Function). The SqlException branch is dead
+    /// in the PS source (the caught record's exception is always the method-invocation
+    /// wrapper) and stays dead here now that Fill failures arrive wrapped.</summary>
     private void ResolveSqlError(Exception? err)
     {
         if (err is null)
@@ -226,11 +248,19 @@ public sealed partial class InvokeDbaQueryCommand
         // PS: the nested Resolve-SqlError's own $PSBoundParameters never contains Verbose,
         // so its "SQL Error:"/"Other Error:" verbose lines are DEAD CODE (codex r1 F2).
         string preference = GetEffectiveErrorActionPreference();
-        if (string.Equals(preference, "SilentlyContinue", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(preference, "Ignore", StringComparison.OrdinalIgnoreCase))
-        {
+        bool swallow = string.Equals(preference, "SilentlyContinue", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(preference, "Ignore", StringComparison.OrdinalIgnoreCase);
+        // The PS method-invocation RAISE landed one record in the caller's -ErrorVariable/
+        // $error even when Resolve-SqlError swallows it (lab: evCount=1 under
+        // SilentlyContinue). One WriteError reproduces that semantic core; the additional
+        // frame-rethrow copies PS accumulates under Continue (lab: 12) are engine
+        // bookkeeping - accepted-class, see the r2 disposition. Stop/Default skip the
+        // write: WriteError would itself convert to the terminating preference exception
+        // and replace the record chain the outer catch must observe.
+        if (swallow || string.Equals(preference, "Continue", StringComparison.OrdinalIgnoreCase))
+            WriteError(RecordFrom(err));
+        if (swallow)
             return;
-        }
         throw err;
     }
 
@@ -300,12 +330,14 @@ public sealed partial class InvokeDbaQueryCommand
                 foreach (DataRow row in table.Rows)
                     rows.Add(DataRowToPSObject(row));
                 // PS: , $rows - the comma-wrap emits the collected value as ONE object
-                // ($null for no rows, the single object for one, object[] for many - the
-                // element type is object[], not PSObject[], and GetType is observable).
+                // (the single object for one row, object[] for many - the element type is
+                // object[], not PSObject[], and GetType is observable). An EMPTY table
+                // leaves $rows as AutomationNull, and , $rows unwraps to it in the
+                // pipeline: NOTHING reaches the caller (codex r2 F1).
                 object? shaped;
                 if (rows.Count == 0)
                 {
-                    shaped = null;
+                    continue;
                 }
                 else if (rows.Count == 1)
                 {
@@ -344,11 +376,19 @@ public sealed partial class InvokeDbaQueryCommand
         return PSObject.AsPSObject(value).ToString();
     }
 
-    /// <summary>The catch-block $_ equivalent for a .NET-thrown exception.</summary>
+    /// <summary>The catch-block $_ equivalent for a .NET-thrown exception. A REAL nested
+    /// record rides through; a hand-constructed RuntimeException's lazily-created record
+    /// wraps itself in ParentContainsErrorRecordException and DROPS the inner-exception
+    /// chain (observed: the r2 F2 MethodInvocationException wrapper leaked into the
+    /// warning because the deepest-message walk lost the SqlException), so those build a
+    /// fresh record from the exception itself.</summary>
     private static ErrorRecord RecordFrom(Exception ex)
     {
-        if (ex is RuntimeException runtime && runtime.ErrorRecord is not null)
+        if (ex is RuntimeException runtime && runtime.ErrorRecord is not null &&
+            runtime.ErrorRecord.Exception is not ParentContainsErrorRecordException)
+        {
             return runtime.ErrorRecord;
+        }
         return new ErrorRecord(ex, "Invoke-DbaQuery", ErrorCategory.NotSpecified, null);
     }
 
