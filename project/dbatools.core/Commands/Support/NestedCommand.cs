@@ -103,6 +103,32 @@ internal static class NestedCommand
     }
 
     /// <summary>
+    /// Runs a script — typically a module-scoped `&amp; (Get-Module dbatools) { ... }` hop
+    /// that reaches PRIVATE functions — with the empty-table PSDPV shield, re-emitting
+    /// 3&gt;&amp;1-merged WarningRecords through the host cmdlet's warning stream (caller
+    /// -WarningVariable parity, matching how a function-internal call's warnings bubbled)
+    /// and returning the remaining output. Engine flow control (a Stop-Function-style
+    /// helper's continue/break — PS try/catch cannot intercept those and neither does
+    /// this) and terminating errors propagate to the caller.
+    /// </summary>
+    internal static Collection<PSObject> InvokeScoped(PSCmdlet host, string scriptText, params object?[] scriptArgs)
+    {
+        using (ShieldDefaultParameterValues(host))
+        {
+            Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, ScriptBlock.Create(scriptText), null, scriptArgs);
+            Collection<PSObject> output = new Collection<PSObject>();
+            foreach (PSObject item in raw)
+            {
+                if (item?.BaseObject is WarningRecord warning)
+                    host.WriteWarning(warning.Message);
+                else
+                    output.Add(item!);
+            }
+            return output;
+        }
+    }
+
+    /// <summary>
     /// Streaming invocation over a steppable pipeline — for PS call sites that piped input to
     /// the command at top level, where output must reach the user's pipeline as it is
     /// produced (restore progress objects), not after the command completes.
