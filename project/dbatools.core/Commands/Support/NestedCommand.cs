@@ -110,12 +110,24 @@ internal static class NestedCommand
     /// and returning the remaining output. Engine flow control (a Stop-Function-style
     /// helper's continue/break — PS try/catch cannot intercept those and neither does
     /// this) and terminating errors propagate to the caller.
+    /// The script is wrapped in an `&amp; {{ ... }} @args` block: InvokeScript's
+    /// useLocalScope:false DOT-SOURCES the text, so a bare script's param() would BIND IN
+    /// THE CALLER'S SCOPE and die "Cannot overwrite variable X because the variable has
+    /// been optimized" whenever the calling function/scriptblock has an optimized local of
+    /// the same name (lab-proven: Set-DbatoolsPath's $Name/$Scope vs the Register hop's
+    /// params). The wrapper block creates a real scope for the param binding while dynamic
+    /// READS (preference variables) still resolve through the caller.
     /// </summary>
     internal static Collection<PSObject> InvokeScoped(PSCmdlet host, string scriptText, params object?[] scriptArgs)
     {
         using (ShieldDefaultParameterValues(host))
         {
-            Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, ScriptBlock.Create(scriptText), null, scriptArgs);
+            // The carrier param is the ONLY name bound in the caller's scope; the args
+            // array travels as a single element so null elements survive the InvokeScript
+            // object[]-unpacking (W5-016), then splats positionally into the real scope.
+            ScriptBlock script = ScriptBlock.Create(
+                "param($__nestedCommandArguments)\n& {\n" + scriptText + "\n} @__nestedCommandArguments");
+            Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, script, null, new object?[] { scriptArgs });
             Collection<PSObject> output = new Collection<PSObject>();
             foreach (PSObject item in raw)
             {
