@@ -466,17 +466,21 @@ public sealed partial class InvokeDbaQueryCommand
     /// </summary>
     private Collection<PSObject> InvokeNestedPreservingWarnings(string commandName, Hashtable parameters, object? pipelineInput, out ErrorRecord? failure)
     {
+        // PS: a bound -WarningAction on the outer command sets the preference the nested
+        // call inherits (display suppression; -WarningVariable still captures).
         ScriptBlock script;
         if (pipelineInput is null)
         {
             script = ScriptBlock.Create(
-                "param($__params) try { $__r = & " + commandName + " @__params -WarningVariable __nestedWarnings; @{ ok = $true; result = $__r; warnings = $__nestedWarnings } } catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }");
+                "param($__params, $__wp) if ($null -ne $__wp) { $WarningPreference = $__wp } try { $__r = & " + commandName + " @__params -WarningVariable __nestedWarnings; @{ ok = $true; result = $__r; warnings = $__nestedWarnings } } catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }");
         }
         else
         {
             script = ScriptBlock.Create(
-                "param($__params, $__input) try { $__r = $__input | & " + commandName + " @__params -WarningVariable __nestedWarnings; @{ ok = $true; result = $__r; warnings = $__nestedWarnings } } catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }");
+                "param($__params, $__wp, $__input) if ($null -ne $__wp) { $WarningPreference = $__wp } try { $__r = $__input | & " + commandName + " @__params -WarningVariable __nestedWarnings; @{ ok = $true; result = $__r; warnings = $__nestedWarnings } } catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }");
         }
+        object? boundWarningAction;
+        MyInvocation.BoundParameters.TryGetValue("WarningAction", out boundWarningAction);
 
         Collection<PSObject> raw;
         object? effectiveDefaults = SessionState.PSVariable.GetValue("PSDefaultParameterValues");
@@ -487,8 +491,8 @@ public sealed partial class InvokeDbaQueryCommand
         try
         {
             raw = pipelineInput is null
-                ? InvokeCommand.InvokeScript(true, script, null, parameters)
-                : InvokeCommand.InvokeScript(true, script, null, parameters, pipelineInput);
+                ? InvokeCommand.InvokeScript(true, script, null, parameters, boundWarningAction)
+                : InvokeCommand.InvokeScript(true, script, null, parameters, boundWarningAction, pipelineInput);
         }
         finally
         {

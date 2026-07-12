@@ -81,8 +81,12 @@ public sealed partial class ImportDbaCsvCommand
         connectParams["SqlCredential"] = SqlCredential;
         connectParams["Database"] = Database;
         connectParams["MinimumVersion"] = 9;
+        // PS: a bound -WarningAction on the outer command sets the preference the nested
+        // call inherits (display suppression; -WarningVariable still captures).
         ScriptBlock script = ScriptBlock.Create(
-            "param($__connectParams) try { $__server = Connect-DbaInstance @__connectParams -WarningVariable __nestedWarnings; @{ ok = $true; server = $__server; warnings = $__nestedWarnings } } catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }");
+            "param($__connectParams, $__wp) if ($null -ne $__wp) { $WarningPreference = $__wp } try { $__server = Connect-DbaInstance @__connectParams -WarningVariable __nestedWarnings; @{ ok = $true; server = $__server; warnings = $__nestedWarnings } } catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }");
+        object? boundWarningAction;
+        MyInvocation.BoundParameters.TryGetValue("WarningAction", out boundWarningAction);
 
         Collection<PSObject> results;
         object? effectiveDefaults = SessionState.PSVariable.GetValue("PSDefaultParameterValues");
@@ -92,7 +96,7 @@ public sealed partial class ImportDbaCsvCommand
             SessionState.PSVariable.Set("PSDefaultParameterValues", globalDefaults);
         try
         {
-            results = InvokeCommand.InvokeScript(true, script, null, connectParams);
+            results = InvokeCommand.InvokeScript(true, script, null, connectParams, boundWarningAction);
         }
         finally
         {

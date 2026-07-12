@@ -117,7 +117,7 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
                     {
                         foreach (string exclusion in ExcludeFilter)
                         {
-                            if (PsLike(fullNameText, exclusion))
+                            if (PsLikeTruthy(fullNameValue, exclusion))
                             {
                                 excluded = true;
                                 break;
@@ -134,7 +134,7 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
                         bool isIncluded = false;
                         foreach (string inclusion in IncludeFilter!)
                         {
-                            if (PsLike(fullNameText, inclusion))
+                            if (PsLikeTruthy(fullNameValue, inclusion))
                             {
                                 isIncluded = true;
                                 break;
@@ -219,6 +219,21 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
         return WildcardPattern.Get(pattern, WildcardOptions.IgnoreCase).IsMatch(value ?? "");
     }
 
+    /// <summary>PS -like truthiness over a possibly-array left operand: an enumerable LHS
+    /// filters per element and is truthy when ANY element matches (codex r1 F4).</summary>
+    private static bool PsLikeTruthy(object? value, string pattern)
+    {
+        IEnumerable? enumerable = LanguagePrimitives.GetEnumerable(value);
+        if (enumerable is null)
+            return PsLike(value is null ? "" : PsText(value), pattern);
+        foreach (object? element in enumerable)
+        {
+            if (PsLike(PsText(element), pattern))
+                return true;
+        }
+        return false;
+    }
+
     /// <summary>PS string interpolation of an arbitrary token.</summary>
     private static string PsText(object? value)
     {
@@ -249,8 +264,12 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
     /// </summary>
     private Collection<PSObject> InvokeNestedPreservingWarnings(string commandName, Hashtable parameters, out ErrorRecord? failure)
     {
+        // PS: a bound -WarningAction on the outer command sets the preference the nested
+        // call inherits (display suppression; -WarningVariable still captures) - codex r1 F1.
         ScriptBlock script = ScriptBlock.Create(
-            "param($__params) try { $__r = & " + commandName + " @__params -WarningVariable __nestedWarnings; @{ ok = $true; result = $__r; warnings = $__nestedWarnings } } catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }");
+            "param($__params, $__wp) if ($null -ne $__wp) { $WarningPreference = $__wp } try { $__r = & " + commandName + " @__params -WarningVariable __nestedWarnings; @{ ok = $true; result = $__r; warnings = $__nestedWarnings } } catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }");
+        object? boundWarningAction;
+        MyInvocation.BoundParameters.TryGetValue("WarningAction", out boundWarningAction);
 
         Collection<PSObject> raw;
         object? effectiveDefaults = SessionState.PSVariable.GetValue("PSDefaultParameterValues");
@@ -260,7 +279,7 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
             SessionState.PSVariable.Set("PSDefaultParameterValues", globalDefaults);
         try
         {
-            raw = InvokeCommand.InvokeScript(true, script, null, parameters);
+            raw = InvokeCommand.InvokeScript(true, script, null, parameters, boundWarningAction);
         }
         finally
         {
