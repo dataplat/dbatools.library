@@ -133,7 +133,10 @@ public sealed partial class InvokeDbaQueryCommand
         }
         else
         {
-            IDictionary dictionary = (IDictionary)firstBase!;
+            // PS: ($SqlParameter | Select-Object -First 1).GetEnumerator() on an EMPTY
+            // array is a method call on $null (codex r1 F3).
+            if (firstBase is not IDictionary dictionary)
+                throw new RuntimeException("You cannot call a method on a null-valued expression.");
             foreach (DictionaryEntry entry in dictionary)
             {
                 object? entryValue = entry.Value is PSObject wrappedValue ? wrappedValue.BaseObject : entry.Value;
@@ -214,16 +217,14 @@ public sealed partial class InvokeDbaQueryCommand
         {
             // For SQL exception
             WriteMessage(MessageLevel.Debug, "Capture SQL Error");
-            if (_verboseRequested)
-                WriteMessage(MessageLevel.Verbose, "SQL Error:  " + err.Message);
         }
         else
         {
             // For other exception
             WriteMessage(MessageLevel.Debug, "Capture Other Error");
-            if (_verboseRequested)
-                WriteMessage(MessageLevel.Verbose, "Other Error:  " + err.Message);
         }
+        // PS: the nested Resolve-SqlError's own $PSBoundParameters never contains Verbose,
+        // so its "SQL Error:"/"Other Error:" verbose lines are DEAD CODE (codex r1 F2).
         string preference = GetEffectiveErrorActionPreference();
         if (string.Equals(preference, "SilentlyContinue", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(preference, "Ignore", StringComparison.OrdinalIgnoreCase))

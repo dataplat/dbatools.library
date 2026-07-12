@@ -93,7 +93,7 @@ public sealed partial class InvokeDbaQueryCommand
             // Verbose output in Invoke-DbaQuery is special, because it's the only way to assure on all versions of Powershell to have separate outputs (results and messages) coming from the TSQL Query.
             // We suppress the verbosity of all other functions in order to be sure the output is consistent with what you get, e.g., executing the same in SSMS
             WriteMessage(MessageLevel.Debug, "SqlInstance passed in, will work on: " + PsText(instance));
-            Server server;
+            object? server;
             bool startedWithAnOpenConnection;
             try
             {
@@ -114,7 +114,7 @@ public sealed partial class InvokeDbaQueryCommand
                 if (startedWithAnOpenConnection)
                 {
                     WriteMessage(MessageLevel.Debug, "Current connection will be reused");
-                    server = (Server)inputObject!;
+                    server = inputObject;
                 }
                 else
                 {
@@ -138,10 +138,12 @@ public sealed partial class InvokeDbaQueryCommand
                         StopFunction("Failure", target: instance, errorRecord: connectFailure, continueLoop: true);
                         continue;
                     }
+                    // PS: $server takes whatever the nested call emitted - null when it
+                    // emitted nothing; property access below stays null-tolerant (codex r1 F1).
                     object? serverValue = connected.Count > 0 ? connected[0] : null;
                     if (serverValue is PSObject wrappedServer)
                         serverValue = wrappedServer.BaseObject;
-                    server = (Server)serverValue!;
+                    server = serverValue;
                 }
             }
             catch (PipelineStoppedException)
@@ -153,10 +155,18 @@ public sealed partial class InvokeDbaQueryCommand
                 StopFunction("Failure", target: instance, errorRecord: RecordFrom(ex), continueLoop: true);
                 continue;
             }
-            ServerConnection conncontext = server.ConnectionContext;
+            // PS: $conncontext = $server.ConnectionContext - a null/foreign $server reads
+            // null, and the null lands on Invoke-DbaAsync's ValidateNotNullOrEmpty binder
+            // inside the try (the "[instance] Failed during execution" path), not before it.
+            object? conncontextValue = server is null ? null : PsProperty.Get(server, "ConnectionContext");
+            if (conncontextValue is PSObject wrappedContext)
+                conncontextValue = wrappedContext.BaseObject;
+            ServerConnection? conncontext = conncontextValue as ServerConnection;
             bool continueInstance = false;
             try
             {
+                if (conncontext is null)
+                    throw new RuntimeException("Cannot validate argument on parameter 'SqlConnection'. The argument is null or empty. Provide an argument that is not null or empty, and then try the command again.");
                 if (LanguagePrimitives.IsTrue(File) || LanguagePrimitives.IsTrue(SqlObject))
                 {
                     foreach (string? item in _files)
