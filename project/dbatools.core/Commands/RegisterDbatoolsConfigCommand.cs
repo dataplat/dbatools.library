@@ -42,7 +42,9 @@ public sealed class RegisterDbatoolsConfigCommand : DbaBaseCmdlet
     [Parameter]
     public ConfigScope Scope { get; set; } = ConfigScope.UserDefault;
 
-    private readonly List<Config> _configurationItems = new();
+    // Nullable element: PS accumulates a $null Config after a real one (the dedup only
+    // drops the FIRST null), so the collected set can legitimately carry a null slot.
+    private readonly List<Config?> _configurationItems = new();
 
     protected override void BeginProcessing()
     {
@@ -84,7 +86,9 @@ public sealed class RegisterDbatoolsConfigCommand : DbaBaseCmdlet
                 {
                     foreach (Config item in Config)
                     {
-                        if (!ContainsFullName(item.FullName))
+                        // PS null-propagates $item.FullName when $item is $null (no throw) -
+                        // ?. reproduces it so a null Config element does not NRE here.
+                        if (!ContainsFullName(item?.FullName))
                             _configurationItems.Add(item);
                     }
                 }
@@ -126,11 +130,25 @@ public sealed class RegisterDbatoolsConfigCommand : DbaBaseCmdlet
         //endregion Finish File Based Persistence
     }
 
-    /// <summary>PS: $configurationItems.FullName -notcontains ... (case-insensitive).</summary>
+    /// <summary>
+    /// PS: $configurationItems.FullName -contains &lt;fullName&gt; (case-insensitive). Two PS
+    /// member-enumeration quirks are reproduced verbatim so a null Config element behaves
+    /// exactly like the retired function (empirically verified against it, all cases):
+    ///   * The EMPTY collection projects to a scalar $null, and ($null -contains $null) is
+    ///     TRUE while ($null -contains "x") is FALSE - so the FIRST item is dropped only when
+    ///     it is a null (lone @($null) completes with Count=0, no throw).
+    ///   * .FullName over a NON-empty collection SKIPS null elements entirely (it does not
+    ///     project them as $null) - so a null item never matches an already-collected null,
+    ///     and every null after the first real item is appended (@($c,$null,$null) => Count 3).
+    /// </summary>
     private bool ContainsFullName(string? fullName)
     {
-        foreach (Config existing in _configurationItems)
+        if (_configurationItems.Count == 0)
+            return fullName is null;
+        foreach (Config? existing in _configurationItems)
         {
+            if (existing is null)
+                continue; // PS member enumeration skips null elements
             if (PsString.Eq(existing.FullName, fullName))
                 return true;
         }
