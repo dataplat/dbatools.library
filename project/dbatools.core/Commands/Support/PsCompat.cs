@@ -193,6 +193,21 @@ internal static class PsOps
     }
 }
 
+/// <summary>Reproduces the PS [string[]] bind-time cast for compiled parameters: script
+/// functions convert the argument BEFORE mandatory validation, so a null ELEMENT becomes
+/// "" and the mandatory rejection reports "empty string" exactly like the function (the
+/// compiled binder would otherwise validate the raw null and report "null" - lab-proven
+/// divergence, W1-035). A null or already-converted argument passes through unchanged.</summary>
+internal sealed class PsStringArrayCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        if (inputData is null)
+            return null;
+        return LanguagePrimitives.ConvertTo(inputData, typeof(string[]), CultureInfo.InvariantCulture);
+    }
+}
+
 /// <summary>The PS property-assignment binder's argument conversion.</summary>
 internal static class PsAssignment
 {
