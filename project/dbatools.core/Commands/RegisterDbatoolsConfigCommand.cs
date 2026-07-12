@@ -69,11 +69,20 @@ public sealed class RegisterDbatoolsConfigCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
+        // PS casts the typed parameters at BIND time (once): [string[]]$FullName turns a
+        // $null element into "", and [string]$Name turns an explicit -Name $null into ""
+        // (an omitted -Name keeps the "*" default). The compiled binder keeps null, so
+        // reproduce the cast here and feed the coerced values to BOTH the registry hop and
+        // the native file branch - a raw null NREs on .ToLowerInvariant(), and a raw null
+        // $Name would select "*" instead of "".
+        string[]? fullName = FullName is null ? null : System.Array.ConvertAll(FullName, s => s ?? "");
+        string name = Name ?? "";
+
         //region Registry Based
         if ((((int)Scope) & 15) != 0)
         {
             NestedCommand.InvokeScoped(this, RegistryWriteScript,
-                ParameterSetName, Config, FullName, Module, Name, Scope, EnableException.ToBool());
+                ParameterSetName, Config, fullName, Module, name, Scope, EnableException.ToBool());
         }
         //endregion Registry Based
 
@@ -93,10 +102,11 @@ public sealed class RegisterDbatoolsConfigCommand : DbaBaseCmdlet
                     }
                 }
 
-                if (FullName is not null)
+                if (fullName is not null)
                 {
-                    foreach (string item in FullName)
+                    foreach (string item in fullName)
                     {
+                        // fullName elements are already cast ("" for a $null element, above).
                         if (!ContainsFullName(item) && ConfigurationHost.Configurations.ContainsKey(item.ToLowerInvariant()))
                             _configurationItems.Add(ConfigurationHost.Configurations[item.ToLowerInvariant()]);
                     }
@@ -105,14 +115,29 @@ public sealed class RegisterDbatoolsConfigCommand : DbaBaseCmdlet
             else if (ParameterSetName == "Name")
             {
                 // PS: ...Configurations.Values | Where-Object Module -EQ $Module | Where-Object Name -Like $Name
-                WildcardPattern namePattern = new(Name ?? "*", WildcardOptions.IgnoreCase);
+                WildcardPattern namePattern = new(name, WildcardOptions.IgnoreCase);
                 foreach (Config item in ConfigurationHost.Configurations.Values)
                 {
-                    if (PsString.Eq(item.Module, Module) && namePattern.IsMatch(item.Name))
+                    if (!PsString.Eq(item.Module, Module))
+                        continue;
+
+                    bool nameMatches;
+                    try
                     {
-                        if (!ContainsFullName(item.FullName))
-                            _configurationItems.Add(item);
+                        nameMatches = namePattern.IsMatch(item.Name);
                     }
+                    catch (WildcardPatternException ex)
+                    {
+                        // PS Where-Object Name -Like <bad pattern> writes a NON-terminating
+                        // OperatorFailed error and continues; the native filter would otherwise
+                        // throw a TERMINATING WildcardPatternException. (The FQID differs from
+                        // Where-Object's - native ports cannot reproduce its command identity.)
+                        WriteError(new ErrorRecord(ex, "OperatorFailed", ErrorCategory.InvalidArgument, item.Name));
+                        continue;
+                    }
+
+                    if (nameMatches && !ContainsFullName(item.FullName))
+                        _configurationItems.Add(item);
                 }
             }
         }
