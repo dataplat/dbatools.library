@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
@@ -67,12 +68,27 @@ public sealed class InvokeDbatoolsRenameHelperCommand : DbaBaseCmdlet
                 if (ShouldProcess(file, "Replacing " + key + " with " + value))
                 {
                     // PS: ((Get-Content -Path $file -Raw) -Replace "\b$key\b", $value).Trim()
+                    // A wildcard-bearing FullName matching several files makes -Raw emit
+                    // one string PER file; -Replace applies element-wise and .Trim() rides
+                    // member enumeration (also element-wise), then Set-Content writes the
+                    // WHOLE resulting value to every matched path (codex r1 F1).
                     Hashtable contentParams = new();
                     contentParams["Path"] = file;
                     contentParams["Raw"] = new SwitchParameter(true);
                     Collection<PSObject> raw = NestedCommand.Invoke(this, "Get-Content", contentParams);
-                    string current = raw.Count > 0 ? raw[0].BaseObject as string ?? "" : "";
-                    string content = Regex.Replace(current, "\\b" + key + "\\b", value, RegexOptions.IgnoreCase).Trim();
+                    List<string> transformed = new();
+                    foreach (PSObject rawItem in raw)
+                    {
+                        string current = rawItem?.BaseObject as string ?? "";
+                        transformed.Add(Regex.Replace(current, "\\b" + key + "\\b", value, RegexOptions.IgnoreCase).Trim());
+                    }
+                    object content;
+                    if (transformed.Count == 0)
+                        content = "";
+                    else if (transformed.Count == 1)
+                        content = transformed[0];
+                    else
+                        content = transformed.ToArray();
                     Hashtable setParams = new();
                     setParams["Path"] = file;
                     setParams["Encoding"] = Encoding;
