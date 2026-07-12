@@ -48,6 +48,13 @@ public sealed class TestDbaConnectionCommand : DbaBaseCmdlet
         if (SqlInstance is null)
             return;
 
+        // The function's loop-reset block names ONLY authType/tcpport/authscheme (#9066);
+        // $server and $username are function-locals that PERSIST across loop iterations, so
+        // a later instance whose connect fails emits the PREVIOUS row's SqlVersion and
+        // ConnectingAsUser (codex r1 - faithful quirk, not fixed).
+        object? username = null;
+        Server? server = null;
+
         foreach (DbaInstanceParameter instance in SqlInstance)
         {
             // Clear loop variables assigned after connection test - https://github.com/dataplat/dbatools/issues/9066
@@ -61,7 +68,12 @@ public sealed class TestDbaConnectionCommand : DbaBaseCmdlet
             string localWindows = Environment.OSVersion.Version.ToString();
             // PS: $PSVersionTable.<key> is HASHTABLE key access, not property access.
             object? localEdition = GetTableEntry(versionTable, "PSEdition");
-            string localPowerShell = PsToText(GetTableEntry(versionTable, "PSVersion"));
+            // PS: $PSVersionTable.PSVersion.ToString() is a METHOD CALL - a missing entry
+            // dies method-on-null, unlike the [string] cast below (codex r1).
+            object? psVersionEntry = GetTableEntry(versionTable, "PSVersion");
+            if (psVersionEntry is null)
+                throw new PSInvalidOperationException("You cannot call a method on a null-valued expression.");
+            string localPowerShell = PsToText(psVersionEntry);
             // PS: [string]$PSVersionTable.CLRVersion - null renders empty.
             string localClr = PsToText(GetTableEntry(versionTable, "CLRVersion"));
             string? localSmo = GetLoadedSmoVersion();
@@ -135,8 +147,9 @@ public sealed class TestDbaConnectionCommand : DbaBaseCmdlet
 
             bool connectSuccess;
             object? instanceName;
-            object? username = null;
-            Server? server = null;
+            // PS: $server = Connect-DbaInstance ... inside the try - a failed connect never
+            // assigns, so server/username keep the PREVIOUS iteration's values (see the
+            // loop-persistence note above the foreach).
             ErrorRecord? connectError = null;
             foreach (PSObject item in NestedCommand.InvokeScoped(this, ConnectScript, instance, SqlCredential))
             {
