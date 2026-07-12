@@ -151,14 +151,18 @@ public sealed class TestDbaPathCommand : DbaBaseCmdlet
                     // PS: $PathsBatch[$i] - out-of-range array indexing reads $null (an
                     // injected path can return surplus result rows - codex r1).
                     string? filePath = i < pathsBatch.Length ? pathsBatch[i] : null;
-                    WriteObject(BuildResult(server, filePath, doesPass, EqTrue(r[1])));
+                    // PS: IsContainer = $r[1] -eq $true - the property stores the RAW
+                    // operator result: a bool for scalar columns, the FILTERED MATCH ARRAY
+                    // for an enumerable LHS (an injected varbinary renders "" when no byte
+                    // matches - lab-proven; codex r3 refinement).
+                    WriteObject(BuildResult(server, filePath, doesPass, EqTrueRaw(r[1])));
                     i += 1;
                 }
             }
         }
     }
 
-    private static PSObject BuildResult(Server server, string? filePath, bool fileExists, bool isContainer)
+    private static PSObject BuildResult(Server server, string? filePath, bool fileExists, object? isContainer)
     {
         PSObject output = new PSObject();
         output.Properties.Add(new PSNoteProperty("SqlInstance", server.Name));
@@ -170,12 +174,19 @@ public sealed class TestDbaPathCommand : DbaBaseCmdlet
         return output;
     }
 
-    /// <summary>PS: $value -eq $true - the RHS converts to the LHS runtime type (a Byte
-    /// column compares as 1; a STRING column compares case-insensitively against "True" -
-    /// codex r1); an ENUMERABLE left operand filters its elements and is truthy on any
-    /// match (the array-LHS operator class; a varbinary column arrives as byte[] - codex
-    /// r3); inconvertible values (DBNull) compare false.</summary>
+    /// <summary>PS boolean context of $value -eq $true (the -or operands): truthiness of
+    /// the raw operator result.</summary>
     private static bool EqTrue(object? value)
+    {
+        return LanguagePrimitives.IsTrue(EqTrueRaw(value));
+    }
+
+    /// <summary>PS: $value -eq $true, the RAW operator result. A scalar LHS converts the
+    /// RHS to its runtime type and returns a bool (a Byte column compares as 1; a STRING
+    /// column compares case-insensitively against "True" - codex r1); an ENUMERABLE LHS
+    /// FILTERS its elements and returns the match array (a varbinary column arrives as
+    /// byte[] - codex r3); inconvertible values (DBNull) compare false.</summary>
+    private static object EqTrueRaw(object? value)
     {
         if (value is null)
             return false;
@@ -186,12 +197,13 @@ public sealed class TestDbaPathCommand : DbaBaseCmdlet
         System.Collections.IEnumerable? enumerable = LanguagePrimitives.GetEnumerable(value);
         if (enumerable is not null)
         {
+            List<object?> matches = new List<object?>();
             foreach (object? element in enumerable)
             {
-                if (EqTrue(element))
-                    return true;
+                if (LanguagePrimitives.IsTrue(EqTrueRaw(element)))
+                    matches.Add(element);
             }
-            return false;
+            return matches.ToArray();
         }
         try
         {
