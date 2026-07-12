@@ -208,6 +208,16 @@ internal sealed class PsStringArrayCastAttribute : ArgumentTransformationAttribu
     }
 }
 
+/// <summary>The scalar sibling of PsStringArrayCast: PS [string] converts at BIND time, so
+/// an explicit null argument becomes "" before mandatory/validation runs (W1-032 class).</summary>
+internal sealed class PsStringCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        return LanguagePrimitives.ConvertTo(inputData, typeof(string), CultureInfo.InvariantCulture);
+    }
+}
+
 /// <summary>The PS property-assignment binder's argument conversion.</summary>
 internal static class PsAssignment
 {
