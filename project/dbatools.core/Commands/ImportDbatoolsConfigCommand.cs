@@ -159,7 +159,7 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
                             setParams["Value"] = PsProperty.Get(element, "Value");
                             // PS: -EnableException (hardcoded switch, not the caller's value)
                             setParams["EnableException"] = new SwitchParameter(true);
-                            InvokeNestedPreservingWarnings("Set-DbatoolsConfig", setParams, out setFailure);
+                            EmitAll(InvokeNestedPreservingWarnings("Set-DbatoolsConfig", setParams, out setFailure));
                         }
                         else
                         {
@@ -167,7 +167,7 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
                             setParams["FullName"] = fullNameValue;
                             setParams["PersistedValue"] = PsProperty.Get(element, "Value");
                             setParams["PersistedType"] = PsProperty.Get(element, "Type");
-                            InvokeNestedPreservingWarnings("Set-DbatoolsConfig", setParams, out setFailure);
+                            EmitAll(InvokeNestedPreservingWarnings("Set-DbatoolsConfig", setParams, out setFailure));
                         }
                         if (setFailure is not null)
                         {
@@ -194,7 +194,7 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
                     setParams["FullName"] = fullName;
                     setParams["Value"] = PsProperty.Get(value, "Value");
                     setParams["EnableException"] = EnableException.ToBool();
-                    InvokeNestedPreservingWarnings("Set-DbatoolsConfig", setParams, out moduleSetFailure);
+                    EmitAll(InvokeNestedPreservingWarnings("Set-DbatoolsConfig", setParams, out moduleSetFailure));
                 }
                 else
                 {
@@ -204,7 +204,7 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
                         (string)LanguagePrimitives.ConvertTo(PsProperty.Get(value, "Value"), typeof(string), CultureInfo.InvariantCulture),
                         (ConfigurationValueType)LanguagePrimitives.ConvertTo(PsProperty.Get(value, "Type"), typeof(ConfigurationValueType), CultureInfo.InvariantCulture));
                     setParams["EnableException"] = EnableException.ToBool();
-                    InvokeNestedPreservingWarnings("Set-DbatoolsConfig", setParams, out moduleSetFailure);
+                    EmitAll(InvokeNestedPreservingWarnings("Set-DbatoolsConfig", setParams, out moduleSetFailure));
                 }
                 // PS: these Set calls have no try/catch - a terminating failure propagates.
                 if (moduleSetFailure is not null)
@@ -217,6 +217,21 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
     private static bool PsLike(string? value, string pattern)
     {
         return WildcardPattern.Get(pattern, WildcardOptions.IgnoreCase).IsMatch(value ?? "");
+    }
+
+    /// <summary>PS -eq truthiness over a possibly-array left operand: an enumerable LHS
+    /// filters per element and is truthy when ANY element matches (codex r2 F3).</summary>
+    private static bool PsEqTruthy(object? left, object? right)
+    {
+        IEnumerable? enumerable = LanguagePrimitives.GetEnumerable(left);
+        if (enumerable is null)
+            return PsOps.Eq(left, right);
+        foreach (object? element in enumerable)
+        {
+            if (PsOps.Eq(element, right))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>PS -like truthiness over a possibly-array left operand: an enumerable LHS
@@ -232,6 +247,15 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
                 return true;
         }
         return false;
+    }
+
+    /// <summary>PS: an unassigned Set-DbatoolsConfig statement lets its output (e.g. a
+    /// PSDefaultParameterValues-injected -PassThru Config object) flow to the pipeline
+    /// (codex r2 F2).</summary>
+    private void EmitAll(Collection<PSObject> results)
+    {
+        foreach (PSObject item in results)
+            WriteObject(item);
     }
 
     /// <summary>PS string interpolation of an arbitrary token.</summary>
@@ -272,11 +296,12 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
         MyInvocation.BoundParameters.TryGetValue("WarningAction", out boundWarningAction);
 
         Collection<PSObject> raw;
+        // Empty-table shield: module-internal calls never saw caller-local OR global
+        // defaults (lab-proven via the PassThru-injection probe).
         object? effectiveDefaults = SessionState.PSVariable.GetValue("PSDefaultParameterValues");
-        object? globalDefaults = SessionState.PSVariable.GetValue("global:PSDefaultParameterValues");
-        bool shielded = effectiveDefaults is not null && !ReferenceEquals(effectiveDefaults, globalDefaults);
+        bool shielded = effectiveDefaults is not null;
         if (shielded)
-            SessionState.PSVariable.Set("PSDefaultParameterValues", globalDefaults);
+            SessionState.PSVariable.Set("PSDefaultParameterValues", new DefaultParameterDictionary());
         try
         {
             raw = InvokeCommand.InvokeScript(true, script, null, parameters, boundWarningAction);
@@ -421,17 +446,17 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
             #endregion No Version
 
             #region Version One
-            if (PsOps.Eq(version, 1))
+            if (PsEqTruthy(version, 1))
             {
                 object? style = PsProperty.Get(item, "Style");
-                if (!LanguagePrimitives.IsTrue(style) || PsOps.Eq(style, "Simple"))
+                if (!LanguagePrimitives.IsTrue(style) || PsEqTruthy(style, "Simple"))
                 {
                     results.Add(NewConfigItem(PsProperty.Get(item, "FullName"), PsProperty.Get(item, "Data")));
                 }
                 else
                 {
                     object? type = PsProperty.Get(item, "Type");
-                    if (PsOps.Eq(type, "Object") || PsOps.Eq(type, 12))
+                    if (PsEqTruthy(type, "Object") || PsEqTruthy(type, 12))
                     {
                         results.Add(NewConfigItem(PsProperty.Get(item, "FullName"), PsProperty.Get(item, "Value"), "Object", keepPersisted: true));
                     }
@@ -509,11 +534,17 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
         return results;
     }
 
-    /// <summary>The caller never passes -Default, so existing keys are overwritten.</summary>
+    /// <summary>The caller never passes -Default, so existing keys are overwritten. A null
+    /// FullName faults the index assignment exactly like PS (codex r2 F4).</summary>
     private static void MergePersisted(Hashtable results, List<PSObject> items)
     {
         foreach (PSObject item in items)
-            results[PsText(PsProperty.Get(item, "FullName"))] = item;
+        {
+            object? fullName = PsProperty.Get(item, "FullName");
+            if (fullName is null)
+                throw new RuntimeException("Index operation failed; the array index evaluated to null.");
+            results[PsText(fullName)] = item;
+        }
     }
 
     private List<PSObject> ReadPersistedFile(string pathVariable, string filename)

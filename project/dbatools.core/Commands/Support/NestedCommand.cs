@@ -38,10 +38,12 @@ internal static class NestedCommand
         object? effective = host.SessionState.PSVariable.GetValue("PSDefaultParameterValues");
         if (effective is null)
             return null;
-        object? globalValue = host.SessionState.PSVariable.GetValue("global:PSDefaultParameterValues");
-        if (ReferenceEquals(effective, globalValue))
-            return null;
-        host.SessionState.PSVariable.Set("PSDefaultParameterValues", globalValue);
+        // Module-internal calls resolve $PSDefaultParameterValues from the MODULE's session
+        // state, where none is defined - neither caller-LOCAL nor GLOBAL defaults ever
+        // reached the retired functions' nested calls (lab-proven: a global
+        // Set-DbatoolsConfig:PassThru default injects into an InvokeScript-invoked nested
+        // call but NOT into the function's own). The faithful shield is an EMPTY table.
+        host.SessionState.PSVariable.Set("PSDefaultParameterValues", new System.Management.Automation.DefaultParameterDictionary());
         return new DefaultParameterRestore(host, effective);
     }
 

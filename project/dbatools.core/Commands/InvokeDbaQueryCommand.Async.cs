@@ -484,11 +484,12 @@ public sealed partial class InvokeDbaQueryCommand
         MyInvocation.BoundParameters.TryGetValue("WarningAction", out boundWarningAction);
 
         Collection<PSObject> raw;
+        // Empty-table shield: module-internal calls never saw caller-local OR global
+        // defaults (lab-proven via the PassThru-injection probe).
         object? effectiveDefaults = SessionState.PSVariable.GetValue("PSDefaultParameterValues");
-        object? globalDefaults = SessionState.PSVariable.GetValue("global:PSDefaultParameterValues");
-        bool shielded = effectiveDefaults is not null && !ReferenceEquals(effectiveDefaults, globalDefaults);
+        bool shielded = effectiveDefaults is not null;
         if (shielded)
-            SessionState.PSVariable.Set("PSDefaultParameterValues", globalDefaults);
+            SessionState.PSVariable.Set("PSDefaultParameterValues", new DefaultParameterDictionary());
         try
         {
             raw = pipelineInput is null

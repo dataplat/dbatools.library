@@ -89,11 +89,12 @@ public sealed partial class ImportDbaCsvCommand
         MyInvocation.BoundParameters.TryGetValue("WarningAction", out boundWarningAction);
 
         Collection<PSObject> results;
+        // Empty-table shield: module-internal calls never saw caller-local OR global
+        // defaults (lab-proven via the PassThru-injection probe).
         object? effectiveDefaults = SessionState.PSVariable.GetValue("PSDefaultParameterValues");
-        object? globalDefaults = SessionState.PSVariable.GetValue("global:PSDefaultParameterValues");
-        bool shielded = effectiveDefaults is not null && !ReferenceEquals(effectiveDefaults, globalDefaults);
+        bool shielded = effectiveDefaults is not null;
         if (shielded)
-            SessionState.PSVariable.Set("PSDefaultParameterValues", globalDefaults);
+            SessionState.PSVariable.Set("PSDefaultParameterValues", new DefaultParameterDictionary());
         try
         {
             results = InvokeCommand.InvokeScript(true, script, null, connectParams, boundWarningAction);
