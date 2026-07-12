@@ -185,15 +185,14 @@ public sealed class NewDbaAzAccessTokenCommand : DbaBaseCmdlet
 
     /// <summary>
     /// Runs a branch body in the dbatools SCRIPT module scope (private functions, module
-    /// $PSDefaultParameterValues resolution) with the empty-table PSDPV shield on the outer
-    /// hop, mirroring how the function's own nested calls resolved.
+    /// $PSDefaultParameterValues resolution) via NestedCommand.InvokeScoped: the branch
+    /// scripts merge warnings back (3>&1) and the helper re-emits them through THIS
+    /// cmdlet's warning stream, so the caller's -WarningAction/-WarningVariable behave
+    /// exactly like they did around the function (codex r1 F1).
     /// </summary>
     private Collection<PSObject> InvokeModuleScoped(string scriptText, params object?[] scriptArgs)
     {
-        using (NestedCommand.ShieldDefaultParameterValues(this))
-        {
-            return InvokeCommand.InvokeScript(false, ScriptBlock.Create(scriptText), null, scriptArgs);
-        }
+        return NestedCommand.InvokeScoped(this, scriptText, scriptArgs);
     }
 
     /// <summary>PS: $x = (Get-DbatoolsConfigValue -FullName ...) - scalar for one output.</summary>
@@ -242,7 +241,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 & $__dbatoolsModule {
     param($appid, $clientsecret)
     New-Object System.Management.Automation.PSCredential ($appid, $clientsecret)
-} $appid $clientsecret
+} $appid $clientsecret 3>&1
 """;
 
     private const string ManagedIdentityScript = """
@@ -262,7 +261,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     $response = Invoke-TlsWebRequest @params -UseBasicParsing -ErrorAction Stop
     return ($response.Content | ConvertFrom-Json).access_token
-} $Config
+} $Config 3>&1
 """;
 
 #if NETFRAMEWORK
@@ -280,7 +279,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     } else {
         throw ($result.Exception | ConvertTo-Json | ConvertFrom-Json).InnerException.Message
     }
-} $Credential $Tenant $Config
+} $Credential $Tenant $Config 3>&1
 """;
 #endif
 
@@ -295,7 +294,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         Tenant       = $Tenant
         UserID       = $Credential.UserName
     }
-} $Credential $Tenant
+} $Credential $Tenant 3>&1
 """;
 
     // The $source here-string content below is BYTE-IDENTICAL to
