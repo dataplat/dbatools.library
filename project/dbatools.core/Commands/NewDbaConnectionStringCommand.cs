@@ -24,9 +24,9 @@ namespace Dataplat.Dbatools.Commands;
 /// DbConnectionStringBuilder base indexer (virtual dispatch reaches the typed
 /// validation). Under -WhatIf BOTH ShouldProcess sites print per instance, because the
 /// function's new-path emit+continue sits inside the first gate and execution falls
-/// through to the legacy site - preserved. The surface has NO positional parameters
-/// (unlike the smaller W1 functions, the live function reports every position as null -
-/// baseline-pinned). Config defaults ride the REAL Get-DbatoolsConfigValue nested
+/// through to the legacy site - preserved. Positions 0-18 pin the PS implicit
+/// positional binding: non-switch parameters number consecutively in declaration order
+/// and switches are never positional (gate-pinned). Config defaults ride the REAL Get-DbatoolsConfigValue nested
 /// (Mandatory/Optional coercions included). Lab-pinned strings in
 /// migration probe-connstring-w1027 (P1-P15) and tests/New-DbaConnectionString.Tests.ps1
 /// (TA-034). Surface pinned by migration/baselines/New-DbaConnectionString.json.
@@ -36,49 +36,49 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
 {
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
     [Alias("ServerInstance", "SqlServer", "Server", "DataSource")]
     public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
 
-    [Parameter]
+    [Parameter(Position = 1)]
     [Alias("SqlCredential")]
     public PSCredential? Credential { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 2)]
     public string? AccessToken { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 3)]
     [ValidateSet("ReadOnly", "ReadWrite")]
     public string? ApplicationIntent { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 4)]
     public string? BatchSeparator { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 5)]
     public string? ClientName { get; set; } = "custom connection";
 
-    [Parameter]
+    [Parameter(Position = 6)]
     public int ConnectTimeout { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 7)]
     public string? Database { get; set; }
 
     [Parameter]
     public SwitchParameter EncryptConnection { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 8)]
     public string? FailoverPartner { get; set; }
 
     [Parameter]
     public SwitchParameter IsActiveDirectoryUniversalAuth { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 9)]
     public int LockTimeout { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 10)]
     public int MaxPoolSize { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 11)]
     public int MinPoolSize { get; set; }
 
     [Parameter]
@@ -87,36 +87,36 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
     [Parameter]
     public SwitchParameter MultiSubnetFailover { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 12)]
     [ValidateSet("TcpIp", "NamedPipes", "Multiprotocol", "AppleTalk", "BanyanVines", "Via", "SharedMemory", "NWLinkIpxSpx")]
     public string? NetworkProtocol { get; set; }
 
     [Parameter]
     public SwitchParameter NonPooledConnection { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 13)]
     public int PacketSize { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 14)]
     public int PooledConnectionLifetime { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 15)]
     [ValidateSet("CaptureSql", "ExecuteAndCaptureSql", "ExecuteSql")]
     public string? SqlExecutionModes { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 16)]
     public int StatementTimeout { get; set; }
 
     [Parameter]
     public SwitchParameter TrustServerCertificate { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 17)]
     public string? WorkstationId { get; set; }
 
     [Parameter]
     public SwitchParameter Legacy { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 18)]
     public string? AppendConnectionString { get; set; }
 
     protected override void BeginProcessing()
