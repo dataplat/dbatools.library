@@ -465,8 +465,8 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
     /// </summary>
     private Hashtable ReadDbatoolsConfigPersisted(string module, ConfigScope scope, int moduleVersion)
     {
-        // PS @{} literal: case-insensitive hashtable.
-        Hashtable results = new(StringComparer.CurrentCultureIgnoreCase);
+        // PS @{} literal (edition-split comparer, capacity 0).
+        Hashtable results = PsHashtable.Literal(0);
         string filename = module.ToLowerInvariant() + "-" + moduleVersion.ToString(CultureInfo.InvariantCulture) + ".json";
         int scopeValue = (int)scope;
         bool noRegistry = LanguagePrimitives.IsTrue(GetModuleVariable("NoRegistry"));

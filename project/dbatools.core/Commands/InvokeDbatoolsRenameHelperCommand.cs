@@ -93,7 +93,7 @@ public sealed class InvokeDbatoolsRenameHelperCommand : DbaBaseCmdlet
     /// so the port constructs with the same capacity and source insertion order.</summary>
     private static Hashtable BuildParamRenames()
     {
-        Hashtable renames = new(18, StringComparer.CurrentCultureIgnoreCase);
+        Hashtable renames = PsHashtable.Literal(18);
         renames.Add("ExcludeAllSystemDb", "ExcludeSystem");
         renames.Add("ExcludeAllUserDb", "ExcludeUser");
         renames.Add("Invoke-Sqlcmd2", "Invoke-DbaQuery");
@@ -118,7 +118,7 @@ public sealed class InvokeDbatoolsRenameHelperCommand : DbaBaseCmdlet
     /// <summary>The $commandrenames PS literal (capacity-sized like the @{} literal).</summary>
     private static Hashtable BuildCommandRenames()
     {
-        Hashtable renames = new(215, StringComparer.CurrentCultureIgnoreCase);
+        Hashtable renames = PsHashtable.Literal(215);
         renames.Add("Find-DbaDuplicateIndex", "Find-DbaDbDuplicateIndex");
         renames.Add("Find-DbaDisabledIndex", "Find-DbaDbDisabledIndex");
         renames.Add("Add-DbaRegisteredServer", "Add-DbaRegServer");

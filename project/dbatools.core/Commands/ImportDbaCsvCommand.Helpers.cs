@@ -144,13 +144,15 @@ public sealed partial class ImportDbaCsvCommand
         object? serverValue = outcome["server"];
         if (serverValue is PSObject wrappedServer)
             serverValue = wrappedServer.BaseObject;
-        _server = (Server)serverValue!;
+        // PS: $server takes whatever the nested call emitted; the caller's dynamic reads
+        // null-propagate for null/foreign values (codex r2 F2).
+        _server = serverValue as Server;
         return null;
     }
 
     /// <summary>Runs the real Get-Content through the caller's runspace (edition-faithful
     /// encoding detection) with -ErrorAction Stop, like the PS source.</summary>
-    private List<string?> GetContentLines(string path, long totalCount)
+    private List<string?> GetContentLines(object path, long totalCount)
     {
         Hashtable parameters = new();
         parameters["Path"] = path;
@@ -165,7 +167,7 @@ public sealed partial class ImportDbaCsvCommand
 
     /// <summary>PS: (Get-Content -Path $file -TotalCount 1 -ErrorAction Stop).ToString() -
     /// an empty file yields $null and the method call on it is statement-terminating.</summary>
-    private string GetFirstLineToString(string path)
+    private string GetFirstLineToString(object path)
     {
         List<string?> lines = GetContentLines(path, 1);
         string? firstline = lines.Count > 0 ? lines[0] : null;
@@ -239,7 +241,19 @@ public sealed partial class ImportDbaCsvCommand
             case ushort us:
                 ordinal = us;
                 return true;
+            case bool flag:
+                // PS binder: bool/char/enum also pick the ordinal overloads (lab-proven).
+                ordinal = flag ? 1 : 0;
+                return true;
+            case char character:
+                ordinal = character;
+                return true;
             default:
+                if (value is Enum)
+                {
+                    ordinal = Convert.ToInt32(value, CultureInfo.InvariantCulture);
+                    return true;
+                }
                 ordinal = 0;
                 return false;
         }
@@ -522,7 +536,7 @@ public sealed partial class ImportDbaCsvCommand
         sqlcmd.Parameters.AddWithValue("tableName", "[" + schema + "].[" + table + "]");
 
         // PS @{} literal: case-insensitive hashtable, bucket enumeration order.
-        Hashtable columns = new(StringComparer.CurrentCultureIgnoreCase);
+        Hashtable columns = PsHashtable.Literal(0);
         SqlDataReader reader;
         try
         {
@@ -561,7 +575,7 @@ public sealed partial class ImportDbaCsvCommand
             throw new RuntimeException(MethodCallMessage("ExecuteReader", 0, ex), ex);
         }
 
-        Hashtable maxLengths = new(StringComparer.CurrentCultureIgnoreCase);
+        Hashtable maxLengths = PsHashtable.Literal(0);
         if (reader.Read())
         {
             foreach (object columnKey in columnNames)

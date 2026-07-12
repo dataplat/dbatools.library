@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections;
 using System.Globalization;
 using System.Management.Automation;
 using System.Numerics;
@@ -99,21 +100,43 @@ internal static class PsBool
 /// <summary>PS comparison-operator parity (case-insensitive -eq / -in).</summary>
 internal static class PsString
 {
-    /// <summary>The PS -eq operator for strings: case-insensitive, invariant culture.</summary>
+    /// <summary>The PS -eq operator for strings: case-insensitive, invariant culture
+    /// (canonically equivalent composed/decomposed strings compare EQUAL, lab-proven both
+    /// editions - ordinal does not).</summary>
     internal static bool Eq(string? left, string? right)
     {
-        return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(left, right, StringComparison.InvariantCultureIgnoreCase);
     }
 
-    /// <summary>The PS -in operator over a literal string list: case-insensitive.</summary>
+    /// <summary>The PS -in operator over a literal string list: case-insensitive, invariant.</summary>
     internal static bool In(string? value, params string[] candidates)
     {
         foreach (string candidate in candidates)
         {
-            if (string.Equals(value, candidate, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(value, candidate, StringComparison.InvariantCultureIgnoreCase))
                 return true;
         }
         return false;
+    }
+}
+
+/// <summary>
+/// PS @{} hashtable-literal construction parity: the engine pre-sizes the table with the
+/// literal's entry count (the capacity changes the 5.1 bucket enumeration order,
+/// lab-proven W1-022), and the comparer is EDITION-SPLIT - 5.1 literals hash
+/// culture-insensitively while 7 keys ordinally (lab-proven: composed/decomposed e-acute
+/// collides on 5.1 and stays distinct on 7).
+/// </summary>
+internal static class PsHashtable
+{
+    /// <summary>Builds a hashtable shaped like a PS @{} literal with the given entry count.</summary>
+    internal static Hashtable Literal(int capacity)
+    {
+#if NETFRAMEWORK
+        return new Hashtable(capacity, StringComparer.CurrentCultureIgnoreCase);
+#else
+        return new Hashtable(capacity, StringComparer.OrdinalIgnoreCase);
+#endif
     }
 }
 

@@ -62,15 +62,25 @@ public sealed partial class ImportDbaCsvCommand
                 continue;
             }
 
-            // PS: $file = (Resolve-Path -Path $filename).ProviderPath
+            // PS: $file = (Resolve-Path -Path $filename).ProviderPath - a multi-match
+            // wildcard leaves $file an ARRAY: the METHOD binder space-joins it for
+            // GetExtension/OpenRead-style calls (lab-proven, codex r2 F1) while provider
+            // cmdlets like Get-Content receive the array itself.
             Collection<string> resolvedPaths = SessionState.Path.GetResolvedProviderPathFromPSPath(filenameText, out _);
-            if (resolvedPaths.Count > 1)
+            object fileValue;
+            string file;
+            if (resolvedPaths.Count == 1)
             {
-                // PS crashes statement-terminating here: GetExtension cannot convert the
-                // ProviderPath array to string.
-                throw new RuntimeException("Cannot convert argument \"path\", with value: \"System.Object[]\", for \"GetExtension\" to type \"System.String\".");
+                fileValue = resolvedPaths[0];
+                file = resolvedPaths[0];
             }
-            string file = resolvedPaths[0];
+            else
+            {
+                string[] resolvedArray = new string[resolvedPaths.Count];
+                resolvedPaths.CopyTo(resolvedArray, 0);
+                fileValue = resolvedArray;
+                file = string.Join(" ", resolvedArray);
+            }
 
             string ext = System.IO.Path.GetExtension(file).ToLower();
             bool isCompressed = PsString.Eq(ext, ".gz");
@@ -83,7 +93,7 @@ public sealed partial class ImportDbaCsvCommand
                 try
                 {
                     long linesToRead = SkipRows + 2;
-                    firstlines = GetContentLines(file, linesToRead);
+                    firstlines = GetContentLines(fileValue, linesToRead);
                     // Get only the lines after SkipRows for delimiter check
                     if (SkipRows > 0 && firstlines.Count > SkipRows)
                         firstlines = firstlines.GetRange(SkipRows, firstlines.Count - SkipRows);
@@ -185,13 +195,13 @@ public sealed partial class ImportDbaCsvCommand
 
             foreach (DbaInstanceParameter instance in SqlInstance)
             {
-                if (ImportIntoInstance(instance, file) == InstanceOutcome.ReturnFromProcess)
+                if (ImportIntoInstance(instance, file, fileValue) == InstanceOutcome.ReturnFromProcess)
                     return;
             }
         }
     }
 
-    private InstanceOutcome ImportIntoInstance(DbaInstanceParameter instance, string file)
+    private InstanceOutcome ImportIntoInstance(DbaInstanceParameter instance, string file, object fileValue)
     {
         Stopwatch elapsed = Stopwatch.StartNew();
         // Open Connection to SQL Server
@@ -223,7 +233,14 @@ public sealed partial class ImportDbaCsvCommand
                 StopFunction("Failure", target: instance, errorRecord: connectFailure, category: ErrorCategory.ConnectionError, continueLoop: true);
                 return InstanceOutcome.Next;
             }
-            SetActiveConnection(_server!.ConnectionContext);
+            if (_server is null)
+            {
+                // PS: a nested Connect that emits nothing leaves $server null; the reads
+                // null-propagate and $sqlconn.Open() faults with the null-method text
+                // inside this try (codex r2 F2).
+                throw new RuntimeException("You cannot call a method on a null-valued expression.");
+            }
+            SetActiveConnection(_server.ConnectionContext);
             _sqlconn = (SqlConnection)_server.ConnectionContext.SqlConnectionObject;
             if (_sqlconn.State != ConnectionState.Open)
                 _sqlconn.Open();
@@ -458,7 +475,7 @@ public sealed partial class ImportDbaCsvCommand
                 _bulkcopy.EnableStreaming = true;
 
                 // If the first column has quotes, then we have to setup a column map
-                string quotematch = GetFirstLineToString(file);
+                string quotematch = GetFirstLineToString(fileValue);
 
                 if ((!KeepOrdinalOrder.IsPresent && !AutoCreateTable.IsPresent) || Regex.IsMatch(quotematch, "'", RegexOptions.IgnoreCase) || Regex.IsMatch(quotematch, "\"", RegexOptions.IgnoreCase))
                 {
@@ -474,9 +491,9 @@ public sealed partial class ImportDbaCsvCommand
                     {
                         try
                         {
-                            Hashtable autoMap = new(StringComparer.CurrentCultureIgnoreCase);
+                            Hashtable autoMap = PsHashtable.Literal(0);
                             _columnMap = autoMap;
-                            List<string?> firstlineItems = GetContentLines(file, 1);
+                            List<string?> firstlineItems = GetContentLines(fileValue, 1);
                             string firstline = (firstlineItems.Count > 0 ? firstlineItems[0] : null) ?? "";
                             bool isFirst = true;
                             // PS: -split "$Delimiter", 0, "SimpleMatch" - literal but
