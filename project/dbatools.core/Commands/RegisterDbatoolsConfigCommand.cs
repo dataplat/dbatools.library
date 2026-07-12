@@ -128,11 +128,19 @@ public sealed class RegisterDbatoolsConfigCommand : DbaBaseCmdlet
                     }
                     catch (WildcardPatternException ex)
                     {
-                        // PS Where-Object Name -Like <bad pattern> writes a NON-terminating
-                        // OperatorFailed error and continues; the native filter would otherwise
-                        // throw a TERMINATING WildcardPatternException. (The FQID differs from
-                        // Where-Object's - native ports cannot reproduce its command identity.)
-                        WriteError(new ErrorRecord(ex, "OperatorFailed", ErrorCategory.InvalidArgument, item.Name));
+                        // PS `Where-Object Name -Like <bad pattern>` emits a NON-terminating
+                        // error for the PIPELINE OBJECT and continues (the native IsMatch would
+                        // otherwise THROW a terminating WildcardPatternException). Reproduce the
+                        // Where-Object record shape verbatim: a PSInvalidOperationException
+                        // "The 'Ilike' operator failed: <inner>", ErrorCategory.InvalidOperation,
+                        // TargetObject = the Config item. The only residual difference is the
+                        // FQID's command-identity suffix (RegisterDbatoolsConfigCommand vs
+                        // WhereObjectCommand) - a native port cannot emit Where-Object's identity;
+                        // dispositioned in .claude/codex-review-dispositions.jsonl.
+                        // Where-Object's format string is "The '{0}' operator failed: {1}." -
+                        // the trailing period is part of it, matched here for message parity.
+                        PSInvalidOperationException opFailed = new($"The 'Ilike' operator failed: {ex.Message}.", ex);
+                        WriteError(new ErrorRecord(opFailed, "OperatorFailed", ErrorCategory.InvalidOperation, item));
                         continue;
                     }
 
