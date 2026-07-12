@@ -13,8 +13,14 @@ namespace Dataplat.Dbatools.Commands;
 /// set converts through LanguagePrimitives like the PS assignment binder (string params
 /// feeding int/byte/enum properties: Offset, Precision, Scale, the enum sets), so a bad
 /// value faults with the same deepest conversion message the function's catch handed
-/// Stop-Function "Failure". The Value/SqlValue objects assign verbatim, preserving the
-/// falsy-value binding (#9542). Positions 0-15 pin the PS implicit positional binding
+/// Stop-Function "Failure". The Value/SqlValue objects assign through PSObject.Base - the
+/// PS assignment binder unwraps the pipeline transit wrapper (pure property bags stay
+/// PSObject), and an object-typed compiled parameter RECEIVES that wrapper, which
+/// Microsoft.Data.SqlClient's TVP path rejects at Fill time ("Failed to convert parameter
+/// value from a PSObject to a IEnumerable`1" - lab-proven 2026-07-12 via Invoke-DbaQuery's
+/// structured-parameter test; PS-side probes cannot observe the wrapper because the method
+/// binder unwraps at every boundary). Falsy CLR values still bind (#9542) - Base preserves
+/// them. Positions 0-15 pin the PS implicit positional binding
 /// (non-switch parameters numbered consecutively; switches never positional).
 /// Surface pinned by migration/baselines/New-DbaSqlParameter.json.
 /// </summary>
@@ -138,7 +144,7 @@ public sealed class NewDbaSqlParameterCommand : DbaBaseCmdlet
                 param.SqlDbType = (System.Data.SqlDbType)LanguagePrimitives.ConvertTo(SqlDbType, typeof(System.Data.SqlDbType), null);
 
             if (TestBound("SqlValue"))
-                param.SqlValue = SqlValue;
+                param.SqlValue = PsAssignment.Unwrap(SqlValue);
 
             if (TestBound("TypeName"))
                 param.TypeName = TypeName;
@@ -147,7 +153,7 @@ public sealed class NewDbaSqlParameterCommand : DbaBaseCmdlet
                 param.UdtTypeName = UdtTypeName;
 
             if (TestBound("Value"))
-                param.Value = Value;
+                param.Value = PsAssignment.Unwrap(Value);
 
             WriteObject(param);
         }

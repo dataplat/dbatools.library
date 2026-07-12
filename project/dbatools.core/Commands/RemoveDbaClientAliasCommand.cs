@@ -15,9 +15,16 @@ namespace Dataplat.Dbatools.Commands;
 /// (local in-process or remoting, exactly like the function) and Test-ElevationRequirement
 /// runs module-scoped with -Continue, so the private helper's dynamically scoped continue
 /// propagates out of the nested script as the engine flow-control exception and continues
-/// THIS cmdlet's computer loop. Warnings from both helpers merge back 3&gt;&amp;1 for caller
-/// -WarningVariable parity. PS function parameters are positional by default, so Positions
-/// 0-2 are pinned. One object per removed alias is emitted immediately to the pipeline.
+/// THIS cmdlet's computer loop. Warnings from both helpers merge back 3&gt;&amp;1 and re-emit
+/// through this cmdlet's warning stream (display parity; NOTE lab-proven both editions:
+/// caller -WarningVariable captures ZERO from the Invoke-Command2 hop for the function and
+/// the cmdlet alike - 3&gt;&amp;1 at the caller is the observing shape). The hops receive the
+/// RAW DbaInstanceParameter element (null included) like the function's $computer, and the
+/// ShouldProcess target interpolates it PS-style (FullSmoName, empty for null). The hop
+/// script returns a terminating failure as marker data so output streamed before the
+/// failure still reaches the pipeline (function stream parity). PS function parameters are
+/// positional by default, so Positions 0-2 are pinned. One object per removed alias is
+/// emitted immediately to the pipeline.
 /// Surface pinned by migration/baselines/Remove-DbaClientAlias.json.
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "DbaClientAlias", SupportsShouldProcess = true)]
@@ -53,15 +60,22 @@ public sealed class RemoveDbaClientAliasCommand : DbaBaseCmdlet
             return;
 
         // PS: foreach ($computer in $ComputerName) - member enumeration of the parameter array.
+        // Elements can be null (PS never dereferences $computer; the hops and the message
+        // interpolation receive it as-is - lab-proven: the function surfaces the nested
+        // binding error and continues to the next computer).
         foreach (DbaInstanceParameter computer in ComputerName)
         {
-            string computerText = computer.ComputerName;
+            // PS interpolation "$computer": null renders empty; a DbaInstanceParameter renders
+            // its ToString (FullSmoName) - lab-proven WhatIf target "x on WORKSTATION\someinstance"
+            // for instance-shaped input, NOT the bare ComputerName.
+            string computerDisplay = computer is null ? "" : PSObject.AsPSObject(computer).ToString();
 
             // PS: $null = Test-ElevationRequirement -ComputerName $computer -Continue -
-            // output discarded, warnings bubble, the failure continue targets this loop.
+            // output discarded, warnings bubble, the failure continue targets this loop. The
+            // hop receives the RAW element exactly like the function passed $computer.
             try
             {
-                NestedCommand.InvokeScoped(this, TestElevationScript, computerText, EnableException.ToBool());
+                NestedCommand.InvokeScoped(this, TestElevationScript, computer, EnableException.ToBool());
             }
             catch (FlowControlException)
             {
@@ -69,12 +83,29 @@ public sealed class RemoveDbaClientAliasCommand : DbaBaseCmdlet
             }
 
             // PS: if ($PSCmdlet.ShouldProcess("$($Alias -join ', ') on $computer", "Remove aliases"))
-            if (ShouldProcess(string.Join(", ", Alias) + " on " + computerText, "Remove aliases"))
+            if (ShouldProcess(string.Join(", ", Alias) + " on " + computerDisplay, "Remove aliases"))
             {
+                bool hopFailed = false;
                 try
                 {
-                    foreach (PSObject item in NestedCommand.InvokeScoped(this, InvokeCommand2Script, computerText, Credential, Alias))
+                    foreach (PSObject item in NestedCommand.InvokeScoped(this, InvokeCommand2Script, computer, Credential, Alias))
+                    {
+                        // The hop script catches a terminating failure and returns the caught
+                        // record AS DATA after the output already streamed, so objects the
+                        // registry scriptblock emitted BEFORE the failure still reach the
+                        // pipeline exactly like the function's direct Invoke-Command2 call
+                        // (lab-proven: the 32-bit hive's Removed object precedes an invalid-
+                        // wildcard failure; buffering in the hop used to discard it).
+                        ErrorRecord? caught = ExtractCaughtError(item);
+                        if (caught is not null)
+                        {
+                            // PS: catch { Stop-Function -Message "Failure" -ErrorRecord $_ -Target $computer -Continue }
+                            StopFunction("Failure", target: computer, errorRecord: caught, continueLoop: true);
+                            hopFailed = true;
+                            break;
+                        }
                         WriteObject(item);
+                    }
                 }
                 catch (PipelineStoppedException)
                 {
@@ -83,11 +114,27 @@ public sealed class RemoveDbaClientAliasCommand : DbaBaseCmdlet
                 catch (Exception ex)
                 {
                     // PS: catch { Stop-Function -Message "Failure" -ErrorRecord $_ -Target $computer -Continue }
-                    StopFunction("Failure", target: computerText, errorRecord: ToCaughtRecord(ex), continueLoop: true);
+                    StopFunction("Failure", target: computer, errorRecord: ToCaughtRecord(ex), continueLoop: true);
                     continue;
                 }
+                if (hopFailed)
+                    continue;
             }
         }
+    }
+
+    /// <summary>Detects the hop script's caught-error marker (the script-side catch returns
+    /// the ErrorRecord as data so pre-failure output survives - the W1-019 outcome-as-data
+    /// wrapper shape) and unwraps the record.</summary>
+    private static ErrorRecord? ExtractCaughtError(PSObject? item)
+    {
+        if (item?.BaseObject is PSCustomObject)
+        {
+            PSPropertyInfo? marker = item.Properties["__dbatoolsCaughtError"];
+            if (marker?.Value is not null)
+                return PsAssignment.Unwrap(marker.Value) as ErrorRecord;
+        }
+        return null;
     }
 
     /// <summary>PS: catch { $_ } - a nested terminating error carries the original failing
@@ -155,7 +202,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-    Invoke-Command2 -ComputerName $computer -Credential $credential -ScriptBlock $scriptBlock -ErrorAction Stop -Verbose:$false -ArgumentList $Alias 3>&1
+    try {
+        Invoke-Command2 -ComputerName $computer -Credential $credential -ScriptBlock $scriptBlock -ErrorAction Stop -Verbose:$false -ArgumentList $Alias 3>&1
+    } catch {
+        # outcome-as-data: pre-failure output already streamed; the caught record rides back
+        # as a marker object the cmdlet routes to Stop-Function (never a real output shape)
+        [PSCustomObject]@{ __dbatoolsCaughtError = $PSItem }
+    }
 } $computer $credential $Alias
 """;
 }

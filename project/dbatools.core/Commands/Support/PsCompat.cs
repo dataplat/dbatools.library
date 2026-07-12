@@ -192,3 +192,21 @@ internal static class PsOps
         return value;
     }
 }
+
+/// <summary>The PS property-assignment binder's argument conversion.</summary>
+internal static class PsAssignment
+{
+    /// <summary>Unwraps the pipeline-transit PSObject wrapper to its base object, EXCEPT
+    /// pure property bags, which stay PSObject (their PSCustomObject base is an empty
+    /// sentinel) - exactly what a PS `$store.Property = $value` assignment binds. Use for
+    /// any bound object-typed compiled parameter assigned into a .NET store consumed by
+    /// pure .NET code: the compiled binder KEEPS the wrapper, PS-side probes cannot see it
+    /// (the method binder unwraps at every boundary), and consumers like
+    /// Microsoft.Data.SqlClient's TVP binding reject it (W1-030, lab-proven 2026-07-12).</summary>
+    internal static object? Unwrap(object? value)
+    {
+        if (value is PSObject psValue && psValue.BaseObject is not PSCustomObject)
+            return psValue.BaseObject;
+        return value;
+    }
+}
