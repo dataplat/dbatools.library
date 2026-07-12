@@ -55,11 +55,11 @@ public sealed class SetDbaDefaultPathCommand : DbaInstanceCmdlet
             string path = Path.Trim().TrimEnd('\\');
 
             // PS: if (-not (Test-DbaPath -SqlInstance $server -Path $Path)) { Stop-Function ... -Continue }
-            bool accessible = false;
-            foreach (PSObject result in NestedCommand.InvokeScoped(this, TestDbaPathScript, server, path))
-            {
-                accessible = LanguagePrimitives.IsTrue(PsAssignment.Unwrap(result));
-            }
+            // PS collection truthiness: empty = false, one item = that item's truthiness,
+            // several items = true regardless of contents (codex r1).
+            System.Collections.ObjectModel.Collection<PSObject> pathResults = NestedCommand.InvokeScoped(this, TestDbaPathScript, server, path);
+            bool accessible = pathResults.Count > 1 ||
+                (pathResults.Count == 1 && LanguagePrimitives.IsTrue(PsAssignment.Unwrap(pathResults[0])));
             if (!accessible)
             {
                 StopFunction("Path " + path + " is not accessible on " + server.Name, target: instance, continueLoop: true);
