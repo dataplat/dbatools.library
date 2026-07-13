@@ -152,12 +152,17 @@ public sealed class GetDbaDbPageInfoCommand : DbaInstanceCmdlet
                 StopFunction("Failure", target: instance, errorRecord: connection.Failure, category: ErrorCategory.ConnectionError, continueLoop: true);
                 continue;
             }
-            Server server = connection.Server!;
+            // PS reads are ETS-FIRST: $server.Databases and the per-db properties
+            // resolve instance/note members before native ones (the mock-driven
+            // characterization test decorates real objects this way).
+            object? serverValue = connection.ServerValue;
 
             bool filterInclude = PsTruthy(Database);
-            foreach (Microsoft.SqlServer.Management.Smo.Database candidate in server.Databases)
+            foreach (object? candidate in EnumerateValue(DotAccess(serverValue, "Databases")))
             {
-                if (filterInclude && !MatchesAny(candidate.Name, Database!))
+                if (candidate is null)
+                    continue;
+                if (filterInclude && !MatchesAny(DotAccess(candidate, "Name"), Database!))
                     continue;
                 inputObjects.Add(candidate);
             }
@@ -165,20 +170,21 @@ public sealed class GetDbaDbPageInfoCommand : DbaInstanceCmdlet
 
         foreach (object? item in inputObjects)
         {
-            Microsoft.SqlServer.Management.Smo.Database? db = (item is PSObject pso ? pso.BaseObject : item) as Microsoft.SqlServer.Management.Smo.Database;
             try
             {
-                // PS: a null db null-walks $db.Parent.VersionMajor to null, and
-                // null -ge 11 is FALSE - the "Unsupported" branch.
-                object? versionMajor = db?.Parent?.VersionMajor;
-                if (versionMajor is int major && major >= 11)
+                // PS: $db.Parent.VersionMajor reads ETS-first; a null db null-walks to
+                // null, and null -ge 11 is FALSE - the "Unsupported" branch. A
+                // non-comparable value faults into the catch like the PS -ge.
+                object? versionMajor = DotAccess(DotAccess(item, "Parent"), "VersionMajor");
+                bool supported = versionMajor is not null && LanguagePrimitives.Compare(versionMajor, 11, false, CultureInfo.InvariantCulture) >= 0;
+                if (supported)
                 {
-                    foreach (PSObject? row in NestedCommand.InvokeScoped(this, DatabaseQueryScript, db!, _sql))
+                    foreach (PSObject? row in NestedCommand.InvokeScoped(this, DatabaseQueryScript, item!, _sql))
                         WriteObject(row);
                 }
                 else
                 {
-                    StopFunction("Unsupported SQL Server version", target: db, continueLoop: true);
+                    StopFunction("Unsupported SQL Server version", target: item, continueLoop: true);
                     continue;
                 }
             }
@@ -207,7 +213,7 @@ public sealed class GetDbaDbPageInfoCommand : DbaInstanceCmdlet
     }
 
     /// <summary>PS -in over the filter array (elementwise -eq).</summary>
-    private static bool MatchesAny(string name, string[] values)
+    private static bool MatchesAny(object? name, string[] values)
     {
         foreach (string value in values)
         {
@@ -215,6 +221,22 @@ public sealed class GetDbaDbPageInfoCommand : DbaInstanceCmdlet
                 return true;
         }
         return false;
+    }
+
+    /// <summary>Enumerates a PS value: null yields nothing, a collection yields
+    /// elements, a scalar yields itself.</summary>
+    private static IEnumerable<object?> EnumerateValue(object? value)
+    {
+        if (value is null)
+            yield break;
+        object? unwrapped = value is PSObject pso ? pso.BaseObject : value;
+        if (unwrapped is not string && LanguagePrimitives.GetEnumerable(unwrapped) is IEnumerable elements)
+        {
+            foreach (object? element in elements)
+                yield return element;
+            yield break;
+        }
+        yield return value;
     }
 
     /// <summary>PS pipeline-assignment collapse: none = null, one = the item, many = array.</summary>
