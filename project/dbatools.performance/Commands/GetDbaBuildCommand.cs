@@ -112,7 +112,7 @@ public sealed class GetDbaBuildCommand : DbaBaseCmdlet
         }
         if (PsOps.IsTrue(MajorVersion))
         {
-            Match major = Regex.Match(MajorVersion!, "^(SQL)?(\\d{4}(R2)?)$");
+            Match major = Regex.Match(MajorVersion!, "^(SQL)?(\\d{4}(R2)?)$", RegexOptions.IgnoreCase);
             if (major.Success)
             {
                 MajorVersion = major.Groups[2].Value;
@@ -124,19 +124,19 @@ public sealed class GetDbaBuildCommand : DbaBaseCmdlet
             }
             if (!PsOps.IsTrue(ServicePack))
                 ServicePack = "RTM";
-            Match sp = Regex.Match(ServicePack, "^(SP)?\\s*(\\d+)$");
+            Match sp = Regex.Match(ServicePack, "^(SP)?\\s*(\\d+)$", RegexOptions.IgnoreCase);
             if (sp.Success)
             {
                 ServicePack = sp.Groups[2].Value == "0" ? "RTM" : "SP" + sp.Groups[2].Value;
             }
-            else if (!Regex.IsMatch(ServicePack, "^RTM$"))
+            else if (!Regex.IsMatch(ServicePack, "^RTM$", RegexOptions.IgnoreCase))
             {
                 StopFunction("Incorrect SQL Server service pack format: use SPX, X or RTM, where X is a service pack number");
                 return;
             }
             if (PsOps.IsTrue(CumulativeUpdate))
             {
-                Match cu = Regex.Match(CumulativeUpdate!, "^(CU)?\\s*(\\d+)$");
+                Match cu = Regex.Match(CumulativeUpdate!, "^(CU)?\\s*(\\d+)$", RegexOptions.IgnoreCase);
                 if (cu.Success)
                 {
                     CumulativeUpdate = cu.Groups[2].Value == "0" ? "" : "CU" + cu.Groups[2].Value;
