@@ -100,7 +100,9 @@ public sealed class GetDbaWaitStatisticCommand : DbaInstanceCmdlet
                 StopFunction("Failure", target: instance, errorRecord: connection.Failure, category: ErrorCategory.ConnectionError, continueLoop: true);
                 continue;
             }
-            Server server = connection.Server!;
+            // PS: $server keeps Connect-DbaInstance's WRAPPER (instance ETS
+            // decorations - mock ScriptMethods - must dispatch in the hop).
+            object server = connection.RawServerValue ?? connection.Server!;
 
             // PS: if ($IncludeIgnorable) { $excludeColumns = 'Notes' } else { 'Notes', 'Ignorable' }
             object excludeColumns = IncludeIgnorable.ToBool()

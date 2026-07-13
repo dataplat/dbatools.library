@@ -22,6 +22,7 @@ internal static class NestedConnect
     {
         internal bool Ok;
         internal object? ServerValue;
+        internal object? RawServerValue;
         internal ErrorRecord? Failure;
 
         /// <summary>The SMO server, when the nested call produced one.</summary>
@@ -97,6 +98,10 @@ internal static class NestedConnect
         if (outcome.Ok)
         {
             object? serverValue = outcomeTable["server"];
+            // The PSObject wrapper carries instance ETS decorations (mock-driven test
+            // servers Add-Member ScriptMethods) - keep it for hops that need the
+            // fn-world dispatch (the W1-105 law).
+            outcome.RawServerValue = serverValue;
             if (serverValue is PSObject wrappedServer)
                 serverValue = wrappedServer.BaseObject;
             outcome.ServerValue = serverValue;
