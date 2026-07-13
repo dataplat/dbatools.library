@@ -123,12 +123,12 @@ public sealed class FindDbaDbUnusedIndexCommand : DbaBaseCmdlet
 
         foreach (SmoDatabase? db in InputObject)
         {
-            if (db is null)
+            if (db is null || db.Parent is null)
             {
-                // PS walk for a null element (codex r1 F1): the accessibility statement
-                // indexes a null array (record, statement continues), then
-                // $null.VersionMajor -lt 9 is TRUE (null compares less), so the version
-                // Stop-Function fires with -Continue.
+                // PS walk for a null element OR a Parent-less Database (codex r1 F1 +
+                // r2): the accessibility statement indexes a null array (record,
+                // statement continues), then $null.VersionMajor -lt 9 is TRUE (null
+                // compares less), so the version Stop-Function fires with -Continue.
                 StatementFault.Surface(this, new ErrorRecord(new RuntimeException("Cannot index into a null array."), "NullArray", ErrorCategory.InvalidOperation, null));
                 StopFunction("This function does not support versions lower than SQL Server 2005 (v9).", continueLoop: true);
                 continue;
