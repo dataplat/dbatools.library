@@ -108,9 +108,9 @@ public sealed class InvokeDbaDiagnosticQueryCommand : DbaInstanceCmdlet
             if (bag is not null && bag.ContainsKey("__w1108Begin"))
                 _beginBag = bag;
         }
-        // PS: the begin Stop-Function+return path never reaches the bag emission -
-        // Test-FunctionInterrupt then returns every process block.
-        if (_beginBag is null)
+        // PS: the begin Stop-Function+return path exits the dot-sourced block; the
+        // bag flags it - Test-FunctionInterrupt then returns every process block.
+        if (_beginBag is null || LanguagePrimitives.IsTrue(_beginBag["Interrupted"]))
             _beginInterrupted = true;
     }
 
@@ -162,8 +162,8 @@ public sealed class InvokeDbaDiagnosticQueryCommand : DbaInstanceCmdlet
 
     protected override void EndProcessing()
     {
-        if (_beginBag is not null)
-            NestedCommand.InvokeScoped(this, EndScript, _beginBag["ProgressId"]);
+        // PS: the end block runs even after a begin early-return.
+        NestedCommand.InvokeScoped(this, EndScript, _beginBag is not null ? _beginBag["ProgressId"] : null);
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
@@ -185,6 +185,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($Path, $ExcludeQueryTextColumn, $ExcludePlanColumn, $NoColumnParsing, $EnableException, $__boundVerbose)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
     $ProgressId = Get-Random
+    $__begun = $false
+    # the dot-sourced block shares this scope; the begin Stop-Function's `return`
+    # exits IT, so the bag below always emits (the fn end block still runs)
+    . {
 
     Write-Message -Level Verbose -Message "Interpreting DMV Script Collections"
 
@@ -234,7 +238,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
 
-    @{ __w1108Begin = $true; ProgressId = $ProgressId; ScriptVersions = $scriptversions }
+    $__begun = $true
+    }
+    @{ __w1108Begin = $true; ProgressId = $ProgressId; ScriptVersions = $scriptversions; Interrupted = (-not $__begun) }
 } $Path $ExcludeQueryTextColumn $ExcludePlanColumn $NoColumnParsing $EnableException $__boundVerbose 3>&1
 """;
 
@@ -266,6 +272,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $QueryName = $__state.QueryName
         $databases = $__state.databases
     }
+    # the dot-sourced block shares this scope; the SelectionHelper empty-pick
+    # `return` exits IT, so the halt sentinel below still emits
+    . {
 
     $counter = 0
 
@@ -514,6 +523,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
 
+    }
     @{ __w1108State = @{ first = $first; QueryName = $QueryName; databases = $databases; halt = $__halt } }
 } $server $instance $scriptversions $ProgressId $Database $ExcludeDatabase $ExcludeQuery $QueryName $UseSelectionHelper $instanceOnly $DatabaseSpecific $OutputPath $ExportQueries $__state $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
 """;
