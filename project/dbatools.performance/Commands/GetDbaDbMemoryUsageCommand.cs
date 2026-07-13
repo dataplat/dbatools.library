@@ -79,7 +79,8 @@ public sealed class GetDbaDbMemoryUsageCommand : DbaInstanceCmdlet
     // row loop with the STALE $results, and a faulted $percentUsed statement keeps its
     // previous value while the emission still runs.
     private Collection<PSObject> _results = new Collection<PSObject>();
-    private object _percentUsed = 0;
+    // PS: $percentUsed starts UNDEFINED (null) - a first-row fault leaves it null.
+    private object? _percentUsed;
 
     protected override void ProcessRecord()
     {
@@ -148,7 +149,13 @@ public sealed class GetDbaDbMemoryUsageCommand : DbaInstanceCmdlet
                         _percentUsed = Math.Round((double)LanguagePrimitives.ConvertTo(rawPercent, typeof(double), CultureInfo.InvariantCulture));
                     }
                     catch (PipelineStoppedException) { throw; }
-                    catch (Exception ex) { StatementFault.Surface(this, ex, "Get-DbaDbMemoryUsage"); }
+                    catch (Exception ex)
+                    {
+                        // PS: the [Math]::Round binder fault - MethodException with the
+                        // argument-conversion id and NotSpecified category.
+                        string faultMessage = "Cannot convert argument \"d\", with value: \"" + PsText(rawPercent) + "\", for \"Round\" to type \"System.Double\": \"" + ex.Message + "\"";
+                        StatementFault.Surface(this, new ErrorRecord(new MethodException(faultMessage, ex), "MethodArgumentConversionInvalidCastArgument", ErrorCategory.NotSpecified, null));
+                    }
                 }
 
                 // PS: the [int] cast and the [DbaSize]*1024 operator sit inside the
@@ -158,8 +165,18 @@ public sealed class GetDbaDbMemoryUsageCommand : DbaInstanceCmdlet
                 try
                 {
                     pageCount = LanguagePrimitives.ConvertTo(DotAccess(item, "PageCount"), typeof(int), CultureInfo.InvariantCulture);
-                    Size sizeMb = (Size)LanguagePrimitives.ConvertTo(DotAccess(item, "SizeMb"), typeof(Size), CultureInfo.InvariantCulture);
-                    size = sizeMb * 1024.0;
+                    // PS: [DbaSize]$null * 1024 null-propagates without invoking the
+                    // operator; only a real Size multiplies.
+                    object? sizeMbValue = DotAccess(item, "SizeMb");
+                    if (sizeMbValue is null)
+                    {
+                        size = null;
+                    }
+                    else
+                    {
+                        Size sizeMb = (Size)LanguagePrimitives.ConvertTo(sizeMbValue, typeof(Size), CultureInfo.InvariantCulture);
+                        size = sizeMb * 1024.0;
+                    }
                 }
                 catch (PipelineStoppedException)
                 {
@@ -224,6 +241,14 @@ public sealed class GetDbaDbMemoryUsageCommand : DbaInstanceCmdlet
         if (value is PSObject psValue && psValue.BaseObject is not PSCustomObject)
             return psValue.BaseObject;
         return value;
+    }
+
+    /// <summary>PS string interpolation via LanguagePrimitives (invariant).</summary>
+    private static string PsText(object? value)
+    {
+        if (value is null)
+            return "";
+        return (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
     }
 
     // PS: $server.Query($query) on the engine (the W1-046 seam).
