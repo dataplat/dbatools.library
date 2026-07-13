@@ -67,8 +67,11 @@ public sealed class GetDbaDbccMemoryStatusCommand : DbaInstanceCmdlet
                 {
                     if (item?.BaseObject is not DataTable dataset)
                         continue;
-                    string dataSection = dataset.Columns[0].ColumnName;
-                    string dataType = dataset.Columns[1].ColumnName;
+                    // PS: out-of-range collection indexing reads NULL (no fault) in BOTH
+                    // editions (lab-probed) - a short table yields null section/type/value.
+                    int columnCount = dataset.Columns.Count;
+                    string? dataSection = columnCount > 0 ? dataset.Columns[0].ColumnName : null;
+                    string? dataType = columnCount > 1 ? dataset.Columns[1].ColumnName : null;
                     recordset = recordset + 1;
                     foreach (DataRow row in dataset.Rows)
                     {
@@ -82,8 +85,8 @@ public sealed class GetDbaDbccMemoryStatusCommand : DbaInstanceCmdlet
                         result.Properties.Add(new PSNoteProperty("RowId", rowId));
                         result.Properties.Add(new PSNoteProperty("RecordSetId", recordsetId));
                         result.Properties.Add(new PSNoteProperty("Type", dataSection));
-                        result.Properties.Add(new PSNoteProperty("Name", row[0]));
-                        result.Properties.Add(new PSNoteProperty("Value", row[1]));
+                        result.Properties.Add(new PSNoteProperty("Name", columnCount > 0 ? row[0] : null));
+                        result.Properties.Add(new PSNoteProperty("Value", columnCount > 1 ? row[1] : null));
                         result.Properties.Add(new PSNoteProperty("ValueType", dataType));
                         WriteObject(result);
                     }
