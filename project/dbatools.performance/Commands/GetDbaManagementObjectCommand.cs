@@ -43,8 +43,13 @@ public sealed class GetDbaManagementObjectCommand : DbaBaseCmdlet
         // PS: foreach ($computer in $ComputerName.ComputerName) - member enumeration
         // (an explicit $null parameter walks to null and iterates zero times).
         List<object?> computers = new List<object?>();
-        foreach (DbaInstanceParameter item in ComputerName ?? new DbaInstanceParameter[0])
-            computers.Add(item?.ComputerName);
+        foreach (DbaInstanceParameter? item in ComputerName ?? new DbaInstanceParameter[0])
+        {
+            // PS member enumeration SKIPS null elements (pinned law).
+            if (item is null)
+                continue;
+            computers.Add(item.ComputerName);
+        }
 
         foreach (object? computer in computers)
         {
