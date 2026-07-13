@@ -80,23 +80,22 @@ public sealed class GetDbaNetworkActivityCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        // PS: a pipeline record RE-BINDS $ComputerName raw, bypassing the begin mutation.
-        List<string> names;
+        // PS: a pipeline record RE-BINDS $ComputerName raw, bypassing the begin
+        // mutation - and the function iterates the array DIRECTLY, so null elements
+        // iterate too (Resolve runs with null and the "can't connect" warn fires).
+        List<string?> names;
         if (ReferenceEquals(ComputerName, _beginBound))
         {
-            names = _mutatedNames;
+            names = new List<string?>(_mutatedNames);
         }
         else
         {
-            names = new List<string>();
+            names = new List<string?>();
             foreach (string? name in ComputerName ?? new string[0])
-            {
-                if (name is not null)
-                    names.Add(name);
-            }
+                names.Add(name);
         }
 
-        foreach (string computer in names)
+        foreach (string? computer in names)
         {
             object? server = PipelineValue(NestedCommand.InvokeScoped(this, ResolveScript, computer, Credential, BoundVerbose()));
             object? fullName = DotAccess(server, "FullComputerName");
@@ -134,7 +133,7 @@ public sealed class GetDbaNetworkActivityCommand : DbaBaseCmdlet
             }
             else
             {
-                WriteMessage(MessageLevel.Warning, "can't connect to " + computer);
+                WriteMessage(MessageLevel.Warning, "can't connect to " + PsText(computer));
             }
         }
     }
