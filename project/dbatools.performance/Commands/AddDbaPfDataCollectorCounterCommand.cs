@@ -355,7 +355,16 @@ public sealed class AddDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
         }
         else
         {
-            _newitem.InnerText = (string?)LanguagePrimitives.ConvertTo(counterElement, typeof(string), CultureInfo.InvariantCulture) ?? "";
+            try
+            {
+                _newitem.InnerText = (string?)LanguagePrimitives.ConvertTo(counterElement, typeof(string), CultureInfo.InvariantCulture) ?? "";
+            }
+            catch (Exception ex) when (ex is not PipelineStoppedException)
+            {
+                // PS: a failing string conversion in the property assignment is a
+                // statement fault, not a command abort (codex r1 F2).
+                SurfaceStatementFault(ex);
+            }
         }
 
         // PS: $null = $node.ParentNode.AppendChild($newitem) - a null $node reads a null
