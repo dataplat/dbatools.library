@@ -121,8 +121,19 @@ public sealed class FindDbaDbUnusedIndexCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (SmoDatabase db in InputObject)
+        foreach (SmoDatabase? db in InputObject)
         {
+            if (db is null)
+            {
+                // PS walk for a null element (codex r1 F1): the accessibility statement
+                // indexes a null array (record, statement continues), then
+                // $null.VersionMajor -lt 9 is TRUE (null compares less), so the version
+                // Stop-Function fires with -Continue.
+                StatementFault.Surface(this, new ErrorRecord(new RuntimeException("Cannot index into a null array."), "NullArray", ErrorCategory.InvalidOperation, null));
+                StopFunction("This function does not support versions lower than SQL Server 2005 (v9).", continueLoop: true);
+                continue;
+            }
+
             // PS: $db.Parent.Databases[$db] - the object index string-converts to "[name]"
             // and never matches: the accessibility check is DEAD (preserved).
             SmoDatabase? bracketLookup = db.Parent.Databases[PsText(db)];
@@ -201,19 +212,20 @@ public sealed class FindDbaDbUnusedIndexCommand : DbaBaseCmdlet
     {
         if (fetched.Count == 0)
             return current;
+        // PS: the typed-array += conversion is ATOMIC - the first invalid item faults the
+        // whole assignment and $InputObject keeps its previous value (codex r1 F2).
         List<SmoDatabase> combined = new List<SmoDatabase>();
         if (current is not null)
             combined.AddRange(current);
-        foreach (PSObject item in fetched)
+        try
         {
-            try
-            {
+            foreach (PSObject item in fetched)
                 combined.Add((SmoDatabase)LanguagePrimitives.ConvertTo(item, typeof(SmoDatabase), CultureInfo.InvariantCulture));
-            }
-            catch (PSInvalidCastException ex)
-            {
-                StatementFault.Surface(this, ex, "Find-DbaDbUnusedIndex");
-            }
+        }
+        catch (PSInvalidCastException ex)
+        {
+            StatementFault.Surface(this, ex, "Find-DbaDbUnusedIndex");
+            return current;
         }
         return combined.ToArray();
     }
