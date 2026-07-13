@@ -56,8 +56,11 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
     [Parameter(ValueFromPipeline = true, Position = 5)]
     public object[]? InputObject { get; set; }
 
-    // PS function-scope staleness: $csname persists across objects/items.
+    // PS function-scope staleness: $csname persists across objects/items; until the
+    // computing branch runs, the interpolation reads it DYNAMICALLY (module scope, then
+    // global) like any undefined function variable (codex r1 / the W1-044 $counters class).
     private object? _csname;
+    private bool _csnameAssigned;
 
     protected override void BeginProcessing()
     {
@@ -155,6 +158,7 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
                 {
                     Collection<PSObject> cleaned = NestedCommand.InvokeScoped(this, RemoveInvalidFileNameCharsScript, DotAccess(setObject, "Name"), EnableException.ToBool(), BoundVerbose());
                     _csname = cleaned.Count > 0 ? (object?)cleaned[cleaned.Count - 1] : null;
+                    _csnameAssigned = true;
                     FilePath = PsText(Path) + "\\" + PsText(_csname) + ".xml";
                 }
                 catch (PipelineStoppedException)
@@ -168,8 +172,10 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
             }
 
             // PS: Write-Message -Level Verbose -Message "Wrote $csname to $filename." -
-            // $filename is UNDEFINED (typo) and interpolates empty.
-            WriteMessage(MessageLevel.Verbose, "Wrote " + PsText(_csname) + " to .");
+            // $filename is UNDEFINED (typo) and $csname may be too: both resolve through
+            // the dynamic scope chain (module, then global) when no local exists.
+            object? csnameValue = _csnameAssigned ? _csname : GetModuleScopeVariable("csname");
+            WriteMessage(MessageLevel.Verbose, "Wrote " + PsText(csnameValue) + " to " + PsText(GetModuleScopeVariable("filename")) + ".");
 
             // PS: Set-Content -Path $FilePath -Value $object.Xml -Encoding Unicode (engine
             // cmdlet: per-edition encoding). Bound -Verbose is NOT propagated: binding it
@@ -335,6 +341,20 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
         object? errorAction;
         if (MyInvocation.BoundParameters.TryGetValue("ErrorAction", out errorAction))
             parameters["ErrorAction"] = errorAction;
+    }
+
+    /// <summary>PS: an undefined function variable resolves through the dynamic scope
+    /// chain - module scope, then global (the W1-007/W1-044 technique).</summary>
+    private object? GetModuleScopeVariable(string variableName)
+    {
+        Hashtable getModuleParams = new Hashtable();
+        getModuleParams["Name"] = "dbatools";
+        foreach (PSObject wrapped in NestedCommand.Invoke(this, "Get-Module", getModuleParams))
+        {
+            if (wrapped?.BaseObject is PSModuleInfo module && module.ModuleType == ModuleType.Script)
+                return module.SessionState.PSVariable.GetValue(variableName);
+        }
+        return null;
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
