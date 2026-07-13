@@ -86,22 +86,9 @@ public sealed class GetDbaMemoryUsageCommand : DbaBaseCmdlet
                 {
                     foreach (object? item in EnumerateValue(PipelineValue(NestedCommand.InvokeScoped(this, InvokeScript, fullName, Credential, MemoryCounterRegex, PlanCounterRegex, BufferCounterRegex, SSASCounterRegex, SSISCounterRegex, BoundVerbose()))))
                     {
-                        // PS: the [dbasize](...) cast sits INSIDE the PSCustomObject
-                        // statement - a fault abandons this result's emission.
-                        object? memory;
-                        try
-                        {
-                            memory = DbaSizeBytes(DotAccess(item, "Memory"));
-                        }
-                        catch (PipelineStoppedException)
-                        {
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            StatementFault.Surface(this, ex, "Get-DbaMemoryUsage");
-                            continue;
-                        }
+                        // PS: a [dbasize] cast fault propagates to the surrounding try's
+                        // catch - the REMAINING results for this computer are abandoned.
+                        object? memory = DbaSizeBytes(DotAccess(item, "Memory"));
                         PSObject result = new PSObject();
                         result.Properties.Add(new PSNoteProperty("ComputerName", DotAccess(item, "ComputerName")));
                         result.Properties.Add(new PSNoteProperty("SqlInstance", DotAccess(item, "SqlInstance")));
@@ -118,7 +105,8 @@ public sealed class GetDbaMemoryUsageCommand : DbaBaseCmdlet
                 }
                 catch (Exception ex)
                 {
-                    StopFunction("Failure", target: computer, errorRecord: StatementFault.Record(ex, "Get-DbaMemoryUsage"), continueLoop: true);
+                    // PS: $Computer was reassigned to the RESOLVED name before the try.
+                    StopFunction("Failure", target: fullName, errorRecord: StatementFault.Record(ex, "Get-DbaMemoryUsage"), continueLoop: true);
                     continue;
                 }
             }
