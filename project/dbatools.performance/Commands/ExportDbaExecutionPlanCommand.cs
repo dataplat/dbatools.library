@@ -138,8 +138,22 @@ public sealed class ExportDbaExecutionPlanCommand : DbaInstanceCmdlet
             List<string> whereArray = new List<string>();
 
             // PS: if ($Database -gt 0) - the ARRAY -gt operator FILTERS; truthiness of the
-            // filtered set decides (string elements compare against "0").
-            if (PsOps.IsTrue(GreaterThanFilter(Database, 0)))
+            // filtered set decides (string elements compare against "0"). A non-comparable
+            // element ABORTS the comparison (codex r1: NotIcomparable), statement-style.
+            bool databaseClauseApplies = false;
+            try
+            {
+                databaseClauseApplies = PsOps.IsTrue(GreaterThanFilter(Database, 0));
+            }
+            catch (PipelineStoppedException)
+            {
+                throw;
+            }
+            catch (Exception compareFault)
+            {
+                StatementFault.Surface(this, compareFault, "Export-DbaExecutionPlan");
+            }
+            if (databaseClauseApplies)
             {
                 string dbList = JoinValues(Database!, "','");
                 whereArray.Add(" DB_NAME(deqp.dbid) IN ('" + dbList + "') ");
@@ -310,10 +324,8 @@ public sealed class ExportDbaExecutionPlanCommand : DbaInstanceCmdlet
         List<object?> matched = new List<object?>();
         foreach (object? value in values)
         {
-            bool greater;
-            try { greater = PsOps.Compare(value, comparand) > 0; }
-            catch { greater = false; }
-            if (greater)
+            // a non-comparable element throws and aborts the whole filter, like PS -gt
+            if (PsOps.Compare(value, comparand) > 0)
                 matched.Add(value);
         }
         return matched.ToArray();
