@@ -87,7 +87,7 @@ public sealed class GetDbaUptimeCommand : DbaInstanceCmdlet
 
             // The whole post-connect body is VERBATIM; the only throw-through is the
             // EE Stop-Function (the function terminating path), which propagates.
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript, server, _servername, _nowUtc, Credential, EnableException.ToBool(), BoundVerbose()))
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript, server, instance, _servername, _nowUtc, Credential, EnableException.ToBool(), BoundVerbose()))
                 WriteObject(item);
         }
     }
@@ -117,10 +117,10 @@ if ($instance.Gettype().FullName -eq [System.Management.Automation.PSCustomObjec
     // PS: the post-connect body VERBATIM (uptime math, network-name resolve, the
     // OS-boot-time try/fallback-try with Stop-Function -Continue, the bare emission).
     private const string BodyScript = """
-param($server, $servername, $nowutc, $Credential, $EnableException, $__boundVerbose)
+param($server, $instance, $servername, $nowutc, $Credential, $EnableException, $__boundVerbose)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $servername, $nowutc, $Credential, $EnableException, $__boundVerbose)
+    param($server, $instance, $servername, $nowutc, $Credential, $EnableException, $__boundVerbose)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
     # the foreach shell absorbs Stop-Function -Continue's `continue` the way the
     # function's instance loop did - the caller then moves to the next instance
@@ -163,6 +163,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             SinceWindowsBoot = $WindowsUptimeString
         }
     }
-} $server $servername $nowutc $Credential $EnableException $__boundVerbose 3>&1
+} $server $instance $servername $nowutc $Credential $EnableException $__boundVerbose 3>&1
 """;
 }
