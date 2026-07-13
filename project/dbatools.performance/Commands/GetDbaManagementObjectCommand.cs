@@ -40,9 +40,10 @@ public sealed class GetDbaManagementObjectCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        // PS: foreach ($computer in $ComputerName.ComputerName) - member enumeration.
+        // PS: foreach ($computer in $ComputerName.ComputerName) - member enumeration
+        // (an explicit $null parameter walks to null and iterates zero times).
         List<object?> computers = new List<object?>();
-        foreach (DbaInstanceParameter item in ComputerName)
+        foreach (DbaInstanceParameter item in ComputerName ?? new DbaInstanceParameter[0])
             computers.Add(item?.ComputerName);
 
         foreach (object? computer in computers)
