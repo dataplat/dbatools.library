@@ -156,6 +156,19 @@ public sealed class GetDbaPfDataCollectorCommand : DbaBaseCmdlet
 
     private object? _collectorXml;
 
+    /// <summary>PS pipeline-assignment collapse: none = null, one = the item, many = array.</summary>
+    private static object? PipelineValue(Collection<PSObject> results)
+    {
+        if (results.Count == 0)
+            return null;
+        if (results.Count == 1)
+            return results[0];
+        object?[] array = new object?[results.Count];
+        for (int n = 0; n < results.Count; n++)
+            array[n] = results[n];
+        return array;
+    }
+
     /// <summary>PS truthiness of the accumulated list as an array value.</summary>
     private static bool PsTruthyList(List<object?> values)
     {
