@@ -125,9 +125,11 @@ public sealed class GetDbaTopResourceUsageCommand : DbaInstanceCmdlet
     /// instance loop).</summary>
     private bool RunBlock(Server server, string sql, string label)
     {
-        WriteMessage(MessageLevel.Debug, "Executing SQL: " + sql);
         try
         {
+            // PS: the Write-Message -Level Debug sits INSIDE the try - a
+            // $DebugPreference = "Stop" fault follows the block-fault path.
+            WriteMessage(MessageLevel.Debug, "Executing SQL: " + sql);
             foreach (PSObject? item in NestedCommand.InvokeScoped(this, QueryProjectionScript, server, sql))
                 WriteObject(item);
             return true;
