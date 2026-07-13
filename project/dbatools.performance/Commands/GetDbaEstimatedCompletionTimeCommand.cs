@@ -157,12 +157,22 @@ public sealed class GetDbaEstimatedCompletionTimeCommand : DbaInstanceCmdlet
         }
     }
 
-    /// <summary>PS -join: each element converts via LanguagePrimitives.</summary>
+    /// <summary>PS -join: elements convert with the CURRENT-culture ToString (unlike
+    /// interpolation's invariant conversion - lab-probed both editions: fr-FR joins
+    /// [decimal]1.5 as "1,5").</summary>
     private static string PsJoin(object[] values, string separator)
     {
         List<string> parts = new List<string>();
         foreach (object? value in values)
-            parts.Add(PsText(value));
+        {
+            object? unwrapped = value is PSObject pso ? pso.BaseObject : value;
+            if (unwrapped is null)
+                parts.Add("");
+            else if (unwrapped is IConvertible convertible)
+                parts.Add(convertible.ToString(CultureInfo.CurrentCulture));
+            else
+                parts.Add(unwrapped.ToString() ?? "");
+        }
         return string.Join(separator, parts);
     }
 
