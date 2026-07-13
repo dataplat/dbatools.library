@@ -301,6 +301,11 @@ public sealed class AddDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             {
                 try
                 {
+                    // The function's try{} sets the engine's propagate flag, so statement
+                    // faults at ANY depth under Invoke-Command2 / the read-back unwind to
+                    // this catch instead of writing-and-continuing (EngineTryScope = the
+                    // W1-045 S08 lab split).
+                    using EngineTryScope tryScope = EngineTryScope.Enter(this);
                     Collection<PSObject> results = NestedCommand.InvokeScoped(this, InvokeCommand2Script, computer, Credential, setname, _plainxml, BoundVerbose());
 
                     // PS: Write-Message -Level Verbose -Message " $results"
