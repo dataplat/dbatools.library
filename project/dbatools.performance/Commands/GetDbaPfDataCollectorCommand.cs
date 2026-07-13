@@ -79,13 +79,21 @@ public sealed class GetDbaPfDataCollectorCommand : DbaBaseCmdlet
 
         object? effectiveCredential = _credentialAdopted ? _credential : Credential;
 
-        // PS: if ($InputObject.Credential -and (Test-Bound Credential -Not)).
+        // PS: if ($InputObject.Credential -and (Test-Bound Credential -Not)) - the
+        // [PSCredential]-typed assignment COERCES; a failed coercion (multi-input
+        // Object[]) statement-faults and keeps the prior value.
         object? inputCredential = MemberEnum(_accumulated, "Credential");
         if (LanguagePrimitives.IsTrue(inputCredential) && !TestBound("Credential"))
         {
-            effectiveCredential = inputCredential;
-            _credential = inputCredential;
-            _credentialAdopted = true;
+            try
+            {
+                object? coerced = LanguagePrimitives.ConvertTo(inputCredential, typeof(PSCredential), CultureInfo.InvariantCulture);
+                effectiveCredential = coerced;
+                _credential = coerced;
+                _credentialAdopted = true;
+            }
+            catch (PipelineStoppedException) { throw; }
+            catch (Exception ex) { StatementFault.Surface(this, ex, "Get-DbaPfDataCollector"); }
         }
 
         // PS: refetch when no input OR input plus an explicitly bound -ComputerName.
@@ -115,9 +123,24 @@ public sealed class GetDbaPfDataCollectorCommand : DbaBaseCmdlet
 
         foreach (object? set in _accumulated)
         {
+            // PS: $collectorxml is a process-local - a faulted [xml] cast keeps the
+            // STALE value from the prior set and the loop re-projects it with the
+            // CURRENT $set values.
             try
             {
-                foreach (PSObject? item in NestedCommand.InvokeScoped(this, SetProjectionScript, set, Collector, effectiveCredential))
+                _collectorXml = PipelineValue(NestedCommand.InvokeScoped(this, CollectorXmlScript, set));
+            }
+            catch (PipelineStoppedException)
+            {
+                throw;
+            }
+            catch (RuntimeException ex)
+            {
+                StatementFault.Surface(this, ex, "Get-DbaPfDataCollector");
+            }
+            try
+            {
+                foreach (PSObject? item in NestedCommand.InvokeScoped(this, SetProjectionScript, _collectorXml, set, Collector, effectiveCredential))
                     WriteObject(item);
             }
             catch (PipelineStoppedException)
@@ -130,6 +153,8 @@ public sealed class GetDbaPfDataCollectorCommand : DbaBaseCmdlet
             }
         }
     }
+
+    private object? _collectorXml;
 
     /// <summary>PS truthiness of the accumulated list as an array value.</summary>
     private static bool PsTruthyList(List<object?> values)
@@ -192,15 +217,20 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $__computer $Credential $CollectorSet $__boundVerbose 3>&1
 """;
 
+    // PS: the $collectorxml assignment (statement-conditional, stale-able).
+    private const string CollectorXmlScript = """
+param($set)
+([xml]$set.Xml).DataCollectorSet.PerformanceCounterDataCollector
+""";
+
     // PS: the per-set XML walk + emission VERBATIM (adapter reads, the Collector filter,
     // the UNC remote build, the PSCustomObject and its Select-DefaultView columns).
     private const string SetProjectionScript = """
-param($set, $Collector, $Credential)
+param($collectorxml, $set, $Collector, $Credential)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($set, $Collector, $Credential)
+    param($collectorxml, $set, $Collector, $Credential)
     $columns = 'ComputerName', 'DataCollectorSet', 'Name', 'DataCollectorType', 'DataSourceName', 'FileName', 'FileNameFormat', 'FileNameFormatPattern', 'LatestOutputLocation', 'LogAppend', 'LogCircular', 'LogFileFormat', 'LogOverwrite', 'SampleInterval', 'SegmentMaxRecords', 'Counters'
-    $collectorxml = ([xml]$set.Xml).DataCollectorSet.PerformanceCounterDataCollector
     foreach ($col in $collectorxml) {
         if ($Collector -and $Collector -notcontains $col.Name) {
             continue
@@ -239,6 +269,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Credential                 = $Credential
         } | Select-DefaultView -Property $columns
     }
-} $set $Collector $Credential 3>&1
+} $collectorxml $set $Collector $Credential 3>&1
 """;
 }
