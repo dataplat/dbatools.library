@@ -192,14 +192,28 @@ public sealed class GetDbaCpuUsageCommand : DbaInstanceCmdlet
         return matches.ToArray();
     }
 
-    /// <summary>Member-enumeration read over the filter result (the .spid projection).</summary>
+    /// <summary>The .spid read over the filter result: ONE match is plain property access
+    /// (a nested collection stays nested); 2+ matches member-enumerate - collection values
+    /// FLATTEN one level and a singleton total unwraps to scalar.</summary>
     private static object? ProjectMemberValues(List<object?> matches, string property)
     {
+        if (matches.Count == 0)
+            return null;
+        if (matches.Count == 1)
+            return DotAccess(matches[0], property);
         List<object?> collected = new List<object?>();
         foreach (object? match in matches)
         {
             object? value = DotAccess(match, property);
-            collected.Add(value);
+            if (value is not string && LanguagePrimitives.GetEnumerable(value) is IEnumerable elements)
+            {
+                foreach (object? element in elements)
+                    collected.Add(UnwrapTransit(element));
+            }
+            else
+            {
+                collected.Add(value);
+            }
         }
         if (collected.Count == 0)
             return null;
