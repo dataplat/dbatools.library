@@ -242,12 +242,22 @@ public sealed class GetDbaDbccSessionBufferCommand : DbaInstanceCmdlet
                 continue;
             int columnCount = row.Table.Columns.Count;
             object? cell = columnCount > 0 ? row[0] : null;
-            // PS: $str = $row[0].ToString() - a null read faults InvokeMethodOnNull and
-            // $str keeps its previous value; execution continues at the next statement.
+            // PS: $str = $row[0].ToString() - a null read faults InvokeMethodOnNull, a
+            // throwing method faults with the engine's MethodInvocationException shape;
+            // $str keeps its previous value and execution continues at the next statement.
             if (cell is null)
+            {
                 StatementFault.Surface(this, NullMethodRecord());
+            }
             else
-                _str = cell.ToString();
+            {
+                try
+                {
+                    _str = cell.ToString();
+                }
+                catch (PipelineStoppedException) { throw; }
+                catch (Exception ex) { StatementFault.Surface(this, MethodFaultRecord(ex, "ToString", 0)); }
+            }
             if (_str is null)
             {
                 StatementFault.Surface(this, NullMethodRecord());
@@ -259,7 +269,7 @@ public sealed class GetDbaDbccSessionBufferCommand : DbaInstanceCmdlet
                     hexStringBuilder.Append(_str.Substring(11, 48));
                 }
                 catch (PipelineStoppedException) { throw; }
-                catch (Exception ex) { StatementFault.Surface(this, ex, "Get-DbaDbccSessionBuffer"); }
+                catch (Exception ex) { StatementFault.Surface(this, MethodFaultRecord(ex, "Substring", 2)); }
             }
             if (_str is null)
             {
@@ -272,7 +282,7 @@ public sealed class GetDbaDbccSessionBufferCommand : DbaInstanceCmdlet
                     asciiStringBuilder.Append(_str.Substring(61, 16));
                 }
                 catch (PipelineStoppedException) { throw; }
-                catch (Exception ex) { StatementFault.Surface(this, ex, "Get-DbaDbccSessionBuffer"); }
+                catch (Exception ex) { StatementFault.Surface(this, MethodFaultRecord(ex, "Substring", 2)); }
             }
         }
 
@@ -303,6 +313,14 @@ public sealed class GetDbaDbccSessionBufferCommand : DbaInstanceCmdlet
     private static ErrorRecord NullMethodRecord()
     {
         return new ErrorRecord(new RuntimeException("You cannot call a method on a null-valued expression."), "InvokeMethodOnNull", ErrorCategory.InvalidOperation, null);
+    }
+
+    /// <summary>The engine's method-fault record: a MethodInvocationException whose message
+    /// wraps the inner text and whose FQEID leads with the inner exception's type name.</summary>
+    private static ErrorRecord MethodFaultRecord(Exception inner, string methodName, int argumentCount)
+    {
+        string message = "Exception calling \"" + methodName + "\" with \"" + argumentCount.ToString(CultureInfo.InvariantCulture) + "\" argument(s): \"" + inner.Message + "\"";
+        return new ErrorRecord(new MethodInvocationException(message, inner), inner.GetType().Name, ErrorCategory.NotSpecified, null);
     }
 
     /// <summary>PS string interpolation via LanguagePrimitives (invariant).</summary>
