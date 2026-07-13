@@ -160,8 +160,8 @@ public sealed class GetDbaDbPageInfoCommand : DbaInstanceCmdlet
             bool filterInclude = PsTruthy(Database);
             foreach (object? candidate in EnumerateValue(DotAccess(serverValue, "Databases")))
             {
-                if (candidate is null)
-                    continue;
+                // PS: null elements survive the append (and later null-walk to the
+                // "Unsupported" branch); the Name filter drops them when bound.
                 if (filterInclude && !MatchesAny(DotAccess(candidate, "Name"), Database!))
                     continue;
                 inputObjects.Add(candidate);
