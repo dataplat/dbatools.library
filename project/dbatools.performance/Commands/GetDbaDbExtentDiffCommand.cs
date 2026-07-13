@@ -77,8 +77,10 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
 
             // PS: $dbs = $server.Databases with VALUE-truthy Name -In/-NotIn filters.
             List<Microsoft.SqlServer.Management.Smo.Database> dbs = new List<Microsoft.SqlServer.Management.Smo.Database>();
-            bool filterInclude = Database is not null && Database.Length > 0;
-            bool filterExclude = ExcludeDatabase is not null && ExcludeDatabase.Length > 0;
+            // PS: if ($Database) is VALUE truthiness - a 1-element array takes its
+            // element's truthiness, so @($false) or @("") skips the filter entirely.
+            bool filterInclude = PsTruthy(Database);
+            bool filterExclude = PsTruthy(ExcludeDatabase);
             foreach (Microsoft.SqlServer.Management.Smo.Database candidate in server.Databases)
             {
                 if (filterInclude && !MatchesAny(candidate.Name, Database!))
@@ -286,6 +288,17 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
         if (value is null)
             return false;
         return PsText(value).StartsWith("DIFF_MAP", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>PS array truthiness: empty = false, one element = its truthiness,
+    /// two or more = true.</summary>
+    private static bool PsTruthy(object[]? values)
+    {
+        if (values is null || values.Length == 0)
+            return false;
+        if (values.Length == 1)
+            return LanguagePrimitives.IsTrue(values[0]);
+        return true;
     }
 
     /// <summary>PS -In over the raw filter array (elementwise -eq).</summary>
