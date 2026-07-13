@@ -179,14 +179,24 @@ public sealed class GetDbaTopResourceUsageCommand : DbaInstanceCmdlet
     }
 
     /// <summary>The undefined-variable read: an unset begin-block fragment resolves
-    /// module scope then global (the established law), read as interpolation text.</summary>
+    /// module scope then global (the established law), read as interpolation text - an
+    /// ARRAY value $OFS-joins per element (the hop enumerates it into N results).</summary>
     private string ModuleVariableText(string name)
     {
         Collection<PSObject> results = NestedCommand.InvokeScoped(this, ModuleVariableScript, name);
-        object? value = results.Count == 1 ? results[0] : null;
-        if (value is null)
+        if (results.Count == 0)
             return "";
-        return (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
+        List<string> texts = new List<string>();
+        foreach (PSObject? result in results)
+        {
+            if (result is null)
+            {
+                texts.Add("");
+                continue;
+            }
+            texts.Add((string)LanguagePrimitives.ConvertTo(result, typeof(string), CultureInfo.InvariantCulture));
+        }
+        return string.Join(" ", texts);
     }
 
     private const string ModuleVariableScript = """
