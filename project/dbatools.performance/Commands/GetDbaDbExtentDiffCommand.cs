@@ -56,7 +56,7 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
 
     // PS: process-block locals persist and the un-tried Query statements keep their
     // STALE value on a fault - the emission statement still runs with it.
-    private object? _pageResults;
+    private object? _dbccPageResults;
     private Collection<PSObject> _masterFiles = new Collection<PSObject>();
 
     protected override void ProcessRecord()
@@ -111,7 +111,7 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
                     ";
                     try
                     {
-                        _pageResults = PipelineValue(NestedCommand.InvokeScoped(this, ServerQueryDbScript, server, dmvQuery, db.Name));
+                        _dbccPageResults = PipelineValue(NestedCommand.InvokeScoped(this, ServerQueryDbScript, server, dmvQuery, db.Name));
                     }
                     catch (PipelineStoppedException) { throw; }
                     catch (RuntimeException ex) { StatementFault.Surface(this, ex, "Get-DbaDbExtentDiff"); }
@@ -121,7 +121,7 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
                     object? changedPerc;
                     try
                     {
-                        changedPerc = PsMathRound(DotAccess(_pageResults, "ChangedPerc"));
+                        changedPerc = PsMathRound(DotAccess(_dbccPageResults, "ChangedPerc"));
                     }
                     catch (PipelineStoppedException) { throw; }
                     catch (Exception ex)
@@ -134,8 +134,8 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
                     result.Properties.Add(new PSNoteProperty("InstanceName", server.ServiceName));
                     result.Properties.Add(new PSNoteProperty("SqlInstance", SmoServerExtensions.GetDomainInstanceName(server)));
                     result.Properties.Add(new PSNoteProperty("DatabaseName", db.Name));
-                    result.Properties.Add(new PSNoteProperty("ExtentsTotal", DotAccess(_pageResults, "ExtentsTotal")));
-                    result.Properties.Add(new PSNoteProperty("ExtentsChanged", DotAccess(_pageResults, "ExtentsChanged")));
+                    result.Properties.Add(new PSNoteProperty("ExtentsTotal", DotAccess(_dbccPageResults, "ExtentsTotal")));
+                    result.Properties.Add(new PSNoteProperty("ExtentsChanged", DotAccess(_dbccPageResults, "ExtentsChanged")));
                     result.Properties.Add(new PSNoteProperty("ChangedPerc", changedPerc));
                     WriteObject(result);
                 }
@@ -189,25 +189,28 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
                 foreach (string groupName in groupOrder)
                 {
                     object sizeTotal = 0;
-                    List<PSObject> dbExtents = new List<PSObject>();
+                    List<object?> dbExtents = new List<object?>();
                     foreach (PSObject fileRow in groups[groupName])
                     {
-                        int extentId = 0;
+                        // PS: int arithmetic overflow-promotes to double and the loop
+                        // exits - long carries the same values and exit condition.
+                        long extentId = 0;
                         object? size = DotAccess(fileRow, "size");
                         int sizeValue = ToInt(size);
                         sizeTotal = PsAdd(sizeTotal, PsDivide(sizeValue, 8));
                         while (extentId < sizeValue)
                         {
-                            int pageId = extentId + 6;
+                            long pageId = extentId + 6;
                             string pageQuery = "DBCC PAGE ('" + PsText(DotAccess(fileRow, "dbname")) + "', " + PsText(DotAccess(fileRow, "file_id")) + ", " + pageId.ToString(CultureInfo.InvariantCulture) + ", 3)  WITH TABLERESULTS, NO_INFOMSGS";
-                            Collection<PSObject> pageResults = new Collection<PSObject>();
                             try
                             {
-                                pageResults = NestedCommand.InvokeScoped(this, ServerQueryScript, server, pageQuery);
+                                _dbccPageResults = PipelineValue(NestedCommand.InvokeScoped(this, ServerQueryScript, server, pageQuery));
                             }
                             catch (PipelineStoppedException) { throw; }
                             catch (RuntimeException ex) { StatementFault.Surface(this, ex, "Get-DbaDbExtentDiff"); }
-                            foreach (PSObject? pageItem in pageResults)
+                            // PS: the filter pipe walks the STALE $DBCCPageResults when the
+                            // Query statement faulted; a lone real $null matches nothing.
+                            foreach (object? pageItem in EnumerateValue(_dbccPageResults))
                             {
                                 if (pageItem is null)
                                     continue;
@@ -253,10 +256,10 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
 
     /// <summary>PS begin-block Get-DbaExtent: counts extents from the regex-matched
     /// Field texts with PS-numeric accumulation.</summary>
-    private static object GetDbaExtent(List<PSObject> dbExtents)
+    private static object GetDbaExtent(List<object?> dbExtents)
     {
         object res = 0;
-        foreach (PSObject row in dbExtents)
+        foreach (object? row in dbExtents)
         {
             // PS: [string[]]$field = $dbExtents.Field - each element casts to string.
             string f = PsText(DotAccess(row, "Field"));
@@ -329,12 +332,33 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
         return (double)a / b;
     }
 
-    /// <summary>PS addition over the int-or-double values this command produces.</summary>
+    /// <summary>PS addition over the int-or-double values this command produces; an
+    /// int overflow promotes to double like the engine.</summary>
     private static object PsAdd(object a, object b)
     {
         if (a is int ia && b is int ib)
-            return ia + ib;
+        {
+            long sum = (long)ia + ib;
+            if (sum >= int.MinValue && sum <= int.MaxValue)
+                return (int)sum;
+            return (double)sum;
+        }
         return Convert.ToDouble(a, CultureInfo.InvariantCulture) + Convert.ToDouble(b, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Enumerates a PS pipeline value: null yields nothing through a filter
+    /// pipe, an array yields elements, a scalar yields itself.</summary>
+    private static IEnumerable<object?> EnumerateValue(object? value)
+    {
+        if (value is null)
+            yield break;
+        if (value is object?[] array)
+        {
+            foreach (object? element in array)
+                yield return element;
+            yield break;
+        }
+        yield return value;
     }
 
     private static int ToInt(object? value)
