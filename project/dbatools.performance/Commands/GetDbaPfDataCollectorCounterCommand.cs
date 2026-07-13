@@ -60,23 +60,20 @@ public sealed class GetDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    // PS: $Credential reassignment and $InputObject += persist across process blocks.
+    // PS: $Credential reassignment persists across process blocks; $InputObject is
+    // re-bound FRESH on every pipeline record (even the same array reference piped
+    // twice via -NoEnumerate), so the += growth never survives into the next record.
     private object? _credential;
     private bool _credentialAdopted;
     private List<object?> _accumulated = new List<object?>();
-    private object? _lastBoundInputObject;
 
     protected override void ProcessRecord()
     {
-        if (!ReferenceEquals(InputObject, _lastBoundInputObject))
+        _accumulated = new List<object?>();
+        if (InputObject is not null)
         {
-            _accumulated = new List<object?>();
-            if (InputObject is not null)
-            {
-                foreach (object? item in InputObject)
-                    _accumulated.Add(item);
-            }
-            _lastBoundInputObject = InputObject;
+            foreach (object? item in InputObject)
+                _accumulated.Add(item);
         }
 
         object? effectiveCredential = _credentialAdopted ? _credential : Credential;
@@ -166,7 +163,21 @@ public sealed class GetDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
                 catch { value = null; }
                 if (value is PSObject psValue && psValue.BaseObject is not PSCustomObject)
                     value = psValue.BaseObject;
-                collected.Add(value);
+                // PS member enumeration FLATTENS collection values one level (W1-060 law).
+                if (value is not string && LanguagePrimitives.GetEnumerable(value) is IEnumerable elements)
+                {
+                    foreach (object? element in elements)
+                    {
+                        object? unwrapped = element;
+                        if (unwrapped is PSObject psElement && psElement.BaseObject is not PSCustomObject)
+                            unwrapped = psElement.BaseObject;
+                        collected.Add(unwrapped);
+                    }
+                }
+                else
+                {
+                    collected.Add(value);
+                }
             }
             else if (wrapped.BaseObject is PSCustomObject)
             {

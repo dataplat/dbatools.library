@@ -16,8 +16,8 @@ namespace Dataplat.Dbatools.Commands;
 /// public/Get-DbaPfDataCollector.ps1 (W1-088). Quirks preserved: an InputObject
 /// Credential is ADOPTED when -Credential is unbound (member-enum read, sticky across
 /// records); the refetch gate (no input OR input plus bound -ComputerName) appends
-/// Get-DbaPfDataCollectorSet output per computer to the accumulated InputObject
-/// (W1-070 reference-reset law); the type gate's record-less Stop-Function fires when
+/// Get-DbaPfDataCollectorSet output per computer to the per-record InputObject
+/// (pipeline binding re-binds fresh every record); the type gate's record-less Stop-Function fires when
 /// the member-enumerated DataCollectorSetObject reads falsy; each SET rides the VERBATIM
 /// XML-walk hop ([xml]$set.Xml adapter walk, the -notcontains Collector filter, the
 /// UNC remote-location build, the 21-prop PSCustomObject and its Select-DefaultView
@@ -58,23 +58,20 @@ public sealed class GetDbaPfDataCollectorCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    // PS: $Credential reassignment and $InputObject += persist across process blocks.
+    // PS: $Credential reassignment persists across process blocks; $InputObject is
+    // re-bound FRESH on every pipeline record (even the same array reference piped
+    // twice via -NoEnumerate), so the += growth never survives into the next record.
     private object? _credential;
     private bool _credentialAdopted;
     private List<object?> _accumulated = new List<object?>();
-    private object? _lastBoundInputObject;
 
     protected override void ProcessRecord()
     {
-        if (!ReferenceEquals(InputObject, _lastBoundInputObject))
+        _accumulated = new List<object?>();
+        if (InputObject is not null)
         {
-            _accumulated = new List<object?>();
-            if (InputObject is not null)
-            {
-                foreach (object? item in InputObject)
-                    _accumulated.Add(item);
-            }
-            _lastBoundInputObject = InputObject;
+            foreach (object? item in InputObject)
+                _accumulated.Add(item);
         }
 
         object? effectiveCredential = _credentialAdopted ? _credential : Credential;
@@ -196,7 +193,21 @@ public sealed class GetDbaPfDataCollectorCommand : DbaBaseCmdlet
                 catch { value = null; }
                 if (value is PSObject psValue && psValue.BaseObject is not PSCustomObject)
                     value = psValue.BaseObject;
-                collected.Add(value);
+                // PS member enumeration FLATTENS collection values one level (W1-060 law).
+                if (value is not string && LanguagePrimitives.GetEnumerable(value) is IEnumerable elements)
+                {
+                    foreach (object? element in elements)
+                    {
+                        object? unwrapped = element;
+                        if (unwrapped is PSObject psElement && psElement.BaseObject is not PSCustomObject)
+                            unwrapped = psElement.BaseObject;
+                        collected.Add(unwrapped);
+                    }
+                }
+                else
+                {
+                    collected.Add(value);
+                }
             }
             else if (wrapped.BaseObject is PSCustomObject)
             {
