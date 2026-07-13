@@ -208,14 +208,14 @@ public sealed class GetDbaCpuUsageCommand : DbaInstanceCmdlet
         return collected.ToArray();
     }
 
-    /// <summary>Add-Member -Force NoteProperty.</summary>
+    /// <summary>Add-Member -Force NoteProperty: an existing INSTANCE member is removed and
+    /// the note re-appends at the END (an adapted property is shadowed, never assigned).</summary>
     private static void SetNote(PSObject target, string name, object? value)
     {
         PSPropertyInfo? existing = target.Properties[name];
-        if (existing is not null)
-            existing.Value = value;
-        else
-            target.Properties.Add(new PSNoteProperty(name, value));
+        if (existing is not null && existing.IsInstance)
+            target.Properties.Remove(name);
+        target.Properties.Add(new PSNoteProperty(name, value));
     }
 
     /// <summary>The PS dot operator with member-enumeration semantics (W1-044 shape).</summary>
