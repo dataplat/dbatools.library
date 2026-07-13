@@ -157,18 +157,51 @@ public sealed class GetDbaMemoryUsageCommand : DbaBaseCmdlet
         yield return value;
     }
 
-    /// <summary>The PS dot operator (deserialized note-property reads).</summary>
+    /// <summary>The PS dot operator with member-enumeration semantics (W1-060 shape).</summary>
     private static object? DotAccess(object? item, string name)
     {
         if (item is null)
             return null;
         PSObject wrapped = PSObject.AsPSObject(item);
         PSPropertyInfo? direct = wrapped.Properties[name];
-        if (direct is null)
-            return null;
-        object? value;
-        try { value = direct.Value; }
-        catch { return null; }
+        if (direct is not null)
+        {
+            object? value;
+            try { value = direct.Value; }
+            catch { return null; }
+            return UnwrapTransit(value);
+        }
+        object? baseValue = wrapped.BaseObject;
+        if (baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable elements)
+        {
+            List<object?> collected = new List<object?>();
+            foreach (object? element in elements)
+            {
+                if (element is null)
+                    continue;
+                PSObject wrappedElement = PSObject.AsPSObject(element);
+                PSPropertyInfo? property = wrappedElement.Properties[name];
+                if (property is not null)
+                {
+                    try { collected.Add(UnwrapTransit(property.Value)); }
+                    catch { collected.Add(null); }
+                }
+                else if (wrappedElement.BaseObject is PSCustomObject)
+                {
+                    collected.Add(null);
+                }
+            }
+            if (collected.Count == 0)
+                return null;
+            if (collected.Count == 1)
+                return collected[0];
+            return collected.ToArray();
+        }
+        return null;
+    }
+
+    private static object? UnwrapTransit(object? value)
+    {
         if (value is PSObject psValue && psValue.BaseObject is not PSCustomObject)
             return psValue.BaseObject;
         return value;
