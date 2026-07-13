@@ -45,7 +45,7 @@ public sealed class GetDbaDbFeatureUsageCommand : DbaInstanceCmdlet
     public string[]? ExcludeDatabase { get; set; }
 
     /// <summary>Database objects piped in, typically from Get-DbaDatabase.</summary>
-    [Parameter(ValueFromPipeline = true)]
+    [Parameter(ValueFromPipeline = true, Position = 4)]
     public Microsoft.SqlServer.Management.Smo.Database[]? InputObject { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
