@@ -24,9 +24,18 @@ namespace Dataplat.Dbatools.Commands;
 [Cmdlet(VerbsCommon.Get, "DbaManagementObject")]
 public sealed class GetDbaManagementObjectCommand : DbaBaseCmdlet
 {
-    /// <summary>The target computer(s); defaults to the local computer.</summary>
+    /// <summary>The target computer(s); defaults to the local computer (an unset
+    /// COMPUTERNAME leaves the PS default null - zero iterations).</summary>
     [Parameter(ValueFromPipeline = true, Position = 0)]
-    public DbaInstanceParameter[] ComputerName { get; set; } = new DbaInstanceParameter[] { new DbaInstanceParameter(Environment.GetEnvironmentVariable("COMPUTERNAME")) };
+    public DbaInstanceParameter[]? ComputerName { get; set; } = BuildDefaultComputerName();
+
+    private static DbaInstanceParameter[]? BuildDefaultComputerName()
+    {
+        string? name = Environment.GetEnvironmentVariable("COMPUTERNAME");
+        if (string.IsNullOrEmpty(name))
+            return null;
+        return new DbaInstanceParameter[] { new DbaInstanceParameter(name) };
+    }
 
     /// <summary>Windows credential for the remote invocation.</summary>
     [Parameter(Position = 1)]
