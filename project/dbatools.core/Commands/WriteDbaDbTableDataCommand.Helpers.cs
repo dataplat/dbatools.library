@@ -371,14 +371,19 @@ public sealed partial class WriteDbaDbTableDataCommand
         }
     }
 
-    /// <summary>PS ColumnMappings.Add binder parity (the W1-018 class): Int32-typed key AND
-    /// value take the ordinal overload; otherwise both string-convert.</summary>
+    /// <summary>PS ColumnMappings.Add binder parity (the W1-018 class): each Int32-typed
+    /// operand independently lands its ordinal slot - the binder resolves ALL FOUR mixed
+    /// overloads (codex r1 F3).</summary>
     private void AddColumnMapping(object? key, object? value)
     {
         object? rawKey = PsAssignment.Unwrap(key);
         object? rawValue = PsAssignment.Unwrap(value);
         if (rawKey is int sourceOrdinal && rawValue is int destinationOrdinal)
             _bulkCopy!.ColumnMappings.Add(sourceOrdinal, destinationOrdinal);
+        else if (rawKey is int sourceOrdinalOnly)
+            _bulkCopy!.ColumnMappings.Add(sourceOrdinalOnly, PsToText(rawValue));
+        else if (rawValue is int destinationOrdinalOnly)
+            _bulkCopy!.ColumnMappings.Add(PsToText(rawKey), destinationOrdinalOnly);
         else
             _bulkCopy!.ColumnMappings.Add(PsToText(rawKey), PsToText(rawValue));
     }

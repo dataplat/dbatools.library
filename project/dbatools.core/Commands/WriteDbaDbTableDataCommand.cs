@@ -64,10 +64,12 @@ public sealed partial class WriteDbaDbTableDataCommand : DbaBaseCmdlet
     public string Schema { get; set; } = "dbo";
 
     [Parameter]
+    [PsIntCast]
     [ValidateNotNull]
     public int BatchSize { get; set; } = 50000;
 
     [Parameter]
+    [PsIntCast]
     [ValidateNotNull]
     public int NotifyAfter { get; set; } = 5000;
 
@@ -93,6 +95,7 @@ public sealed partial class WriteDbaDbTableDataCommand : DbaBaseCmdlet
     public SwitchParameter Truncate { get; set; }
 
     [Parameter]
+    [PsIntCast]
     [ValidateNotNull]
     public int BulkCopyTimeOut { get; set; } = 5000;
 
@@ -204,6 +207,15 @@ public sealed partial class WriteDbaDbTableDataCommand : DbaBaseCmdlet
             #endregion Scenario 2: Multiple valid tables
 
             #region Scenario 3: Invalid data types
+            if (item is null)
+            {
+                // PS: the if-condition's $object.GetType() dies method-on-null - a
+                // statement-terminating error that skips the WHOLE if/else (the null never
+                // reaches the steppable) and continues with the next element (codex r1 F4,
+                // lab-proven).
+                WriteError(new ErrorRecord(new PSInvalidOperationException("You cannot call a method on a null-valued expression."), "InvokeMethodOnNull", ErrorCategory.InvalidOperation, null));
+                continue;
+            }
             // PS: $null = $steppablePipeline.Process($object)
             using (NestedCommand.ShieldDefaultParameterValues(this))
             {

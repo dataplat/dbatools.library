@@ -218,6 +218,16 @@ internal sealed class PsStringCastAttribute : ArgumentTransformationAttribute
     }
 }
 
+/// <summary>PS [int] bind-time cast: an explicit null argument becomes 0 BEFORE validation
+/// attributes run (so [ValidateNotNull()][int] accepts -Param $null as 0 - W1-043 class).</summary>
+internal sealed class PsIntCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        return LanguagePrimitives.ConvertTo(inputData, typeof(int), CultureInfo.InvariantCulture);
+    }
+}
+
 /// <summary>The PS property-assignment binder's argument conversion.</summary>
 internal static class PsAssignment
 {
