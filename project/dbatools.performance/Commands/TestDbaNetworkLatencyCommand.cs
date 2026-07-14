@@ -134,7 +134,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     ExecuteOnlyTotal = [prettytimespan]::FromMilliseconds($totalWarm)
                     ExecuteOnlyAvg   = [prettytimespan]::FromMilliseconds($averageWarm)
                     NetworkOnlyTotal = [prettytimespan]::FromMilliseconds($totalTime - $totalWarm)
-                } | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, 'Count as ExecutionCount', Total, 'Avg as Average', ExecuteOnlyTotal, 'ExecuteOnlyAvg as ExecuteOnlyAverage', NetworkOnlyTotal -FunctionName Test-DbaNetworkLatency #backwards compat
+                } | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, 'Count as ExecutionCount', Total, 'Avg as Average', ExecuteOnlyTotal, 'ExecuteOnlyAvg as ExecuteOnlyAverage', NetworkOnlyTotal #backwards compat
             } catch {
                 Stop-Function -Message "Error occurred testing dba network latency: $_" -ErrorRecord $_ -Continue -Target $instance -FunctionName Test-DbaNetworkLatency
             }
