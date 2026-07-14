@@ -100,7 +100,6 @@ $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
-try {
 & $__dbatoolsModule {
     [CmdletBinding()]
     param($SqlInstance, $SqlCredential, $Database, $Table, $SqlCms, $ServersFromFile, [Microsoft.SqlServer.Management.Smo.Server[]]$InputObject, $EnableException, $__boundSqlCms, $__boundServersFromFile, $__boundInputObject)
@@ -211,8 +210,5 @@ try {
         }
 
 } $SqlInstance $SqlCredential $Database $Table $SqlCms $ServersFromFile $InputObject $EnableException $__boundSqlCms $__boundServersFromFile $__boundInputObject @__commonParameters 3>&1 2>&1
-} catch {
-    $_
-}
 """;
 }
