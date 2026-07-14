@@ -77,18 +77,43 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 
     private void EmitTerminatingValidation()
     {
-        object? oldWarningPreference = SessionState.PSVariable.GetValue("WarningPreference");
-        try
+        ScriptBlock warningScript = ScriptBlock.Create(
+            "param($__nestedCommandArguments)\n& {\n" + ValidationWarningScript + "\n} @__nestedCommandArguments");
+        using (NestedCommand.ShieldDefaultParameterValues(this))
         {
-            SessionState.PSVariable.Set("WarningPreference", ActionPreference.SilentlyContinue);
-            _ = NestedCommand.InvokeScoped(this, ValidationWarningScript, ValidationMessage);
-        }
-        finally
-        {
-            SessionState.PSVariable.Set("WarningPreference", oldWarningPreference);
+            foreach (PSObject item in InvokeCommand.InvokeScript(false, warningScript, null,
+                new object?[] { new object?[] { ValidationMessage } }))
+            {
+                if (item?.BaseObject is WarningRecord warning)
+                    PersistSuppressedWarning(warning);
+            }
         }
 
         _ = NestedCommand.InvokeScoped(this, ValidationThrowScript, ValidationMessage);
+    }
+
+    private void PersistSuppressedWarning(WarningRecord warning)
+    {
+        if (!MyInvocation.BoundParameters.TryGetValue("WarningVariable", out object? rawName))
+            return;
+
+        string variableName = LanguagePrimitives.ConvertTo<string>(rawName);
+        bool append = variableName.StartsWith("+", StringComparison.Ordinal);
+        if (append)
+            variableName = variableName.Substring(1);
+        if (String.IsNullOrWhiteSpace(variableName))
+            return;
+
+        ScriptBlock persistScript = ScriptBlock.Create("""
+param($__name, $__warning, $__append)
+$__items = @()
+if ($__append) {
+    $__items = @(Get-Variable -Name $__name -ValueOnly -ErrorAction SilentlyContinue)
+}
+$__items += $__warning
+Set-Variable -Name $__name -Value $__items
+""");
+        _ = InvokeCommand.InvokeScript(false, persistScript, null, variableName, warning, append);
     }
 
     private object? BoundCommonParameter(string name)
@@ -125,8 +150,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding()]
     param($Message)
     $EnableException = $false
-    Stop-Function -Message $Message -FunctionName Watch-DbaDbLogin
-} $Message 3>&1
+    $__warnings = @()
+    Stop-Function -Message $Message -FunctionName Watch-DbaDbLogin -WarningVariable __warnings 3>$null
+    $__warnings
+} $Message
 """;
 
     private const string ValidationThrowScript = """
