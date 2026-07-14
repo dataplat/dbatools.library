@@ -168,14 +168,27 @@ try {
     [CmdletBinding()]
     param($SqlInstance, $SqlCredential, $Database, $Table, $SqlCms, $ServersFromFile, [Microsoft.SqlServer.Management.Smo.Server[]]$InputObject, $EnableException, $__boundSqlCms, $__boundServersFromFile, $__boundInputObject)
 
+        $__invokeConnect = {
+            [CmdletBinding()]
+            param([hashtable]$Parameters)
+            Connect-DbaInstance @Parameters
+        }
+
         if (-not ($__boundSqlCms -or $__boundServersFromFile -or $__boundInputObject)) {
             Stop-Function -Message "You must specify a server list source using -SqlCms or -ServersFromFile or pipe in connected instances. See the command documentation and examples for more details." -FunctionName Watch-DbaDbLogin
             return
         }
 
         try {
-            $serverDest = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential
+            $__connectWarnings = @()
+            $serverDest = & $__invokeConnect @{
+                SqlInstance = $SqlInstance
+                SqlCredential = $SqlCredential
+            } -WarningVariable __connectWarnings
         } catch {
+            foreach ($__connectWarning in $__connectWarnings) {
+                Write-Warning ($__connectWarning.ToString()) 3>$null
+            }
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $SqlInstance -FunctionName Watch-DbaDbLogin
             return
         }
@@ -208,12 +221,21 @@ try {
         #>
         foreach ($instance in $servers) {
             try {
+                $__connectWarnings = @()
                 if ($instance -is [Microsoft.SqlServer.Management.RegisteredServers.RegisteredServer]) {
-                    $InputObject += Connect-DbaInstance -SqlInstance $instance.ServerName -SqlCredential $SqlCredential -MinimumVersion 9
+                    $__sourceInstance = $instance.ServerName
                 } else {
-                    $InputObject += Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential -MinimumVersion 9
+                    $__sourceInstance = $instance
                 }
+                $InputObject += & $__invokeConnect @{
+                    SqlInstance = $__sourceInstance
+                    SqlCredential = $SqlCredential
+                    MinimumVersion = 9
+                } -WarningVariable __connectWarnings
             } catch {
+                foreach ($__connectWarning in $__connectWarnings) {
+                    Write-Warning ($__connectWarning.ToString()) 3>$null
+                }
                 Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Watch-DbaDbLogin
             }
         }
