@@ -279,8 +279,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-    }
-
 
         foreach ($computer in $ComputerName) {
             $computer = $ogComputer = $computer.ComputerName
