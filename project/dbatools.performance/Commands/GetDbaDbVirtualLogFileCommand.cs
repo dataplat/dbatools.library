@@ -129,15 +129,13 @@ public sealed class GetDbaDbVirtualLogFileCommand : DbaInstanceCmdlet
         return true;
     }
 
-    /// <summary>PS -in over the filter array (elementwise -eq).</summary>
+    /// <summary>PS -in over the filter array (elementwise -eq with the ELEMENT as the
+    /// left operand, so a non-string filter value drives the coercion - codex W1-110 r1
+    /// class fix, retrofitted: -Database 1 matches a database named "01" exactly like
+    /// the function did).</summary>
     private static bool MatchesAny(string name, object[] values)
     {
-        foreach (object? value in values)
-        {
-            if (PsOps.Eq(name, value))
-                return true;
-        }
-        return false;
+        return PsOps.In(name, values);
     }
 
     /// <summary>The PS dot operator (raw DataRow column reads).</summary>

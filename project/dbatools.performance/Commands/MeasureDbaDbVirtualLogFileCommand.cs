@@ -128,15 +128,12 @@ public sealed class MeasureDbaDbVirtualLogFileCommand : DbaInstanceCmdlet
         return true;
     }
 
-    /// <summary>PS -in over the filter array (elementwise -eq).</summary>
+    /// <summary>PS -in over the filter array (elementwise -eq with the ELEMENT as the
+    /// left operand, so a non-string filter value drives the coercion - codex W1-110 r1:
+    /// -Database 1 matches a database named "01" exactly like the function did).</summary>
     private static bool MatchesAny(string name, object[] values)
     {
-        foreach (object? value in values)
-        {
-            if (PsOps.Eq(name, value))
-                return true;
-        }
-        return false;
+        return PsOps.In(name, values);
     }
 
     /// <summary>PS string interpolation via LanguagePrimitives (invariant).</summary>

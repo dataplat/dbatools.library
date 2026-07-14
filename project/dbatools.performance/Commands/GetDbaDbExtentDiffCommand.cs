@@ -301,15 +301,12 @@ public sealed class GetDbaDbExtentDiffCommand : DbaInstanceCmdlet
         return true;
     }
 
-    /// <summary>PS -In over the raw filter array (elementwise -eq).</summary>
+    /// <summary>PS -In over the raw filter array (elementwise -eq with the ELEMENT as
+    /// the left operand, so a non-string filter value drives the coercion - codex W1-110
+    /// r1 class fix, retrofitted).</summary>
     private static bool MatchesAny(string name, object[] values)
     {
-        foreach (object? value in values)
-        {
-            if (PsOps.Eq(name, value))
-                return true;
-        }
-        return false;
+        return PsOps.In(name, values);
     }
 
     /// <summary>PS pipeline-assignment collapse: none = null, one = the item, many = array.</summary>

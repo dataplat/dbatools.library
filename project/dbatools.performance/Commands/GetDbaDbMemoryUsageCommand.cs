@@ -215,15 +215,12 @@ public sealed class GetDbaDbMemoryUsageCommand : DbaInstanceCmdlet
         }
     }
 
-    /// <summary>PS -in/-notin over the filter array (elementwise -eq).</summary>
+    /// <summary>PS -in/-notin over the filter array (elementwise -eq with the ELEMENT
+    /// as the left operand, so a non-string filter value drives the coercion - codex
+    /// W1-110 r1 class fix, retrofitted).</summary>
     private static bool MatchesAny(object? value, object[] candidates)
     {
-        foreach (object? candidate in candidates)
-        {
-            if (PsOps.Eq(value, candidate))
-                return true;
-        }
-        return false;
+        return PsOps.In(value, candidates);
     }
 
     /// <summary>The PS dot operator (single objects here; DataRow column reads).</summary>
