@@ -50,6 +50,12 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
+        if (!TestBound("SqlCms", "ServersFromFile", "InputObject"))
+        {
+            StopFunction("You must specify a server list source using -SqlCms or -ServersFromFile or pipe in connected instances. See the command documentation and examples for more details.");
+            return;
+        }
+
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, Database, Table, SqlCms, ServersFromFile, InputObject,
             EnableException.ToBool(), TestBound("SqlCms"), TestBound("ServersFromFile"),
