@@ -102,7 +102,7 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param($SqlInstance, $SqlCredential, $Database, $Table, $SqlCms, $ServersFromFile, $InputObject, $EnableException, $__boundSqlCms, $__boundServersFromFile, $__boundInputObject)
+    param($SqlInstance, $SqlCredential, $Database, $Table, $SqlCms, $ServersFromFile, [Microsoft.SqlServer.Management.Smo.Server[]]$InputObject, $EnableException, $__boundSqlCms, $__boundServersFromFile, $__boundInputObject)
 
         if (-not ($__boundSqlCms -or $__boundServersFromFile -or $__boundInputObject)) {
             Stop-Function -Message "You must specify a server list source using -SqlCms or -ServersFromFile or pipe in connected instances. See the command documentation and examples for more details." -FunctionName Watch-DbaDbLogin
