@@ -66,7 +66,7 @@ public sealed class TestDbaDiskSpeedCommand : DbaInstanceCmdlet
     {
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, AggregateBy, EnableException.ToBool(),
-            _sql, BoundVerbose()))
+            _sql, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -80,10 +80,10 @@ public sealed class TestDbaDiskSpeedCommand : DbaInstanceCmdlet
         }
     }
 
-    private object? BoundVerbose()
+    private object? BoundCommonParameter(string name)
     {
-        if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))
-            return LanguagePrimitives.IsTrue(verbose);
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
         return null;
     }
 
@@ -213,11 +213,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $AggregateBy, $EnableException, $sql, $__boundVerbose)
+param($SqlInstance, $SqlCredential, $AggregateBy, $EnableException, $sql, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($SqlInstance, $SqlCredential, $AggregateBy, $EnableException, $sql, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($SqlInstance, $SqlCredential, $AggregateBy, $EnableException, $sql)
 
         foreach ($instance in $SqlInstance) {
             try {
@@ -258,7 +261,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $server.Query("$sqlToRun")
         }
 
-} $SqlInstance $SqlCredential $AggregateBy $EnableException $sql $__boundVerbose 3>&1 2>&1
+} $SqlInstance $SqlCredential $AggregateBy $EnableException $sql @__commonParameters 3>&1 2>&1
 """;
 }
-
