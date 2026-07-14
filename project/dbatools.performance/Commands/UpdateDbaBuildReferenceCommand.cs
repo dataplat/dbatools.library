@@ -89,11 +89,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $webContent = Invoke-TlsWebRequest $url -UseBasicParsing -ErrorAction Stop
             } catch {
                 try {
-                    Write-Message -Level Verbose -Message "Probably using a proxy for internet access, trying default proxy settings" -FunctionName Update-DbaBuildReference
+                    Write-Message -Level Verbose -Message "Probably using a proxy for internet access, trying default proxy settings"
                     (New-Object System.Net.WebClient).Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
                     $webContent = Invoke-TlsWebRequest $url -UseBasicParsing -ErrorAction Stop
                 } catch {
-                    Write-Message -Level Warning -Message "Couldn't download updated index from $url" -FunctionName Update-DbaBuildReference
+                    Write-Message -Level Warning -Message "Couldn't download updated index from $url"
                     return
                 }
             }
