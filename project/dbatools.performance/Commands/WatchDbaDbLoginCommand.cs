@@ -18,8 +18,6 @@ namespace Dataplat.Dbatools.Commands;
 [Cmdlet(VerbsCommon.Watch, "DbaDbLogin", DefaultParameterSetName = "Default")]
 public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 {
-    private const string ValidationMessage = "You must specify a server list source using -SqlCms or -ServersFromFile or pipe in connected instances. See the command documentation and examples for more details.";
-
     /// <summary>SQL Server instance that stores the captured login activity.</summary>
     [Parameter(Position = 0)]
     public DbaInstanceParameter? SqlInstance { get; set; }
@@ -52,18 +50,23 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        if (EnableException.ToBool() && !TestBound("SqlCms", "ServersFromFile", "InputObject"))
-        {
-            EmitTerminatingValidation();
-            return;
-        }
-
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, Database, Table, SqlCms, ServersFromFile, InputObject,
             EnableException.ToBool(), TestBound("SqlCms"), TestBound("ServersFromFile"),
             TestBound("InputObject"), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
+            PSPropertyInfo? failureProperty = item?.Properties["__dbatoolsHopFailure"];
+            object? failureValue = failureProperty?.Value;
+            if (failureValue is PSObject wrappedFailure)
+                failureValue = wrappedFailure.BaseObject;
+            if (failureValue is ErrorRecord hopError)
+            {
+                PersistHopWarnings(item?.Properties["__dbatoolsHopWarnings"]?.Value);
+                RemoveHopErrorBookkeeping(hopError);
+                _ = NestedCommand.InvokeScoped(this, RethrowScript, hopError);
+                return;
+            }
+            else if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
@@ -75,21 +78,26 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
         }
     }
 
-    private void EmitTerminatingValidation()
+    private void PersistHopWarnings(object? warnings)
     {
-        ScriptBlock warningScript = ScriptBlock.Create(
-            "param($__nestedCommandArguments)\n& {\n" + ValidationWarningScript + "\n} @__nestedCommandArguments");
-        using (NestedCommand.ShieldDefaultParameterValues(this))
+        if (warnings is null)
+            return;
+
+        IEnumerable? warningItems = LanguagePrimitives.GetEnumerable(warnings);
+        if (warningItems is null)
         {
-            foreach (PSObject item in InvokeCommand.InvokeScript(false, warningScript, null,
-                new object?[] { new object?[] { ValidationMessage } }))
-            {
-                if (item?.BaseObject is WarningRecord warning)
-                    PersistSuppressedWarning(warning);
-            }
+            object? single = warnings is PSObject wrapped ? wrapped.BaseObject : warnings;
+            if (single is WarningRecord warning)
+                PersistSuppressedWarning(warning);
+            return;
         }
 
-        _ = NestedCommand.InvokeScoped(this, ValidationThrowScript, ValidationMessage);
+        foreach (object? item in warningItems)
+        {
+            object? unwrapped = item is PSObject wrapped ? wrapped.BaseObject : item;
+            if (unwrapped is WarningRecord warning)
+                PersistSuppressedWarning(warning);
+        }
     }
 
     private void PersistSuppressedWarning(WarningRecord warning)
@@ -143,27 +151,9 @@ Set-Variable -Name $__name -Value $__items
         }
     }
 
-    private const string ValidationWarningScript = """
-param($Message)
-$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
-& $__dbatoolsModule {
-    [CmdletBinding()]
-    param($Message)
-    $EnableException = $false
-    $__warnings = @()
-    Stop-Function -Message $Message -FunctionName Watch-DbaDbLogin -WarningVariable __warnings 3>$null
-    $__warnings
-} $Message
-""";
-
-    private const string ValidationThrowScript = """
-param($Message)
-$record = [System.Management.Automation.ErrorRecord]::new(
-    [System.Exception]::new($Message),
-    "dbatools_Watch-DbaDbLogin",
-    [System.Management.Automation.ErrorCategory]::NotSpecified,
-    $null)
-throw $record
+    private const string RethrowScript = """
+param($Record)
+throw $Record
 """;
 
     private const string ProcessScript = """
@@ -172,6 +162,8 @@ $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+    $__hopWarnings = @()
+try {
 & $__dbatoolsModule {
     [CmdletBinding()]
     param($SqlInstance, $SqlCredential, $Database, $Table, $SqlCms, $ServersFromFile, [Microsoft.SqlServer.Management.Smo.Server[]]$InputObject, $EnableException, $__boundSqlCms, $__boundServersFromFile, $__boundInputObject)
@@ -281,6 +273,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-} $SqlInstance $SqlCredential $Database $Table $SqlCms $ServersFromFile $InputObject $EnableException $__boundSqlCms $__boundServersFromFile $__boundInputObject @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $Table $SqlCms $ServersFromFile $InputObject $EnableException $__boundSqlCms $__boundServersFromFile $__boundInputObject @__commonParameters -WarningVariable __hopWarnings 3>&1 2>&1
+} catch {
+    [pscustomobject]@{
+        __dbatoolsHopFailure = $_
+        __dbatoolsHopWarnings = @($__hopWarnings)
+    }
+}
 """;
 }
