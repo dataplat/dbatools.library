@@ -18,6 +18,8 @@ namespace Dataplat.Dbatools.Commands;
 [Cmdlet(VerbsCommon.Watch, "DbaDbLogin", DefaultParameterSetName = "Default")]
 public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 {
+    private const string ValidationMessage = "You must specify a server list source using -SqlCms or -ServersFromFile or pipe in connected instances. See the command documentation and examples for more details.";
+
     /// <summary>SQL Server instance that stores the captured login activity.</summary>
     [Parameter(Position = 0)]
     public DbaInstanceParameter? SqlInstance { get; set; }
@@ -50,6 +52,12 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
+        if (EnableException.ToBool() && !TestBound("SqlCms", "ServersFromFile", "InputObject"))
+        {
+            EmitTerminatingValidation();
+            return;
+        }
+
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, Database, Table, SqlCms, ServersFromFile, InputObject,
             EnableException.ToBool(), TestBound("SqlCms"), TestBound("ServersFromFile"),
@@ -65,6 +73,22 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }
+    }
+
+    private void EmitTerminatingValidation()
+    {
+        object? oldWarningPreference = SessionState.PSVariable.GetValue("WarningPreference");
+        try
+        {
+            SessionState.PSVariable.Set("WarningPreference", ActionPreference.SilentlyContinue);
+            _ = NestedCommand.InvokeScoped(this, ValidationWarningScript, ValidationMessage);
+        }
+        finally
+        {
+            SessionState.PSVariable.Set("WarningPreference", oldWarningPreference);
+        }
+
+        _ = NestedCommand.InvokeScoped(this, ValidationThrowScript, ValidationMessage);
     }
 
     private object? BoundCommonParameter(string name)
@@ -93,6 +117,27 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
             // Best-effort bookkeeping only.
         }
     }
+
+    private const string ValidationWarningScript = """
+param($Message)
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param($Message)
+    $EnableException = $false
+    Stop-Function -Message $Message -FunctionName Watch-DbaDbLogin
+} $Message 3>&1
+""";
+
+    private const string ValidationThrowScript = """
+param($Message)
+$record = [System.Management.Automation.ErrorRecord]::new(
+    [System.Exception]::new($Message),
+    "dbatools_Watch-DbaDbLogin",
+    [System.Management.Automation.ErrorCategory]::NotSpecified,
+    $null)
+throw $record
+""";
 
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $Table, $SqlCms, $ServersFromFile, $InputObject, $EnableException, $__boundSqlCms, $__boundServersFromFile, $__boundInputObject, $__boundVerbose, $__boundDebug)
