@@ -124,12 +124,7 @@ public sealed class CopyDbaAgentJobCommand : DbaBaseCmdlet
             ? InputObject
             : _beginJobs.ToArray();
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            Source, Destination, DestinationSqlCredential, Job, ExcludeJob,
-            DisableOnSource.ToBool(), DisableOnDestination.ToBool(), Force.ToBool(), NewName,
-            UseLastModified.ToBool(), jobs, EnableException.ToBool(), this,
-            _boundJob, _boundExcludeJob, _boundNewName,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -140,7 +135,12 @@ public sealed class CopyDbaAgentJobCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            Source, Destination, DestinationSqlCredential, Job, ExcludeJob,
+            DisableOnSource.ToBool(), DisableOnDestination.ToBool(), Force.ToBool(), NewName,
+            UseLastModified.ToBool(), jobs, EnableException.ToBool(), this,
+            _boundJob, _boundExcludeJob, _boundNewName,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -289,6 +289,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $missingLogin = $serverJob.OwnerLoginName | Where-Object { $destServer.Logins.Name -notcontains $_ }
 
             if ($missingLogin.Count -gt 0) {
+                # Secondary check: verify if the owner has access via AD group membership
                 $missingLogin = $missingLogin | Where-Object {
                     $ownerName = $_
                     try {
@@ -350,6 +351,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($destJobs.name -contains $destJobName) {
                 if ($UseLastModified) {
                     try {
+                        # Query date_modified from both source and destination using parameterized queries
                         $splatSourceDate = @{
                             SqlInstance  = $sourceserver
                             Database     = "msdb"
@@ -378,9 +380,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 continue
                             }
                         } elseif ($sourceDate -gt $destDate) {
+                            # Source is newer, proceed with drop and recreate
                             if ($__realCmdlet.ShouldProcess($destinstance, "Source job is newer (modified $sourceDate). Dropping and recreating job $destJobName")) {
                                 try {
                                     Write-Message -Message "Source job $jobName is newer. Dropping and recreating $destJobName." -Level Verbose -FunctionName Copy-DbaAgentJob
+                                    # Before dropping, save which alerts reference this job
                                     $splatAlertsForJob = @{
                                         SqlInstance  = $destServer
                                         Database     = "msdb"
@@ -399,6 +403,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 }
                             }
                         } elseif ($sourceDate -eq $destDate) {
+                            # Dates are equal, skip
                             if ($__realCmdlet.ShouldProcess($destinstance, "Job $jobName has same modification date. Skipping.")) {
                                 $copyJobStatus.Status = "Skipped"
                                 $copyJobStatus.Notes = "Job has same modification date on source and destination"
@@ -407,6 +412,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                             continue
                         } else {
+                            # Destination is newer, skip with warning
                             if ($__realCmdlet.ShouldProcess($destinstance, "Job $jobName is newer on destination. Skipping.")) {
                                 $copyJobStatus.Status = "Skipped"
                                 $copyJobStatus.Notes = "Destination job is newer than source (dest: $destDate, source: $sourceDate)"
@@ -439,6 +445,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($__realCmdlet.ShouldProcess($destinstance, "Dropping job $destJobName and recreating")) {
                         try {
                             Write-Message -Message "Dropping Job $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob
+                            # Before dropping, save which alerts reference this job
                             $splatAlertsForJob = @{
                                 SqlInstance  = $destServer
                                 Database     = "msdb"
@@ -482,6 +489,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $destServer.JobServer.Jobs[$destJobName].IsEnabled = $sourceServer.JobServer.Jobs[$serverJob.name].IsEnabled
                     $destServer.JobServer.Jobs[$destJobName].Alter()
 
+                    # Restore alert-to-job links if job was dropped and recreated
                     if ($alertsReferencingJob -and $alertsReferencingJob.Count -gt 0) {
                         Write-Message -Message "Restoring alert-to-job links for $jobName" -Level Verbose -FunctionName Copy-DbaAgentJob
                         foreach ($alertName in $alertsReferencingJob) {
