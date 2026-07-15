@@ -1,0 +1,200 @@
+#nullable enable
+
+using System;
+using System.Collections;
+using System.Management.Automation;
+using Dataplat.Dbatools.Parameter;
+
+namespace Dataplat.Dbatools.Commands;
+
+/// <summary>
+/// Coordinates migration of SQL Agent objects and server properties. Port of
+/// public/Copy-DbaAgentServer.ps1 (W2-008). The workflow remains a module-scoped PowerShell
+/// compatibility hop so nested command order, refreshes, streams, and source quirks retain
+/// engine semantics. The compiled cmdlet supplies the real outer ShouldProcess runtime. Surface
+/// pinned by migration/baselines/Copy-DbaAgentServer.json.
+/// </summary>
+[Cmdlet(VerbsCommon.Copy, "DbaAgentServer",
+    SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
+public sealed class CopyDbaAgentServerCommand : DbaBaseCmdlet
+{
+    /// <summary>Source SQL Server instance.</summary>
+    [Parameter(Mandatory = true, Position = 0)]
+    public DbaInstanceParameter Source { get; set; } = null!;
+
+    /// <summary>Alternative credential for the source instance.</summary>
+    [Parameter(Position = 1)]
+    public PSCredential? SourceSqlCredential { get; set; }
+
+    /// <summary>Destination SQL Server instances.</summary>
+    [Parameter(Mandatory = true, Position = 2)]
+    public DbaInstanceParameter[] Destination { get; set; } = null!;
+
+    /// <summary>Alternative credential for destination instances.</summary>
+    [Parameter(Position = 3)]
+    public PSCredential? DestinationSqlCredential { get; set; }
+
+    /// <summary>Disable copied jobs on each destination.</summary>
+    [Parameter]
+    public SwitchParameter DisableJobsOnDestination { get; set; }
+
+    /// <summary>Disable copied jobs on the source.</summary>
+    [Parameter]
+    public SwitchParameter DisableJobsOnSource { get; set; }
+
+    /// <summary>Skip SQL Agent server-property scripting.</summary>
+    [Parameter]
+    public SwitchParameter ExcludeServerProperties { get; set; }
+
+    /// <summary>Request replacement of existing Agent objects.</summary>
+    [Parameter]
+    public SwitchParameter Force { get; set; }
+
+    // EnableException is inherited from DbaBaseCmdlet - never redeclared.
+
+    protected override void ProcessRecord()
+    {
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
+            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
+            DisableJobsOnDestination.ToBool(), DisableJobsOnSource.ToBool(),
+            ExcludeServerProperties.ToBool(), Force.ToBool(), EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Verbose"),
+            BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+            }
+            else
+            {
+                WriteObject(item);
+            }
+        }
+    }
+
+    private object? BoundCommonParameter(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    private void RemoveHopErrorBookkeeping(ErrorRecord record)
+    {
+        try
+        {
+            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+                return;
+            if (errorList[0] is not ErrorRecord first)
+                return;
+            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
+                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
+            {
+                errorList.RemoveAt(0);
+            }
+        }
+        catch
+        {
+            // Best-effort bookkeeping only.
+        }
+    }
+
+    private const string BodyScript = """
+param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeServerProperties, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundVerbose, $__boundDebug)
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeServerProperties, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundWhatIf) { $WhatIfPreference = [bool]$__boundWhatIf }
+    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    try {
+        $sourceServer = Connect-DbaInstance -SqlInstance $Source -SqlCredential $SourceSqlCredential
+    } catch {
+        Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $Source -FunctionName Copy-DbaAgentServer
+        return
+    }
+    $sourceAgent = $sourceServer.JobServer
+
+    if ($Force) { $ConfirmPreference = 'none' }
+
+    if (Test-FunctionInterrupt) { return }
+    foreach ($destinstance in $Destination) {
+        try {
+            $destServer = Connect-DbaInstance -SqlInstance $destinstance -SqlCredential $DestinationSqlCredential
+        } catch {
+            Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $destinstance -Continue -FunctionName Copy-DbaAgentServer
+        }
+
+        Copy-DbaAgentJobCategory -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
+
+        $destServer.Refresh()
+        $destServer.JobServer.Refresh()
+        $destServer.JobServer.JobCategories.Refresh()
+        $destServer.JobServer.OperatorCategories.Refresh()
+        $destServer.JobServer.AlertCategories.Refresh()
+
+        Copy-DbaAgentOperator -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
+        $destServer.Refresh()
+        $destServer.JobServer.Refresh()
+        $destServer.JobServer.Operators.Refresh()
+
+        $destServer = Connect-DbaInstance -SqlInstance $destinstance -SqlCredential $DestinationSqlCredential
+
+        Copy-DbaAgentProxy -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
+        $destServer.JobServer.ProxyAccounts.Refresh()
+
+        Copy-DbaAgentSchedule -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
+        $destServer.JobServer.SharedSchedules.Refresh()
+
+        $destServer.JobServer.Refresh()
+        $destServer.Refresh()
+        Copy-DbaAgentJob -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force -DisableOnDestination:$DisableJobsOnDestination -DisableOnSource:$DisableJobsOnSource
+
+        Copy-DbaAgentAlert -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force -IncludeDefaults
+        $destServer.JobServer.Alerts.Refresh()
+
+        $copyAgentPropStatus = [PSCustomObject]@{
+            SourceServer      = $sourceServer.Name
+            DestinationServer = $destServer.Name
+            Name              = "Server level properties"
+            Type              = "Agent Properties"
+            Status            = $null
+            Notes             = $null
+            DateTime          = [Dataplat.Dbatools.Utility.DbaDateTime](Get-Date)
+        }
+
+        if ($ExcludeServerProperties) {
+            if ($__realCmdlet.ShouldProcess($destinstance, "Skipping Agent Server property copy")) {
+                $copyAgentPropStatus.Status = "Skipped"
+                $copyAgentPropStatus.Notes = $null
+                $copyAgentPropStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
+            }
+        } else {
+            if ($__realCmdlet.ShouldProcess($destinstance, "Copying Agent Properties")) {
+                try {
+                    Write-Message -Level Verbose -Message "Copying SQL Agent Properties" -FunctionName Copy-DbaAgentServer
+                    $sql = $sourceAgent.Script() | Out-String
+                    $sql = $sql -replace [Regex]::Escape("'$source'"), "'$destinstance'"
+                    $sql = $sql -replace [Regex]::Escape("@errorlog_file="), [Regex]::Escape("--@errorlog_file=")
+                    $sql = $sql -replace [Regex]::Escape("@auto_start="), [Regex]::Escape("--@auto_start=")
+                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentServer
+                    $null = $destServer.Query($sql)
+                    $copyAgentPropStatus.Status = "Successful"
+                    $copyAgentPropStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
+                } catch {
+                    $message = $_.Exception.InnerException.InnerException.InnerException.Message
+                    if (-not $message) { $message = $_.Exception.Message }
+                    $copyAgentPropStatus.Status = "Failed"
+                    $copyAgentPropStatus.Notes = $message
+                    $copyAgentPropStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
+                    Write-Message -Level Verbose -Message "Issue copying SQL Agent properties on $destinstance | $PSItem" -FunctionName Copy-DbaAgentServer
+                    continue
+                }
+            }
+        }
+    }
+} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $DisableJobsOnDestination $DisableJobsOnSource $ExcludeServerProperties $Force $EnableException $__realCmdlet $__boundWhatIf $__boundVerbose $__boundDebug 3>&1 2>&1
+""";
+}
