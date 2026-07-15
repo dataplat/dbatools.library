@@ -36,6 +36,7 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
 
     /// <summary>SQL Agent jobs supplied directly or through the pipeline.</summary>
     [Parameter(ValueFromPipeline = true, Position = 4)]
+    [PsAgentJobArrayCast]
     public SmoAgentJob[]? InputObject { get; set; }
 
     /// <summary>Exclude jobs whose IsEnabled property is false.</summary>
@@ -135,6 +136,7 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential,
         [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject, $Server, $EnableException)
     $server = $Server
@@ -162,6 +164,7 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject, [string[]]$Job,
         [string[]]$ExcludeJob, $ExcludeDisabledJobs, $Server, $EnableException)
     $server = $Server
@@ -197,6 +200,24 @@ internal sealed class PsAgentStepDbaInstanceArrayCastAttribute : ArgumentTransfo
         try
         {
             return LanguagePrimitives.ConvertTo(inputData, typeof(DbaInstanceParameter[]), CultureInfo.InvariantCulture);
+        }
+        catch (PSInvalidCastException ex)
+        {
+            throw new ArgumentTransformationMetadataException(ex.Message, ex);
+        }
+    }
+}
+
+/// <summary>Reproduces the advanced function's typed SQL Agent Job array conversion.</summary>
+internal sealed class PsAgentJobArrayCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        if (inputData is null)
+            return null;
+        try
+        {
+            return LanguagePrimitives.ConvertTo(inputData, typeof(SmoAgentJob[]), CultureInfo.InvariantCulture);
         }
         catch (PSInvalidCastException ex)
         {
