@@ -83,11 +83,13 @@ public sealed class GetDbaAgentAlertCommand : DbaBaseCmdlet
 
     private const string BodyScript = """
 param($SqlInstance, $SqlCredential, $Alert, $ExcludeAlert, $EnableException, $__boundAlert, $__boundExcludeAlert, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Alert, [string[]]$ExcludeAlert, $EnableException, $__boundAlert, $__boundExcludeAlert, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($instance in $SqlInstance) {
         try {
@@ -135,6 +137,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Select-DefaultView -InputObject $alrt -Property $defaults
         }
     }
-} $SqlInstance $SqlCredential $Alert $ExcludeAlert $EnableException $__boundAlert $__boundExcludeAlert $__boundVerbose $__boundDebug 3>&1 2>&1
+} $SqlInstance $SqlCredential $Alert $ExcludeAlert $EnableException $__boundAlert $__boundExcludeAlert $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
