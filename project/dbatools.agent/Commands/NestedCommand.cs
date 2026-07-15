@@ -53,19 +53,20 @@ internal static class NestedCommand
         using (ShieldDefaultParameterValues(host))
         {
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
+            string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
             ScriptBlock script = ScriptBlock.Create(
-                "param($__nestedCommandArguments, $__nestedTermination)\ntry { & {\n" + scriptText +
+                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\ntry { & {\n" + scriptText +
                 "\n} @__nestedCommandArguments } catch { " +
                 "$__nestedTermination.ErrorRecord = $PSItem; " +
-                "Write-Output -NoEnumerate $__nestedTermination }");
+                "Write-Output $__nestedTerminationMarker }");
             Collection<PSObject> raw = host.InvokeCommand.InvokeScript(
                 false,
                 script,
                 null,
-                new object?[] { scriptArgs, termination });
+                new object?[] { scriptArgs, termination, terminationMarker });
             foreach (PSObject item in raw)
             {
-                if (ReferenceEquals(item?.BaseObject, termination))
+                if (string.Equals(item?.BaseObject as string, terminationMarker, StringComparison.Ordinal))
                 {
                     if (termination["ErrorRecord"] is not ErrorRecord terminatingError)
                         throw new InvalidOperationException("Nested command terminated without an ErrorRecord.");
