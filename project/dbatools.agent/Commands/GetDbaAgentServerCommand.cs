@@ -33,24 +33,30 @@ public sealed class GetDbaAgentServerCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, EnableException.ToBool(), _server,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
+            if (Interrupted)
+                return;
+
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
+                new[] { instance }, SqlCredential, EnableException.ToBool(), _server,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-            }
-            else if (item is not null && LanguagePrimitives.IsTrue(
-                item.Properties["__GetDbaAgentServerProcessComplete"]?.Value))
-            {
-                object? serverState = item.Properties["Server"]?.Value;
-                _server = serverState is PSObject wrapper ? wrapper.BaseObject : serverState;
-            }
-            else
-            {
-                WriteObject(item);
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                }
+                else if (item is not null && LanguagePrimitives.IsTrue(
+                    item.Properties["__GetDbaAgentServerProcessComplete"]?.Value))
+                {
+                    object? serverState = item.Properties["Server"]?.Value;
+                    _server = serverState is PSObject wrapper ? wrapper.BaseObject : serverState;
+                }
+                else
+                {
+                    WriteObject(item);
+                }
             }
         }
     }

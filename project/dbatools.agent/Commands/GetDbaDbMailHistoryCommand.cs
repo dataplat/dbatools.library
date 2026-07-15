@@ -45,24 +45,33 @@ public sealed class GetDbaDbMailHistoryCommand : DbaBaseCmdlet
             return;
 
         object? since = TestBound(nameof(Since)) ? Since : null;
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, since, Status, EnableException.ToBool(), _server,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        if (SqlInstance is null)
+            return;
+
+        foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
+            if (Interrupted)
+                return;
+
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
+                new[] { instance }, SqlCredential, since, Status, EnableException.ToBool(), _server,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-            }
-            else if (item is not null && LanguagePrimitives.IsTrue(
-                item.Properties["__GetDbaDbMailHistoryProcessComplete"]?.Value))
-            {
-                object? serverState = item.Properties["Server"]?.Value;
-                _server = serverState is PSObject wrapper ? wrapper.BaseObject : serverState;
-            }
-            else
-            {
-                WriteObject(item);
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                }
+                else if (item is not null && LanguagePrimitives.IsTrue(
+                    item.Properties["__GetDbaDbMailHistoryProcessComplete"]?.Value))
+                {
+                    object? serverState = item.Properties["Server"]?.Value;
+                    _server = serverState is PSObject wrapper ? wrapper.BaseObject : serverState;
+                }
+                else
+                {
+                    WriteObject(item);
+                }
             }
         }
     }
