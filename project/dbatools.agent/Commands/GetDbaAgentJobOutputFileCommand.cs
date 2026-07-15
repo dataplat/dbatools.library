@@ -1,30 +1,34 @@
 #nullable enable
 
 using System;
-using System.Collections;
 using System.Globalization;
 using System.Management.Automation;
+using Dataplat.Dbatools.Connection;
+using Dataplat.Dbatools.Message;
 using Dataplat.Dbatools.Parameter;
+using Dataplat.Dbatools.Utility;
+using Microsoft.SqlServer.Management.Smo;
+using Microsoft.SqlServer.Management.Smo.Agent;
+using AgentJob = Microsoft.SqlServer.Management.Smo.Agent.Job;
 
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Retrieves configured SQL Agent job-step output files and remote paths. The complete filtering
-/// and output-shaping workflow remains a module-scoped PowerShell compatibility hop. Surface
-/// pinned by migration/baselines/Get-DbaAgentJobOutputFile.json.
+/// Retrieves configured SQL Agent job-step output files and remote paths. Surface pinned by
+/// migration/baselines/Get-DbaAgentJobOutputFile.json.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaAgentJobOutputFile")]
-public sealed class GetDbaAgentJobOutputFileCommand : DbaBaseCmdlet
+public sealed class GetDbaAgentJobOutputFileCommand : DbaInstanceCmdlet
 {
     /// <summary>Target SQL Server instances.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0)]
     [PsDbaInstanceArrayCast]
     [ValidateNotNullOrEmpty]
-    public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
+    public override DbaInstanceParameter[] SqlInstance { get; set; } = null!;
 
     /// <summary>Alternative credential for the target instances.</summary>
     [Parameter(ValueFromPipelineByPropertyName = true, Position = 1)]
-    public PSCredential? SqlCredential { get; set; }
+    public override PSCredential? SqlCredential { get; set; }
 
     /// <summary>Job names to include.</summary>
     [Parameter]
@@ -41,93 +45,73 @@ public sealed class GetDbaAgentJobOutputFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Job, ExcludeJob, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-            }
-            else
-            {
-                WriteObject(item);
-            }
-        }
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+            if (Interrupted)
                 return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
+
+            Server? server = ConnectInstance(instance, "Failure");
+            if (server is null)
+                continue;
+
+            foreach (AgentJob job in server.JobServer.Jobs)
             {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
-    }
+                if (Interrupted)
+                    return;
+                if (FilterHelper.IsActive(Job) && !Contains(Job!, job.Name))
+                    continue;
+                if (FilterHelper.IsActive(ExcludeJob) && Contains(ExcludeJob!, job.Name))
+                    continue;
 
-    private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Job, $ExcludeJob, $EnableException, $__boundVerbose, $__boundDebug)
-$__commonParameters = @{}
-if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
-if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
-$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
-& $__dbatoolsModule {
-    [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [object[]]$Job, [object[]]$ExcludeJob, $EnableException)
+                foreach (JobStep step in job.JobSteps)
+                {
+                    if (Interrupted)
+                        return;
 
-    foreach ($instance in $SqlInstance) {
-        try {
-            $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
-        } catch {
-            Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaAgentJobOutputFile
-        }
-        $jobs = $server.JobServer.Jobs
-        if ($Job) {
-            $jobs = $jobs | Where-Object Name -In $Job
-        }
-        if ($ExcludeJob) {
-            $jobs = $jobs | Where-Object Name -NotIn $ExcludeJob
-        }
-        foreach ($j in $jobs) {
-            foreach ($step in $j.JobSteps) {
-                if ($step.OutputFileName) {
-                    [PSCustomObject]@{
-                        ComputerName         = $server.ComputerName
-                        InstanceName         = $server.ServiceName
-                        SqlInstance          = $server.DomainInstanceName
-                        Job                  = $j.Name
-                        JobStep              = $step.Name
-                        OutputFileName       = $step.OutputFileName
-                        RemoteOutputFileName = Join-AdminUNC $server.ComputerName $step.OutputFileName
-                        StepId               = $step.Id
-                    } | Select-DefaultView -ExcludeProperty StepId
-                } else {
-                    Write-Message -Level Verbose -Message "$step for $j has no output file" -FunctionName Get-DbaAgentJobOutputFile
+                    if (!string.IsNullOrEmpty(step.OutputFileName))
+                    {
+                        PSObject result = new();
+                        result.Properties.Add(new PSNoteProperty("ComputerName", SmoServerExtensions.GetComputerName(server)));
+                        result.Properties.Add(new PSNoteProperty("InstanceName", server.ServiceName));
+                        result.Properties.Add(new PSNoteProperty("SqlInstance", SmoServerExtensions.GetDomainInstanceName(server)));
+                        result.Properties.Add(new PSNoteProperty("Job", job.Name));
+                        result.Properties.Add(new PSNoteProperty("JobStep", step.Name));
+                        result.Properties.Add(new PSNoteProperty("OutputFileName", step.OutputFileName));
+                        result.Properties.Add(new PSNoteProperty("RemoteOutputFileName", JoinAdminUnc(SmoServerExtensions.GetComputerName(server), step.OutputFileName)));
+                        result.Properties.Add(new PSNoteProperty("StepId", step.ID));
+                        OutputHelper.SetDefaultDisplayPropertySet(result,
+                            "ComputerName", "InstanceName", "Job", "JobStep", "OutputFileName",
+                            "RemoteOutputFileName", "SqlInstance");
+                        WriteObject(result);
+                    }
+                    else
+                    {
+                        WriteMessage(MessageLevel.Verbose, $"{step} for {job} has no output file");
+                    }
                 }
             }
         }
     }
-} $SqlInstance $SqlCredential $Job $ExcludeJob $EnableException @__commonParameters 3>&1 2>&1
-""";
+
+    private static bool Contains(object[] values, string name)
+    {
+        foreach (object? value in values)
+        {
+            if (LanguagePrimitives.Equals(name, value, true, CultureInfo.InvariantCulture))
+                return true;
+        }
+        return false;
+    }
+
+    private static string JoinAdminUnc(string? serverName, string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || filePath.StartsWith("\\\\", StringComparison.Ordinal) ||
+            Environment.OSVersion.Platform != PlatformID.Win32NT)
+            return filePath;
+
+        string host = (serverName ?? string.Empty).Split('\\')[0];
+        return "\\\\" + host + "\\" + filePath.Replace(':', '$');
+    }
 }
 
 /// <summary>Reproduces an advanced function's typed-array conversion before validation.</summary>
