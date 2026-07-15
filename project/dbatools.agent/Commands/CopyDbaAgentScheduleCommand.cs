@@ -100,10 +100,7 @@ public sealed class CopyDbaAgentScheduleCommand : DbaBaseCmdlet
             ? InputObject
             : _beginSchedules.ToArray();
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            Destination, DestinationSqlCredential, Schedule, schedules, Force.ToBool(),
-            EnableException.ToBool(), this, _sourceBound, inputObjectBoundNow,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -114,7 +111,10 @@ public sealed class CopyDbaAgentScheduleCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            Destination, DestinationSqlCredential, Schedule, schedules, Force.ToBool(),
+            EnableException.ToBool(), this, _sourceBound, inputObjectBoundNow,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
