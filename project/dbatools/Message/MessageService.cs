@@ -157,7 +157,7 @@ namespace Dataplat.Dbatools.Message
                         try
                         {
                             cmdlet.SessionState.PSVariable.Set("WarningPreference", ActionPreference.SilentlyContinue);
-                            cmdlet.WriteWarning(messageStreams);
+                            WriteNonDebugStreamWithoutDebugInquiry(cmdlet, () => cmdlet.WriteWarning(messageStreams));
                         }
                         finally
                         {
@@ -166,7 +166,7 @@ namespace Dataplat.Dbatools.Message
                     }
                     else
                     {
-                        cmdlet.WriteWarning(messageStreams);
+                        WriteNonDebugStreamWithoutDebugInquiry(cmdlet, () => cmdlet.WriteWarning(messageStreams));
                     }
                     // The PS Write-Message cannot see the caller's redirect, so the Warning
                     // channel is logged in both modes.
@@ -196,7 +196,7 @@ namespace Dataplat.Dbatools.Message
 
             if ((MessageHost.MaximumVerbose >= (int)level) && (MessageHost.MinimumVerbose <= (int)level))
             {
-                cmdlet.WriteVerbose(messageStreams);
+                WriteNonDebugStreamWithoutDebugInquiry(cmdlet, () => cmdlet.WriteVerbose(messageStreams));
                 channels = channels | LogEntryType.Verbose;
             }
 
@@ -230,18 +230,46 @@ namespace Dataplat.Dbatools.Message
 
         private static void WriteDebugWithoutInquire(PSCmdlet cmdlet, string message)
         {
+            cmdlet.WriteDebug(message);
+        }
+
+        private static void WriteNonDebugStreamWithoutDebugInquiry(PSCmdlet cmdlet, Action write)
+        {
 #if NET8_0_OR_GREATER
-            bool debugBound = cmdlet.MyInvocation.BoundParameters.TryGetValue("Debug", out object boundDebug) &&
-                LanguagePrimitives.IsTrue(boundDebug);
-            if (debugBound)
+            // A compiled cmdlet's -Debug flag makes PowerShell 7 treat verbose and warning
+            // writes as Inquire. The retired PS7 compatibility body deliberately did not
+            // forward that common flag; it enabled only $DebugPreference. Mask the runtime
+            // flag for non-debug channels so verbose remains silent and warnings remain normal.
+            object runtime = cmdlet.CommandRuntime;
+            System.Reflection.PropertyInfo debugFlag = null;
+            Type runtimeType = runtime.GetType();
+            while (runtimeType != null && debugFlag == null)
             {
-                cmdlet.InvokeCommand.InvokeScript(false, ScriptBlock.Create(
-                    "param($message) $old = $DebugPreference; try { $DebugPreference = 'Continue'; Write-Debug -Message $message } finally { $DebugPreference = $old }"),
-                    null, new object[] { message });
+                debugFlag = runtimeType.GetProperty(
+                    "Debug",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.DeclaredOnly);
+                runtimeType = runtimeType.BaseType;
+            }
+            if (debugFlag != null && debugFlag.CanRead && debugFlag.CanWrite &&
+                LanguagePrimitives.IsTrue(debugFlag.GetValue(runtime)))
+            {
+                object oldDebug = debugFlag.GetValue(runtime);
+                try
+                {
+                    debugFlag.SetValue(runtime, false);
+                    write();
+                }
+                finally
+                {
+                    debugFlag.SetValue(runtime, oldDebug);
+                }
                 return;
             }
 #endif
-            cmdlet.WriteDebug(message);
+            write();
         }
 
         /// <summary>

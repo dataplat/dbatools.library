@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 using Dataplat.Dbatools.Connection;
+using Dataplat.Dbatools.Message;
 using Dataplat.Dbatools.Parameter;
 using Microsoft.SqlServer.Management.Smo;
 
@@ -38,6 +39,7 @@ namespace Dataplat.Dbatools.Commands
             int minimumVersion = 0,
             bool azureUnsupported = false)
         {
+            WriteAttributedMessage("Connect-DbaInstance", MessageLevel.Debug, "Starting process block");
             try
             {
                 SmoConnectionRequest request = new SmoConnectionRequest();
@@ -55,6 +57,7 @@ namespace Dataplat.Dbatools.Commands
 
                 Server server = ConnectionService.GetServer(request);
                 SetActiveConnection(server.ConnectionContext);
+                WriteAttributedMessage("Connect-DbaInstance", MessageLevel.Debug, "We are finished with this instance");
                 return server;
             }
             catch (Exception ex)
