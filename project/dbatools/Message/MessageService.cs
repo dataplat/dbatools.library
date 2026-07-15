@@ -230,9 +230,12 @@ namespace Dataplat.Dbatools.Message
 
         private static void WriteDebugWithoutInquire(PSCmdlet cmdlet, string message)
         {
+            bool restoreInquire = false;
+#if NET8_0_OR_GREATER
             object oldPreference = cmdlet.SessionState.PSVariable.GetValue("DebugPreference");
-            bool restoreInquire = oldPreference is ActionPreference preference &&
+            restoreInquire = oldPreference is ActionPreference preference &&
                 preference == ActionPreference.Inquire;
+#endif
             try
             {
                 if (restoreInquire)
