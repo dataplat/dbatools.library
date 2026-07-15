@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Globalization;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
 
@@ -30,6 +31,7 @@ public sealed class GetDbaDbMailHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Return mail with this delivery status.</summary>
     [Parameter(Position = 3)]
+    [PsDbMailHistoryStringCast]
     [ValidateSet("Unsent", "Sent", "Failed", "Retrying")]
     public string? Status { get; set; }
 
@@ -152,6 +154,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     JOIN msdb.dbo.sysmail_profile p
                     ON a.profile_id = p.profile_id"
 
+        # The retired script is distributed with CRLF query text. Raw C# string literals retain
+        # the source file's line endings, so pin the diagnostic/query string to that contract.
+        $sql = $sql.Replace("`r`n", "`n").Replace("`n", "`r`n")
+
         if ($Since -or $Status) {
             $wherearray = @()
 
@@ -184,4 +190,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 } $SqlInstance $SqlCredential $Since $Status $EnableException $Server @__commonParameters 3>&1 2>&1
 """;
+}
+
+/// <summary>Reproduces the advanced-function [string] cast before ValidateSet executes.</summary>
+internal sealed class PsDbMailHistoryStringCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        return LanguagePrimitives.ConvertTo(inputData, typeof(string), CultureInfo.InvariantCulture);
+    }
 }
