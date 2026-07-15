@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Globalization;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
 using SmoAgentCompletionResult = Microsoft.SqlServer.Management.Smo.Agent.CompletionResult;
@@ -45,6 +46,7 @@ public sealed class GetDbaAgentJobHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Completion result to return.</summary>
     [Parameter]
+    [PsCompletionResultCast]
     [ValidateSet("Failed", "Succeeded", "Retry", "Cancelled", "InProgress", "Unknown")]
     public SmoAgentCompletionResult OutcomeType { get; set; }
 
@@ -92,7 +94,7 @@ public sealed class GetDbaAgentJobHistoryCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }
-        _beginInterrupted = !completed || _filter is null;
+        _beginInterrupted = !completed || _filter is null || (ExcludeJobSteps && WithOutputFile);
     }
 
     protected override void ProcessRecord()
@@ -239,7 +241,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         try {
-            Write-Message -Message "Attempting to get job history from $instance" -Level Verbose -FunctionName Get-DbaAgentJobHistory
+            Write-Message -Message "Attempting to get job history from $instance" -Level Verbose
             if ($Job) {
                 foreach ($currentjob in $Job) {
                     $Filter.JobName = $currentjob
@@ -322,4 +324,20 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 } $Filter $SqlInstance $SqlCredential $Job $ExcludeJob $ExcludeJobSteps $WithOutputFile $JobCollection $EnableException @__commonParameters 3>&1 2>&1
 """;
+}
+
+/// <summary>Reproduces the advanced-function enum cast before ValidateSet executes.</summary>
+internal sealed class PsCompletionResultCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        try
+        {
+            return LanguagePrimitives.ConvertTo(inputData, typeof(SmoAgentCompletionResult), CultureInfo.InvariantCulture);
+        }
+        catch (PSInvalidCastException ex)
+        {
+            throw new ArgumentTransformationMetadataException(ex.Message, ex);
+        }
+    }
 }
