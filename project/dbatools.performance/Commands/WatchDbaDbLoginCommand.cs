@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
 
@@ -18,6 +19,8 @@ namespace Dataplat.Dbatools.Commands;
 [Cmdlet(VerbsCommon.Watch, "DbaDbLogin", DefaultParameterSetName = "Default")]
 public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 {
+    private readonly List<WarningRecord> _pendingHopWarnings = new List<WarningRecord>();
+
     /// <summary>SQL Server instance that stores the captured login activity.</summary>
     [Parameter(Position = 0)]
     public DbaInstanceParameter? SqlInstance { get; set; }
@@ -55,6 +58,16 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
             EnableException.ToBool(), TestBound("SqlCms"), TestBound("ServersFromFile"),
             TestBound("InputObject"), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
+            PSPropertyInfo? warningProperty = item?.Properties["__dbatoolsHopWarning"];
+            object? warningValue = warningProperty?.Value;
+            if (warningValue is PSObject wrappedWarning)
+                warningValue = wrappedWarning.BaseObject;
+            if (warningValue is WarningRecord hopWarning)
+            {
+                _pendingHopWarnings.Add(hopWarning);
+                continue;
+            }
+
             PSPropertyInfo? failureProperty = item?.Properties["__dbatoolsHopFailure"];
             object? failureValue = failureProperty?.Value;
             if (failureValue is PSObject wrappedFailure)
@@ -80,28 +93,43 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 
     private void PersistHopWarnings(object? warnings)
     {
-        if (warnings is null)
-            return;
+        List<WarningRecord> collected = new List<WarningRecord>(_pendingHopWarnings);
+        _pendingHopWarnings.Clear();
 
-        IEnumerable? warningItems = LanguagePrimitives.GetEnumerable(warnings);
-        if (warningItems is null)
+        if (warnings is not null)
         {
-            object? single = warnings is PSObject wrapped ? wrapped.BaseObject : warnings;
-            if (single is WarningRecord warning)
-                PersistSuppressedWarning(warning);
-            return;
+            IEnumerable? warningItems = LanguagePrimitives.GetEnumerable(warnings);
+            if (warningItems is null)
+            {
+                object? single = warnings is PSObject wrapped ? wrapped.BaseObject : warnings;
+                if (single is WarningRecord warning)
+                    collected.Add(warning);
+            }
+            else
+            {
+                foreach (object? item in warningItems)
+                {
+                    object? unwrapped = item is PSObject wrapped ? wrapped.BaseObject : item;
+                    if (unwrapped is WarningRecord warning)
+                        collected.Add(warning);
+                }
+            }
         }
 
-        foreach (object? item in warningItems)
+        HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+        List<WarningRecord> unique = new List<WarningRecord>();
+        foreach (WarningRecord warning in collected)
         {
-            object? unwrapped = item is PSObject wrapped ? wrapped.BaseObject : item;
-            if (unwrapped is WarningRecord warning)
-                PersistSuppressedWarning(warning);
+            if (seen.Add(warning.Message))
+                unique.Add(warning);
         }
+        PersistSuppressedWarnings(unique);
     }
 
-    private void PersistSuppressedWarning(WarningRecord warning)
+    private void PersistSuppressedWarnings(IList<WarningRecord> warnings)
     {
+        if (warnings.Count == 0)
+            return;
         if (!MyInvocation.BoundParameters.TryGetValue("WarningVariable", out object? rawName))
             return;
 
@@ -113,15 +141,15 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
             return;
 
         ScriptBlock persistScript = ScriptBlock.Create("""
-param($__name, $__warning, $__append)
+param($__name, $__warnings, $__append)
 $__items = @()
 if ($__append) {
     $__items = @(Get-Variable -Name $__name -ValueOnly -ErrorAction SilentlyContinue)
 }
-$__items += $__warning
+$__items += @($__warnings)
 Set-Variable -Name $__name -Value $__items
 """);
-        _ = InvokeCommand.InvokeScript(false, persistScript, null, variableName, warning, append);
+        _ = InvokeCommand.InvokeScript(false, persistScript, null, variableName, (object)warnings, append);
     }
 
     private object? BoundCommonParameter(string name)
@@ -162,7 +190,7 @@ $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
-    $__hopWarnings = @()
+$__automaticHopWarnings = @()
 try {
 & $__dbatoolsModule {
     [CmdletBinding()]
@@ -173,6 +201,31 @@ try {
             param([hashtable]$Parameters)
             Connect-DbaInstance @Parameters
         }
+        $__getConnectWarning = {
+            param($Warnings, [datetime]$Started, $Target, $ErrorRecord)
+            $__warningRecord = $null
+            if (@($Warnings).Count -gt 0) {
+                $__warningRecord = @($Warnings)[-1]
+            } else {
+                $__entry = Get-DbatoolsLog |
+                    Where-Object { $_.FunctionName -eq "Connect-DbaInstance" -and $_.Timestamp -ge $Started -and [int]$_.Level -eq 666 } |
+                    Select-Object -Last 1
+                if ($__entry) {
+                    $__warningRecord = [System.Management.Automation.WarningRecord]::new(
+                        ("[{0:HH:mm:ss}][{1}] {2}" -f $__entry.Timestamp, $__entry.FunctionName, $__entry.Message))
+                } else {
+                    $__warningRecord = [System.Management.Automation.WarningRecord]::new(
+                        ("[{0:HH:mm:ss}][Connect-DbaInstance] Failure | Error connecting to [{1}]: {2}" -f (Get-Date), $Target, $ErrorRecord.Exception.Message))
+                }
+            }
+            if ($__warningRecord) {
+                if ($EnableException) {
+                    [pscustomobject]@{ __dbatoolsHopWarning = $__warningRecord }
+                } else {
+                    Write-Warning $__warningRecord.Message
+                }
+            }
+        }
 
         if (-not ($__boundSqlCms -or $__boundServersFromFile -or $__boundInputObject)) {
             Stop-Function -Message "You must specify a server list source using -SqlCms or -ServersFromFile or pipe in connected instances. See the command documentation and examples for more details." -FunctionName Watch-DbaDbLogin
@@ -181,14 +234,13 @@ try {
 
         try {
             $__connectWarnings = @()
+            $__connectStarted = Get-Date
             $serverDest = & $__invokeConnect @{
                 SqlInstance = $SqlInstance
                 SqlCredential = $SqlCredential
             } -WarningVariable __connectWarnings
         } catch {
-            foreach ($__connectWarning in $__connectWarnings) {
-                Write-Warning ($__connectWarning.ToString()) 3>$null
-            }
+            & $__getConnectWarning $__connectWarnings $__connectStarted $SqlInstance $_
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $SqlInstance -FunctionName Watch-DbaDbLogin
             return
         }
@@ -222,6 +274,7 @@ try {
         foreach ($instance in $servers) {
             try {
                 $__connectWarnings = @()
+                $__connectStarted = Get-Date
                 if ($instance -is [Microsoft.SqlServer.Management.RegisteredServers.RegisteredServer]) {
                     $__sourceInstance = $instance.ServerName
                 } else {
@@ -233,9 +286,7 @@ try {
                     MinimumVersion = 9
                 } -WarningVariable __connectWarnings
             } catch {
-                foreach ($__connectWarning in $__connectWarnings) {
-                    Write-Warning ($__connectWarning.ToString()) 3>$null
-                }
+                & $__getConnectWarning $__connectWarnings $__connectStarted $__sourceInstance $_
                 Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Watch-DbaDbLogin
             }
         }
@@ -295,11 +346,11 @@ try {
             }
         }
 
-} $SqlInstance $SqlCredential $Database $Table $SqlCms $ServersFromFile $InputObject $EnableException $__boundSqlCms $__boundServersFromFile $__boundInputObject @__commonParameters -WarningVariable __hopWarnings 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $Table $SqlCms $ServersFromFile $InputObject $EnableException $__boundSqlCms $__boundServersFromFile $__boundInputObject @__commonParameters -WarningVariable __automaticHopWarnings 3>&1 2>&1
 } catch {
     [pscustomobject]@{
         __dbatoolsHopFailure = $_
-        __dbatoolsHopWarnings = @($__hopWarnings)
+        __dbatoolsHopWarnings = @($__automaticHopWarnings)
     }
 }
 """;
