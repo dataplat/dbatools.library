@@ -1,9 +1,13 @@
 #nullable enable
 
 using System;
-using System.Collections;
+using System.Globalization;
 using System.Management.Automation;
+using Dataplat.Dbatools.Connection;
 using Dataplat.Dbatools.Parameter;
+using Dataplat.Dbatools.Utility;
+using Microsoft.SqlServer.Management.Smo;
+using Microsoft.SqlServer.Management.Smo.Agent;
 
 namespace Dataplat.Dbatools.Commands;
 
@@ -13,15 +17,15 @@ namespace Dataplat.Dbatools.Commands;
 /// migration/baselines/Get-DbaAgentAlertCategory.json.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaAgentAlertCategory")]
-public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
+public sealed class GetDbaAgentAlertCategoryCommand : DbaInstanceCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
-    public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
+    public override DbaInstanceParameter[] SqlInstance { get; set; } = null!;
 
     /// <summary>Login to the target instance using alternative credentials.</summary>
     [Parameter(Position = 1)]
-    public PSCredential? SqlCredential { get; set; }
+    public override PSCredential? SqlCredential { get; set; }
 
     /// <summary>One or more exact alert category names to return.</summary>
     [Parameter(Position = 2)]
@@ -36,95 +40,75 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Category, EnableException.ToBool(),
-            TestBound(nameof(Category)), BoundCommonParameter("Verbose"),
-            BoundCommonParameter("Debug")))
+        foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-            }
-            else
-            {
-                WriteObject(item);
-            }
-        }
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-        {
-            return LanguagePrimitives.IsTrue(value);
-        }
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-            {
+            if (Interrupted)
                 return;
-            }
-            if (errorList[0] is not ErrorRecord first)
+
+            Server? server = ConnectInstance(instance, "Failure");
+            if (server is null)
+                continue;
+
+            AlertCategory? currentCategory = null;
+            try
             {
-                return;
+                foreach (AlertCategory category in server.JobServer.AlertCategories)
+                {
+                    currentCategory = category;
+                    if (Interrupted)
+                        return;
+                    if (TestBound(nameof(Category)) && !Contains(Category, category.Name))
+                        continue;
+
+                    int alertCount = 0;
+                    foreach (Alert alert in server.JobServer.Alerts)
+                    {
+                        if (LanguagePrimitives.Equals(alert.CategoryName, category.Name, true,
+                            CultureInfo.InvariantCulture))
+                            alertCount++;
+                    }
+
+                    PSObject wrapped = PSObject.AsPSObject(category);
+                    AddOrReplaceNote(wrapped, "ComputerName", SmoServerExtensions.GetComputerName(server));
+                    AddOrReplaceNote(wrapped, "InstanceName", server.ServiceName);
+                    AddOrReplaceNote(wrapped, "SqlInstance", SmoServerExtensions.GetDomainInstanceName(server));
+                    AddOrReplaceNote(wrapped, "AlertCount", alertCount);
+                    OutputHelper.SetDefaultDisplayPropertySet(wrapped,
+                        "ComputerName", "InstanceName", "SqlInstance", "Name", "ID", "AlertCount");
+                    WriteObject(wrapped);
+                }
             }
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
+            catch (PipelineStoppedException)
             {
-                errorList.RemoveAt(0);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                StopFunction($"Something went wrong getting the alert category {currentCategory} on {instance}",
+                    target: currentCategory,
+                    errorRecord: new ErrorRecord(ex, string.Empty, ErrorCategory.NotSpecified, currentCategory),
+                    continueLoop: true);
+                continue;
             }
         }
-        catch
+    }
+
+    private static bool Contains(string[]? values, string name)
+    {
+        if (values is null)
+            return false;
+        foreach (string? value in values)
         {
-            // Best-effort bookkeeping only.
+            if (LanguagePrimitives.Equals(name, value, true, CultureInfo.InvariantCulture))
+                return true;
         }
+        return false;
     }
 
-    private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Category, $EnableException, $__boundCategory, $__boundVerbose, $__boundDebug)
-$__commonParameters = @{}
-if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
-if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
-$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
-& $__dbatoolsModule {
-    [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Category, $EnableException, $__boundCategory)
-
-    foreach ($instance in $SqlInstance) {
-        try {
-            $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
-        } catch {
-            Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaAgentAlertCategory
-        }
-
-        $alertCategories = $server.JobServer.AlertCategories
-        if ($__boundCategory) {
-            $alertCategories = $alertCategories | Where-Object { $_.Name -in $Category }
-        }
-
-        $defaults = 'ComputerName', 'InstanceName', 'SqlInstance', 'Name', 'ID', 'AlertCount'
-
-        try {
-            foreach ($cat in $alertCategories) {
-                $alertCount = ($server.JobServer.Alerts | Where-Object { $_.CategoryName -eq $cat.Name }).Count
-
-                Add-Member -Force -InputObject $cat -MemberType NoteProperty -Name ComputerName -value $server.ComputerName
-                Add-Member -Force -InputObject $cat -MemberType NoteProperty -Name InstanceName -value $server.ServiceName
-                Add-Member -Force -InputObject $cat -MemberType NoteProperty -Name SqlInstance -value $server.DomainInstanceName
-                Add-Member -Force -InputObject $cat -MemberType NoteProperty -Name AlertCount -Value $alertCount
-
-                Select-DefaultView -InputObject $cat -Property $defaults
-            }
-        } catch {
-            Stop-Function -Message "Something went wrong getting the alert category $cat on $instance" -Target $cat -Continue -ErrorRecord $_ -FunctionName Get-DbaAgentAlertCategory
-        }
+    private static void AddOrReplaceNote(PSObject wrapped, string name, object? value)
+    {
+        if (wrapped.Properties[name] is PSNoteProperty)
+            wrapped.Properties.Remove(name);
+        wrapped.Properties.Add(new PSNoteProperty(name, value));
     }
-} $SqlInstance $SqlCredential $Category $EnableException $__boundCategory @__commonParameters 3>&1 2>&1
-""";
 }
