@@ -233,8 +233,10 @@ namespace Dataplat.Dbatools.Message
             bool restoreInquire = false;
 #if NET8_0_OR_GREATER
             object oldPreference = cmdlet.SessionState.PSVariable.GetValue("DebugPreference");
-            restoreInquire = oldPreference is ActionPreference preference &&
-                preference == ActionPreference.Inquire;
+            bool debugBound = cmdlet.MyInvocation.BoundParameters.TryGetValue("Debug", out object boundDebug) &&
+                LanguagePrimitives.IsTrue(boundDebug);
+            restoreInquire = debugBound || (oldPreference is ActionPreference preference &&
+                preference == ActionPreference.Inquire);
 #endif
             try
             {
