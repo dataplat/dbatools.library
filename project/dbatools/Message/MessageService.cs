@@ -172,7 +172,7 @@ namespace Dataplat.Dbatools.Message
                     // channel is logged in both modes.
                     channels = channels | LogEntryType.Warning;
                 }
-                cmdlet.WriteDebug(messageStreams);
+                WriteDebugWithoutInquire(cmdlet, messageStreams);
                 channels = channels | LogEntryType.Debug;
             }
 
@@ -202,7 +202,7 @@ namespace Dataplat.Dbatools.Message
 
             if ((MessageHost.MaximumDebug >= (int)level) && (MessageHost.MinimumDebug <= (int)level))
             {
-                cmdlet.WriteDebug(messageStreams);
+                WriteDebugWithoutInquire(cmdlet, messageStreams);
                 channels = channels | LogEntryType.Debug;
             }
 
@@ -226,6 +226,24 @@ namespace Dataplat.Dbatools.Message
                     try { cmdlet.InvokeCommand.InvokeScript(subscription.ScriptBlock.ToString(), entry); }
                     catch (Exception e) { cmdlet.WriteError(new ErrorRecord(e, "", ErrorCategory.NotSpecified, entry)); }
                 }
+        }
+
+        private static void WriteDebugWithoutInquire(PSCmdlet cmdlet, string message)
+        {
+            object oldPreference = cmdlet.SessionState.PSVariable.GetValue("DebugPreference");
+            bool restoreInquire = oldPreference is ActionPreference preference &&
+                preference == ActionPreference.Inquire;
+            try
+            {
+                if (restoreInquire)
+                    cmdlet.SessionState.PSVariable.Set("DebugPreference", ActionPreference.Continue);
+                cmdlet.WriteDebug(message);
+            }
+            finally
+            {
+                if (restoreInquire)
+                    cmdlet.SessionState.PSVariable.Set("DebugPreference", oldPreference);
+            }
         }
 
         /// <summary>

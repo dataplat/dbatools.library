@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Management.Automation;
 using Dataplat.Dbatools.Connection;
 using Dataplat.Dbatools.Parameter;
@@ -44,6 +45,13 @@ namespace Dataplat.Dbatools.Commands
                 request.SqlCredential = SqlCredential;
                 request.MinimumVersion = minimumVersion;
                 request.AzureUnsupported = azureUnsupported;
+                request.BoundParameters = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "SqlInstance",
+                    "SqlCredential"
+                };
+                request.MessageCallback = (level, message) =>
+                    WriteAttributedMessage("Connect-DbaInstance", level, message);
 
                 Server server = ConnectionService.GetServer(request);
                 SetActiveConnection(server.ConnectionContext);

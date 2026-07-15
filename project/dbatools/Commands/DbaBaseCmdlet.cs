@@ -95,10 +95,21 @@ namespace Dataplat.Dbatools.Commands
         /// <param name="tag">Message tags</param>
         protected void WriteMessage(MessageLevel level, string message, object target = null, Exception exception = null, string[] tag = null)
         {
+            WriteAttributedMessage(GetCommandName(), level, message, target, exception, tag);
+        }
+
+        /// <summary>
+        /// Routes a message through this cmdlet's streams while preserving the source helper's
+        /// function attribution. Used by native service seams such as ConnectInstance, where the
+        /// retired function emitted messages from Connect-DbaInstance.
+        /// </summary>
+        protected void WriteAttributedMessage(string functionName, MessageLevel level, string message,
+            object target = null, Exception exception = null, string[] tag = null)
+        {
             MessageService.MessageRequest request = new MessageService.MessageRequest();
             request.Level = level;
             request.Message = message;
-            request.FunctionName = GetCommandName();
+            request.FunctionName = functionName;
             request.ModuleName = "dbatools";
             request.Target = target;
             request.Exception = exception;
