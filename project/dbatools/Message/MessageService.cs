@@ -236,13 +236,15 @@ namespace Dataplat.Dbatools.Message
             try
             {
                 if (restoreInquire)
-                    cmdlet.SessionState.PSVariable.Set("DebugPreference", ActionPreference.Continue);
+                    cmdlet.InvokeCommand.InvokeScript(false,
+                        ScriptBlock.Create("$DebugPreference = 'Continue'"), null, null);
                 cmdlet.WriteDebug(message);
             }
             finally
             {
                 if (restoreInquire)
-                    cmdlet.SessionState.PSVariable.Set("DebugPreference", oldPreference);
+                    cmdlet.InvokeCommand.InvokeScript(false,
+                        ScriptBlock.Create("$DebugPreference = 'Inquire'"), null, null);
             }
         }
 
