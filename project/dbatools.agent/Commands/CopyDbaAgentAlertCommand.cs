@@ -267,6 +267,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $notifications = $serverAlert.EnumNotifications()
             $jobName = $serverAlert.JobName
 
+            # JobId = 00000000-0000-0000-0000-000 means the Alert does not execute/is attached to a SQL Agent Job.
             if ($serverAlert.JobId -ne '00000000-0000-0000-0000-000000000000') {
                 $copyAgentAlertStatus = [PSCustomObject]@{
                     SourceServer      = $sourceServer.Name
@@ -279,6 +280,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
                 if ($__realCmdlet.ShouldProcess($destinstance, "Adding $alertName to $jobName")) {
                     try {
+                        <# THERE needs to be validation within this block to see if the $jobName actually exists on the source server. #>
                         Write-Message -Message "Adding $alertName to $jobName" -Level Verbose -FunctionName Copy-DbaAgentAlert
                         $newJob = $destServer.JobServer.Jobs[$jobName]
                         $newJobId = ($newJob.JobId) -replace " ", ""
@@ -310,6 +312,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         Status            = $null
                         DateTime          = [Dataplat.Dbatools.Utility.DbaDateTime](Get-Date)
                     }
+                    # can't add them this way, we need to modify the existing one or give all options that are supported.
                     foreach ($notify in $notifications) {
                         $notifyCollection = @()
                         if ($notify.UseNetSend -eq $true) {
