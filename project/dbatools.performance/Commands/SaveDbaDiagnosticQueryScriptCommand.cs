@@ -26,13 +26,7 @@ public sealed class SaveDbaDiagnosticQueryScriptCommand : DbaBaseCmdlet
     private static FileInfo? BuildDefaultPath()
     {
         string path = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        // The source's typed default ([System.IO.FileInfo]$Path = [Environment]::GetFolderPath(...))
-        // FAULTS at invocation when the folder resolves empty ([FileInfo]"" has no conversion).
-        // Ride the engine's own converter so that environment faults here too instead of flowing
-        // a null Path into the body's Test-Path (empty-MyDocuments cannot be staged on the lab,
-        // so the exact record shape is a documented degradation).
-        return (FileInfo?)LanguagePrimitives.ConvertTo(path, typeof(FileInfo),
-            System.Globalization.CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(path) ? null : new FileInfo(path);
     }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
@@ -40,6 +34,15 @@ public sealed class SaveDbaDiagnosticQueryScriptCommand : DbaBaseCmdlet
     protected override void ProcessRecord()
     {
         if (Interrupted) { return; }
+        // The source's typed default ([System.IO.FileInfo]$Path = [Environment]::GetFolderPath(...))
+        // FAULTS the invocation when the folder resolves empty AND -Path was not supplied - PS only
+        // evaluates the default for unbound parameters, so a bound -Path must never trip this.
+        // Riding the engine's own converter on "" reproduces the cast fault organically before any
+        // body work (empty-MyDocuments cannot be staged on the lab, so the exact outer record shape
+        // is a documented degradation).
+        if (Path is null && !TestBound("Path"))
+            LanguagePrimitives.ConvertTo(string.Empty, typeof(FileInfo),
+                System.Globalization.CultureInfo.InvariantCulture);
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
             Path, EnableException.ToBool(), BoundVerbose()))
         {
