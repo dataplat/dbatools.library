@@ -42,25 +42,31 @@ public sealed class GetDbaAgentOperatorCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Operator, ExcludeOperator,
-            EnableException.ToBool(), _server, _alertLastEmail,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
+            if (Interrupted)
+                return;
+
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
+                new[] { instance }, SqlCredential, Operator, ExcludeOperator,
+                EnableException.ToBool(), _server, _alertLastEmail,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-            }
-            else if (item is not null && LanguagePrimitives.IsTrue(
-                item.Properties["__GetDbaAgentOperatorProcessComplete"]?.Value))
-            {
-                _server = Unwrap(item.Properties["Server"]?.Value);
-                _alertLastEmail = Unwrap(item.Properties["AlertLastEmail"]?.Value);
-            }
-            else
-            {
-                WriteObject(item);
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                }
+                else if (item is not null && LanguagePrimitives.IsTrue(
+                    item.Properties["__GetDbaAgentOperatorProcessComplete"]?.Value))
+                {
+                    _server = Unwrap(item.Properties["Server"]?.Value);
+                    _alertLastEmail = Unwrap(item.Properties["AlertLastEmail"]?.Value);
+                }
+                else
+                {
+                    WriteObject(item);
+                }
             }
         }
     }
