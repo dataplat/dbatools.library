@@ -230,27 +230,18 @@ namespace Dataplat.Dbatools.Message
 
         private static void WriteDebugWithoutInquire(PSCmdlet cmdlet, string message)
         {
-            bool restoreInquire = false;
 #if NET8_0_OR_GREATER
-            object oldPreference = cmdlet.SessionState.PSVariable.GetValue("DebugPreference");
             bool debugBound = cmdlet.MyInvocation.BoundParameters.TryGetValue("Debug", out object boundDebug) &&
                 LanguagePrimitives.IsTrue(boundDebug);
-            restoreInquire = debugBound || (oldPreference is ActionPreference preference &&
-                preference == ActionPreference.Inquire);
+            if (debugBound)
+            {
+                cmdlet.InvokeCommand.InvokeScript(false, ScriptBlock.Create(
+                    "param($message) $old = $DebugPreference; try { $DebugPreference = 'Continue'; Write-Debug -Message $message } finally { $DebugPreference = $old }"),
+                    null, new object[] { message });
+                return;
+            }
 #endif
-            try
-            {
-                if (restoreInquire)
-                    cmdlet.InvokeCommand.InvokeScript(false,
-                        ScriptBlock.Create("$DebugPreference = 'Continue'"), null, null);
-                cmdlet.WriteDebug(message);
-            }
-            finally
-            {
-                if (restoreInquire)
-                    cmdlet.InvokeCommand.InvokeScript(false,
-                        ScriptBlock.Create("$DebugPreference = 'Inquire'"), null, null);
-            }
+            cmdlet.WriteDebug(message);
         }
 
         /// <summary>
