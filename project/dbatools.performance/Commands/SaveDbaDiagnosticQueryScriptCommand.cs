@@ -26,13 +26,20 @@ public sealed class SaveDbaDiagnosticQueryScriptCommand : DbaBaseCmdlet
     private static FileInfo? BuildDefaultPath()
     {
         string path = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        return string.IsNullOrEmpty(path) ? null : new FileInfo(path);
+        // The source's typed default ([System.IO.FileInfo]$Path = [Environment]::GetFolderPath(...))
+        // FAULTS at invocation when the folder resolves empty ([FileInfo]"" has no conversion).
+        // Ride the engine's own converter so that environment faults here too instead of flowing
+        // a null Path into the body's Test-Path (empty-MyDocuments cannot be staged on the lab,
+        // so the exact record shape is a documented degradation).
+        return (FileInfo?)LanguagePrimitives.ConvertTo(path, typeof(FileInfo),
+            System.Globalization.CultureInfo.InvariantCulture);
     }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     protected override void ProcessRecord()
     {
+        if (Interrupted) { return; }
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
             Path, EnableException.ToBool(), BoundVerbose()))
         {

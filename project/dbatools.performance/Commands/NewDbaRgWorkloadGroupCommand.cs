@@ -86,6 +86,11 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
+        // The source's already-exists/no-Force site reads process-level $_ into Stop-Function
+        // -ErrorRecord ([ErrorRecord[]]): a piped record fails argument transformation and
+        // terminates the invocation (probe: migration/tools/Probe-RgStopFunctionFlowTruthTable.ps1,
+        // both editions). Carry the record so the verbatim statement reproduces it organically.
+        object? pipelineItem = PsPipelineItem.Current(this);
         foreach (DbaInstanceParameter instance in SqlInstance ?? Array.Empty<DbaInstanceParameter>())
         {
             // Connect-DbaInstance is inside the PowerShell function's try. NestedConnect
@@ -109,7 +114,7 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
                 RequestMaximumCpuTimeInSeconds, RequestMemoryGrantTimeoutInSeconds,
                 MaximumDegreeOfParallelism, GroupMaximumRequests,
                 SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
-                this, BoundVerbose()))
+                this, BoundVerbose(), pipelineItem))
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -155,11 +160,13 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($server, $instance, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $Importance, $RequestMaximumMemoryGrantPercentage, $RequestMaximumCpuTimeInSeconds, $RequestMemoryGrantTimeoutInSeconds, $MaximumDegreeOfParallelism, $GroupMaximumRequests, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose)
+param($server, $instance, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $Importance, $RequestMaximumMemoryGrantPercentage, $RequestMaximumCpuTimeInSeconds, $RequestMemoryGrantTimeoutInSeconds, $MaximumDegreeOfParallelism, $GroupMaximumRequests, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__pipelineItem)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $instance, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $Importance, $RequestMaximumMemoryGrantPercentage, $RequestMaximumCpuTimeInSeconds, $RequestMemoryGrantTimeoutInSeconds, $MaximumDegreeOfParallelism, $GroupMaximumRequests, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($server, $instance, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $Importance, $RequestMaximumMemoryGrantPercentage, $RequestMaximumCpuTimeInSeconds, $RequestMemoryGrantTimeoutInSeconds, $MaximumDegreeOfParallelism, $GroupMaximumRequests, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__pipelineItem)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    # Process-block $_ carrier: the already-exists Stop-Function reads $_ into -ErrorRecord.
+    $_ = $__pipelineItem
 
     foreach ($wklGroup in $WorkloadGroup) {
         switch ($ResourcePoolType) {
@@ -208,6 +215,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         Get-DbaRgResourcePool -SqlInstance $server -Type $ResourcePoolType | Where-Object Name -eq $resPool.Name | Get-DbaRgWorkloadGroup | Where-Object Name -eq $wklGroup
     }
-} $server $instance $WorkloadGroup $ResourcePool $ResourcePoolType $Importance $RequestMaximumMemoryGrantPercentage $RequestMaximumCpuTimeInSeconds $RequestMemoryGrantTimeoutInSeconds $MaximumDegreeOfParallelism $GroupMaximumRequests $SkipReconfigure $Force $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $server $instance $WorkloadGroup $ResourcePool $ResourcePoolType $Importance $RequestMaximumMemoryGrantPercentage $RequestMaximumCpuTimeInSeconds $RequestMemoryGrantTimeoutInSeconds $MaximumDegreeOfParallelism $GroupMaximumRequests $SkipReconfigure $Force $EnableException $__realCmdlet $__boundVerbose $__pipelineItem 3>&1 2>&1
 """;
 }

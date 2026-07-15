@@ -53,6 +53,7 @@ public sealed class StopDbaPfDataCollectorSetCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
+        if (Interrupted) { return; }
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
             ComputerName, Credential, CollectorSet, InputObject,
             TestBound("ComputerName"), !NoWait.ToBool(), EnableException.ToBool(),

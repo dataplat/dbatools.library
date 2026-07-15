@@ -228,6 +228,38 @@ internal sealed class PsIntCastAttribute : ArgumentTransformationAttribute
     }
 }
 
+/// <summary>The advanced function process-block $_ automatic variable, for verbatim hops
+/// whose source reads $_ at process level (not inside catch/Where-Object scopes, which set
+/// their own). The engine sets $_ in a function's process block only for PIPELINE records;
+/// otherwise a read resolves dynamically up the caller chain (e.g. an enclosing
+/// ForEach-Object's $_). A compiled cmdlet mirrors that with CurrentPipelineObject (engine
+/// per-record input, non-public getter - reflection like the W1-018 _rowsCopied precedent)
+/// and a dynamic GetVariableValue lookup as the non-piped fallback.</summary>
+internal static class PsPipelineItem
+{
+    private static readonly System.Reflection.PropertyInfo? CurrentPipelineObjectProperty =
+        typeof(Cmdlet).GetProperty("CurrentPipelineObject",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic);
+
+    /// <summary>The value the source function's process block would see as $_.</summary>
+    internal static object? Current(PSCmdlet host)
+    {
+        object? piped = null;
+        try { piped = CurrentPipelineObjectProperty?.GetValue(host); }
+        catch { /* engine internals unavailable: fall through to the dynamic read */ }
+        if (piped is PSObject psPiped &&
+            (ReferenceEquals(psPiped, System.Management.Automation.Internal.AutomationNull.Value) ||
+             psPiped.BaseObject is null))
+            piped = null;
+        if (piped is not null)
+            return piped;
+        try { return host.GetVariableValue("_", null); }
+        catch { return null; }
+    }
+}
+
 /// <summary>The PS property-assignment binder's argument conversion.</summary>
 internal static class PsAssignment
 {
