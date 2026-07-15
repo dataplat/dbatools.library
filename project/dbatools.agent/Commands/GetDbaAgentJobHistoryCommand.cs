@@ -45,6 +45,7 @@ public sealed class GetDbaAgentJobHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Completion result to return.</summary>
     [Parameter]
+    [ValidateSet("Failed", "Succeeded", "Retry", "Cancelled", "InProgress", "Unknown")]
     public SmoAgentCompletionResult OutcomeType { get; set; }
 
     /// <summary>Return job-level outcomes only.</summary>
