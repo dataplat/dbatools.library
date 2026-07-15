@@ -174,7 +174,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 param($SqlInstance, $SqlCredential, $JobName, $ExcludeJobName, $StepName, $LastUsed, $IsDisabled, $IsFailed, $IsNotScheduled, $IsNoEmailNotification, $Category, $Owner, $Since, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$JobName, [string[]]$ExcludeJobName, [string[]]$StepName, [int]$LastUsed, $IsDisabled, $IsFailed, $IsNotScheduled, $IsNoEmailNotification, [string[]]$Category, [string]$Owner, [datetime]$Since, $EnableException, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$JobName, [string[]]$ExcludeJobName, [string[]]$StepName, [int]$LastUsed, $IsDisabled, $IsFailed, $IsNotScheduled, $IsNoEmailNotification, [string[]]$Category, [string]$Owner, $Since, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
     if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
