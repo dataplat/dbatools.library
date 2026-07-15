@@ -34,6 +34,7 @@ public sealed class GetDbaAgentScheduleCommand : DbaBaseCmdlet
 
     /// <summary>Numeric schedule identifiers to include.</summary>
     [Parameter(Position = 4)]
+    [PsAgentLogIntArrayCast]
     public int[]? Id { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
