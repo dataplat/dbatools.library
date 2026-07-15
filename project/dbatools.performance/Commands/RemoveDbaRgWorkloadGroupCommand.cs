@@ -54,12 +54,14 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     private object? _effectiveInputObject;
-    private bool _skipEnd;
 
     protected override void ProcessRecord()
     {
-        if (_skipEnd)
-            return;
+        // The source's guard `Stop-Function; return` has NO Test-FunctionInterrupt prologue:
+        // it abandons only the CURRENT process invocation - later pipeline records re-run the
+        // guards and the end block still executes (architecture.md 2.1 no-prologue note).
+        // The earlier _skipEnd whole-cmdlet stop diverged (opus W1-117 round 1).
+        if (Interrupted) { return; }
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
@@ -74,7 +76,6 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
                      LanguagePrimitives.IsTrue(item.Properties[CarrierMarker].Value))
             {
                 _effectiveInputObject = item.Properties["InputObject"]?.Value;
-                _skipEnd = LanguagePrimitives.IsTrue(item.Properties["SkipEnd"]?.Value);
             }
             else
             {
@@ -85,8 +86,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
 
     protected override void EndProcessing()
     {
-        if (_skipEnd)
-            return;
+        if (Interrupted) { return; }
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
             _effectiveInputObject, SkipReconfigure.ToBool(), EnableException.ToBool(),
@@ -142,12 +142,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     if (-not $InputObject -and -not $WorkloadGroup) {
         Stop-Function -Message "You must pipe in a workload group or specify a WorkloadGroup." -FunctionName Remove-DbaRgWorkloadGroup
-        [pscustomobject]@{ __dbatoolsW1117Carrier = $true; SkipEnd = $true; InputObject = $InputObject }
+        [pscustomobject]@{ __dbatoolsW1117Carrier = $true; InputObject = $InputObject }
         return
     }
     if (-not $InputObject -and -not $SqlInstance) {
         Stop-Function -Message "You must pipe in a workload group or specify a SqlInstance." -FunctionName Remove-DbaRgWorkloadGroup
-        [pscustomobject]@{ __dbatoolsW1117Carrier = $true; SkipEnd = $true; InputObject = $InputObject }
+        [pscustomobject]@{ __dbatoolsW1117Carrier = $true; InputObject = $InputObject }
         return
     }
 
@@ -167,7 +167,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $InputObject += $resPool.WorkloadGroups | Where-Object Name -in $WorkloadGroup
     }
 
-    [pscustomobject]@{ __dbatoolsW1117Carrier = $true; SkipEnd = $false; InputObject = $InputObject }
+    [pscustomobject]@{ __dbatoolsW1117Carrier = $true; InputObject = $InputObject }
 } $SqlInstance $SqlCredential $WorkloadGroup $ResourcePool $ResourcePoolType $InputObject $EnableException $__boundVerbose 3>&1 2>&1
 """;
 
