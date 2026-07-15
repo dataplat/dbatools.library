@@ -95,11 +95,13 @@ public sealed class CopyDbaAgentProxyCommand : DbaBaseCmdlet
 
     private const string BodyScript = """
 param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $ProxyAccount, $ExcludeProxyAccount, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, [string[]]$ProxyAccount, [string[]]$ExcludeProxyAccount, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     try {
         $sourceServer = Connect-DbaInstance -SqlInstance $Source -SqlCredential $SourceSqlCredential -MinimumVersion 9
@@ -224,6 +226,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $ProxyAccount $ExcludeProxyAccount $Force $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $ProxyAccount $ExcludeProxyAccount $Force $EnableException $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

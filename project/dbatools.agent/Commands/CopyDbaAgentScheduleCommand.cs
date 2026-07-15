@@ -146,11 +146,13 @@ public sealed class CopyDbaAgentScheduleCommand : DbaBaseCmdlet
 
     private const string BeginScript = """
 param($Source, $SourceSqlCredential, $Schedule, $Id, $InputObject, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $SourceSqlCredential, [string[]]$Schedule, [int[]]$Id, [Microsoft.SqlServer.Management.Smo.Agent.JobSchedule[]]$InputObject, $EnableException, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if ($Source) {
         try {
@@ -166,16 +168,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     $InputObject
     [pscustomobject]@{ __CopyDbaAgentScheduleBeginComplete = $true }
-} $Source $SourceSqlCredential $Schedule $Id $InputObject $EnableException $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Source $SourceSqlCredential $Schedule $Id $InputObject $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     private const string ProcessScript = """
 param($Destination, $DestinationSqlCredential, $Schedule, $InputObject, $Force, $EnableException, $__realCmdlet, $__boundSource, $__boundInputObject, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, [string[]]$Schedule, [Microsoft.SqlServer.Management.Smo.Agent.JobSchedule[]]$InputObject, $Force, $EnableException, $__realCmdlet, $__boundSource, $__boundInputObject, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     if ($Force) { $ConfirmPreference = 'none' }
 
     if (Test-FunctionInterrupt) { return }
@@ -261,6 +265,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $Destination $DestinationSqlCredential $Schedule $InputObject $Force $EnableException $__realCmdlet $__boundSource $__boundInputObject $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Destination $DestinationSqlCredential $Schedule $InputObject $Force $EnableException $__realCmdlet $__boundSource $__boundInputObject $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

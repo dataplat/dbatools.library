@@ -58,7 +58,7 @@ public sealed class CopyDbaAgentServerCommand : DbaBaseCmdlet
             Source, SourceSqlCredential, Destination, DestinationSqlCredential,
             DisableJobsOnDestination.ToBool(), DisableJobsOnSource.ToBool(),
             ExcludeServerProperties.ToBool(), Force.ToBool(), EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Verbose"),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"), BoundCommonParameter("Verbose"),
             BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
@@ -101,13 +101,17 @@ public sealed class CopyDbaAgentServerCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeServerProperties, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundVerbose, $__boundDebug)
+param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeServerProperties, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeServerProperties, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundWhatIf) { $WhatIfPreference = [bool]$__boundWhatIf }
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeServerProperties, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     try {
         $sourceServer = Connect-DbaInstance -SqlInstance $Source -SqlCredential $SourceSqlCredential
@@ -166,13 +170,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($ExcludeServerProperties) {
-            if ($__realCmdlet.ShouldProcess($destinstance, "Skipping Agent Server property copy")) {
+            if ($PSCmdlet.ShouldProcess($destinstance, "Skipping Agent Server property copy")) {
                 $copyAgentPropStatus.Status = "Skipped"
                 $copyAgentPropStatus.Notes = $null
                 $copyAgentPropStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
             }
         } else {
-            if ($__realCmdlet.ShouldProcess($destinstance, "Copying Agent Properties")) {
+            if ($PSCmdlet.ShouldProcess($destinstance, "Copying Agent Properties")) {
                 try {
                     Write-Message -Level Verbose -Message "Copying SQL Agent Properties" -FunctionName Copy-DbaAgentServer
                     $sql = $sourceAgent.Script() | Out-String
@@ -195,6 +199,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $DisableJobsOnDestination $DisableJobsOnSource $ExcludeServerProperties $Force $EnableException $__realCmdlet $__boundWhatIf $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $DisableJobsOnDestination $DisableJobsOnSource $ExcludeServerProperties $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 2>&1
 """;
 }

@@ -107,11 +107,13 @@ public sealed class CopyDbaAgentJobCategoryCommand : DbaBaseCmdlet
 
     private const string BodyScript = """
 param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $CategoryType, $JobCategory, $AgentCategory, $OperatorCategory, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, [string[]]$CategoryType, [string[]]$JobCategory, [string[]]$AgentCategory, [string[]]$OperatorCategory, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     function Copy-JobCategory {
         param ([string[]]$jobCategories)
@@ -355,6 +357,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         Copy-AlertCategory
         Copy-JobCategory
     }
-} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $CategoryType $JobCategory $AgentCategory $OperatorCategory $Force $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $CategoryType $JobCategory $AgentCategory $OperatorCategory $Force $EnableException $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

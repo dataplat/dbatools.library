@@ -151,11 +151,13 @@ public sealed class CopyDbaAgentJobStepCommand : DbaBaseCmdlet
 
     private const string BeginScript = """
 param($Source, $SourceSqlCredential, $Job, $ExcludeJob, $InputObject, $EnableException, $__boundJob, $__boundExcludeJob, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $SourceSqlCredential, [object[]]$Job, [object[]]$ExcludeJob, [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject, $EnableException, $__boundJob, $__boundExcludeJob, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if ($Source) {
         try {
@@ -173,16 +175,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     $InputObject
     [pscustomobject]@{ __CopyDbaAgentJobStepBeginComplete = $true }
-} $Source $SourceSqlCredential $Job $ExcludeJob $InputObject $EnableException $__boundJob $__boundExcludeJob $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Source $SourceSqlCredential $Job $ExcludeJob $InputObject $EnableException $__boundJob $__boundExcludeJob $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     private const string ProcessScript = """
 param($Destination, $DestinationSqlCredential, $Job, $ExcludeJob, $Step, $InputObject, $EnableException, $__realCmdlet, $__boundJob, $__boundExcludeJob, $__boundStep, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, [object[]]$Job, [object[]]$ExcludeJob, [string[]]$Step, [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject, $EnableException, $__realCmdlet, $__boundJob, $__boundExcludeJob, $__boundStep, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if (Test-FunctionInterrupt) { return }
     foreach ($destinstance in $Destination) {
@@ -273,6 +277,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $Destination $DestinationSqlCredential $Job $ExcludeJob $Step $InputObject $EnableException $__realCmdlet $__boundJob $__boundExcludeJob $__boundStep $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Destination $DestinationSqlCredential $Job $ExcludeJob $Step $InputObject $EnableException $__realCmdlet $__boundJob $__boundExcludeJob $__boundStep $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

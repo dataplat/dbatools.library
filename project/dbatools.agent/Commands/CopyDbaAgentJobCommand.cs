@@ -172,11 +172,13 @@ public sealed class CopyDbaAgentJobCommand : DbaBaseCmdlet
 
     private const string BeginScript = """
 param($Source, $SourceSqlCredential, $Job, $ExcludeJob, $NewName, $InputObject, $EnableException, $__boundJob, $__boundExcludeJob, $__boundNewName, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $SourceSqlCredential, [object[]]$Job, [object[]]$ExcludeJob, $NewName, [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject, $EnableException, $__boundJob, $__boundExcludeJob, $__boundNewName, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if ($Source) {
         try {
@@ -202,16 +204,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     $InputObject
     [pscustomobject]@{ __CopyDbaAgentJobBeginComplete = $true }
-} $Source $SourceSqlCredential $Job $ExcludeJob $NewName $InputObject $EnableException $__boundJob $__boundExcludeJob $__boundNewName $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Source $SourceSqlCredential $Job $ExcludeJob $NewName $InputObject $EnableException $__boundJob $__boundExcludeJob $__boundNewName $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     private const string ProcessScript = """
 param($Source, $Destination, $DestinationSqlCredential, $Job, $ExcludeJob, $DisableOnSource, $DisableOnDestination, $Force, $NewName, $UseLastModified, $InputObject, $EnableException, $__realCmdlet, $__boundJob, $__boundExcludeJob, $__boundNewName, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, [object[]]$Job, [object[]]$ExcludeJob, $DisableOnSource, $DisableOnDestination, $Force, $NewName, $UseLastModified, [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject, $EnableException, $__realCmdlet, $__boundJob, $__boundExcludeJob, $__boundNewName, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     if ($Force) { $ConfirmPreference = 'none' }
 
     if (Test-FunctionInterrupt) { return }
@@ -253,12 +257,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 continue
             }
             Write-Message -Message "Working on job: $jobName" -Level Verbose -FunctionName Copy-DbaAgentJob
-            $sql = "
-            SELECT sp.[name] AS MaintenancePlanName
-            FROM msdb.dbo.sysmaintplan_plans AS sp
-            INNER JOIN msdb.dbo.sysmaintplan_subplans AS sps
-                ON sps.plan_id = sp.id
-            WHERE job_id = '$($jobId)'"
+            $sql = "`r`n                SELECT sp.[name] AS MaintenancePlanName`r`n                FROM msdb.dbo.sysmaintplan_plans AS sp`r`n                INNER JOIN msdb.dbo.sysmaintplan_subplans AS sps`r`n                    ON sps.plan_id = sp.id`r`n                WHERE job_id = '$($jobId)'"
             Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentJob
 
             $MaintenancePlanName = $sourceServer.Query($sql).MaintenancePlanName
@@ -532,6 +531,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $Source $Destination $DestinationSqlCredential $Job $ExcludeJob $DisableOnSource $DisableOnDestination $Force $NewName $UseLastModified $InputObject $EnableException $__realCmdlet $__boundJob $__boundExcludeJob $__boundNewName $__boundVerbose $__boundDebug 3>&1 2>&1
+} $Source $Destination $DestinationSqlCredential $Job $ExcludeJob $DisableOnSource $DisableOnDestination $Force $NewName $UseLastModified $InputObject $EnableException $__realCmdlet $__boundJob $__boundExcludeJob $__boundNewName $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
