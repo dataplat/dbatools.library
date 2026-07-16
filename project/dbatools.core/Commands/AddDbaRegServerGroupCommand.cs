@@ -1,0 +1,227 @@
+#nullable enable
+
+using System;
+using System.Collections;
+using System.Management.Automation;
+using Dataplat.Dbatools.Parameter;
+
+namespace Dataplat.Dbatools.Commands;
+
+/// <summary>
+/// Creates server groups in CMS or Local Server Groups. Port of
+/// public/Add-DbaRegServerGroup.ps1 (W3-003). The ENTIRE process body rides one VERBATIM
+/// module hop per record with $Pscmdlet.ShouldProcess routed to the REAL cmdlet (W1-085),
+/// Test-Bound -ParameterName Group carried as a flag, and bound -WhatIf/-Confirm carried
+/// into the hop's own SupportsShouldProcess binding (the Copy-family convention).
+/// Cross-record fn-scope persistence rides the __w3003State sentinel bag: $InputObject +=
+/// growth with the ReferenceEquals pipeline-rebind reset (W1-070), and the -Group PARAMETER
+/// SHADOWED by the split-segment loop variable (`foreach ($group in $groupList)` assigns
+/// the same case-insensitive variable, so a later record's nested
+/// Get-DbaRegServerGroup -Group $Group reads the PRIOR record's last segment - preserved),
+/// plus the stale-able locals ($reggroup, $currentInstance, $target, $newGroup, $groupList,
+/// $instance). Nested Get-DbaRegServerGroup and the PRIVATE
+/// Get-RegServerGroupReverseParse ride the hop verbatim in module scope. Surface pinned by
+/// migration/baselines/Add-DbaRegServerGroup.json (implicit positions 0-5, Name mandatory
+/// pos2, InputObject ServerGroup[] pos5 VFP, ConfirmImpact Medium, no OutputType).
+/// </summary>
+[Cmdlet(VerbsCommon.Add, "DbaRegServerGroup", SupportsShouldProcess = true)]
+public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
+{
+    /// <summary>The target SQL Server instance hosting the CMS.</summary>
+    [Parameter(Position = 0)]
+    public DbaInstanceParameter[]? SqlInstance { get; set; }
+
+    /// <summary>Alternative credential for the target instances.</summary>
+    [Parameter(Position = 1)]
+    public PSCredential? SqlCredential { get; set; }
+
+    /// <summary>The name for the new server group; backslash notation creates nested hierarchies.</summary>
+    [Parameter(Mandatory = true, Position = 2)]
+    public string Name { get; set; } = null!;
+
+    /// <summary>Additional details about the server group.</summary>
+    [Parameter(Position = 3)]
+    public string? Description { get; set; }
+
+    /// <summary>The parent group path for the new group.</summary>
+    [Parameter(Position = 4)]
+    public string? Group { get; set; }
+
+    /// <summary>Server group object(s) from Get-DbaRegServerGroup.</summary>
+    [Parameter(ValueFromPipeline = true, Position = 5)]
+    public Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]? InputObject { get; set; }
+
+    // EnableException is inherited from DbaBaseCmdlet - never redeclared.
+
+    // PS function-scope locals persisting across records (the state bag rides the hop
+    // and comes back as the sentinel item).
+    private Hashtable? _state;
+    private object? _inputObjectState;
+    private object? _lastBoundInputObject;
+    private object? _groupState;
+    private bool _bindInitialized;
+
+    protected override void ProcessRecord()
+    {
+        if (Interrupted)
+            return;
+
+        // PS: named $InputObject keeps ONE array reference across records (the += growth
+        // persists); a piped ServerGroup re-binds a fresh array per record (W1-070).
+        if (!ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
+        {
+            _inputObjectState = InputObject;
+            _lastBoundInputObject = InputObject;
+        }
+
+        if (!_bindInitialized)
+        {
+            // PS: unbound [string] reads "" (W1-087). $Group is subsequently SHADOWED by
+            // the split-segment loop; the sentinel carries the mutated value forward.
+            _groupState = Group ?? "";
+            _bindInitialized = true;
+        }
+
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+            SqlInstance, SqlCredential, Name, Description ?? "", _groupState,
+            _inputObjectState, EnableException.ToBool(), _state, TestBound("Group"), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w3003State"))
+            {
+                _state = sentinel["__w3003State"] as Hashtable;
+                if (_state is not null)
+                {
+                    _inputObjectState = _state["InputObject"];
+                    _groupState = _state["Group"];
+                }
+                continue;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
+            }
+            WriteObject(item);
+        }
+    }
+
+    private object? BoundCommonParameter(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    /// <summary>Removes the silent $error copy the nested pipeline bagged for a merged-back
+    /// non-terminating record (the W1-045 compensation).</summary>
+    private void RemoveHopErrorBookkeeping(ErrorRecord record)
+    {
+        try
+        {
+            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+                return;
+            if (errorList[0] is not ErrorRecord first)
+                return;
+            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
+                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
+            {
+                errorList.RemoveAt(0);
+            }
+        }
+        catch
+        {
+            // Best-effort bookkeeping only.
+        }
+    }
+
+    // PS: the ENTIRE process body VERBATIM plus the trailing state sentinel. Substitutions
+    // only: Test-Bound -ParameterName Group -> carried $__boundGroup, $Pscmdlet ->
+    // $__realCmdlet, and explicit -FunctionName Add-DbaRegServerGroup on
+    // Stop-Function/Write-Message (W1-090).
+    private const string ProcessScript = """
+param($SqlInstance, $SqlCredential, $Name, $Description, $Group, $InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Name, [string]$Description, [string]$Group, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # restore fn-scope locals mutated by earlier records
+    if ($null -ne $__state) {
+        $reggroup = $__state.reggroup
+        $currentInstance = $__state.currentInstance
+        $target = $__state.target
+        $newGroup = $__state.newGroup
+        $groupList = $__state.groupList
+        $instance = $__state.instance
+    }
+
+    foreach ($instance in $SqlInstance) {
+        if (($__boundGroup)) {
+            $InputObject += Get-DbaRegServerGroup -SqlInstance $instance -SqlCredential $SqlCredential -Group $Group
+        } else {
+            $InputObject += Get-DbaRegServerGroup -SqlInstance $instance -SqlCredential $SqlCredential -Id 1
+        }
+    }
+
+    if (-not $SqlInstance -and -not $InputObject) {
+        if (($__boundGroup)) {
+            $InputObject += Get-DbaRegServerGroup -Group $Group
+        } else {
+            $InputObject += Get-DbaRegServerGroup -Id 1
+        }
+    }
+
+    foreach ($reggroup in $InputObject) {
+        if ($reggroup.Source -eq "Azure Data Studio") {
+            Stop-Function -Message "You cannot use dbatools to remove or add registered server groups in Azure Data Studio" -Continue -FunctionName Add-DbaRegServerGroup
+        }
+
+        $currentInstance = $reggroup.ParentServer
+
+        if ($reggroup.ID) {
+            $target = $reggroup.Parent
+        } else {
+            $target = "Local Registered Server Groups"
+        }
+
+        if ($__realCmdlet.ShouldProcess($target, "Adding $Name")) {
+            try {
+                $groupList = $Name -split '\\'
+                foreach ($group in $groupList) {
+                    if ($null -eq $reggroup.ServerGroups[$group]) {
+                        $newGroup = New-Object Microsoft.SqlServer.Management.RegisteredServers.ServerGroup($reggroup, $group)
+                        $newGroup.create()
+                        $reggroup.refresh()
+                    } else {
+                        Write-Message -Level Verbose -Message "Group $group already exists. Will continue." -FunctionName Add-DbaRegServerGroup
+                        $newGroup = $reggroup.ServerGroups[$group]
+                    }
+                    $reggroup = $reggroup.ServerGroups[$group]
+                }
+                $newgroup.Description = $Description
+                $newgroup.Alter()
+
+                Get-DbaRegServerGroup -SqlInstance $currentInstance -Group (Get-RegServerGroupReverseParse -object $newgroup)
+                if ($currentInstance.ConnectionContext) {
+                    $currentInstance.ConnectionContext.Disconnect()
+                }
+            } catch {
+                Stop-Function -Message "Failed to add $reggroup" -ErrorRecord $_ -Continue -FunctionName Add-DbaRegServerGroup
+            }
+        }
+    }
+
+    @{ __w3003State = @{ InputObject = $InputObject; Group = $Group; reggroup = $reggroup; currentInstance = $currentInstance; target = $target; newGroup = $newGroup; groupList = $groupList; instance = $instance } }
+} $SqlInstance $SqlCredential $Name $Description $Group $InputObject $EnableException $__state $__boundGroup $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+}
