@@ -11,16 +11,15 @@ namespace Dataplat.Dbatools.Commands.Test
     /// Host cmdlet for RestoreUtility.ConvertDbaLsn: the helper needs a live PSCmdlet for
     /// its Write-Message/Stop-Function plumbing (InnerCommand routes through the host's
     /// streams), so the tests run it inside a real in-process runspace instead of mocking.
-    /// Mirrors the sole caller's shape (Invoke-DbaAdvancedRestore catches the throw).
+    /// Mirrors the sole caller's shape (Invoke-DbaAdvancedRestore catches the throw):
+    /// DbaBaseCmdlet host per the BP-002 mandatory-base-class rule, which also supplies
+    /// the EnableException parameter surface (codex TB-011 r1).
     /// </summary>
     [Cmdlet("Test", "LsnConversionHost")]
-    public sealed class TestLsnConversionHostCommand : PSCmdlet
+    public sealed class TestLsnConversionHostCommand : DbaBaseCmdlet
     {
         [Parameter(Mandatory = true)]
         public string LSN { get; set; }
-
-        [Parameter]
-        public SwitchParameter EnableException { get; set; }
 
         protected override void ProcessRecord()
         {
