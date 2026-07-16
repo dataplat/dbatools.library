@@ -10,13 +10,15 @@ namespace Dataplat.Dbatools.Commands;
 /// <summary>
 /// Removes registered server groups (CMS or local store). Port of
 /// public/Remove-DbaRegServerGroup.ps1 (W3-080), sibling of Remove-DbaRegServer
-/// (W3-079): one VERBATIM module hop per record, records SELF-CONTAINED (piped
-/// $InputObject rebinds; the += accumulation and the LOCAL-store fallback are
-/// invocation-local; drops in process - the W3-074 shape, no sentinel). SOURCE QUIRKS
-/// preserved verbatim: the $parentserver null-check runs AFTER the
-/// $parentserver.DomainInstanceName dereference, and the LOCAL branch's output object
-/// reads $parentserver properties that were never assigned in that iteration (stale or
-/// null - exactly as the function behaved). The Azure Data Studio guard (inside the
+/// (W3-079): one VERBATIM module hop per record. Piped $InputObject rebinds and the +=
+/// accumulation/LOCAL-store fallback are invocation-local (SqlInstance is not VFP), but
+/// records are NOT fully self-contained: the leaked $parentserver crosses records in
+/// the source fn scope, so the __w3080State sentinel carries it (B batch finding 11,
+/// preserve-verbatim trio ruling). SOURCE QUIRKS preserved verbatim: the $parentserver
+/// null-check runs AFTER the $parentserver.DomainInstanceName dereference, and the
+/// LOCAL branch's output object reads $parentserver properties never assigned in that
+/// iteration (stale from an earlier record/iteration, or null - exactly as the function
+/// behaved). The Azure Data Studio guard (inside the
 /// gate here, unlike the sibling), the ScriptDrop-ExecuteNonQuery CMS drop path with
 /// its why-comment, and the private Get-RegServerParent/Select-DefaultView calls ride
 /// the hop. $Pscmdlet.ShouldProcess routes to the REAL cmdlet (ConfirmImpact HIGH
