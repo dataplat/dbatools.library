@@ -41,6 +41,7 @@ public sealed partial class InvokeDbaAdvancedRestoreCommand : DbaBaseCmdlet
 
     /// <summary>The exact point-in-time for log restore operations.</summary>
     [Parameter(Position = 3)]
+    [PsDateTimeCast]
     public DateTime RestoreTime { get; set; } = DateTime.Now.AddDays(2);
 
     /// <summary>Directory where SQL Server creates standby files (puts the database in standby mode).</summary>
@@ -106,6 +107,7 @@ public sealed partial class InvokeDbaAdvancedRestoreCommand : DbaBaseCmdlet
 
     /// <summary>Only StopMark occurrences after this date are considered.</summary>
     [Parameter(Position = 12)]
+    [PsDateTimeCast]
     public DateTime StopAfterDate { get; set; }
 
     /// <summary>LSN at which to stop the restore (numeric or colon-delimited form).</summary>

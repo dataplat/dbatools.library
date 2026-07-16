@@ -24,6 +24,7 @@ public sealed class SelectDbaBackupInformationCommand : DbaBaseCmdlet
 
     /// <summary>The specific point in time to restore the database to.</summary>
     [Parameter(Position = 1)]
+    [PsDateTimeCast]
     public DateTime RestoreTime { get; set; } = DateTime.Now.AddMonths(1);
 
     /// <summary>Excludes transaction log backups from the restore chain.</summary>

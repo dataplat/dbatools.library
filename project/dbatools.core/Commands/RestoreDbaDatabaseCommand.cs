@@ -52,6 +52,7 @@ public sealed partial class RestoreDbaDatabaseCommand : DbaBaseCmdlet
 
     /// <summary>Point-in-time recovery target.</summary>
     [Parameter(ParameterSetName = "Restore")]
+    [PsDateTimeCast]
     public DateTime RestoreTime { get; set; } = DateTime.Now.AddYears(1);
 
     /// <summary>Leaves the database in a restoring state for additional log restores.</summary>
@@ -225,6 +226,7 @@ public sealed partial class RestoreDbaDatabaseCommand : DbaBaseCmdlet
 
     /// <summary>Stop at the first StopMark after this datetime.</summary>
     [Parameter]
+    [PsDateTimeCast]
     public DateTime StopAfterDate { get; set; } = new DateTime(1971, 1, 1);
 
     /// <summary>LSN at which to stop the restore.</summary>
