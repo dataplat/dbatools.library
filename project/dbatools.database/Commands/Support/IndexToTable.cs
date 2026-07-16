@@ -53,7 +53,14 @@ public sealed class IndexToTableColumn
 /// columns are excluded by the adapter; Select-Object -Unique over the column objects is a
 /// no-op for real inputs (a table's Columns collection cannot repeat a name) and is not
 /// reproduced; the helper's prologue (Get-DbaDatabase, Stop-Function guard,
-/// Test-FunctionInterrupt) is caller plumbing in compiled form.
+/// Test-FunctionInterrupt) is caller plumbing in compiled form - NOTE for that caller:
+/// PS $null.Tables silently yields nothing when the database is not found, so the compiled
+/// caller must treat not-found as empty rather than let this class's null guard surface
+/// (carry into the Invoke-DbaDbDataMasking lab gate). Documented divergence: datatype
+/// lowercasing uses ToLowerInvariant where the helper's ToLower() is CURRENT-culture -
+/// under tr-TR the helper's dotless-i would miss the fixed list and fall to default; the
+/// outputs coincide because both branches share a format, and the invariant form is the
+/// intended behavior going forward.
 /// </summary>
 public static class IndexToTable
 {

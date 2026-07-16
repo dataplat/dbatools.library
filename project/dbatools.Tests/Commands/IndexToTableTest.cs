@@ -30,7 +30,11 @@ namespace Dataplat.Dbatools.Commands.Test
         [TestMethod]
         public void BuildColumnStatement_CoversAllFourHelperBranches()
         {
-            // Branch 1: the fixed list renders without length.
+            // Branch 1: the fixed list renders without length. NOTE: this branch is
+            // output-equivalent to default for all reachable inputs (same format string),
+            // so these assertions cannot isolate it - what makes the helper's missing
+            // `break` safe is that no fixed-list member contains 'char' or ends in
+            // 'varcharmax', the real invariant (opus round 1).
             Assert.AreEqual("[Created] [datetime]", IndexToTable.BuildColumnStatement("Created", "datetime", 8));
             Assert.AreEqual("[N] [bigint]", IndexToTable.BuildColumnStatement("N", "bigint", 8));
             // Branch 2: *varcharmax loses its max suffix and gains (max) - helper line 80.
