@@ -42,7 +42,9 @@ namespace Dataplat.Dbatools.Commands.Test
             // PS switch: the [string] subject's type wins the -eq conversion, so the int
             // case 869 becomes "869" and only that exact digit string matches.
             Assert.AreEqual("0869", RestoreUtility.ConvertDbVersionToSqlVersion("0869"), "a leading zero misses every case and passes through verbatim");
-            Assert.AreEqual(" 869", RestoreUtility.ConvertDbVersionToSqlVersion(" 869"), "no trimming");
+            Assert.AreEqual(" 869", RestoreUtility.ConvertDbVersionToSqlVersion(" 869"), "no leading trimming");
+            // Codex r1: the leading pin alone lets a TrimEnd() implementation false-pass.
+            Assert.AreEqual("869 ", RestoreUtility.ConvertDbVersionToSqlVersion("869 "), "no trailing trimming");
         }
 
         [TestMethod]
