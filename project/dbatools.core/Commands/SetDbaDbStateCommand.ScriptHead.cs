@@ -78,7 +78,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # pipeline in the source (one CommandRuntime); the transplant field name is identical
     # on PS 5.1 and PS 7 (W3-082 mechanism, empirically verified)
     $__spField = $Pscmdlet.CommandRuntime.GetType().GetField("lastShouldProcessContinueStatus", [System.Reflection.BindingFlags]"NonPublic,Instance")
-    if ($null -ne $__state -and $null -ne $__spField -and $null -ne $__state.shouldProcessContinueStatus) {
+    if ($null -eq $__spField) {
+        throw "Set-DbaDbState: prompt-state transplant field lastShouldProcessContinueStatus not resolvable on this engine (C1 assert)."
+    }
+    if ($null -ne $__state -and $null -ne $__state.shouldProcessContinueStatus) {
         $__spField.SetValue($Pscmdlet.CommandRuntime, [Enum]::Parse($__spField.FieldType, $__state.shouldProcessContinueStatus))
     }
 
