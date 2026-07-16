@@ -49,17 +49,20 @@ namespace Dataplat.Dbatools.Utility
         /// coerces all three identically. A null argument is the PS [string] binder's
         /// empty string (probed: $null -eq $s is False inside the function) and throws
         /// like it, per above.
-        /// CALLER REACHABILITY MAP (opus TB-015; New-DbaLogin.ps1:247-257 pre-validates
-        /// with the SAME char-set trim then rejects chars outside "0123456789ABCDEF"
-        /// case-insensitively): REACHABLE - normal hex, lowercase hex, the leading-zero
-        /// destruction, and the all-zero crash (the guard's trim empties "0x0000" so its
-        /// foreach validates zero chars and passes it straight through); GUARD-REJECTED -
-        /// uppercase X, non-hex, whitespace (Stop-Function InvalidArgument first). The
-        /// crash throw escapes the caller's begin block with NO try/catch - it BYPASSES
-        /// the Stop-Function/-EnableException contract every other invalid-Sid path
-        /// honors; whether the compiled New-DbaLogin keeps the hard throw or folds it
-        /// into its error contract is flagged to the W2 security row alongside the
-        /// leading-zero-destruction flag.
+        /// CALLER REACHABILITY MAP for STRING Sids (opus TB-015; New-DbaLogin.ps1:247-257
+        /// pre-validates with the SAME char-set trim then rejects chars outside
+        /// "0123456789ABCDEF" case-insensitively): REACHABLE - normal hex, lowercase hex,
+        /// the leading-zero destruction, and the all-zero crash (the guard's trim empties
+        /// "0x0000" so its foreach validates zero chars and passes it straight through);
+        /// GUARD-REJECTED - uppercase X, non-hex, whitespace (Stop-Function
+        /// InvalidArgument first). The crash throw escapes the caller's begin block with
+        /// NO try/catch - it BYPASSES the Stop-Function/-EnableException contract the
+        /// guard's own rejections honor (codex TB-015 r2 scope note: $Sid is [object], so
+        /// a truthy non-string/non-Byte[] Sid already dies at the guard's own
+        /// $Sid.TrimStart with the same uncaught-throw shape - the bypass is not unique
+        /// to the all-zero crash); whether the compiled New-DbaLogin keeps the hard
+        /// throws or folds them into its error contract is flagged to the W2 security row
+        /// alongside the leading-zero-destruction flag.
         /// </summary>
         public static byte[] ToBytes(string inputObject)
         {
