@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using Dataplat.Dbatools.Message;
 using Microsoft.SqlServer.Management.Smo;
@@ -28,7 +30,7 @@ namespace Dataplat.Dbatools.Commands
         /// <param name="server">The connected SMO server (its ConnectionContext is shared with the RMO object)</param>
         /// <param name="database">The database whose name seeds the ReplicationDatabase</param>
         /// <param name="messageCallback">Optional verbatim-message sink (Write-Message -Level Verbose equivalent)</param>
-        public static ReplicationDatabase Connect(Server server, Microsoft.SqlServer.Management.Smo.Database database, Action<MessageLevel, string> messageCallback)
+        public static ReplicationDatabase Connect(Server? server, Microsoft.SqlServer.Management.Smo.Database? database, Action<MessageLevel, string?>? messageCallback)
         {
             ReplicationDatabase repDB = new ReplicationDatabase();
             repDB.Name = database == null ? null : database.Name;
