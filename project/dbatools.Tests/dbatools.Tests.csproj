@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>Dataplat.Dbatools</RootNamespace>
     <TargetFrameworks>net472;net8.0</TargetFrameworks>
@@ -41,6 +41,10 @@
   <ItemGroup>
     <ProjectReference Include="..\dbatools\dbatools.csproj" />
     <ProjectReference Include="..\dbatools.core\dbatools.core.csproj" />
+    <ProjectReference Include="..\dbatools.replication\dbatools.replication.csproj" />
+    <Reference Include="Microsoft.SqlServer.Rmo">
+      <HintPath>..\..\var\misc\both\Microsoft.SqlServer.Rmo.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <!-- SMA for tests: the runtime's PowerShell.SDK reference is PrivateAssets=all and does not flow -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
