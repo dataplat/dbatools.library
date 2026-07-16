@@ -29,6 +29,7 @@ public sealed class RemoveDbaInstanceListCommand : DbaBaseCmdlet
 {
     /// <summary>The instance name(s) to remove from the autocomplete list.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0)]
+    [PsStringArrayCast]
     public string[] SqlInstance { get; set; } = null!;
 
     /// <summary>Persists the updated list to disk for future sessions.</summary>
