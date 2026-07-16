@@ -29,18 +29,19 @@ namespace Dataplat.Dbatools.Commands.Test
             int messages = 0;
             Action<DbaMessageLevel, string> sink = delegate (DbaMessageLevel level, string message) { messages++; };
 
-            bool threw = false;
+            Exception caught = null;
             try
             {
                 ReplicationDb.Connect(offline, database, sink);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // PS parity: the helper would fault identically here - LoadProperties()
-                // against an unreachable server propagates uncaught in both worlds.
-                threw = true;
+                // PS parity: the helper faults identically against an unreachable server -
+                // the fault propagates uncaught in both worlds.
+                caught = ex;
             }
-            Assert.IsTrue(threw, "an offline LoadProperties fault must propagate uncaught");
+            Assert.IsNotNull(caught, "an offline fault must propagate uncaught");
+            Assert.IsFalse(caught is NullReferenceException, "the fault must be the connection failure, not a member-access bug");
             Assert.AreEqual(0, messages, "the verbose message fires only on a false LoadProperties return, never on a fault");
         }
 
@@ -48,22 +49,24 @@ namespace Dataplat.Dbatools.Commands.Test
         public void Connect_NullArgumentsFlowLikeNonStrictPsUntilTheSharedFault()
         {
             // PS non-strict member access turns $null.Name / $null.ConnectionContext into
-            // nulls, and the helper then faults at LoadProperties() on the RMO object with
-            // no connection context; the port's null-conditionals reproduce the flow and
-            // the same terminal fault, with the callback silent throughout.
+            // nulls; the call then faults before returning (in both worlds), with the
+            // callback silent throughout. The NRE exclusion below is the discriminating
+            // assertion: deleting the port's null-conditionals would surface a
+            // NullReferenceException - exactly the PS-divergent outcome - and fail here.
             int messages = 0;
             Action<DbaMessageLevel, string> sink = delegate (DbaMessageLevel level, string message) { messages++; };
 
-            bool threw = false;
+            Exception caught = null;
             try
             {
                 ReplicationDb.Connect(null, null, sink);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                threw = true;
+                caught = ex;
             }
-            Assert.IsTrue(threw, "LoadProperties without a connection context must fault in both worlds");
+            Assert.IsNotNull(caught, "a null-argument call must fault before returning in both worlds");
+            Assert.IsFalse(caught is NullReferenceException, "null arguments must flow through like PS non-strict member access, not fault on member access");
             Assert.AreEqual(0, messages, "no message on the fault path");
         }
     }
