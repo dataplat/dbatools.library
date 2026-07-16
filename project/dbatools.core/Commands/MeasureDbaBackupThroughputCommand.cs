@@ -38,10 +38,12 @@ public sealed class MeasureDbaBackupThroughputCommand : DbaBaseCmdlet
 
     /// <summary>Analyzes only backups taken on or after this date and time.</summary>
     [Parameter(Position = 4)]
+    [PsDateTimeCast]
     public DateTime Since { get; set; }
 
     /// <summary>The backup type to analyze. Defaults to Full.</summary>
     [Parameter(Position = 5)]
+    [PsStringCast]
     [ValidateSet("Full", "Log", "Differential", "File", "Differential File", "Partial Full", "Partial Differential")]
     public string Type { get; set; } = "Full";
 
