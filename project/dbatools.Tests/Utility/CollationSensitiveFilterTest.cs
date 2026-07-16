@@ -160,10 +160,26 @@ namespace Dataplat.Dbatools.Utility.Test
             CollectionAssert.AreEqual(new[] { "Alpha" }, result, "a scalar Value iterates once like PS foreach");
         }
 
+        private sealed class TouchRecordingEnumerable : IEnumerable<object>
+        {
+            public bool Touched;
+
+            public IEnumerator<object> GetEnumerator()
+            {
+                Touched = true;
+                yield break;
+            }
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+        }
+
         [TestMethod]
         public void Compare_InvalidCollationFaultsBeforeEnumeration()
         {
-            object[] input = { Named("Alpha") };
+            TouchRecordingEnumerable input = new TouchRecordingEnumerable();
 
             bool threw = false;
             try
@@ -177,6 +193,7 @@ namespace Dataplat.Dbatools.Utility.Test
                 threw = true;
             }
             Assert.IsTrue(threw, "an unknown collation must fault like the PS helper's getStringComparer call");
+            Assert.IsFalse(input.Touched, "the collation fault must fire before the input is enumerated");
         }
 
         [TestMethod]
