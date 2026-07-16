@@ -62,10 +62,12 @@ public sealed class InvokeDbaPfRelogCommand : DbaBaseCmdlet
 
     /// <summary>Range start.</summary>
     [Parameter(Position = 6)]
+    [PsDateTimeCast]
     public DateTime BeginTime { get; set; }
 
     /// <summary>Range end.</summary>
     [Parameter(Position = 7)]
+    [PsDateTimeCast]
     public DateTime EndTime { get; set; }
 
     /// <summary>relog config file.</summary>

@@ -66,10 +66,12 @@ public sealed class ExportDbaExecutionPlanCommand : DbaInstanceCmdlet
 
     /// <summary>Plans created after this time.</summary>
     [Parameter(ParameterSetName = "NotPiped")]
+    [PsDateTimeCast]
     public DateTime SinceCreation { get; set; }
 
     /// <summary>Plans last executed after this time.</summary>
     [Parameter(ParameterSetName = "NotPiped")]
+    [PsDateTimeCast]
     public DateTime SinceLastExecution { get; set; }
 
     /// <summary>Piped plan objects from Get-DbaExecutionPlan (or this command's output).</summary>

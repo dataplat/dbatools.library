@@ -45,6 +45,7 @@ public sealed class GetDbaModuleCommand : DbaBaseCmdlet
 
     /// <summary>Only modules modified at or after this time.</summary>
     [Parameter(Position = 4)]
+    [PsDateTimeCast]
     public DateTime ModifiedSince { get; set; } = (DateTime)LanguagePrimitives.ConvertTo("1900-01-01", typeof(DateTime), CultureInfo.InvariantCulture);
 
     /// <summary>The module types to include.</summary>
