@@ -77,10 +77,17 @@ internal static class RestoreUtility
     /// [System.Convert]::ToString($str, 16), the len-14 substring off-by-one, and PadLeft
     /// AFTER the base conversion. Returns null after the Stop-Function site fired
     /// (non-EnableException); throws InnerCommandException under EnableException.
+    /// Documented divergence (opus TB-011): when a numeric section overflows Int64 the PS
+    /// binder raises MethodException where long.Parse raises OverflowException - and the
+    /// compiled caller catches only InnerCommandException (the PS caller's bare catch took
+    /// anything), so an overflow would escape unhandled. Unreachable today: the sole
+    /// caller pre-filters pure numerics away from this helper entirely, and hex sections
+    /// are regex-capped at 8 digits.
     /// </summary>
     internal static LsnConversion? ConvertDbaLsn(PSCmdlet host, string lsn, bool enableException)
     {
         const string functionName = "Convert-DbaLSN";
+        lsn = PsString(lsn);
         string? hexadecimal = null;
         string? numeric = null;
 

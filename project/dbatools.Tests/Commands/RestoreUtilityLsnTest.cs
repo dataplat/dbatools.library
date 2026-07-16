@@ -19,6 +19,7 @@ namespace Dataplat.Dbatools.Commands.Test
     public sealed class TestLsnConversionHostCommand : DbaBaseCmdlet
     {
         [Parameter(Mandatory = true)]
+        [AllowEmptyString]
         public string LSN { get; set; }
 
         protected override void ProcessRecord()
@@ -42,10 +43,13 @@ namespace Dataplat.Dbatools.Commands.Test
     /// padding (10/5), the numeric-to-hex branch's PRESERVED len-14 substring off-by-one
     /// (drops the middle section's LEADING digit - silent corruption whenever that digit is
     /// nonzero), the 16-digit-minimum numeric regex, verbatim case preservation of hex
-    /// input, and both Stop-Function modes (EnableException throw the caller catches;
-    /// non-EnableException null return with the warning suppressed-but-logged). Only the
-    /// hex branch is reachable from the sole caller (Invoke-DbaAdvancedRestore pre-filters
-    /// pure numerics), but the numeric branch is carried and pinned too.
+    /// input, and both Stop-Function modes (EnableException throws for the caller to catch
+    /// and suppresses the warning display, 3>$null parity; non-EnableException returns
+    /// null with the warning DISPLAYED). Only the hex branch is reachable from the sole
+    /// caller (Invoke-DbaAdvancedRestore pre-filters pure numerics), but the numeric
+    /// branch is carried and pinned too - including a sect1 above int.MaxValue that
+    /// discriminates the (long, int) binder resolution the port hardcodes as long.Parse
+    /// (opus TB-011: byte-range probes alone would pass under an (int, int) binding).
     /// </summary>
     [TestClass]
     public class RestoreUtilityLsnTest
@@ -98,6 +102,12 @@ namespace Dataplat.Dbatools.Commands.Test
                 // "corrected" len-15/10-digit implementation would emit f0000000 here and
                 // fail. PS ground truth both editions: 00000001:0194d800:0001.
                 Assert.AreEqual("00000001:0194d800:0001|1402653184000001", InvokeOne(shell, "1402653184000001", true));
+                // BINDER pin (opus TB-011): sect1 = 4000000000 exceeds int.MaxValue, so
+                // this discriminates the (long, int) overload the PS binder resolves
+                // [System.Convert]::ToString($string, 16) to - an (int, int) or narrower
+                // binding throws here instead of emitting ee6b2800. PS ground truth both
+                // editions: ee6b2800:000044aa:002b.
+                Assert.AreEqual("ee6b2800:000044aa:002b|4000000000000001757800043", InvokeOne(shell, "4000000000000001757800043", true));
                 shell.Runspace.Dispose();
             }
         }
@@ -121,6 +131,9 @@ namespace Dataplat.Dbatools.Commands.Test
             {
                 string marker = InvokeOne(shell, "notanlsn", true);
                 Assert.AreEqual("INNERSTOP:LSN passed in is neither Numeric nor in the correct hexadecimal format", marker, "the sole caller catches this throw and re-stops with its own InvalidArgument message");
+                // The empty string also lands here (PS binds an unbound/$null [string] to
+                // "", PsString parity on the port side) - ground-truthed both editions.
+                StringAssert.StartsWith(InvokeOne(shell, "", true), "INNERSTOP:");
                 shell.Runspace.Dispose();
             }
         }
