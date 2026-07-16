@@ -1,7 +1,6 @@
 using System;
+using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Reflection;
 using Dataplat.Dbatools.dbaSystem;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -10,15 +9,16 @@ namespace Dataplat.Dbatools.dbaSystem.Test
     /// <summary>
     /// TB-002 coverage for DmfLibrary.Load, the C# parity port of
     /// private/functions/Add-PbmLibrary.ps1. Assembly loading is process-global and
-    /// irreversible, so every load scenario runs inside ONE sequential test whose internal
-    /// ordering is deterministic: the asymmetric missing-file legs prove Common loads
-    /// before Dmf, the success leg asserts Dmf's actual load location under the fake
-    /// root (its first true load in the process), then idempotence re-runs the call.
+    /// irreversible, so the whole load lifecycle runs in a DEDICATED CHILD PROCESS per
+    /// TFM - the edition-matched PowerShell host (Windows PowerShell 5.1 for net472,
+    /// pwsh 7 for net8.0, both gate currency per COORDINATION.md 7.1) loading the built
+    /// dbatools.dll exactly like production. Isolation makes the run order-independent,
+    /// leaves nothing loaded in the test host, and lets the location assertion demand
+    /// the EXACT fake-root path on both TFMs (the child has no Dmf in its deps graph).
     /// The fake roots are built from the DMF assemblies the SqlManagementObjects package
     /// ships into the test output for both TFMs.
     /// </summary>
     [TestClass]
-    [DoNotParallelize]
     public class DmfLibraryTest
     {
         private static string NewRoot(bool withCommon, bool withDmf)
@@ -34,76 +34,118 @@ namespace Dataplat.Dbatools.dbaSystem.Test
             return root;
         }
 
-        private static bool IsLoaded(string assemblyName)
+        private static void TryRemove(string path)
         {
-            return AppDomain.CurrentDomain.GetAssemblies()
-                .Any(assembly => String.Equals(assembly.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase));
+            try
+            {
+                if (Directory.Exists(path))
+                    Directory.Delete(path, true);
+                else if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
 
-        private static void TryRemove(string root)
-        {
-            // Loaded assembly files stay locked on net472; best-effort cleanup only.
-            try { Directory.Delete(root, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-        }
+        // The child runs on Windows (the file-copy scheme and both PS hosts are
+        // Windows-bound), so the exact-path comparison is OrdinalIgnoreCase.
+        private const string ChildLifecycleScript = @"
+param([string]$DbatoolsDll, [string]$CommonMissingRoot, [string]$DmfMissingRoot, [string]$CompleteRoot)
+$ErrorActionPreference = ""Stop""
+function Fail([string]$reason) { Write-Output (""FAIL: "" + $reason); exit 1 }
+function Get-DmfLoaded([string]$name) {
+    [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq $name }
+}
+function Get-FileNotFound($caught) {
+    $walker = $caught
+    while ($walker -and -not ($walker -is [System.IO.FileNotFoundException])) { $walker = $walker.InnerException }
+    $walker
+}
+Add-Type -Path $DbatoolsDll
+
+# Leg 1: Common missing, Dmf present -> the FIRST load fails and Dmf stays unloaded,
+# proving Load never reached the second file (Common-first order).
+$caught = $null
+try { [Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CommonMissingRoot) } catch { $caught = $_.Exception }
+$notFound = Get-FileNotFound $caught
+if (-not $notFound) { Fail ""leg1: expected FileNotFoundException for missing Dmf.Common"" }
+if ($notFound.FileName -notlike ""*Dmf.Common*"") { Fail (""leg1: wrong file failed: "" + $notFound.FileName) }
+if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf"") { Fail ""leg1: Dmf loaded despite Common failing first - order broken"" }
+if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common"") { Fail ""leg1: Common unexpectedly loaded"" }
+
+# Leg 2: Common present, Dmf missing -> Common loads (first), then the SECOND load
+# fails on Dmf. Common being loaded afterward proves it was attempted before the failure.
+$caught = $null
+try { [Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($DmfMissingRoot) } catch { $caught = $_.Exception }
+$notFound = Get-FileNotFound $caught
+if (-not $notFound) { Fail ""leg2: expected FileNotFoundException for missing Dmf"" }
+if ($notFound.FileName -like ""*Dmf.Common*"") { Fail ""leg2: failure should be the Dmf load, not Common"" }
+if (-not (Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common"")) { Fail ""leg2: Common not loaded before the Dmf failure - order broken"" }
+if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf"") { Fail ""leg2: Dmf unexpectedly loaded"" }
+
+# Leg 3: complete root -> success; Dmf must come from the EXACT fake-root lib path
+# (this child has no Dmf in its default load context, unlike the MSTest host).
+[Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CompleteRoot)
+$dmf = Get-DmfLoaded ""Microsoft.SqlServer.Dmf""
+if (-not $dmf) { Fail ""leg3: Dmf not loaded"" }
+$expected = Join-Path (Join-Path $CompleteRoot ""lib"") ""Microsoft.SqlServer.Dmf.dll""
+$actualFull = [System.IO.Path]::GetFullPath($dmf.Location)
+$expectedFull = [System.IO.Path]::GetFullPath($expected)
+if (-not [String]::Equals($actualFull, $expectedFull, [StringComparison]::OrdinalIgnoreCase)) {
+    Fail (""leg3: Dmf loaded from '"" + $actualFull + ""' expected '"" + $expectedFull + ""'"")
+}
+if (-not (Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common"")) { Fail ""leg3: Common not loaded"" }
+
+# Leg 4: idempotence - re-running with everything loaded succeeds, like re-running
+# the helper's Add-Type calls.
+[Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CompleteRoot)
+Write-Output ""ALL-LEGS-PASS""
+exit 0
+";
 
         [TestMethod]
-        public void Load_FullLifecycle_OrderFailuresLocationAndIdempotence()
+        public void Load_FullLifecycle_RunsIsolatedInChildProcessPerTfm()
         {
-            // Loud guard, not a skip: if DMF is ever preloaded by another test, this test
-            // FAILS (CI cannot green without exercising these legs) and the fix is to move
-            // the lifecycle into a dedicated child process at that point - not needed while
-            // this class is the process's only DMF consumer.
-            if (IsLoaded("Microsoft.SqlServer.Dmf.Common") || IsLoaded("Microsoft.SqlServer.Dmf"))
-                Assert.Fail("DMF already loaded in this test process; another test now loads DMF - move this lifecycle test into a dedicated child process per TFM.");
-
-            // Leg 1: Common missing, Dmf present -> fails on the FIRST load; Dmf must remain
-            // unloaded, proving Load never reached the second file (Common-first order).
             string commonMissing = NewRoot(false, true);
             string dmfMissing = NewRoot(true, false);
             string complete = NewRoot(true, true);
+            string script = Path.Combine(Path.GetTempPath(), "dbatools-tests-dmf-child-" + Guid.NewGuid().ToString("N") + ".ps1");
+            File.WriteAllText(script, ChildLifecycleScript);
             try
             {
-                FileNotFoundException firstFailure = Assert.ThrowsException<FileNotFoundException>(
-                    delegate { DmfLibrary.Load(commonMissing); });
-                StringAssert.Contains(firstFailure.FileName, "Dmf.Common");
-                Assert.IsFalse(IsLoaded("Microsoft.SqlServer.Dmf"), "Dmf loaded despite Common failing first - load order broken");
-                Assert.IsFalse(IsLoaded("Microsoft.SqlServer.Dmf.Common"));
-
-                // Leg 2: Common present, Dmf missing -> Common loads (first), then the
-                // SECOND load fails on Dmf. Common being loaded afterward proves it was
-                // attempted (and succeeded) before the failure.
-                FileNotFoundException secondFailure = Assert.ThrowsException<FileNotFoundException>(
-                    delegate { DmfLibrary.Load(dmfMissing); });
-                Assert.IsFalse(secondFailure.FileName.Contains("Dmf.Common"), "failure should be the Dmf load, not Common");
-                Assert.IsTrue(IsLoaded("Microsoft.SqlServer.Dmf.Common"), "Common not loaded before the Dmf failure - load order broken");
-                Assert.IsFalse(IsLoaded("Microsoft.SqlServer.Dmf"));
-
-                // Leg 3: complete root -> success, with the load LOCATION pinned per TFM.
-                // Add-Type -Path shows the same split per PS edition; in production lib\
-                // holds the only copy, so both editions load from lib and behavior converges.
-                DmfLibrary.Load(complete);
-                Assembly dmf = AppDomain.CurrentDomain.GetAssemblies()
-                    .Single(assembly => String.Equals(assembly.GetName().Name, "Microsoft.SqlServer.Dmf", StringComparison.OrdinalIgnoreCase));
 #if NETFRAMEWORK
-                // Full-framework LoadFrom context: the exact file under the fake root loads.
-                string expectedDmf = Path.Combine(complete, "lib", "Microsoft.SqlServer.Dmf.dll");
+                // Windows PowerShell hosts the net472 build, mirroring production.
+                string shell = "powershell.exe";
 #else
-                // .NET (Core) LoadFrom resolves a colliding identity against the Default
-                // AssemblyLoadContext first; the test app ships Dmf in its deps graph, so
-                // exactly the bin copy deterministically wins over the fake-root file.
-                string expectedDmf = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Microsoft.SqlServer.Dmf.dll");
+                // pwsh 7 hosts the net8.0 build, mirroring production.
+                string shell = "pwsh";
 #endif
-                Assert.AreEqual(Path.GetFullPath(expectedDmf), Path.GetFullPath(dmf.Location), true, "Dmf did not load from the exact expected DLL path");
+                string dbatoolsDll = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dbatools.dll");
+                ProcessStartInfo startInfo = new ProcessStartInfo();
+                startInfo.FileName = shell;
+                startInfo.Arguments = String.Format(
+                    "-NoProfile -ExecutionPolicy Bypass -File \"{0}\" -DbatoolsDll \"{1}\" -CommonMissingRoot \"{2}\" -DmfMissingRoot \"{3}\" -CompleteRoot \"{4}\"",
+                    script, dbatoolsDll, commonMissing, dmfMissing, complete);
+                startInfo.UseShellExecute = false;
+                startInfo.RedirectStandardOutput = true;
+                startInfo.RedirectStandardError = true;
+                startInfo.CreateNoWindow = true;
 
-                // Leg 4: idempotence - re-running with everything already loaded succeeds,
-                // like re-running the helper's Add-Type calls.
-                DmfLibrary.Load(complete);
+                using (Process child = Process.Start(startInfo))
+                {
+                    string stdout = child.StandardOutput.ReadToEnd();
+                    string stderr = child.StandardError.ReadToEnd();
+                    Assert.IsTrue(child.WaitForExit(120000), "child lifecycle process timed out");
+                    Assert.AreEqual(0, child.ExitCode, "child lifecycle failed. stdout: " + stdout + " stderr: " + stderr);
+                    StringAssert.Contains(stdout, "ALL-LEGS-PASS");
+                }
             }
             finally
             {
                 TryRemove(commonMissing);
                 TryRemove(dmfMissing);
                 TryRemove(complete);
+                TryRemove(script);
             }
         }
 
