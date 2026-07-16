@@ -33,9 +33,15 @@ namespace Dataplat.Dbatools.Commands.Test
             Assert.ThrowsException<InvalidOperationException>(delegate { MaskingValueConverter.Convert(new object[] { false }, "bit", false); });
             Assert.ThrowsException<InvalidOperationException>(delegate { MaskingValueConverter.Convert(new object[] { "" }, "varchar", false); });
             Assert.ThrowsException<InvalidOperationException>(delegate { MaskingValueConverter.Convert(null, "varchar", false); });
+            InvalidOperationException valueGate = Assert.ThrowsException<InvalidOperationException>(delegate { MaskingValueConverter.Convert(new object[] { 0 }, "bit", false); });
+            Assert.AreEqual("Please enter a value", valueGate.Message);
             // Missing data type is the SECOND gate - value must be truthy to reach it.
             InvalidOperationException dataTypeGate = Assert.ThrowsException<InvalidOperationException>(delegate { MaskingValueConverter.Convert(new object[] { "x" }, null, false); });
             Assert.AreEqual("Please enter a data type", dataTypeGate.Message);
+            // GATE ORDER pin (opus F5): with both violated, the VALUE gate reports first
+            // - PS ground truth both editions: "Please enter a value".
+            InvalidOperationException bothGates = Assert.ThrowsException<InvalidOperationException>(delegate { MaskingValueConverter.Convert(null, null, false); });
+            Assert.AreEqual("Please enter a value", bothGates.Message);
         }
 
         [TestMethod]
@@ -143,6 +149,16 @@ namespace Dataplat.Dbatools.Commands.Test
 
                 Assert.AreEqual("'13.45.12.0000000'", One(new object[] { "13:45:12" }, "time", false).NewValue);
                 Assert.AreEqual("'2020-01-02 13:45:12.345'", One(new object[] { "2020-01-02 13:45:12.345" }, "datetime", false).NewValue, "the invariant datetime branch must NOT follow the culture");
+                // Default-branch discriminator (opus F4): the source's .ToString() METHOD
+                // call is current-culture while "$item" interpolation is invariant. Under
+                // a comma-decimal culture a double splits the two paths - PS ground truth
+                // both editions (de-DE): varchar '12,5' vs decimal 12.5. A port that used
+                // the invariant PsString in the default branch would emit '12.5' and fail.
+                System.Globalization.CultureInfo comma = (System.Globalization.CultureInfo)new System.Globalization.CultureInfo("en-US").Clone();
+                comma.NumberFormat.NumberDecimalSeparator = ",";
+                System.Threading.Thread.CurrentThread.CurrentCulture = comma;
+                Assert.AreEqual("'12,5'", One(new object[] { 12.5d }, "varchar", false).NewValue, "default branch follows the culture");
+                Assert.AreEqual("12.5", One(new object[] { 12.5d }, "decimal", false).NewValue, "numeric-branch interpolation stays invariant");
             }
             finally
             {
