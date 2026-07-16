@@ -22,11 +22,17 @@ namespace Dataplat.Dbatools.Commands.Test
         [AllowEmptyString]
         public string LSN { get; set; }
 
+        /// <summary>Bypass the binder and hand ConvertDbaLsn a literal null: the PS binder
+        /// converts $null to "" for [string] parameters, so this is the only way to reach
+        /// the PsString(null) normalization from a test.</summary>
+        [Parameter]
+        public SwitchParameter PassNullLsn { get; set; }
+
         protected override void ProcessRecord()
         {
             try
             {
-                LsnConversion result = RestoreUtility.ConvertDbaLsn(this, LSN, EnableException.IsPresent);
+                LsnConversion result = RestoreUtility.ConvertDbaLsn(this, PassNullLsn.IsPresent ? null : LSN, EnableException.IsPresent);
                 WriteObject(result == null ? "NULL" : result.Hexadecimal + "|" + result.Numeric);
             }
             catch (InnerCommandException ex)
@@ -134,6 +140,16 @@ namespace Dataplat.Dbatools.Commands.Test
                 // The empty string also lands here (PS binds an unbound/$null [string] to
                 // "", PsString parity on the port side) - ground-truthed both editions.
                 StringAssert.StartsWith(InvokeOne(shell, "", true), "INNERSTOP:");
+                // Literal null pins the PsString(null) normalization itself (codex r3):
+                // the PS binder converts $null to "" before a [string] parameter ever
+                // sees it, so the host's -PassNullLsn switch bypasses the binder. Without
+                // PsString this would be an ArgumentNullException from Regex.IsMatch, not
+                // the Stop-Function error branch.
+                shell.Commands.Clear();
+                shell.AddCommand("Test-LsnConversionHost").AddParameter("LSN", "ignored").AddParameter("PassNullLsn", true).AddParameter("EnableException", true);
+                Collection<PSObject> nullOutput = shell.Invoke();
+                Assert.AreEqual(1, nullOutput.Count);
+                StringAssert.StartsWith((string)nullOutput[0].BaseObject, "INNERSTOP:", "null must normalize to the error branch, not throw ArgumentNullException");
                 shell.Runspace.Dispose();
             }
         }
