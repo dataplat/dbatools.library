@@ -153,7 +153,7 @@ exit 0
                     Assert.AreEqual(0, child.ExitCode, "child lifecycle failed. stdout: " + stdout + " stderr: " + stderr);
                     // The helper emits no messages, and the script prints only the
                     // sentinel on success - the streams carry exactly that and nothing else.
-                    Assert.AreEqual("ALL-LEGS-PASS", stdout.Trim(), "unexpected child stdout: " + stdout);
+                    Assert.AreEqual("ALL-LEGS-PASS" + Environment.NewLine, stdout, "unexpected child stdout: " + stdout);
                     Assert.AreEqual(String.Empty, stderr, "unexpected child stderr: " + stderr);
                 }
             }
