@@ -58,9 +58,11 @@ public sealed class IndexToTableColumn
 /// caller must treat not-found as empty rather than let this class's null guard surface
 /// (carry into the Invoke-DbaDbDataMasking lab gate). Documented divergence: datatype
 /// lowercasing uses ToLowerInvariant where the helper's ToLower() is CURRENT-culture -
-/// under tr-TR the helper's dotless-i would miss the fixed list and fall to default; the
-/// outputs coincide because both branches share a format, and the invariant form is the
-/// intended behavior going forward.
+/// under tr-TR the helper's dotless-i would miss the fixed list and fall to default. Only
+/// the branch formatting coincides (both share a format string); the emitted datatype text
+/// itself diverges - PS writes the culture-lowercased dotless-i string into the SQL while
+/// this port always writes the invariant form, which is the intended behavior going
+/// forward.
 /// </summary>
 public static class IndexToTable
 {
