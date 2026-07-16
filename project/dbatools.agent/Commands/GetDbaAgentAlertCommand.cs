@@ -37,19 +37,32 @@ public sealed class GetDbaAgentAlertCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Alert, ExcludeAlert, EnableException.ToBool(),
-            TestBound(nameof(Alert)), TestBound(nameof(ExcludeAlert)),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        if (Interrupted)
+            return;
+
+        // Stream one hop PER INSTANCE: a whole-array hop batches every instance's Debug
+        // records ahead of all alert output, where the source's foreach interleaves
+        // Debug-then-alerts per instance (opus W2-010 P2A; same class and fix as the
+        // bdced66 DbMail retrofit). The hop body has no cross-instance state.
+        foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
+            if (Interrupted)
+                return;
+
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
+                new[] { instance }, SqlCredential, Alert, ExcludeAlert, EnableException.ToBool(),
+                TestBound(nameof(Alert)), TestBound(nameof(ExcludeAlert)),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-            }
-            else
-            {
-                WriteObject(item);
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                }
+                else
+                {
+                    WriteObject(item);
+                }
             }
         }
     }

@@ -22,6 +22,7 @@ public sealed class AddDbaInstanceListCommand : DbaBaseCmdlet
 {
     /// <summary>The SQL Server instance name or names to add to the autocomplete list.</summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
+    [PsStringArrayCast]
     public string[]? SqlInstance { get; set; }
 
     /// <summary>Persists the instance list to disk for future PowerShell sessions.</summary>
