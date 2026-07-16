@@ -38,10 +38,12 @@ public sealed class GetDbaAgentJobHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Earliest history timestamp to return.</summary>
     [Parameter]
+    [PsDateTimeCast]
     public DateTime StartDate { get; set; } = new(1900, 1, 1);
 
     /// <summary>Latest history timestamp to return.</summary>
     [Parameter]
+    [PsDateTimeCast]
     public DateTime EndDate { get; set; } = DateTime.Now;
 
     /// <summary>Completion result to return.</summary>

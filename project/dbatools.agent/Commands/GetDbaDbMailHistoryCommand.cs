@@ -27,6 +27,7 @@ public sealed class GetDbaDbMailHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Return mail requested on or after this timestamp.</summary>
     [Parameter(Position = 2)]
+    [PsDateTimeCast]
     public DateTime Since { get; set; }
 
     /// <summary>Return mail with this delivery status.</summary>
