@@ -13,11 +13,13 @@ namespace Dataplat.Dbatools.Commands;
 /// public/Resolve-DbaNetworkName.ps1 (W3-083). NO ShouldProcess (plain CmdletBinding) -
 /// no WhatIf/Confirm carriers, no gate routing. PER-ELEMENT process hops (25a09f3
 /// ruling): the source foreaches $ComputerName with no cross-element state, so each
-/// element rides its own hop; the pre-loop bypass-config check and the non-Windows Turbo
-/// coercion are idempotent per element and ride at the top of every hop (verbatim body,
-/// 1-element array). The begin-scope Get-ComputerDomainName helper is re-declared at hop
-/// top (function definitions cannot cross hop scopes). DOT-SOURCED inner block (the
-/// bypass path ends in an early `return`). The $env:COMPUTERNAME bind-time default
+/// element rides its own hop; the PRE-LOOP lines (bypass-config check + non-Windows
+/// Turbo coercion) run in a PROLOGUE hop once per process record (B batch [P3] pair:
+/// per-element hoisting emitted the coercion Verbose N times, and a zero-element input
+/// skipped the pre-loop lines entirely), with the coerced Turbo carried into the
+/// element hops via the __w3083Prologue sentinel. The begin-scope Get-ComputerDomainName
+/// helper is re-declared at hop top (function definitions cannot cross hop scopes). The
+/// $env:COMPUTERNAME bind-time default
 /// applies at construction exactly like PS bind-time defaults (W1-087/W3-063 class).
 /// Private Test-Windows/Invoke-Command2 and public Get-DbaCmObject/config reads ride the
 /// hop verbatim, including the hardcoded -EnableException on Get-DbaCmObject inside its
@@ -51,18 +53,51 @@ public sealed class ResolveDbaNetworkNameCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
+        // PROLOGUE hop, once per process record (B batch [P3] pair): the source's
+        // bypass-config check and non-Windows Turbo coercion sit BEFORE its foreach, so
+        // they run (and the coercion Verbose emits) ONCE per record - including for a
+        // ZERO-element ComputerName, where the per-element loop below never spins. The
+        // bypass path emits its rows whole-array inside the prologue exactly like the
+        // source's own pre-loop foreach; the coerced Turbo returns via sentinel.
+        bool bypassed = false;
+        object effectiveTurbo = Turbo.ToBool();
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, PrologueScript,
+            ComputerName, Turbo.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w3083Prologue"))
+            {
+                Hashtable? prologue = sentinel["__w3083Prologue"] as Hashtable;
+                if (prologue is not null)
+                {
+                    bypassed = LanguagePrimitives.IsTrue(prologue["Bypassed"]);
+                    effectiveTurbo = prologue["Turbo"] ?? effectiveTurbo;
+                }
+                continue;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
+            }
+            WriteObject(item);
+        }
+        if (bypassed)
+            return;
+
         // Stream one hop PER COMPUTER: a whole-array hop batches every element's live
         // Debug/Verbose ahead of all buffered output, where the source's foreach
         // interleaves them per element (W2-010 P2A; coordinator 25a09f3 ruling). The
-        // source loop body has no cross-element state; the pre-loop bypass/Turbo lines
-        // are idempotent per element.
+        // source loop body has no cross-element state.
         foreach (DbaInstanceParameter computer in ComputerName ?? Array.Empty<DbaInstanceParameter>())
         {
             if (Interrupted)
                 return;
 
             foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { computer }, Credential, Turbo.ToBool(), EnableException.ToBool(),
+                new[] { computer }, Credential, effectiveTurbo, EnableException.ToBool(),
                 BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
@@ -103,11 +138,56 @@ public sealed class ResolveDbaNetworkNameCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin-scope helper + the ENTIRE process body VERBATIM per element inside a
-    // dot-sourced block (the bypass path early-returns). Substitutions only: explicit
+    // PS: the source's PRE-LOOP lines (bypass-config check incl. its whole-array row
+    // emission + the non-Windows Turbo coercion), once per process record. The coerced
+    // $Turbo and the bypass verdict return via the __w3083Prologue sentinel.
+    private const string PrologueScript = """
+param($ComputerName, $Turbo, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$ComputerName, $Turbo, $EnableException, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    $__bypassed = $false
+    . {
+        if ((Get-DbatoolsConfigValue -FullName commands.resolve-dbanetworkname.bypass)) {
+            $__bypassed = $true
+            foreach ($computer in $ComputerName) {
+                [PSCustomObject]@{
+                    InputName        = $computer
+                    ComputerName     = $computer
+                    IPAddress        = $computer
+                    DNSHostname      = $computer
+                    DNSDomain        = $computer # (Get-ComputerDomainName -ComputerName $computer)
+                    Domain           = $computer # (Get-ComputerDomainName -ComputerName $computer)
+                    DNSHostEntry     = $computer
+                    FQDN             = $computer
+                    FullComputerName = $computer
+                }
+                continue
+            }
+            return
+        }
+
+        if (-not (Test-Windows -NoWarn)) {
+            Write-Message -Level Verbose -Message "Non-Windows client detected. Turbo (DNS resolution only) set to $true" -FunctionName Resolve-DbaNetworkName
+            $Turbo = $true
+        }
+    }
+
+    @{ __w3083Prologue = @{ Bypassed = $__bypassed; Turbo = $Turbo } }
+} $ComputerName $Turbo $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+
+    // PS: the begin-scope helper + the element loop body VERBATIM per element (the
+    // pre-loop lines live in PrologueScript above). Substitutions only: explicit
     // -FunctionName Resolve-DbaNetworkName on Stop-Function/Write-Message (W1-090). The
-    // $Turbo in-hop coercion on non-Windows, the commented-out DNSDomain lines, and the
-    // hardcoded -EnableException on Get-DbaCmObject ride as-is.
+    // commented-out DNSDomain lines and the hardcoded -EnableException on
+    // Get-DbaCmObject ride as-is.
     private const string ProcessScript = """
 param($ComputerName, $Credential, $Turbo, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -137,29 +217,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     . {
-        if ((Get-DbatoolsConfigValue -FullName commands.resolve-dbanetworkname.bypass)) {
-            foreach ($computer in $ComputerName) {
-                [PSCustomObject]@{
-                    InputName        = $computer
-                    ComputerName     = $computer
-                    IPAddress        = $computer
-                    DNSHostname      = $computer
-                    DNSDomain        = $computer # (Get-ComputerDomainName -ComputerName $computer)
-                    Domain           = $computer # (Get-ComputerDomainName -ComputerName $computer)
-                    DNSHostEntry     = $computer
-                    FQDN             = $computer
-                    FullComputerName = $computer
-                }
-                continue
-            }
-            return
-        }
-
-        if (-not (Test-Windows -NoWarn)) {
-            Write-Message -Level Verbose -Message "Non-Windows client detected. Turbo (DNS resolution only) set to $true" -FunctionName Resolve-DbaNetworkName
-            $Turbo = $true
-        }
-
         foreach ($computer in $ComputerName) {
             if ($computer.IsLocalhost) {
                 $cName = $env:COMPUTERNAME
