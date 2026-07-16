@@ -114,29 +114,42 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            ComputerName, Credential, UseWindowsCredentials.ToBool(),
-            OverrideExplicitCredential.ToBool(), DisabledConnectionTypes,
-            DisableBadCredentialCache.ToBool(), DisableCimPersistence.ToBool(),
-            DisableCredentialAutoRegister.ToBool(), EnableCredentialFailover.ToBool(),
-            WindowsCredentialsAreBad.ToBool(), CimWinRMOptions, CimDCOMOptions,
-            EnableException.ToBool(), _disableCache,
-            TestBound(nameof(Credential)), TestBound(nameof(UseWindowsCredentials)),
-            TestBound(nameof(OverrideExplicitCredential)), TestBound(nameof(DisabledConnectionTypes)),
-            TestBound(nameof(DisableBadCredentialCache)), TestBound(nameof(DisableCimPersistence)),
-            TestBound(nameof(DisableCredentialAutoRegister)), TestBound(nameof(EnableCredentialFailover)),
-            TestBound(nameof(WindowsCredentialsAreBad)), TestBound(nameof(CimWinRMOptions)),
-            TestBound(nameof(CimDCOMOptions)), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // Stream one hop PER COMPUTER: a whole-array hop batches every element's live
+        // Debug/Verbose ahead of all buffered output, where the source's foreach
+        // interleaves them per element (W2-010 P2A; coordinator 25a09f3 ruling - this
+        // command was the ruling's named example). The source loop body has no
+        // cross-element state.
+        // Null fallback = parity: with COMPUTERNAME unset the bind-time default is null
+        // and the source's foreach over $null does nothing (codex sweep r1).
+        foreach (DbaCmConnectionParameter computer in ComputerName ?? Array.Empty<DbaCmConnectionParameter>())
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
+            if (Interrupted)
+                return;
+
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+                new[] { computer }, Credential, UseWindowsCredentials.ToBool(),
+                OverrideExplicitCredential.ToBool(), DisabledConnectionTypes,
+                DisableBadCredentialCache.ToBool(), DisableCimPersistence.ToBool(),
+                DisableCredentialAutoRegister.ToBool(), EnableCredentialFailover.ToBool(),
+                WindowsCredentialsAreBad.ToBool(), CimWinRMOptions, CimDCOMOptions,
+                EnableException.ToBool(), _disableCache,
+                TestBound(nameof(Credential)), TestBound(nameof(UseWindowsCredentials)),
+                TestBound(nameof(OverrideExplicitCredential)), TestBound(nameof(DisabledConnectionTypes)),
+                TestBound(nameof(DisableBadCredentialCache)), TestBound(nameof(DisableCimPersistence)),
+                TestBound(nameof(DisableCredentialAutoRegister)), TestBound(nameof(EnableCredentialFailover)),
+                TestBound(nameof(WindowsCredentialsAreBad)), TestBound(nameof(CimWinRMOptions)),
+                TestBound(nameof(CimDCOMOptions)), this,
+                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                    continue;
+                }
+                WriteObject(item);
             }
-            WriteObject(item);
         }
     }
 
