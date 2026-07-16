@@ -82,29 +82,29 @@ public sealed class NewDbaCredentialCommand : DbaBaseCmdlet
             _bindInitialized = true;
         }
 
-        // Stream one hop PER INSTANCE: a whole-array hop batches every instance's live
-        // Debug/Verbose ahead of all buffered output, where the source's foreach
-        // interleaves them per instance (W2-010 P2A; coordinator 25a09f3 ruling). The
-        // source loop body has no cross-instance state.
-        foreach (DbaInstanceParameter instance in SqlInstance)
+        // WHOLE-ARRAY hop by RULING (coordinator 2026-07-16, amending 25a09f3; B's P2A
+        // delta review): this port's ShouldProcess gates run on the INNER hop
+        // scriptblock's $Pscmdlet because `if ($Force) { $ConfirmPreference = 'none' }`
+        // is hop-scope-local (the W3-005 Copy-family convention). Per-element = N hop
+        // invocations = N CommandRuntimes, so [A]/[L] prompt state (yesToAll/noToAll)
+        // RESETS per instance - B measured 1 prompt whole-array vs 3 per-element. The
+        // source's single function invocation carries prompt state across instances;
+        // only ONE scriptblock invocation reproduces that. Per-element is INELIGIBLE
+        // here unless the gates are re-routed to $__realCmdlet first; the Debug
+        // interleave granularity rides the DEF-001 buffered-output systemic.
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+            SqlInstance, SqlCredential, _nameState, Identity, SecurePassword,
+            MappedClassType, ProviderName ?? "", Force.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
-            if (Interrupted)
-                return;
-
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { instance }, SqlCredential, _nameState, Identity, SecurePassword,
-                MappedClassType, ProviderName ?? "", Force.ToBool(), EnableException.ToBool(),
-                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            if (item?.BaseObject is ErrorRecord nestedError)
             {
-                if (item?.BaseObject is ErrorRecord nestedError)
-                {
-                    RemoveHopErrorBookkeeping(nestedError);
-                    WriteError(nestedError);
-                    continue;
-                }
-                WriteObject(item);
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
             }
+            WriteObject(item);
         }
     }
 

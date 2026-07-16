@@ -88,6 +88,15 @@ public sealed class RemoveDbaDbBackupRestoreHistoryCommand : DbaBaseCmdlet
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
+            // Process hops re-emit the sentinel to carry the cross-record $servername
+            // leak (B batch [P3]: assigned inside the per-db try, read by the catch -
+            // record N's value must be visible to record N+1 like the source fn scope).
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w3075State"))
+            {
+                _state = sentinel["__w3075State"] as Hashtable;
+                continue;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -164,9 +173,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    # begin-computed once-per-invocation state
+    # begin-computed once-per-invocation state + cross-record leaked local restore
     $KeepDays = $__state.KeepDays
     $odt = $__state.odt
+    $servername = $__state.servername
 
     . {
         if ($KeepDays -and $Database) {
@@ -207,6 +217,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
+
+    @{ __w3075State = @{ KeepDays = $KeepDays; odt = $odt; servername = $servername } }
 } $SqlInstance $SqlCredential $Database $InputObject $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

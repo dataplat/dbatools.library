@@ -145,8 +145,20 @@ public sealed partial class RenameDbaDatabaseCommand : DbaBaseCmdlet
             if (sentinel is not null && sentinel.ContainsKey("__w3081State"))
             {
                 Hashtable? latch = sentinel["__w3081State"] as Hashtable;
-                if (latch is not null && latch["interrupted"] is bool interrupted && interrupted)
-                    _hopInterrupted = true;
+                if (latch is not null)
+                {
+                    if (latch["interrupted"] is bool interrupted && interrupted)
+                        _hopInterrupted = true;
+                    // Cross-record carry (B batch): leaked fn-scope locals + the
+                    // ShouldProcess Yes/No-to-All engine state, merged into the begin
+                    // bag so the next record's hop restores them like the source scope.
+                    if (_state is not null)
+                    {
+                        _state["Final_Renames"] = latch["Final_Renames"];
+                        _state["dirfiles"] = latch["dirfiles"];
+                        _state["shouldProcessContinueStatus"] = latch["shouldProcessContinueStatus"];
+                    }
+                }
                 continue;
             }
             if (item?.BaseObject is ErrorRecord nestedError)

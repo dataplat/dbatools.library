@@ -16,7 +16,11 @@ namespace Dataplat.Dbatools.Commands;
 /// records still process - no latch machinery). WHOLE-ARRAY is REQUIRED here, not the
 /// P2A per-element shape: the loop leaks $renamed/$needsrestart across instances (set in
 /// one iteration, read by later ones - the source's own cross-instance state), which is
-/// the 25a09f3 ruling's exemption clause. The Copy-family
+/// the 25a09f3 ruling's exemption clause. The leak ALSO crosses pipeline RECORDS (B
+/// batch review): the __w3082State sentinel carries $renamed/$needsrestart/
+/// $allsqlservices plus the engine's lastShouldProcessContinueStatus so Yes-to-All/
+/// No-to-All answered in one record governs later records like the source's single
+/// CommandRuntime. The Copy-family
 /// `if ($Force) { $ConfirmPreference = 'none' }` begin line rides at hop top with the
 /// INNER $Pscmdlet serving every gate (W3-005/W3-064 convention - no $__realCmdlet). The
 /// interactive PromptForChoice AutoFix paths, the interpolated sp_dropserver/sp_addserver
@@ -46,6 +50,17 @@ public sealed class RepairDbaInstanceNameCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // Cross-record state (B batch findings, hop-scope-dies-per-record class): the source
+    // function scope spans the pipeline, so $renamed/$needsrestart/$allsqlservices leak
+    // across records, and the inner $Pscmdlet's ShouldProcess Yes-to-All/No-to-All
+    // answer must survive record boundaries too (source: ONE CommandRuntime for the
+    // whole pipeline; ConfirmImpact High prompts BY DEFAULT). The sentinel carries the
+    // three locals plus the runtime's lastShouldProcessContinueStatus, which the next
+    // record's hop transplants into its fresh CommandRuntime (field name identical on
+    // PS 5.1 and PS 7; empirically verified - [A] answered in record 1 suppresses the
+    // record-2 prompt exactly like the source).
+    private Hashtable? _state;
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -53,10 +68,16 @@ public sealed class RepairDbaInstanceNameCommand : DbaBaseCmdlet
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, AutoFix.ToBool(), Force.ToBool(),
-            EnableException.ToBool(),
+            EnableException.ToBool(), _state,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w3082State"))
+            {
+                _state = sentinel["__w3082State"] as Hashtable;
+                continue;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -102,7 +123,7 @@ public sealed class RepairDbaInstanceNameCommand : DbaBaseCmdlet
     // bag-read quirk, the interactive PromptForChoice paths and the interpolated
     // sp_dropserver/sp_addserver T-SQL ride as-is.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $AutoFix, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $AutoFix, $Force, $EnableException, $__state, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -111,10 +132,22 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, $AutoFix, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, $AutoFix, $Force, $EnableException, $__state, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if ($Force) { $ConfirmPreference = 'none' }
+
+    # cross-record restore: leaked fn-scope locals + the ShouldProcess Yes/No-to-All
+    # engine state (lastShouldProcessContinueStatus - same field name both editions)
+    $__spField = $Pscmdlet.CommandRuntime.GetType().GetField("lastShouldProcessContinueStatus", [System.Reflection.BindingFlags]"NonPublic,Instance")
+    if ($null -ne $__state) {
+        $renamed = $__state.renamed
+        $needsrestart = $__state.needsrestart
+        $allsqlservices = $__state.allsqlservices
+        if ($null -ne $__spField -and $null -ne $__state.shouldProcessContinueStatus) {
+            $__spField.SetValue($Pscmdlet.CommandRuntime, [Enum]::Parse($__spField.FieldType, $__state.shouldProcessContinueStatus))
+        }
+    }
 
     . {
         foreach ($instance in $SqlInstance) {
@@ -284,6 +317,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $SqlInstance $SqlCredential $AutoFix $Force $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+    @{ __w3082State = @{ renamed = $renamed; needsrestart = $needsrestart; allsqlservices = $allsqlservices; shouldProcessContinueStatus = $(if ($null -ne $__spField) { "$($__spField.GetValue($Pscmdlet.CommandRuntime))" } else { $null }) } }
+} $SqlInstance $SqlCredential $AutoFix $Force $EnableException $__state $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

@@ -249,6 +249,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([string[]]$InstanceName, [string[]]$Type, [int]$Timeout, [PSCredential]$Credential, $Force, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    # ATTRIBUTION SHIM (B batch [P2], the Get-PSCallStack class): Update-ServiceStatus
+    # derives its Stop-Function attribution from $callStack[1].Command. Called bare from
+    # this hop, frame 1 is the hop scriptblock => FQEID dbatools_<ScriptBlock>. This
+    # named wrapper puts "Restart-DbaService" in frame 1 exactly like the source's own
+    # function frame; streams and terminating errors flow through unchanged.
+    function Restart-DbaService {
+        param($__splat)
+        Update-ServiceStatus @__splat
+    }
+
     $processArray = $__state.processArray
 
     $processArray = [array]($processArray | Where-Object { (!$InstanceName -or $_.InstanceName -in $InstanceName) -and (!$Type -or $_.ServiceType -in $Type) })
@@ -285,7 +295,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 EnableException = $EnableException
             }
             if ($Credential) { $splatServiceStatus.Credential = $Credential }
-            $services = Update-ServiceStatus @splatServiceStatus
+            $services = Restart-DbaService -__splat $splatServiceStatus
             foreach ($service in ($services | Where-Object { $_.Status -eq 'Failed' })) {
                 $service
             }
@@ -293,7 +303,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($services) {
                 $splatServiceStatus.InputObject = $services
                 $splatServiceStatus.Action = "restart"
-                Update-ServiceStatus @splatServiceStatus
+                Restart-DbaService -__splat $splatServiceStatus
             }
         }
     } else {
