@@ -66,10 +66,11 @@ public static class IndexToTable
         List<IndexToTableStatement> tableStatements = new List<IndexToTableStatement>();
         foreach (Table tableObject in db.Tables)
         {
-            // Helper lines 32-41.
-            if (schema != null && schema.Length > 0 && !MatchesPsIn(schema, tableObject.Schema))
+            // Helper lines 32-41: `if ($Schema)` is PS array truthiness - a singleton
+            // empty string unwraps to falsy and disables the filter entirely.
+            if (IsPsTruthy(schema) && !MatchesPsIn(schema!, tableObject.Schema))
                 continue;
-            if (table != null && table.Length > 0 && !MatchesPsIn(table, tableObject.Name))
+            if (IsPsTruthy(table) && !MatchesPsIn(table!, tableObject.Name))
                 continue;
 
             if (messageCallback != null)
@@ -162,6 +163,18 @@ public static class IndexToTable
         if (dataType.Contains("char"))
             return String.Format("[{0}] [{1}]({2})", name, dataType, length);
         return String.Format("[{0}] [{1}]", name, dataType);
+    }
+
+    /// <summary>PS `if ($array)` truthiness: null/empty arrays are falsy; a SINGLETON
+    /// unwraps to its element's truthiness (so @("") is falsy and disables the filter);
+    /// two or more elements are always truthy.</summary>
+    public static bool IsPsTruthy(string[]? value)
+    {
+        if (value == null || value.Length == 0)
+            return false;
+        if (value.Length == 1)
+            return !String.IsNullOrEmpty(value[0]);
+        return true;
     }
 
     /// <summary>PS -in for strings: case-insensitive invariant comparison.</summary>

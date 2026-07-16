@@ -79,6 +79,19 @@ namespace Dataplat.Dbatools.Commands.Test
         }
 
         [TestMethod]
+        public void IsPsTruthy_UnwrapsSingletonsLikePsArrayTruthiness()
+        {
+            // The codex round-1 catch: `if ($Schema)` with @("") is FALSY in PS - the
+            // singleton unwraps - so the filter is disabled, not match-everything-out.
+            Assert.IsFalse(IndexToTable.IsPsTruthy(null));
+            Assert.IsFalse(IndexToTable.IsPsTruthy(new string[0]));
+            Assert.IsFalse(IndexToTable.IsPsTruthy(new[] { "" }), "a singleton empty string unwraps to falsy");
+            Assert.IsFalse(IndexToTable.IsPsTruthy(new string[] { null }), "a singleton null unwraps to falsy");
+            Assert.IsTrue(IndexToTable.IsPsTruthy(new[] { "dbo" }));
+            Assert.IsTrue(IndexToTable.IsPsTruthy(new[] { "", "" }), "two elements are truthy regardless of content");
+        }
+
+        [TestMethod]
         public void Convert_NullDatabaseGuards()
         {
             Assert.ThrowsException<ArgumentNullException>(delegate { IndexToTable.Convert(null, null, null, false, null); });
