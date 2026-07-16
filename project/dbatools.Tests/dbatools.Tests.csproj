@@ -42,6 +42,7 @@
     <ProjectReference Include="..\dbatools\dbatools.csproj" />
     <ProjectReference Include="..\dbatools.core\dbatools.core.csproj" />
     <ProjectReference Include="..\dbatools.replication\dbatools.replication.csproj" />
+    <ProjectReference Include="..\dbatools.database\dbatools.database.csproj" />
     <Reference Include="Microsoft.SqlServer.Rmo">
       <HintPath>..\..\var\misc\both\Microsoft.SqlServer.Rmo.dll</HintPath>
     </Reference>
