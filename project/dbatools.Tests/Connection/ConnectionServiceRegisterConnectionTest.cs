@@ -39,7 +39,7 @@ namespace Dataplat.Dbatools.Connection.Test
                 List<string> stale = new List<string>();
                 foreach (string key in ConnectionHost.ActiveConnections.Keys)
                 {
-                    if (key.Length == 0 || key.StartsWith(KeyPrefix, StringComparison.OrdinalIgnoreCase))
+                    if (key.StartsWith(KeyPrefix, StringComparison.OrdinalIgnoreCase))
                         stale.Add(key);
                 }
                 foreach (string key in stale)
@@ -150,18 +150,31 @@ namespace Dataplat.Dbatools.Connection.Test
         {
             // The PS helper writes "Adding to connection hash" before touching the cache;
             // the port keeps that order, so every guarded no-op input (null key, empty
-            // key, null value) still emits exactly one debug message per call.
+            // key, null value) still emits exactly one debug message per call — and for
+            // the valid call the callback itself observes the key is NOT registered yet,
+            // proving message-before-mutation rather than just message-happened.
+            string validKey = UniqueKey();
             List<string> seen = new List<string>();
-            Action<DbaMessageLevel, string> sink = delegate (DbaMessageLevel level, string message)
+            Action<DbaMessageLevel, string> countingSink = delegate (DbaMessageLevel level, string message)
             {
                 Assert.AreEqual(DbaMessageLevel.Debug, level);
                 seen.Add(message);
             };
+            Action<DbaMessageLevel, string> orderingSink = delegate (DbaMessageLevel level, string message)
+            {
+                lock (ConnectionHost.ActiveConnections)
+                {
+                    Assert.IsFalse(ConnectionHost.ActiveConnections.ContainsKey(validKey));
+                }
+                countingSink(level, message);
+            };
 
-            ConnectionService.RegisterConnection(UniqueKey(), new SqlConnection(), sink);
-            ConnectionService.RegisterConnection(null, new SqlConnection(), sink);
-            ConnectionService.RegisterConnection(String.Empty, new SqlConnection(), sink);
-            ConnectionService.RegisterConnection(UniqueKey(), null, sink);
+            ConnectionService.RegisterConnection(validKey, new SqlConnection(), orderingSink);
+            Assert.IsTrue(ConnectionHost.ActiveConnections.ContainsKey(validKey));
+
+            ConnectionService.RegisterConnection(null, new SqlConnection(), countingSink);
+            ConnectionService.RegisterConnection(String.Empty, new SqlConnection(), countingSink);
+            ConnectionService.RegisterConnection(UniqueKey(), null, countingSink);
 
             Assert.AreEqual(4, seen.Count);
             foreach (string message in seen)
@@ -173,34 +186,51 @@ namespace Dataplat.Dbatools.Connection.Test
         {
             // Sentinels pin that the guards are true no-ops: an existing empty-key entry
             // and an existing prefixed entry keep their exact list references and
-            // contents through null-key, empty-key and null-value calls.
+            // contents through null-key, empty-key and null-value calls. The process-wide
+            // empty-key slot is not ours: snapshot whatever was there and restore it.
             string key = UniqueKey();
             object sentinelValue = new object();
             List<object> emptyKeySentinel = new List<object>();
             emptyKeySentinel.Add(sentinelValue);
             List<object> keyedSentinel = new List<object>();
             keyedSentinel.Add(sentinelValue);
+            bool hadEmptyKey;
+            List<object> priorEmptyKey;
             int before;
             lock (ConnectionHost.ActiveConnections)
             {
+                hadEmptyKey = ConnectionHost.ActiveConnections.TryGetValue(String.Empty, out priorEmptyKey);
                 ConnectionHost.ActiveConnections[String.Empty] = emptyKeySentinel;
                 ConnectionHost.ActiveConnections[key] = keyedSentinel;
                 before = ConnectionHost.ActiveConnections.Count;
             }
 
-            ConnectionService.RegisterConnection(null, new SqlConnection(), null);
-            ConnectionService.RegisterConnection(String.Empty, new SqlConnection(), null);
-            ConnectionService.RegisterConnection(key, null, null);
-
-            lock (ConnectionHost.ActiveConnections)
+            try
             {
-                Assert.AreEqual(before, ConnectionHost.ActiveConnections.Count);
-                Assert.AreSame(emptyKeySentinel, ConnectionHost.ActiveConnections[String.Empty]);
-                Assert.AreEqual(1, emptyKeySentinel.Count);
-                Assert.AreSame(sentinelValue, emptyKeySentinel[0]);
-                Assert.AreSame(keyedSentinel, ConnectionHost.ActiveConnections[key]);
-                Assert.AreEqual(1, keyedSentinel.Count);
-                Assert.AreSame(sentinelValue, keyedSentinel[0]);
+                ConnectionService.RegisterConnection(null, new SqlConnection(), null);
+                ConnectionService.RegisterConnection(String.Empty, new SqlConnection(), null);
+                ConnectionService.RegisterConnection(key, null, null);
+
+                lock (ConnectionHost.ActiveConnections)
+                {
+                    Assert.AreEqual(before, ConnectionHost.ActiveConnections.Count);
+                    Assert.AreSame(emptyKeySentinel, ConnectionHost.ActiveConnections[String.Empty]);
+                    Assert.AreEqual(1, emptyKeySentinel.Count);
+                    Assert.AreSame(sentinelValue, emptyKeySentinel[0]);
+                    Assert.AreSame(keyedSentinel, ConnectionHost.ActiveConnections[key]);
+                    Assert.AreEqual(1, keyedSentinel.Count);
+                    Assert.AreSame(sentinelValue, keyedSentinel[0]);
+                }
+            }
+            finally
+            {
+                lock (ConnectionHost.ActiveConnections)
+                {
+                    if (hadEmptyKey)
+                        ConnectionHost.ActiveConnections[String.Empty] = priorEmptyKey;
+                    else
+                        ConnectionHost.ActiveConnections.Remove(String.Empty);
+                }
             }
         }
     }
