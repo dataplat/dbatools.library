@@ -47,6 +47,7 @@ public sealed class CopyDbaRegServerCommand : DbaBaseCmdlet
     /// <summary>Top-level CMS group name(s) to copy; all when omitted.</summary>
     [Parameter(Position = 4)]
     [Alias("CMSGroup")]
+    [PsStringArrayCast]
     public string[]? Group { get; set; }
 
     /// <summary>Replaces source server name references with the destination server name.</summary>
@@ -68,7 +69,8 @@ public sealed class CopyDbaRegServerCommand : DbaBaseCmdlet
             Source, SourceSqlCredential, Destination, DestinationSqlCredential, Group,
             SwitchServerName.ToBool(), Force.ToBool(), EnableException.ToBool(),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            BoundRaw("WarningAction")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -86,6 +88,15 @@ public sealed class CopyDbaRegServerCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    /// <summary>The raw bound value (or null when unbound) for non-boolean common
+    /// parameters carried into the hop (WarningAction - codex W3-002 F3 class).</summary>
+    private object? BoundRaw(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return value;
         return null;
     }
 
@@ -116,8 +127,9 @@ public sealed class CopyDbaRegServerCommand : DbaBaseCmdlet
     // the two hop-level Stop-Function calls (W1-090). The helper and its $Pscmdlet ride
     // untouched.
     private const string BodyScript = """
-param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $Group, $SwitchServerName, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $Group, $SwitchServerName, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
+if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -125,7 +137,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [PSCredential]$SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, [PSCredential]$DestinationSqlCredential, [string[]]$Group, $SwitchServerName, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [PSCredential]$SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, [PSCredential]$DestinationSqlCredential, [string[]]$Group, $SwitchServerName, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if ($Force) { $ConfirmPreference = 'none' }
@@ -370,6 +382,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Invoke-ParseServerGroup -sourceGroup $store -destinationgroup $toCmStore.DatabaseEngineServerGroup -SwitchServerName $SwitchServerName
         }
     }
-} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $Group $SwitchServerName $Force $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $Group $SwitchServerName $Force $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
 """;
 }

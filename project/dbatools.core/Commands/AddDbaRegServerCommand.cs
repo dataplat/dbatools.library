@@ -89,6 +89,15 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
     private object? _nameState;
     private object? _serverNameState;
     private bool _bindInitialized;
+    private bool _inputObjectNamedBound;
+
+    protected override void BeginProcessing()
+    {
+        // Pipeline bindings are absent at begin time, so this pins whether InputObject was
+        // NAMED-bound - the discriminator for the per-record rebind reset (codex W3-002 F1:
+        // the same array INSTANCE piped twice defeats a pure ReferenceEquals check).
+        _inputObjectNamedBound = TestBound("InputObject");
+    }
 
     protected override void ProcessRecord()
     {
@@ -96,8 +105,10 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
             return;
 
         // PS: named $InputObject keeps ONE array reference across records (the += growth
-        // persists); a piped ServerGroup re-binds a fresh array per record (W1-070).
-        if (!ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
+        // persists); a piped ServerGroup re-binds EVERY record it arrives in - even the
+        // same instance again (W1-070 + codex W3-002 F1).
+        if ((!_inputObjectNamedBound && TestBound("InputObject")) ||
+            !ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
         {
             _inputObjectState = InputObject;
             _lastBoundInputObject = InputObject;
@@ -118,7 +129,8 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
             OtherParams ?? "", _inputObjectState, ServerObject, EnableException.ToBool(), _state,
             BoundRaw("ServerName"), BoundRaw("ServerObject"), BoundRaw("Name"), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            BoundRaw("WarningAction")))
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3002State"))
@@ -186,8 +198,9 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
     // $PSBoundParameters.X -> carried $__boundX raw values, $Pscmdlet -> $__realCmdlet,
     // and explicit -FunctionName Add-DbaRegServer on Stop-Function/Write-Message (W1-090).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $ServerName, $Name, $Description, $Group, $ActiveDirectoryTenant, $ActiveDirectoryUserId, $ConnectionString, $OtherParams, $InputObject, $ServerObject, $EnableException, $__state, $__boundServerName, $__boundServerObject, $__boundName, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $ServerName, $Name, $Description, $Group, $ActiveDirectoryTenant, $ActiveDirectoryUserId, $ConnectionString, $OtherParams, $InputObject, $ServerObject, $EnableException, $__state, $__boundServerName, $__boundServerObject, $__boundName, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
+if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -195,7 +208,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$ServerName, [string]$Name, [string]$Description, [object]$Group, [string]$ActiveDirectoryTenant, [string]$ActiveDirectoryUserId, [string]$ConnectionString, [string]$OtherParams, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, [Microsoft.SqlServer.Management.Smo.Server[]]$ServerObject, $EnableException, $__state, $__boundServerName, $__boundServerObject, $__boundName, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$ServerName, [string]$Name, [string]$Description, [object]$Group, [string]$ActiveDirectoryTenant, [string]$ActiveDirectoryUserId, [string]$ConnectionString, [string]$OtherParams, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, [Microsoft.SqlServer.Management.Smo.Server[]]$ServerObject, $EnableException, $__state, $__boundServerName, $__boundServerObject, $__boundName, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # restore fn-scope locals mutated by earlier records
@@ -329,6 +342,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     @{ __w3002State = @{ InputObject = $InputObject; Name = $Name; ServerName = $ServerName; regServerGroup = $regServerGroup; reggroup = $reggroup; target = $target; server = $server; newserver = $newserver; instance = $instance } }
-} $SqlInstance $SqlCredential $ServerName $Name $Description $Group $ActiveDirectoryTenant $ActiveDirectoryUserId $ConnectionString $OtherParams $InputObject $ServerObject $EnableException $__state $__boundServerName $__boundServerObject $__boundName $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $ServerName $Name $Description $Group $ActiveDirectoryTenant $ActiveDirectoryUserId $ConnectionString $OtherParams $InputObject $ServerObject $EnableException $__state $__boundServerName $__boundServerObject $__boundName $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
 """;
 }
