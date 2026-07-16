@@ -82,7 +82,7 @@ namespace Dataplat.Dbatools.Utility.Test
         }
 
         [TestMethod]
-        public void Compare_EqAndNe_UseTheWholeValue()
+        public void Compare_EqAndNe_WithScalarValue()
         {
             object[] input = { Named("Alpha"), Named("beta") };
 

@@ -64,13 +64,16 @@ namespace Dataplat.Dbatools.Utility
                 if (!LanguagePrimitives.IsTrue(item))
                     continue;
 
-                object propertyValue = GetPropertyValue(item, property);
+                // The helper reads $obj.$Property INSIDE each comparison (per candidate),
+                // so a null Value never touches the property at all - the lookup is
+                // deliberately not hoisted, keeping even throwing/side-effecting getters
+                // parity-exact.
                 switch (mode)
                 {
                     case FilterMode.In:
                         foreach (object candidate in EnumerateLikePsForeach(value))
                         {
-                            if (stringComparer.Compare(propertyValue, Unwrap(candidate)) == 0)
+                            if (stringComparer.Compare(GetPropertyValue(item, property), Unwrap(candidate)) == 0)
                             {
                                 // Helper line 89: process-block `return $obj` = emit and
                                 // move to the next pipeline item.
@@ -83,25 +86,28 @@ namespace Dataplat.Dbatools.Utility
                         bool matchFound = false;
                         foreach (object candidate in EnumerateLikePsForeach(value))
                         {
-                            if (stringComparer.Compare(propertyValue, Unwrap(candidate)) == 0)
+                            if (stringComparer.Compare(GetPropertyValue(item, property), Unwrap(candidate)) == 0)
                                 matchFound = true;
                         }
                         if (!matchFound)
                             yield return item;
                         break;
                     case FilterMode.Eq:
-                        if (stringComparer.Compare(propertyValue, Unwrap(value)) == 0)
+                        if (stringComparer.Compare(GetPropertyValue(item, property), Unwrap(value)) == 0)
                             yield return item;
                         break;
                     case FilterMode.Ne:
-                        if (stringComparer.Compare(propertyValue, Unwrap(value)) != 0)
+                        if (stringComparer.Compare(GetPropertyValue(item, property), Unwrap(value)) != 0)
                             yield return item;
                         break;
                 }
             }
         }
 
-        /// <summary>PS `$obj.$Property`: PSObject-aware lookup; a missing property is null.</summary>
+        /// <summary>PS `$obj.$Property`: PSObject-aware lookup; a missing property is null.
+        /// Lookup is PROPERTY-based (note + adapted properties) - Hashtable KEY access,
+        /// which the PS binder would also resolve for `$h.a`, is out of scope; no caller
+        /// passes dictionaries.</summary>
         private static object GetPropertyValue(object item, string property)
         {
             PSObject wrapped = PSObject.AsPSObject(item);
