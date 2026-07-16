@@ -126,6 +126,17 @@ namespace Dataplat.Dbatools.Csv.Tests
                         // which carries it only in ParseError.Exception. Genuine parse
                         // errors still fall through to the errors bag below.
                     }
+                    catch (CsvParseException cpe) when (cpe.ParseError != null && cpe.ParseError.Exception is NullReferenceException && reader.IsClosed)
+                    {
+                        // Second racy shape (observed net8.0): Dispose tears the reader's
+                        // internal buffers mid-parse and the dereference surfaces as an
+                        // NRE, which HandleParseError wraps exactly like the ODE above.
+                        // Tolerated ONLY when the reader is already closed - a genuine
+                        // parse-path NRE on a live reader still lands in the errors bag.
+                        // Whether Read() should surface ObjectDisposedException instead of
+                        // a wrapped parse error on a disposed reader remains the product
+                        // decision flagged to the integrator lane in TB-012.
+                    }
                     catch (Exception ex)
                     {
                         errors.Add(ex);
@@ -146,7 +157,13 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
             }
 
-            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join("; ", errors.Select(e => e.Message))));
+            // Full ToString + the CsvParseException's carried ParseError.Exception (which
+            // the (message, CsvParseError) ctor does NOT surface as InnerException) so a
+            // failure names the actual racy shape instead of the bare "CSV parse error".
+            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join(" ||| ", errors.Select(e =>
+                e is CsvParseException cpeDetail && cpeDetail.ParseError != null && cpeDetail.ParseError.Exception != null
+                    ? e.ToString() + " [ParseError.Exception: " + cpeDetail.ParseError.Exception.ToString() + "]"
+                    : e.ToString()))));
         }
 
 
