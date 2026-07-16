@@ -52,18 +52,29 @@ public sealed class RemoveDbaCmConnectionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            ComputerName, EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // Stream one hop PER COMPUTER: a whole-array hop batches every element's live
+        // Debug/Verbose ahead of all buffered output, where the source's foreach
+        // interleaves them per element (W2-010 P2A; coordinator 25a09f3 ruling - same
+        // shape as the ruling's named W3-063 sibling). The source loop body has no
+        // cross-element state.
+        foreach (DbaCmConnectionParameter computer in ComputerName!)
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
+            if (Interrupted)
+                return;
+
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+                new[] { computer }, EnableException.ToBool(), this,
+                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                    continue;
+                }
+                WriteObject(item);
             }
-            WriteObject(item);
         }
     }
 

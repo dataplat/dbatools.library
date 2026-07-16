@@ -51,19 +51,29 @@ public sealed class RemoveDbaCustomErrorCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, MessageID, Language, EnableException.ToBool(),
-            TestBound(nameof(Language)), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // Stream one hop PER INSTANCE: a whole-array hop batches every instance's live
+        // Debug/Verbose ahead of all buffered output, where the source's foreach
+        // interleaves them per instance (W2-010 P2A; coordinator 25a09f3 ruling). The
+        // source loop body has no cross-instance state.
+        foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
+            if (Interrupted)
+                return;
+
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+                new[] { instance }, SqlCredential, MessageID, Language, EnableException.ToBool(),
+                TestBound(nameof(Language)), this,
+                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                    continue;
+                }
+                WriteObject(item);
             }
-            WriteObject(item);
         }
     }
 
