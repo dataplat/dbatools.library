@@ -44,9 +44,22 @@ namespace Dataplat.Dbatools.Utility
         /// Substring(0,2) throw ArgumentOutOfRangeException - an all-zero hex CRASHES the
         /// helper. [Int16]::Parse(s,'HexNumber') tolerates leading/trailing whitespace in
         /// a pair ("1 23" -> {1,35}) and lowercase hex. PS pipeline shape divergence
-        /// (documented): the PS function's single-byte result unwraps to a SCALAR byte at
-        /// the caller; this port always returns byte[]. A null argument is the PS [string]
-        /// binder's empty string (and throws like it, per above).
+        /// (documented; probed): the PS caller receives Object[] for multi-byte results
+        /// and a SCALAR byte for single-byte ones - this port always returns byte[]; SMO
+        /// coerces all three identically. A null argument is the PS [string] binder's
+        /// empty string (probed: $null -eq $s is False inside the function) and throws
+        /// like it, per above.
+        /// CALLER REACHABILITY MAP (opus TB-015; New-DbaLogin.ps1:247-257 pre-validates
+        /// with the SAME char-set trim then rejects chars outside "0123456789ABCDEF"
+        /// case-insensitively): REACHABLE - normal hex, lowercase hex, the leading-zero
+        /// destruction, and the all-zero crash (the guard's trim empties "0x0000" so its
+        /// foreach validates zero chars and passes it straight through); GUARD-REJECTED -
+        /// uppercase X, non-hex, whitespace (Stop-Function InvalidArgument first). The
+        /// crash throw escapes the caller's begin block with NO try/catch - it BYPASSES
+        /// the Stop-Function/-EnableException contract every other invalid-Sid path
+        /// honors; whether the compiled New-DbaLogin keeps the hard throw or folds it
+        /// into its error contract is flagged to the W2 security row alongside the
+        /// leading-zero-destruction flag.
         /// </summary>
         public static byte[] ToBytes(string inputObject)
         {
