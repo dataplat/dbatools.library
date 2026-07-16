@@ -70,10 +70,13 @@ namespace Dataplat.Dbatools.Commands.Test
             ArrayList single = new ArrayList();
             single.Add("Succeeded");
             Assert.AreEqual("#36B300", Convert(single), "single-element non-array collection binds and resolves");
-            System.Collections.Generic.List<string> multi = new System.Collections.Generic.List<string>();
-            multi.Add("Failed");
-            multi.Add("Retry");
-            Assert.AreEqual("#FF00CC", Convert(multi), "multi-element collection OFS-joins and falls to the default");
+            // The JOIN discriminator (codex r2): {"in","progress"} resolves cyan ONLY if
+            // the elements space-join to "in progress" - any wrong conversion misses the
+            // case and gives magenta instead. PS ground truth both editions: #00CCFF.
+            System.Collections.Generic.List<string> joinParts = new System.Collections.Generic.List<string>();
+            joinParts.Add("in");
+            joinParts.Add("progress");
+            Assert.AreEqual("#00CCFF", Convert(joinParts), "multi-element collection OFS-joins with the default space");
         }
 
         [TestMethod]
