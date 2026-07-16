@@ -105,6 +105,9 @@ public sealed partial class RenameDbaDatabaseCommand : DbaBaseCmdlet
 
     protected override void BeginProcessing()
     {
+        // C1 transplant condition: loud fail before any record if the engine field is gone.
+        PromptStateTransplant.AssertResolvable("Rename-DbaDatabase");
+
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             EnableException.ToBool(),
             TestBound(nameof(SetOffline)), TestBound(nameof(FileName)),

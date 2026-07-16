@@ -61,6 +61,14 @@ public sealed class RepairDbaInstanceNameCommand : DbaBaseCmdlet
     // record-2 prompt exactly like the source).
     private Hashtable? _state;
 
+    /// <inheritdoc />
+    protected override void BeginProcessing()
+    {
+        base.BeginProcessing();
+        // C1 transplant condition: loud fail before any record if the engine field is gone.
+        PromptStateTransplant.AssertResolvable("Repair-DbaInstanceName");
+    }
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -138,13 +146,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($Force) { $ConfirmPreference = 'none' }
 
     # cross-record restore: leaked fn-scope locals + the ShouldProcess Yes/No-to-All
-    # engine state (lastShouldProcessContinueStatus - same field name both editions)
+    # engine state (lastShouldProcessContinueStatus - same field name both editions).
+    # C1 transplant condition: a missing field THROWS (the C# BeginProcessing assert
+    # fires first; this is the in-script belt so the transplant can never silently rot).
     $__spField = $Pscmdlet.CommandRuntime.GetType().GetField("lastShouldProcessContinueStatus", [System.Reflection.BindingFlags]"NonPublic,Instance")
+    if ($null -eq $__spField) {
+        throw "Repair-DbaInstanceName: prompt-state transplant field lastShouldProcessContinueStatus not resolvable on this engine (C1 assert)."
+    }
     if ($null -ne $__state) {
         $renamed = $__state.renamed
         $needsrestart = $__state.needsrestart
         $allsqlservices = $__state.allsqlservices
-        if ($null -ne $__spField -and $null -ne $__state.shouldProcessContinueStatus) {
+        if ($null -ne $__state.shouldProcessContinueStatus) {
             $__spField.SetValue($Pscmdlet.CommandRuntime, [Enum]::Parse($__spField.FieldType, $__state.shouldProcessContinueStatus))
         }
     }

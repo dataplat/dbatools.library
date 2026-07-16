@@ -117,6 +117,9 @@ public sealed partial class SetDbaDbStateCommand : DbaBaseCmdlet
     {
         base.BeginProcessing();
 
+        // C1 transplant condition: loud fail before any record if the engine field is gone.
+        PromptStateTransplant.AssertResolvable("Set-DbaDbState");
+
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             new Hashtable(MyInvocation.BoundParameters), EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))

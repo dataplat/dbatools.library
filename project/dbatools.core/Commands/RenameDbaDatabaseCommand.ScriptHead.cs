@@ -38,9 +38,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # the source (one CommandRuntime). The sentinel carries all three; the engine field
     # name is identical on PS 5.1 and PS 7 (transplant empirically verified).
     $__spField = $PSCmdlet.CommandRuntime.GetType().GetField("lastShouldProcessContinueStatus", [System.Reflection.BindingFlags]"NonPublic,Instance")
+    if ($null -eq $__spField) {
+        throw "Rename-DbaDatabase: prompt-state transplant field lastShouldProcessContinueStatus not resolvable on this engine (C1 assert)."
+    }
     $Final_Renames = $__state.Final_Renames
     $dirfiles = $__state.dirfiles
-    if ($null -ne $__spField -and $null -ne $__state.shouldProcessContinueStatus) {
+    if ($null -ne $__state.shouldProcessContinueStatus) {
         $__spField.SetValue($PSCmdlet.CommandRuntime, [Enum]::Parse($__spField.FieldType, $__state.shouldProcessContinueStatus))
     }
 
