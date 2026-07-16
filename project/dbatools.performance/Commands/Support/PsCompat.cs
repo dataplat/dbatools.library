@@ -230,11 +230,13 @@ internal sealed class PsIntCastAttribute : ArgumentTransformationAttribute
 
 /// <summary>The advanced function process-block $_ automatic variable, for verbatim hops
 /// whose source reads $_ at process level (not inside catch/Where-Object scopes, which set
-/// their own). The engine sets $_ in a function's process block only for PIPELINE records;
-/// otherwise a read resolves dynamically up the caller chain (e.g. an enclosing
-/// ForEach-Object's $_). A compiled cmdlet mirrors that with CurrentPipelineObject (engine
-/// per-record input, non-public getter - reflection like the W1-018 _rowsCopied precedent)
-/// and a dynamic GetVariableValue lookup as the non-piped fallback.</summary>
+/// their own). The engine binds $_ LOCALLY in a function's process block: the current record
+/// for pipeline input, null otherwise - an ambient caller $_ (e.g. Pester's or an enclosing
+/// ForEach-Object's) is NEVER visible there. A compiled cmdlet mirrors that with
+/// CurrentPipelineObject alone (engine per-record input, non-public getter - reflection like
+/// the W1-018 _rowsCopied precedent). A dynamic GetVariableValue("_") fallback is WRONG: it
+/// leaked Pester's ambient $_ into named invocations and the W1-113 re-gate failed on the
+/// named already-exists test that the function passes (null $_, -Continue path).</summary>
 internal static class PsPipelineItem
 {
     private static readonly System.Reflection.PropertyInfo? CurrentPipelineObjectProperty =
@@ -248,15 +250,12 @@ internal static class PsPipelineItem
     {
         object? piped = null;
         try { piped = CurrentPipelineObjectProperty?.GetValue(host); }
-        catch { /* engine internals unavailable: fall through to the dynamic read */ }
+        catch { /* engine internals unavailable: null matches the unbound process-block $_ */ }
         if (piped is PSObject psPiped &&
             (ReferenceEquals(psPiped, System.Management.Automation.Internal.AutomationNull.Value) ||
              psPiped.BaseObject is null))
             piped = null;
-        if (piped is not null)
-            return piped;
-        try { return host.GetVariableValue("_", null); }
-        catch { return null; }
+        return piped;
     }
 }
 
