@@ -12,9 +12,10 @@ namespace Dataplat.Dbatools.Utility
     /// (helper retained); the compiled connect path's ConnectionService.ConvertFromSecurePass
     /// DELEGATES here (opus TB-016 - its earlier NetworkCredential-only variant returned ""
     /// for a null SecureString where this helper throws; unreachable at its null-guarded
-    /// call sites, unified anyway). A third, Marshal/BSTR-based variant remains in
-    /// AddDbaComputerCertificateCommand.SecureToPlain (Windows-only command; noted to the
-    /// tracker, not unified in this row). Probed 5.1 + 7.6: an empty SecureString yields ""
+    /// call sites, unified anyway). A third variant remains in
+    /// AddDbaComputerCertificateCommand.SecureToPlain (Marshal.SecureStringToGlobalAllocUnicode
+    /// + PtrToStringUni; Windows-only command; noted to the tracker, not unified in this
+    /// row). Probed 5.1 + 7.6: an empty SecureString yields ""
     /// and unicode incl. surrogate pairs roundtrips exactly; a NULL SecureString throws
     /// from the PSCredential ctor ("password is null") - PS callers see that wrapped as
     /// MethodInvocationException, direct C# callers get the ctor's PSArgumentNullException
