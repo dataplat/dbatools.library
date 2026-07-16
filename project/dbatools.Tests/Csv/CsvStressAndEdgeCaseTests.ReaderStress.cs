@@ -118,6 +118,14 @@ namespace Dataplat.Dbatools.Csv.Tests
                     {
                         // Expected when disposed during read
                     }
+                    catch (CsvParseException cpe) when (cpe.ParseError != null && cpe.ParseError.Exception is ObjectDisposedException)
+                    {
+                        // Same dispose race, wrapped: the parse-error handler
+                        // (CsvDataReader.Conversion.cs) re-wraps the mid-parse
+                        // ObjectDisposedException via the (message, CsvParseError) ctor,
+                        // which carries it only in ParseError.Exception. Genuine parse
+                        // errors still fall through to the errors bag below.
+                    }
                     catch (Exception ex)
                     {
                         errors.Add(ex);
