@@ -97,6 +97,12 @@ public sealed class GetDbaAgentAlertCommand : DbaBaseCmdlet
     private const string BodyScript = """
 param($SqlInstance, $SqlCredential, $Alert, $ExcludeAlert, $EnableException, $__boundAlert, $__boundExcludeAlert, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
+# WarningAction is deliberately NOT forwarded into the hop (codex W3-005 r1-r3 arc):
+# forwarding suppressing values empties the caller's -WarningVariable, and forwarding Stop
+# terminates inside the hop BEFORE the warning reaches the host stream (same capture loss).
+# All values ride the host's own machinery at the 3>&1 replay, preserving WarningVariable
+# and display parity for every value; the at-emission vs at-replay TIMING difference is the
+# recorded InvokeScoped buffered-output SYSTEMIC (integrator-owned architecture item).
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1

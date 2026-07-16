@@ -96,8 +96,7 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Name, Description ?? "", _groupState,
             _inputObjectState, EnableException.ToBool(), _state, TestBound("Group"), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            BoundRaw("WarningAction")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3003State"))
@@ -124,15 +123,6 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    /// <summary>The raw bound value (or null when unbound) for non-boolean common
-    /// parameters carried into the hop (WarningAction - codex W3-002 F3 class).</summary>
-    private object? BoundRaw(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return value;
         return null;
     }
 
@@ -163,14 +153,14 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
     // $__realCmdlet, and explicit -FunctionName Add-DbaRegServerGroup on
     // Stop-Function/Write-Message (W1-090).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Name, $Description, $Group, $InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+param($SqlInstance, $SqlCredential, $Name, $Description, $Group, $InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
-# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
-# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
-# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
-# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
-if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
+# WarningAction is deliberately NOT forwarded into the hop (codex W3-005 r1-r3 arc):
+# forwarding suppressing values empties the caller's -WarningVariable, and forwarding Stop
+# terminates inside the hop BEFORE the warning reaches the host stream (same capture loss).
+# All values ride the host's own machinery at the 3>&1 replay, preserving WarningVariable
+# and display parity for every value; the at-emission vs at-replay TIMING difference is the
+# recorded InvokeScoped buffered-output SYSTEMIC (integrator-owned architecture item).
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -178,7 +168,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Name, [string]$Description, [string]$Group, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Name, [string]$Description, [string]$Group, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # restore fn-scope locals mutated by earlier records
@@ -248,6 +238,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     @{ __w3003State = @{ InputObject = $InputObject; Group = $Group; reggroup = $reggroup; currentInstance = $currentInstance; target = $target; newGroup = $newGroup; groupList = $groupList; instance = $instance } }
-} $SqlInstance $SqlCredential $Name $Description $Group $InputObject $EnableException $__state $__boundGroup $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Name $Description $Group $InputObject $EnableException $__state $__boundGroup $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
