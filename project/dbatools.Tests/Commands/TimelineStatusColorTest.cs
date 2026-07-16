@@ -8,36 +8,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Dataplat.Dbatools.Commands.Test
 {
     /// <summary>
-    /// Engine host for the collection-join pins: ConvertTimelineStatusColor routes non-array
-    /// collections through PsText -> GetOfsSeparator, which reads the session $OFS - a bare
-    /// instance swallows that SessionState access and silently defaults to a space, so only
-    /// a cmdlet EXECUTING in a real runspace can prove the join consults $OFS (codex TB-013
-    /// r3). Derives from the product cmdlet (unsealed for exactly this) so the REAL
-    /// GetOfsSeparator runs against a real SessionState; the pipeline overrides bypass the
-    /// timeline logic. The inherited mandatory InputObject must still be bound - callers
-    /// pass a dummy.
-    /// </summary>
-    [Cmdlet("Test", "TimelineStatusColorHost")]
-    public sealed class TestTimelineStatusColorHostCommand : ConvertToDbaTimelineCommand
-    {
-        [Parameter]
-        public object StatusValue { get; set; }
-
-        protected override void BeginProcessing()
-        {
-        }
-
-        protected override void ProcessRecord()
-        {
-            WriteObject(ConvertTimelineStatusColor(StatusValue));
-        }
-
-        protected override void EndProcessing()
-        {
-        }
-    }
-
-    /// <summary>
     /// TB-013 coverage for the absorbed Convert-DbaTimelineStatusColor helper inside
     /// ConvertToDbaTimelineCommand. Expected values ground-truthed against the PS helper
     /// on both editions (probe 2026-07-16): the five status colors are case-insensitive
@@ -46,8 +16,12 @@ namespace Dataplat.Dbatools.Commands.Test
     /// (null, empty string, arrays even single-element) render the Style field EMPTY, the
     /// documented lab-proven behavior of the mandatory [string]$Status calculated-property
     /// call site. SCALAR paths (and the array early-return) touch no SessionState, so a
-    /// bare instance suffices for those pins only; the collection $OFS-join pins run
-    /// through the engine-hosted subclass above (codex TB-013 r3).
+    /// bare instance suffices for those pins only; the collection $OFS-join pins drive the
+    /// REAL sealed cmdlet end-to-end in a runspace - an AgentJobHistory-shaped input
+    /// through the actual MapAgentJobHistory call site, asserting on the emitted timeline
+    /// body - because only an executing cmdlet has the SessionState that GetOfsSeparator
+    /// reads (codex TB-013 r3: a bare instance swallows the access and defaults to a
+    /// space; codex r4: do not unseal the production cmdlet for a test subclass).
     /// </summary>
     [TestClass]
     public class TimelineStatusColorTest
@@ -58,10 +32,14 @@ namespace Dataplat.Dbatools.Commands.Test
             return host.ConvertTimelineStatusColor(status);
         }
 
-        private static string InvokeHosted(object status, string ofs)
+        /// <summary>Runs the REAL sealed cmdlet end-to-end: one AgentJobHistory-shaped
+        /// record through the pipeline (optionally under a custom session $OFS) and returns
+        /// the emitted timeline BODY string, whose third column is the Style produced by
+        /// ConvertTimelineStatusColor at the production MapAgentJobHistory call site.</summary>
+        private static string InvokeTimelineBody(object status, string ofs)
         {
             InitialSessionState iss = InitialSessionState.CreateDefault2();
-            iss.Commands.Add(new SessionStateCmdletEntry("Test-TimelineStatusColorHost", typeof(TestTimelineStatusColorHostCommand), null));
+            iss.Commands.Add(new SessionStateCmdletEntry("ConvertTo-DbaTimeline", typeof(ConvertToDbaTimelineCommand), null));
             System.Management.Automation.Runspaces.Runspace runspace = RunspaceFactory.CreateRunspace(iss);
             runspace.Open();
             try
@@ -70,21 +48,38 @@ namespace Dataplat.Dbatools.Commands.Test
                 {
                     runspace.SessionStateProxy.SetVariable("OFS", ofs);
                 }
+                PSObject record = new PSObject();
+                record.Properties.Add(new PSNoteProperty("TypeName", "AgentJobHistory"));
+                record.Properties.Add(new PSNoteProperty("SqlInstance", "srv1"));
+                record.Properties.Add(new PSNoteProperty("InstanceName", "MSSQLSERVER"));
+                record.Properties.Add(new PSNoteProperty("Job", "job1"));
+                record.Properties.Add(new PSNoteProperty("Status", status));
+                record.Properties.Add(new PSNoteProperty("StartDate", new System.DateTime(2026, 1, 1, 8, 0, 0)));
+                record.Properties.Add(new PSNoteProperty("EndDate", new System.DateTime(2026, 1, 1, 9, 0, 0)));
                 using (PowerShell shell = PowerShell.Create())
                 {
                     shell.Runspace = runspace;
-                    shell.AddCommand("Test-TimelineStatusColorHost")
-                        .AddParameter("StatusValue", status)
-                        .AddParameter("InputObject", new object[] { "dummy" });
+                    shell.AddCommand("ConvertTo-DbaTimeline").AddParameter("InputObject", new object[] { record });
                     Collection<PSObject> output = shell.Invoke();
-                    Assert.AreEqual(1, output.Count, "the host cmdlet emits exactly one color string");
-                    return (string)output[0].BaseObject;
+                    Assert.AreEqual(3, output.Count, "header, body array, footer");
+                    object[] body = (object[])output[1].BaseObject;
+                    Assert.AreEqual(1, body.Length, "one process block emits one body string");
+                    return (string)body[0];
                 }
             }
             finally
             {
                 runspace.Dispose();
             }
+        }
+
+        private static string StyleColumn(string bodyRow)
+        {
+            // Body row shape: ['vLabel','hLabel','style',start, end], - take the third
+            // single-quoted column so a color appearing in a label cannot false-match.
+            string[] columns = bodyRow.Split('\'');
+            Assert.IsTrue(columns.Length >= 6, "the row carries at least three quoted columns: " + bodyRow);
+            return columns[5];
         }
 
         [TestMethod]
@@ -134,20 +129,20 @@ namespace Dataplat.Dbatools.Commands.Test
         {
             // Codex r1: arrays are REJECTED by the scalar [string] binder, but non-array
             // collections DO bind, converting with the $OFS join (lab-proven by the
-            // command's W-row; re-probed both editions 2026-07-16). Codex r3: these pins
-            // must run ENGINE-HOSTED - a bare instance swallows the SessionState access
-            // and defaults to a space, so it cannot distinguish a real $OFS read from a
-            // hard-coded separator.
+            // command's W-row; re-probed both editions 2026-07-16). Codex r3/r4: these
+            // pins drive the real cmdlet end-to-end - a bare instance swallows the
+            // SessionState access and defaults to a space, so it cannot distinguish a
+            // real $OFS read from a hard-coded separator.
             ArrayList single = new ArrayList();
             single.Add("Succeeded");
-            Assert.AreEqual("#36B300", InvokeHosted(single, null), "single-element non-array collection binds and resolves");
+            Assert.AreEqual("#36B300", StyleColumn(InvokeTimelineBody(single, null)), "single-element non-array collection binds and resolves");
             // The JOIN discriminator (codex r2): {"in","progress"} resolves cyan ONLY if
             // the elements space-join to "in progress" - any wrong conversion misses the
             // case and gives magenta instead. PS ground truth both editions: #00CCFF.
             System.Collections.Generic.List<string> joinParts = new System.Collections.Generic.List<string>();
             joinParts.Add("in");
             joinParts.Add("progress");
-            Assert.AreEqual("#00CCFF", InvokeHosted(joinParts, null), "multi-element collection OFS-joins with the default space");
+            Assert.AreEqual("#00CCFF", StyleColumn(InvokeTimelineBody(joinParts, null)), "multi-element collection OFS-joins with the default space");
         }
 
         [TestMethod]
@@ -163,12 +158,12 @@ namespace Dataplat.Dbatools.Commands.Test
             System.Collections.Generic.List<string> glued = new System.Collections.Generic.List<string>();
             glued.Add("in p");
             glued.Add("ress");
-            Assert.AreEqual("#00CCFF", InvokeHosted(glued, "rog"), "a custom $OFS is read from the session and used as the join separator");
+            Assert.AreEqual("#00CCFF", StyleColumn(InvokeTimelineBody(glued, "rog")), "a custom $OFS is read from the session and used as the join separator");
             //   $OFS = ",": {"in","progress"} joins to "in,progress" and misses -> #FF00CC.
             System.Collections.Generic.List<string> commaParts = new System.Collections.Generic.List<string>();
             commaParts.Add("in");
             commaParts.Add("progress");
-            Assert.AreEqual("#FF00CC", InvokeHosted(commaParts, ","), "a custom $OFS breaks the space-joined match");
+            Assert.AreEqual("#FF00CC", StyleColumn(InvokeTimelineBody(commaParts, ",")), "a custom $OFS breaks the space-joined match");
             // The bare-instance FALLBACK contract (not caller-reachable parity - the real
             // cmdlet always executes with a SessionState): outside the engine the swallowed
             // SessionState access defaults the separator to a single space.

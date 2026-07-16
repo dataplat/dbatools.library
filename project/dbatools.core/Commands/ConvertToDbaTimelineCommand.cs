@@ -16,12 +16,9 @@ namespace Dataplat.Dbatools.Commands;
 /// private helpers ConvertTo-JsDate and Convert-DbaTimelineStatusColor absorbed; surface pinned
 /// by migration/baselines/ConvertTo-DbaTimeline.json (no OutputType attribute — the PS source
 /// declares none).
-/// Unsealed (TB-013, codex r3) so the offline tests can derive an engine-hosted probe cmdlet:
-/// the $OFS-join parity of the absorbed status-color helper is only observable with a REAL
-/// SessionState, which requires this type to run inside a runspace via a test subclass.
 /// </summary>
 [Cmdlet(VerbsData.ConvertTo, "DbaTimeline")]
-public class ConvertToDbaTimelineCommand : DbaBaseCmdlet
+public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
 {
     /// <summary>The SQL Server data to convert into a timeline (Get-DbaAgentJobHistory, Get-DbaDbBackupHistory, or Find-DbaDbGrowthEvent output).</summary>
     [Parameter(Position = 0, Mandatory = true, ValueFromPipeline = true)]
@@ -430,7 +427,8 @@ public class ConvertToDbaTimelineCommand : DbaBaseCmdlet
     /// instance suffices for those pins ONLY. Non-array collections route through PsText →
     /// GetOfsSeparator, which reads the session $OFS and silently defaults to a space when
     /// SessionState is unavailable — so a bare instance cannot validate the join; the
-    /// collection pins run through an engine-hosted subclass instead (codex TB-013 r3).
+    /// collection pins drive the REAL cmdlet end-to-end in a runspace instead (codex
+    /// TB-013 r3/r4).
     /// </summary>
     internal string ConvertTimelineStatusColor(object? status)
     {
