@@ -60,6 +60,23 @@ namespace Dataplat.Dbatools.Commands.Test
         }
 
         [TestMethod]
+        public void StatusColor_NonArrayCollectionsBindViaTheOfsJoin()
+        {
+            // Codex r1: arrays are REJECTED by the scalar [string] binder, but non-array
+            // collections DO bind, converting with the $OFS join (lab-proven by the
+            // command's W-row; re-probed both editions 2026-07-16). A single-element
+            // ArrayList therefore resolves its status; a multi-element list joins to
+            // "Failed Retry" and misses every case.
+            ArrayList single = new ArrayList();
+            single.Add("Succeeded");
+            Assert.AreEqual("#36B300", Convert(single), "single-element non-array collection binds and resolves");
+            System.Collections.Generic.List<string> multi = new System.Collections.Generic.List<string>();
+            multi.Add("Failed");
+            multi.Add("Retry");
+            Assert.AreEqual("#FF00CC", Convert(multi), "multi-element collection OFS-joins and falls to the default");
+        }
+
+        [TestMethod]
         public void StatusColor_PsObjectWrappingIsTransparent()
         {
             Assert.AreEqual("#36B300", Convert(PSObject.AsPSObject("Succeeded")));
