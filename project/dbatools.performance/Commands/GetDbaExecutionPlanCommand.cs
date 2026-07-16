@@ -48,10 +48,12 @@ public sealed class GetDbaExecutionPlanCommand : DbaInstanceCmdlet
 
     /// <summary>Only plans created at or after this time.</summary>
     [Parameter(Position = 4)]
+    [PsDateTimeCast]
     public DateTime SinceCreation { get; set; }
 
     /// <summary>Only plans last executed at or after this time.</summary>
     [Parameter(Position = 5)]
+    [PsDateTimeCast]
     public DateTime SinceLastExecution { get; set; }
 
     /// <summary>Exclude rows whose single-statement plan is NULL.</summary>
