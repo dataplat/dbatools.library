@@ -173,10 +173,16 @@ namespace Dataplat.Dbatools.Commands.Test
             commaParts.Add("in");
             commaParts.Add("progress");
             Assert.AreEqual("#FF00CC", StyleColumn(InvokeTimelineBody(commaParts, ",")), "a custom $OFS breaks the space-joined match");
-            // (Opus TB-013: the former bare-instance fallback assertion was dropped - its
-            // expected value coincides with the hosted default-space answer, so it could
-            // not fail distinctly; the swallow-and-default contract is documented on
-            // GetOfsSeparator and is not caller-reachable.)
+            // The bare-instance pin of GetOfsSeparator's swallow-and-default CATCH path -
+            // outside the engine the SessionState access throws and must default to a
+            // single space. Opus proposed dropping it (same expected value as the hosted
+            // default), codex r6 counter-ruled and won: the VALUE coincides but the CODE
+            // PATH is unique - a catch block returning "" or null fails only here, and no
+            // hosted test can reach it. Not caller-reachable parity; a fallback contract.
+            System.Collections.Generic.List<string> fallbackParts = new System.Collections.Generic.List<string>();
+            fallbackParts.Add("in");
+            fallbackParts.Add("progress");
+            Assert.AreEqual("#00CCFF", Convert(fallbackParts), "engine-less fallback separator is the documented single space");
         }
 
         [TestMethod]
