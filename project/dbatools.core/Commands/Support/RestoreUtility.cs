@@ -44,10 +44,16 @@ internal static class RestoreUtility
     /// <summary>
     /// Port of private/functions/Convert-DbVersionToSqlVersion.ps1: makes db versions
     /// human readable. Unknown versions fall through unchanged, exactly like the PS switch
-    /// default.
+    /// default. The case labels are QUOTED STRINGS on purpose: the PS switch compares its
+    /// integer case literals against the [string] subject with the SUBJECT's type winning,
+    /// so only exact digit strings match — "0869", " 869" and "869 " pass through verbatim
+    /// (a numeric-parse or trimming rewrite diverges; the TB-014 pins fail it).
     /// </summary>
-    internal static string ConvertDbVersionToSqlVersion(string dbversion)
+    internal static string ConvertDbVersionToSqlVersion(string? dbversion)
     {
+        // PS binding parity (opus TB-014): an unbound/null-bound [string] is empty in PS,
+        // never null — PsString on entry per this file's convention (see PsString doc).
+        dbversion = PsString(dbversion);
         return dbversion switch
         {
             "869" => "SQL Server 2017",

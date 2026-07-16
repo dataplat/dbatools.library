@@ -52,6 +52,9 @@ namespace Dataplat.Dbatools.Commands.Test
         {
             Assert.AreEqual("999", RestoreUtility.ConvertDbVersionToSqlVersion("999"));
             Assert.AreEqual("", RestoreUtility.ConvertDbVersionToSqlVersion(""), "unbound PS [string] is empty and rides the default case");
+            // Opus TB-014: the C#-only null entry must normalize like the PS binder does
+            // (PsString on entry), not leak a null through the default arm.
+            Assert.AreEqual("", RestoreUtility.ConvertDbVersionToSqlVersion(null), "PS binds an unbound/null [string] to empty");
         }
     }
 }
