@@ -75,7 +75,8 @@ public sealed class MoveDbaRegServerGroupCommand : DbaBaseCmdlet
         {
             foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
                 EnableException.ToBool(),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+                BoundRaw("WarningAction")))
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -181,18 +182,19 @@ public sealed class MoveDbaRegServerGroupCommand : DbaBaseCmdlet
     // PS: the begin-block Stop-Function verbatim (message byte-exact); the C# caller
     // reproduces the function-scope latch (see _hopInterrupted).
     private const string BeginScript = """
-param($EnableException, $__boundVerbose, $__boundDebug)
+param($EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
+if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param($EnableException, $__boundVerbose, $__boundDebug)
+    param($EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     Stop-Function -Message "Group must be specified when using -SqlInstance" -FunctionName Move-DbaRegServerGroup
-} $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $EnableException $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the ENTIRE process body VERBATIM (no early return beyond the C#-handled latch).
