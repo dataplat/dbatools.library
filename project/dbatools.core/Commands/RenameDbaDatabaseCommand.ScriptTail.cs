@@ -334,7 +334,7 @@ public sealed partial class RenameDbaDatabaseCommand
         #endregion db loop
     }
 
-    @{ __w3081State = @{ interrupted = (Test-FunctionInterrupt) } }
+    @{ __w3081State = @{ interrupted = (Test-FunctionInterrupt); Final_Renames = $Final_Renames; dirfiles = $dirfiles; shouldProcessContinueStatus = $(if ($null -ne $__spField) { "$($__spField.GetValue($PSCmdlet.CommandRuntime))" } else { $null }) } }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $AllDatabases $DatabaseName $FileGroupName $LogicalName $FileName $ReplaceBefore $Force $Move $SetOffline $Preview $InputObject $EnableException $__state $__hopInterrupted $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

@@ -31,6 +31,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $CurrentDate = $__state.CurrentDate
 
+    # cross-record restore (B batch review, hop-scope-dies-per-record class): the source
+    # fn scope leaks $Final_Renames (sole assignment guarded by !$failed -and $FileName,
+    # read at output level) and $dirfiles (assigned in a try) across pipeline records,
+    # and the inner $PSCmdlet's Yes/No-to-All ShouldProcess answer spans the pipeline in
+    # the source (one CommandRuntime). The sentinel carries all three; the engine field
+    # name is identical on PS 5.1 and PS 7 (transplant empirically verified).
+    $__spField = $PSCmdlet.CommandRuntime.GetType().GetField("lastShouldProcessContinueStatus", [System.Reflection.BindingFlags]"NonPublic,Instance")
+    $Final_Renames = $__state.Final_Renames
+    $dirfiles = $__state.dirfiles
+    if ($null -ne $__spField -and $null -ne $__state.shouldProcessContinueStatus) {
+        $__spField.SetValue($PSCmdlet.CommandRuntime, [Enum]::Parse($__spField.FieldType, $__state.shouldProcessContinueStatus))
+    }
+
         function Get-DbaNameStructure($database) {
             $obj = @()
             # db name
