@@ -222,6 +222,31 @@ internal sealed class PsStringArrayCastAttribute : ArgumentTransformationAttribu
     }
 }
 
+/// <summary>The int-array sibling of PsStringArrayCast (W1-043 class over arrays): the
+/// script [int[]] cast converts a null ELEMENT to 0 BEFORE validation attributes run,
+/// so ValidateRange rejects with the RANGE message where the compiled binder would
+/// report null. CONSERVATIVE like the string sibling (the W3-076 lesson): converts
+/// ONLY an array carrying a null element and passes every other value through so
+/// pipeline BY-VALUE binding attempts are never preempted.</summary>
+internal sealed class PsIntArrayCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        if (inputData is null)
+            return null;
+        object bare = inputData is PSObject pso ? pso.BaseObject : inputData;
+        if (bare is not System.Collections.IList list)
+            return inputData;
+        foreach (object? element in list)
+        {
+            object? bareElement = element is PSObject p ? p.BaseObject : element;
+            if (bareElement is null)
+                return LanguagePrimitives.ConvertTo(inputData, typeof(int[]), CultureInfo.InvariantCulture);
+        }
+        return inputData;
+    }
+}
+
 /// <summary>The scalar sibling of PsStringArrayCast: PS [string] converts at BIND time, so
 /// an explicit null argument becomes "" before mandatory/validation runs (W1-032 class).</summary>
 internal sealed class PsStringCastAttribute : ArgumentTransformationAttribute
