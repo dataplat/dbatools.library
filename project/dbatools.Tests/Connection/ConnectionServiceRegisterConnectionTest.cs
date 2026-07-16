@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Dataplat.Dbatools.Connection;
 using Dataplat.Dbatools.Message;
+using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.Management.Smo;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using DbaMessageLevel = Dataplat.Dbatools.Message.MessageLevel;
@@ -16,8 +17,11 @@ namespace Dataplat.Dbatools.Connection.Test
     /// call sites (retired Connect-DbaInstance.ps1:1246 SqlConnection leg, :1367 Server
     /// leg) drive the scenarios; unreachable-input divergences (null/empty key or value
     /// no-op instead of a binding error) are pinned as the port's documented behavior.
+    /// ActiveConnections is process-wide shared state, so the class opts out of
+    /// parallel execution and every test owns only its prefixed or sentinel keys.
     /// </summary>
     [TestClass]
+    [DoNotParallelize]
     public class ConnectionServiceRegisterConnectionTest
     {
         private const string KeyPrefix = "dbatools-tests-registerconnection-";
@@ -35,7 +39,7 @@ namespace Dataplat.Dbatools.Connection.Test
                 List<string> stale = new List<string>();
                 foreach (string key in ConnectionHost.ActiveConnections.Keys)
                 {
-                    if (key.StartsWith(KeyPrefix, StringComparison.OrdinalIgnoreCase))
+                    if (key.Length == 0 || key.StartsWith(KeyPrefix, StringComparison.OrdinalIgnoreCase))
                         stale.Add(key);
                 }
                 foreach (string key in stale)
@@ -44,11 +48,14 @@ namespace Dataplat.Dbatools.Connection.Test
         }
 
         [TestMethod]
-        public void RegisterConnection_PooledValueReplacesEntry()
+        public void RegisterConnection_PooledSqlConnectionReplacesEntry()
         {
+            // Mirrors retired Connect-DbaInstance.ps1:1246 - the -SqlConnectionOnly leg
+            // registers the raw SqlConnection, which member-misses both NonPooledConnection
+            // probes in PS and must land in the pooled/replace branch.
             string key = UniqueKey();
-            object first = new object();
-            object second = new object();
+            SqlConnection first = new SqlConnection();
+            SqlConnection second = new SqlConnection();
 
             ConnectionService.RegisterConnection(key, first, null);
             ConnectionService.RegisterConnection(key, second, null);
@@ -114,11 +121,16 @@ namespace Dataplat.Dbatools.Connection.Test
         }
 
         [TestMethod]
-        public void RegisterConnection_KeyLookupIsCaseInsensitive()
+        public void RegisterConnection_KeyComparerIsOrdinalIgnoreCase()
         {
+            // The PS helper and the port share one static store; connection strings must
+            // collide case-insensitively AND culture-independently (OrdinalIgnoreCase),
+            // not merely under the current culture's casing rules.
+            Assert.AreSame(StringComparer.OrdinalIgnoreCase, ConnectionHost.ActiveConnections.Comparer);
+
             string key = UniqueKey();
-            ConnectionService.RegisterConnection(key.ToLowerInvariant(), new object(), null);
-            ConnectionService.RegisterConnection(key.ToUpperInvariant(), new object(), null);
+            ConnectionService.RegisterConnection(key.ToLowerInvariant(), new SqlConnection(), null);
+            ConnectionService.RegisterConnection(key.ToUpperInvariant(), new SqlConnection(), null);
 
             int matches = 0;
             lock (ConnectionHost.ActiveConnections)
@@ -134,10 +146,11 @@ namespace Dataplat.Dbatools.Connection.Test
         }
 
         [TestMethod]
-        public void RegisterConnection_EmitsDebugMessageBeforeGuard()
+        public void RegisterConnection_EmitsDebugMessageBeforeEveryGuard()
         {
             // The PS helper writes "Adding to connection hash" before touching the cache;
-            // the port keeps that order, so even a guarded no-op call emits the message.
+            // the port keeps that order, so every guarded no-op input (null key, empty
+            // key, null value) still emits exactly one debug message per call.
             List<string> seen = new List<string>();
             Action<DbaMessageLevel, string> sink = delegate (DbaMessageLevel level, string message)
             {
@@ -145,32 +158,49 @@ namespace Dataplat.Dbatools.Connection.Test
                 seen.Add(message);
             };
 
-            ConnectionService.RegisterConnection(UniqueKey(), new object(), sink);
-            ConnectionService.RegisterConnection(null, new object(), sink);
+            ConnectionService.RegisterConnection(UniqueKey(), new SqlConnection(), sink);
+            ConnectionService.RegisterConnection(null, new SqlConnection(), sink);
+            ConnectionService.RegisterConnection(String.Empty, new SqlConnection(), sink);
+            ConnectionService.RegisterConnection(UniqueKey(), null, sink);
 
-            Assert.AreEqual(2, seen.Count);
-            Assert.AreEqual("Adding to connection hash", seen[0]);
-            Assert.AreEqual("Adding to connection hash", seen[1]);
+            Assert.AreEqual(4, seen.Count);
+            foreach (string message in seen)
+                Assert.AreEqual("Adding to connection hash", message);
         }
 
         [TestMethod]
-        public void RegisterConnection_NullOrEmptyKeyAndNullValueAreNoOps()
+        public void RegisterConnection_GuardedInputsLeaveExistingStateUntouched()
         {
+            // Sentinels pin that the guards are true no-ops: an existing empty-key entry
+            // and an existing prefixed entry keep their exact list references and
+            // contents through null-key, empty-key and null-value calls.
             string key = UniqueKey();
+            object sentinelValue = new object();
+            List<object> emptyKeySentinel = new List<object>();
+            emptyKeySentinel.Add(sentinelValue);
+            List<object> keyedSentinel = new List<object>();
+            keyedSentinel.Add(sentinelValue);
             int before;
             lock (ConnectionHost.ActiveConnections)
             {
+                ConnectionHost.ActiveConnections[String.Empty] = emptyKeySentinel;
+                ConnectionHost.ActiveConnections[key] = keyedSentinel;
                 before = ConnectionHost.ActiveConnections.Count;
             }
 
-            ConnectionService.RegisterConnection(null, new object(), null);
-            ConnectionService.RegisterConnection(String.Empty, new object(), null);
+            ConnectionService.RegisterConnection(null, new SqlConnection(), null);
+            ConnectionService.RegisterConnection(String.Empty, new SqlConnection(), null);
             ConnectionService.RegisterConnection(key, null, null);
 
             lock (ConnectionHost.ActiveConnections)
             {
                 Assert.AreEqual(before, ConnectionHost.ActiveConnections.Count);
-                Assert.IsFalse(ConnectionHost.ActiveConnections.ContainsKey(key));
+                Assert.AreSame(emptyKeySentinel, ConnectionHost.ActiveConnections[String.Empty]);
+                Assert.AreEqual(1, emptyKeySentinel.Count);
+                Assert.AreSame(sentinelValue, emptyKeySentinel[0]);
+                Assert.AreSame(keyedSentinel, ConnectionHost.ActiveConnections[key]);
+                Assert.AreEqual(1, keyedSentinel.Count);
+                Assert.AreSame(sentinelValue, keyedSentinel[0]);
             }
         }
     }
