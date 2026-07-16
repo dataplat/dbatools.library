@@ -17,7 +17,11 @@ namespace Dataplat.Dbatools.Commands;
 /// is mutated in-loop to the first server's sa-equivalent login (id = 1) and the
 /// function-scope value persists into later records - later piped servers REUSE the
 /// first resolution instead of re-resolving (source behavior). The $InputObject +=
-/// Get-DbaDatabase accumulation is invocation-local (piped records rebind).
+/// Get-DbaDatabase accumulation ALSO crosses records (B batch [P1]): the engine
+/// restores only PIPELINE-BOUND params, so with instances piped record-by-record the
+/// source re-processes earlier records' databases; the sentinel carries the
+/// accumulated array and ProcessRecord restores it unless InputObject was piped
+/// this record.
 /// $PSCmdlet.ShouldProcess routes to the REAL cmdlet (W1-085, default ConfirmImpact
 /// Medium); the two explicit `-EnableException $EnableException` Stop-Function calls,
 /// the system-db/inaccessible skips, the ownership-validation warning ladder, the
@@ -56,16 +60,44 @@ public sealed class SetDbaDbOwnerCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    // Cross-record $TargetLogin mutation (unbound resolves once and persists).
+    // Cross-record $TargetLogin mutation (unbound resolves once and persists) PLUS the
+    // cross-record $InputObject accumulation (B batch finding [P1], coordinator
+    // preserve-source-verbatim ruling): the source's `$InputObject += Get-DbaDatabase`
+    // mutates the fn-scope param, and PowerShell restores ONLY pipeline-bound
+    // parameters between records - so when SqlInstance is the piped param, $InputObject
+    // is never restored and ACCUMULATES (record 2 re-processes record 1's databases).
+    // The hop scope dies per record, so the accumulated value rides the sentinel and is
+    // restored EXCEPT when InputObject was pipeline-bound THIS record (mirroring the
+    // engine's restore semantics exactly).
     private Hashtable? _state;
+    private bool _inputObjectNamedAtBegin;
+    private object? _inputObjectPrePipeline;
+
+    /// <inheritdoc />
+    protected override void BeginProcessing()
+    {
+        base.BeginProcessing();
+        // Named parameters are bound before the pipeline starts; anything appearing in
+        // BoundParameters later but not now arrived through the pipeline. The engine
+        // RESTORES a pipeline-bound parameter to this pre-pipeline value after each
+        // piped record, so it is also the reset target for the carried accumulation.
+        _inputObjectNamedAtBegin = MyInvocation.BoundParameters.ContainsKey("InputObject");
+        _inputObjectPrePipeline = InputObject;
+    }
 
     protected override void ProcessRecord()
     {
         if (Interrupted)
             return;
 
+        bool inputObjectPipedThisRecord = !_inputObjectNamedAtBegin &&
+            MyInvocation.BoundParameters.ContainsKey("InputObject");
+        object? effectiveInputObject = InputObject;
+        if (!inputObjectPipedThisRecord && _state is not null && _state.ContainsKey("InputObject"))
+            effectiveInputObject = _state["InputObject"];
+
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, InputObject,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, effectiveInputObject,
             TargetLogin, EnableException.ToBool(), _state, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
@@ -84,6 +116,12 @@ public sealed class SetDbaDbOwnerCommand : DbaBaseCmdlet
             }
             WriteObject(item);
         }
+
+        // Engine restore semantics: after a record where InputObject was PIPELINE-bound,
+        // the fn-scope variable snaps back to its pre-pipeline value - any accumulation
+        // from earlier records is discarded. Mirror that by resetting the carried value.
+        if (inputObjectPipedThisRecord && _state is not null)
+            _state["InputObject"] = _inputObjectPrePipeline;
     }
 
     private object? BoundCommonParameter(string name)
@@ -214,7 +252,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
 
-    @{ __w3088State = @{ TargetLogin = $TargetLogin } }
+    @{ __w3088State = @{ TargetLogin = $TargetLogin; InputObject = $InputObject } }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $InputObject $TargetLogin $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
