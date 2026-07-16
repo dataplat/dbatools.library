@@ -53,10 +53,12 @@ public sealed class GetDbaErrorLogCommand : DbaInstanceCmdlet
 
     /// <summary>Only entries after this time.</summary>
     [Parameter(Position = 5)]
+    [PsDateTimeCast]
     public DateTime After { get; set; }
 
     /// <summary>Only entries before this time.</summary>
     [Parameter(Position = 6)]
+    [PsDateTimeCast]
     public DateTime Before { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
