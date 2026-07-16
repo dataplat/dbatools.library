@@ -84,6 +84,25 @@ namespace Dataplat.Dbatools.Connection.Test
         }
 
         [TestMethod]
+        public void RegisterConnection_NonPooledServerAppendsAfterPooledValue()
+        {
+            // PS parity: the non-pooled leg only re-creates the list when the entry is
+            // missing/falsy, so an existing pooled entry is APPENDED to, never replaced.
+            string key = UniqueKey();
+            SqlConnection pooled = new SqlConnection();
+            Server nonPooled = new Server("dbatools-tests-pooled-then-nonpooled");
+            nonPooled.ConnectionContext.NonPooledConnection = true;
+
+            ConnectionService.RegisterConnection(key, pooled, null);
+            ConnectionService.RegisterConnection(key, nonPooled, null);
+
+            List<object> entries = ConnectionHost.ActiveConnections[key];
+            Assert.AreEqual(2, entries.Count);
+            Assert.AreSame(pooled, entries[0]);
+            Assert.AreSame(nonPooled, entries[1]);
+        }
+
+        [TestMethod]
         public void RegisterConnection_PooledServerReplacesNonPooledBacklog()
         {
             string key = UniqueKey();
@@ -171,12 +190,17 @@ namespace Dataplat.Dbatools.Connection.Test
 
             ConnectionService.RegisterConnection(validKey, new SqlConnection(), orderingSink);
             Assert.IsTrue(ConnectionHost.ActiveConnections.ContainsKey(validKey));
+            Assert.AreEqual(1, seen.Count);
 
             ConnectionService.RegisterConnection(null, new SqlConnection(), countingSink);
+            Assert.AreEqual(2, seen.Count);
             ConnectionService.RegisterConnection(String.Empty, new SqlConnection(), countingSink);
-            ConnectionService.RegisterConnection(UniqueKey(), null, countingSink);
-
+            Assert.AreEqual(3, seen.Count);
+            string nullValueKey = UniqueKey();
+            ConnectionService.RegisterConnection(nullValueKey, null, countingSink);
             Assert.AreEqual(4, seen.Count);
+            Assert.IsFalse(ConnectionHost.ActiveConnections.ContainsKey(nullValueKey));
+
             foreach (string message in seen)
                 Assert.AreEqual("Adding to connection hash", message);
         }
