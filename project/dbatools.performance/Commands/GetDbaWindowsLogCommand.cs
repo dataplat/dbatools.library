@@ -39,10 +39,12 @@ public sealed class GetDbaWindowsLogCommand : DbaBaseCmdlet
 
     /// <summary>Earliest log entry to include.</summary>
     [Parameter(Position = 1)]
+    [PsDateTimeCast]
     public DateTime Start { get; set; } = (DateTime)LanguagePrimitives.ConvertTo("1/1/1970 00:00:00", typeof(DateTime), CultureInfo.InvariantCulture);
 
     /// <summary>Latest log entry to include.</summary>
     [Parameter(Position = 2)]
+    [PsDateTimeCast]
     public DateTime End { get; set; } = DateTime.Now;
 
     /// <summary>Windows credential for the remote execution.</summary>
