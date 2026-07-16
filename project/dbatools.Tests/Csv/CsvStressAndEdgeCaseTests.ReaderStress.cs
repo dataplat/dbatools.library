@@ -126,16 +126,25 @@ namespace Dataplat.Dbatools.Csv.Tests
                         // which carries it only in ParseError.Exception. Genuine parse
                         // errors still fall through to the errors bag below.
                     }
-                    catch (CsvParseException cpe) when (cpe.ParseError != null && cpe.ParseError.Exception is NullReferenceException && reader.IsClosed)
+                    catch (CsvParseException cpe) when (cpe.ParseError != null
+                        && cpe.ParseError.Exception is NullReferenceException nre
+                        && reader.IsClosed
+                        && nre.StackTrace != null
+                        && nre.StackTrace.Contains("Dataplat.Dbatools.Csv.Reader.CsvDataReader"))
                     {
                         // Second racy shape (observed net8.0): Dispose tears the reader's
                         // internal buffers mid-parse and the dereference surfaces as an
                         // NRE, which HandleParseError wraps exactly like the ODE above.
-                        // Tolerated ONLY when the reader is already closed - a genuine
-                        // parse-path NRE on a live reader still lands in the errors bag.
-                        // Whether Read() should surface ObjectDisposedException instead of
-                        // a wrapped parse error on a disposed reader remains the product
-                        // decision flagged to the integrator lane in TB-012.
+                        // Tolerated ONLY when the reader is already closed AND the NRE
+                        // originates inside the reader's own frames (codex: IsClosed is
+                        // sampled after the throw, so the closed check alone could excuse
+                        // a genuine NRE that a fast concurrent dispose overtakes; the
+                        // stack-site constraint narrows the tolerance to the known
+                        // disposal-torn dereference site). A live-reader or foreign-frame
+                        // NRE still lands in the errors bag. Whether Read() should surface
+                        // ObjectDisposedException instead of a wrapped parse error on a
+                        // disposed reader remains the product decision flagged to the
+                        // integrator lane in TB-012.
                     }
                     catch (Exception ex)
                     {
