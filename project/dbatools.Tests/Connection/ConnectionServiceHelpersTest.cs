@@ -40,6 +40,7 @@ namespace Dataplat.Dbatools.Connection.Test
             Assert.AreEqual("application intent=ReadOnly", ConnectionService.ConvertConnectionString("application intent=ReadOnly"), "String.Replace is case-sensitive in both worlds - lowercase stays");
             Assert.AreEqual("A=ApplicationIntentApplicationIntent", ConnectionService.ConvertConnectionString("A=Application IntentApplication Intent"), "every occurrence is replaced, even mid-token");
             Assert.AreEqual("Data Source=sql01", ConnectionService.ConvertConnectionString("Data Source=sql01"), "non-matching strings pass through byte-identical");
+            Assert.IsNull(ConnectionService.ConvertConnectionString(null), "the null early return is a documented divergence unreachable through the PS mandatory binder - pinned mechanically");
         }
 
         [TestMethod]
