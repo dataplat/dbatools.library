@@ -204,7 +204,12 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
     private const string BeginScript = """
 param($__boundKeys, $EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
-if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
+# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
+# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
+# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
+# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
+# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
+if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
@@ -229,7 +234,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     private const string ProcessScript = """
 param($ComputerName, $Credential, $UseWindowsCredentials, $OverrideExplicitCredential, $DisabledConnectionTypes, $DisableBadCredentialCache, $DisableCimPersistence, $DisableCredentialAutoRegister, $EnableCredentialFailover, $WindowsCredentialsAreBad, $CimWinRMOptions, $CimDCOMOptions, $EnableException, $__disableCache, $__boundCredential, $__boundUseWindowsCredentials, $__boundOverrideExplicitCredential, $__boundDisabledConnectionTypes, $__boundDisableBadCredentialCache, $__boundDisableCimPersistence, $__boundDisableCredentialAutoRegister, $__boundEnableCredentialFailover, $__boundWindowsCredentialsAreBad, $__boundCimWinRMOptions, $__boundCimDCOMOptions, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
-if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
+# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
+# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
+# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
+# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
+# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
+if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -285,7 +295,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     private const string EndScript = """
 param($EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
-if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
+# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
+# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
+# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
+# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
+# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
+if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1

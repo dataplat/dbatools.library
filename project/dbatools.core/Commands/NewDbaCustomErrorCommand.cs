@@ -130,7 +130,12 @@ public sealed class NewDbaCustomErrorCommand : DbaBaseCmdlet
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $MessageID, $Severity, $MessageText, $Language, $WithLog, $EnableException, $__boundLanguage, $__boundWithLog, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
-if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
+# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
+# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
+# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
+# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
+# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
+if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
