@@ -49,8 +49,12 @@ namespace Dataplat.Dbatools.dbaSystem.Test
         [TestMethod]
         public void Load_FullLifecycle_OrderFailuresLocationAndIdempotence()
         {
+            // Loud guard, not a skip: if DMF is ever preloaded by another test, this test
+            // FAILS (CI cannot green without exercising these legs) and the fix is to move
+            // the lifecycle into a dedicated child process at that point - not needed while
+            // this class is the process's only DMF consumer.
             if (IsLoaded("Microsoft.SqlServer.Dmf.Common") || IsLoaded("Microsoft.SqlServer.Dmf"))
-                Assert.Inconclusive("DMF already loaded in this test process; load-order and location legs cannot discriminate.");
+                Assert.Fail("DMF already loaded in this test process; another test now loads DMF - move this lifecycle test into a dedicated child process per TFM.");
 
             // Leg 1: Common missing, Dmf present -> fails on the FIRST load; Dmf must remain
             // unloaded, proving Load never reached the second file (Common-first order).
@@ -81,14 +85,15 @@ namespace Dataplat.Dbatools.dbaSystem.Test
                 Assembly dmf = AppDomain.CurrentDomain.GetAssemblies()
                     .Single(assembly => String.Equals(assembly.GetName().Name, "Microsoft.SqlServer.Dmf", StringComparison.OrdinalIgnoreCase));
 #if NETFRAMEWORK
-                // Full-framework LoadFrom context: the file under the fake root is what loads.
-                StringAssert.StartsWith(Path.GetFullPath(dmf.Location), Path.GetFullPath(complete), "Dmf loaded from outside the fake library root");
+                // Full-framework LoadFrom context: the exact file under the fake root loads.
+                string expectedDmf = Path.Combine(complete, "lib", "Microsoft.SqlServer.Dmf.dll");
 #else
                 // .NET (Core) LoadFrom resolves a colliding identity against the Default
                 // AssemblyLoadContext first; the test app ships Dmf in its deps graph, so
-                // the bin copy deterministically wins over the fake-root file.
-                StringAssert.StartsWith(Path.GetFullPath(dmf.Location), Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory), "Dmf resolved from an unexpected location for the Default ALC");
+                // exactly the bin copy deterministically wins over the fake-root file.
+                string expectedDmf = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Microsoft.SqlServer.Dmf.dll");
 #endif
+                Assert.AreEqual(Path.GetFullPath(expectedDmf), Path.GetFullPath(dmf.Location), true, "Dmf did not load from the exact expected DLL path");
 
                 // Leg 4: idempotence - re-running with everything already loaded succeeds,
                 // like re-running the helper's Add-Type calls.
