@@ -37,6 +37,7 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
 
     /// <summary>The name for the new server group; backslash notation creates nested hierarchies.</summary>
     [Parameter(Mandatory = true, Position = 2)]
+    [PsStringCast]
     public string Name { get; set; } = null!;
 
     /// <summary>Additional details about the server group.</summary>

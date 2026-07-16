@@ -47,6 +47,7 @@ public sealed class CopyDbaRegServerCommand : DbaBaseCmdlet
     /// <summary>Top-level CMS group name(s) to copy; all when omitted.</summary>
     [Parameter(Position = 4)]
     [Alias("CMSGroup")]
+    [PsStringArrayCast]
     public string[]? Group { get; set; }
 
     /// <summary>Replaces source server name references with the destination server name.</summary>
