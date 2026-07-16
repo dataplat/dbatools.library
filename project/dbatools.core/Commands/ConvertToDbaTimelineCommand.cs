@@ -422,8 +422,10 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
     /// color, PS switch case-insensitivity preserved, default "#FF00CC". The helper's MANDATORY
     /// [string]$Status rejects a null/empty binding — the calculated property errors (statement
     /// class) and the Style field renders EMPTY, not magenta.
+    /// Internal (not private) so the TB-013 offline tests can pin the switch directly;
+    /// scalar inputs never touch SessionState, so a bare instance suffices there.
     /// </summary>
-    private string ConvertTimelineStatusColor(object? status)
+    internal string ConvertTimelineStatusColor(object? status)
     {
         if (status is null)
         {
