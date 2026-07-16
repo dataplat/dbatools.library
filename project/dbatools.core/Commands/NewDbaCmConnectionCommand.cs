@@ -119,7 +119,9 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
         // interleaves them per element (W2-010 P2A; coordinator 25a09f3 ruling - this
         // command was the ruling's named example). The source loop body has no
         // cross-element state.
-        foreach (DbaCmConnectionParameter computer in ComputerName)
+        // Null fallback = parity: with COMPUTERNAME unset the bind-time default is null
+        // and the source's foreach over $null does nothing (codex sweep r1).
+        foreach (DbaCmConnectionParameter computer in ComputerName ?? Array.Empty<DbaCmConnectionParameter>())
         {
             if (Interrupted)
                 return;

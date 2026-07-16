@@ -57,7 +57,9 @@ public sealed class RemoveDbaCmConnectionCommand : DbaBaseCmdlet
         // interleaves them per element (W2-010 P2A; coordinator 25a09f3 ruling - same
         // shape as the ruling's named W3-063 sibling). The source loop body has no
         // cross-element state.
-        foreach (DbaCmConnectionParameter computer in ComputerName!)
+        // Mandatory binding guarantees non-null, but the empty-array fallback replaces
+        // the null-forgiving suppression with a runtime-safe no-op (codex sweep r1).
+        foreach (DbaCmConnectionParameter computer in ComputerName ?? Array.Empty<DbaCmConnectionParameter>())
         {
             if (Interrupted)
                 return;
