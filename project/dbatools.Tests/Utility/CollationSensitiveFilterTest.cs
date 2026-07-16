@@ -96,14 +96,41 @@ namespace Dataplat.Dbatools.Utility.Test
         [TestMethod]
         public void Compare_SkipsPsFalsyItemsLikeTheHelperGuard()
         {
-            // Helper line 84 `if (-not $obj) { return }` drops PS-FALSY items: null and
-            // empty string here. The empty string would otherwise Eq-match a null property
-            // lookup result, so a false-pass is impossible.
-            object[] input = { null, String.Empty, Named("Alpha") };
+            // Helper line 84 `if (-not $obj) { return }` drops PS-FALSY items. This test
+            // DISCRIMINATES: under Eq against a null Value, every falsy item's missing
+            // "Name" property would compare null == null and be emitted if the guard were
+            // broken - so any falsy leak fails the assertion. The truthy no-Name control
+            // proves the null-property Eq-null match itself works.
+            PSObject truthyWithoutName = new PSObject();
+            truthyWithoutName.Properties.Add(new PSNoteProperty("Other", "control"));
+            object[] input = { null, String.Empty, 0, false, truthyWithoutName };
 
-            string[] result = NamesOf(CollationSensitiveFilter.Compare(input, "Name", CollationSensitiveFilter.FilterMode.In, new[] { "alpha" }, CaseInsensitive));
+            object[] result = CollationSensitiveFilter.Compare(input, "Name", CollationSensitiveFilter.FilterMode.Eq, null, CaseInsensitive).ToArray();
 
-            CollectionAssert.AreEqual(new[] { "Alpha" }, result);
+            Assert.AreEqual(1, result.Length, "only the truthy control may pass the falsy guard");
+            Assert.AreSame(truthyWithoutName, result[0]);
+        }
+
+        private static IEnumerable<object> OneItemThenThrow()
+        {
+            yield return Named("Alpha");
+            throw new InvalidOperationException("second item must never be pulled");
+        }
+
+        [TestMethod]
+        public void Compare_IsLazyLikeTheProcessBlock()
+        {
+            // The helper streams per pipeline item; the port must too. A source that
+            // throws on its second item proves it: building the query and pulling the
+            // first match never reaches the poisoned element.
+            IEnumerable<object> query = CollationSensitiveFilter.Compare(OneItemThenThrow(), "Name", CollationSensitiveFilter.FilterMode.In, new[] { "alpha" }, CaseInsensitive);
+
+            using (IEnumerator<object> cursor = query.GetEnumerator())
+            {
+                Assert.IsTrue(cursor.MoveNext(), "first match must stream out before the source is exhausted");
+                Assert.AreEqual("Alpha", (string)PSObject.AsPSObject(cursor.Current).Properties["Name"].Value);
+                Assert.ThrowsException<InvalidOperationException>(delegate { cursor.MoveNext(); }, "pulling further must hit the poisoned element - proving consumption is demand-driven");
+            }
         }
 
         [TestMethod]
