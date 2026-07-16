@@ -133,11 +133,23 @@ exit 0
 
                 using (Process child = Process.Start(startInfo))
                 {
-                    string stdout = child.StandardOutput.ReadToEnd();
-                    string stderr = child.StandardError.ReadToEnd();
-                    Assert.IsTrue(child.WaitForExit(120000), "child lifecycle process timed out");
+                    // Drain both pipes asynchronously so the timeout is real and full
+                    // pipes can never deadlock the child.
+                    System.Threading.Tasks.Task<string> stdoutTask = child.StandardOutput.ReadToEndAsync();
+                    System.Threading.Tasks.Task<string> stderrTask = child.StandardError.ReadToEndAsync();
+                    if (!child.WaitForExit(120000))
+                    {
+                        try { child.Kill(); } catch (InvalidOperationException) { }
+                        child.WaitForExit();
+                        Assert.Fail("child lifecycle process timed out. stdout: " + stdoutTask.Result + " stderr: " + stderrTask.Result);
+                    }
+                    string stdout = stdoutTask.Result;
+                    string stderr = stderrTask.Result;
                     Assert.AreEqual(0, child.ExitCode, "child lifecycle failed. stdout: " + stdout + " stderr: " + stderr);
-                    StringAssert.Contains(stdout, "ALL-LEGS-PASS");
+                    // The helper emits no messages, and the script prints only the
+                    // sentinel on success - anything else on either stream is a failure.
+                    Assert.AreEqual("ALL-LEGS-PASS", stdout.Trim(), "unexpected child stdout: " + stdout);
+                    Assert.AreEqual(String.Empty, stderr.Trim(), "unexpected child stderr: " + stderr);
                 }
             }
             finally
