@@ -61,6 +61,14 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
     private object? _lastBoundInputObject;
     private object? _groupState;
     private bool _bindInitialized;
+    private bool _inputObjectNamedBound;
+
+    protected override void BeginProcessing()
+    {
+        // Named-at-begin discriminator for the per-record rebind reset (codex W3-002 F1
+        // class swept to this sibling: same-instance repipes defeat pure ReferenceEquals).
+        _inputObjectNamedBound = TestBound("InputObject");
+    }
 
     protected override void ProcessRecord()
     {
@@ -68,8 +76,9 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
             return;
 
         // PS: named $InputObject keeps ONE array reference across records (the += growth
-        // persists); a piped ServerGroup re-binds a fresh array per record (W1-070).
-        if (!ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
+        // persists); a piped ServerGroup re-binds EVERY record it arrives in (W1-070).
+        if ((!_inputObjectNamedBound && TestBound("InputObject")) ||
+            !ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
         {
             _inputObjectState = InputObject;
             _lastBoundInputObject = InputObject;
@@ -87,7 +96,8 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Name, Description ?? "", _groupState,
             _inputObjectState, EnableException.ToBool(), _state, TestBound("Group"), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            BoundRaw("WarningAction")))
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3003State"))
@@ -114,6 +124,15 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    /// <summary>The raw bound value (or null when unbound) for non-boolean common
+    /// parameters carried into the hop (WarningAction - codex W3-002 F3 class).</summary>
+    private object? BoundRaw(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return value;
         return null;
     }
 
@@ -144,8 +163,9 @@ public sealed class AddDbaRegServerGroupCommand : DbaBaseCmdlet
     // $__realCmdlet, and explicit -FunctionName Add-DbaRegServerGroup on
     // Stop-Function/Write-Message (W1-090).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Name, $Description, $Group, $InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Name, $Description, $Group, $InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
+if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -153,7 +173,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Name, [string]$Description, [string]$Group, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Name, [string]$Description, [string]$Group, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # restore fn-scope locals mutated by earlier records
@@ -223,6 +243,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     @{ __w3003State = @{ InputObject = $InputObject; Group = $Group; reggroup = $reggroup; currentInstance = $currentInstance; target = $target; newGroup = $newGroup; groupList = $groupList; instance = $instance } }
-} $SqlInstance $SqlCredential $Name $Description $Group $InputObject $EnableException $__state $__boundGroup $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Name $Description $Group $InputObject $EnableException $__state $__boundGroup $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
 """;
 }
