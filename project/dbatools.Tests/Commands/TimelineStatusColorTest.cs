@@ -115,13 +115,22 @@ namespace Dataplat.Dbatools.Commands.Test
         [TestMethod]
         public void StatusColor_BindingRejectionShapesRenderEmpty()
         {
-            // The PS helper's Mandatory [string]$Status REJECTS these bindings
-            // (ParameterBindingValidationException, probed both editions); in the
+            // The PS helper's Mandatory [string]$Status REJECTS these bindings; in the
             // calculated property that error leaves the Style field EMPTY, never magenta.
+            // Opus TB-013 claimed arrays DO bind via the $OFS join like other collections -
+            // REFUTED by a fresh both-editions probe 2026-07-16 (opus asked for the probe):
+            // single-element, multi-element and PSObject-wrapped arrays all throw
+            // ParameterBindingArgumentTransformationException on the direct call, and the
+            // calculated-property call site renders Style EMPTY for every array shape.
+            // The binder's array/non-array asymmetry is real, however unmechanical it looks.
             Assert.AreEqual("", Convert(null));
             Assert.AreEqual("", Convert(""));
             Assert.AreEqual("", Convert(new object[] { "Failed" }), "arrays never bind to a scalar [string] parameter, even single-element");
             Assert.AreEqual("", Convert(new string[0]));
+            // Opus TB-013 (adopted in narrowed form): also pin the array rejection through
+            // the REAL pipeline, so the full DotAccess/PSObject path is exercised end-to-end.
+            Assert.AreEqual("", StyleColumn(InvokeTimelineBody(new object[] { "Failed" }, null)), "a single-element array renders an empty Style through the real call site");
+            Assert.AreEqual("", StyleColumn(InvokeTimelineBody(new object[] { "in", "progress" }, null)), "a multi-element array renders an empty Style through the real call site");
         }
 
         [TestMethod]
@@ -164,13 +173,10 @@ namespace Dataplat.Dbatools.Commands.Test
             commaParts.Add("in");
             commaParts.Add("progress");
             Assert.AreEqual("#FF00CC", StyleColumn(InvokeTimelineBody(commaParts, ",")), "a custom $OFS breaks the space-joined match");
-            // The bare-instance FALLBACK contract (not caller-reachable parity - the real
-            // cmdlet always executes with a SessionState): outside the engine the swallowed
-            // SessionState access defaults the separator to a single space.
-            System.Collections.Generic.List<string> fallbackParts = new System.Collections.Generic.List<string>();
-            fallbackParts.Add("in");
-            fallbackParts.Add("progress");
-            Assert.AreEqual("#00CCFF", Convert(fallbackParts), "engine-less fallback separator is the documented single space");
+            // (Opus TB-013: the former bare-instance fallback assertion was dropped - its
+            // expected value coincides with the hosted default-space answer, so it could
+            // not fail distinctly; the swallow-and-default contract is documented on
+            // GetOfsSeparator and is not caller-reachable.)
         }
 
         [TestMethod]
