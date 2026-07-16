@@ -866,9 +866,13 @@ namespace Dataplat.Dbatools.Connection
 
         private static string ConvertFromSecurePass(SecureString inputObject)
         {
-            // private/functions/ConvertFrom-SecurePass.ps1: decrypt on Linux, Windows and OSX
-            // via (New-Object PSCredential("fake", $InputObject)).GetNetworkCredential().Password
-            return new System.Net.NetworkCredential("fake", inputObject).Password;
+            // private/functions/ConvertFrom-SecurePass.ps1: decrypt on Linux, Windows and OSX.
+            // Delegates to the TB-016 parity port (opus TB-016): the previous inline
+            // System.Net.NetworkCredential variant returned "" for a null SecureString where
+            // the PS helper this comment cites THROWS from the PSCredential ctor (probed both
+            // editions) - unreachable here because both call sites null-guard first, but the
+            // single compiled counterpart keeps the contracts from drifting.
+            return Dataplat.Dbatools.Utility.SecurePass.ToPlainText(inputObject);
         }
     }
 }
