@@ -69,9 +69,16 @@ public sealed class MoveDbaRegServerCommand : DbaBaseCmdlet
     private object? _inputObjectState;
     private object? _lastBoundInputObject;
     private bool _bindInitialized;
+    private bool _inputObjectNamedBound;
 
     protected override void BeginProcessing()
     {
+        // Pipeline bindings are absent at begin time, so this pins whether InputObject was
+        // NAMED-bound - the discriminator for the per-record rebind reset (codex W3-002 F1
+        // class, swept family-wide: the same array INSTANCE piped twice defeats a pure
+        // ReferenceEquals check).
+        _inputObjectNamedBound = TestBound(nameof(InputObject));
+
         // PS begin: if ((Test-Bound SqlInstance) -and (Test-Bound -Not Name) -and
         // (Test-Bound -Not ServerName)) { Stop-Function "Name or ServerName must be..." }
         if (TestBound(nameof(SqlInstance)) && !TestBound(nameof(Name)) && !TestBound(nameof(ServerName)))
@@ -106,8 +113,10 @@ public sealed class MoveDbaRegServerCommand : DbaBaseCmdlet
             return;
 
         // PS: named $InputObject keeps ONE array reference across records (the += growth
-        // persists); a piped RegisteredServer re-binds a fresh array per record (W1-070).
-        if (!ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
+        // persists); a piped RegisteredServer re-binds EVERY record it arrives in - even
+        // the same instance again (W1-070 + codex W3-002 F1).
+        if ((!_inputObjectNamedBound && TestBound(nameof(InputObject))) ||
+            !ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
         {
             _inputObjectState = InputObject;
             _lastBoundInputObject = InputObject;
@@ -118,7 +127,8 @@ public sealed class MoveDbaRegServerCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Name, ServerName, Group, _inputObjectState,
             EnableException.ToBool(), _state, TestBound(nameof(Group)), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            BoundRaw("WarningAction")))
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3061State"))
@@ -144,6 +154,15 @@ public sealed class MoveDbaRegServerCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    /// <summary>The raw bound value (or null when unbound) - the -WarningAction carrier
+    /// keeps the caller's preference exactly (codex W3-002 F3, swept family-wide).</summary>
+    private object? BoundRaw(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return value;
         return null;
     }
 
@@ -191,8 +210,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // $__boundGroup flag, $Pscmdlet -> $__realCmdlet, the begin latch handled C#-side, and
     // explicit -FunctionName Move-DbaRegServer on Stop-Function (W1-090).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Name, $ServerName, $Group, $InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Name, $ServerName, $Group, $InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
 $__commonParameters = @{}
+if ($null -ne $__boundWarningAction) { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -200,7 +220,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Name, [string[]]$ServerName, [string]$Group, [Microsoft.SqlServer.Management.RegisteredServers.RegisteredServer[]]$InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Name, [string[]]$ServerName, [string]$Group, [Microsoft.SqlServer.Management.RegisteredServers.RegisteredServer[]]$InputObject, $EnableException, $__state, $__boundGroup, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # restore fn-scope locals mutated by earlier records
@@ -246,6 +266,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
     @{ __w3061State = @{ InputObject = $InputObject; parentserver = $parentserver; server = $server; movetogroup = $movetogroup; regserver = $regserver; instance = $instance } }
-} $SqlInstance $SqlCredential $Name $ServerName $Group $InputObject $EnableException $__state $__boundGroup $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Name $ServerName $Group $InputObject $EnableException $__state $__boundGroup $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
 """;
 }
