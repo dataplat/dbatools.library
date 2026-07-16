@@ -91,8 +91,7 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
     {
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             string.Join(", ", MyInvocation.BoundParameters.Keys), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            BoundRaw("WarningAction")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3063DisableCache"))
@@ -129,8 +128,7 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
             TestBound(nameof(WindowsCredentialsAreBad)), TestBound(nameof(CimWinRMOptions)),
             TestBound(nameof(CimDCOMOptions)), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            BoundRaw("WarningAction")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -149,8 +147,7 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
             EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            BoundRaw("WarningAction")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -166,15 +163,6 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    /// <summary>The raw bound value (or null when unbound) - the -WarningAction carrier
-    /// keeps the caller's preference exactly (codex W3-002 F3 class, all hops).</summary>
-    private object? BoundRaw(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return value;
         return null;
     }
 
@@ -202,20 +190,14 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
     // pre-joined key list from the cmdlet's own binding (identical keys for identical
     // invocations); $disable_cache returns through the sentinel for the process hops.
     private const string BeginScript = """
-param($__boundKeys, $EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+param($__boundKeys, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
-# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
-# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
-# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
-# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
-if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param($__boundKeys, $EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+    param($__boundKeys, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     Write-Message -Level InternalComment -Message "Starting execution" -FunctionName New-DbaCmConnection
@@ -223,7 +205,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $disable_cache = Get-DbatoolsConfigValue -Name 'ComputerManagement.Cache.Disable.All' -Fallback $false
     @{ __w3063DisableCache = $disable_cache }
-} $__boundKeys $EnableException $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
+} $__boundKeys $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the process body VERBATIM per record. Substitutions only: Test-Bound "X" ->
@@ -232,14 +214,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // Write-Message/Stop-Function (W1-090). Line 199's EnableCredentialFailover ->
     // DisableCredentialAutoRegister assignment is the SOURCE's own bug - verbatim.
     private const string ProcessScript = """
-param($ComputerName, $Credential, $UseWindowsCredentials, $OverrideExplicitCredential, $DisabledConnectionTypes, $DisableBadCredentialCache, $DisableCimPersistence, $DisableCredentialAutoRegister, $EnableCredentialFailover, $WindowsCredentialsAreBad, $CimWinRMOptions, $CimDCOMOptions, $EnableException, $__disableCache, $__boundCredential, $__boundUseWindowsCredentials, $__boundOverrideExplicitCredential, $__boundDisabledConnectionTypes, $__boundDisableBadCredentialCache, $__boundDisableCimPersistence, $__boundDisableCredentialAutoRegister, $__boundEnableCredentialFailover, $__boundWindowsCredentialsAreBad, $__boundCimWinRMOptions, $__boundCimDCOMOptions, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+param($ComputerName, $Credential, $UseWindowsCredentials, $OverrideExplicitCredential, $DisabledConnectionTypes, $DisableBadCredentialCache, $DisableCimPersistence, $DisableCredentialAutoRegister, $EnableCredentialFailover, $WindowsCredentialsAreBad, $CimWinRMOptions, $CimDCOMOptions, $EnableException, $__disableCache, $__boundCredential, $__boundUseWindowsCredentials, $__boundOverrideExplicitCredential, $__boundDisabledConnectionTypes, $__boundDisableBadCredentialCache, $__boundDisableCimPersistence, $__boundDisableCredentialAutoRegister, $__boundEnableCredentialFailover, $__boundWindowsCredentialsAreBad, $__boundCimWinRMOptions, $__boundCimDCOMOptions, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
-# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
-# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
-# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
-# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
-if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -247,7 +223,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaCmConnectionParameter[]]$ComputerName, [PSCredential]$Credential, $UseWindowsCredentials, $OverrideExplicitCredential, [Dataplat.Dbatools.Connection.ManagementConnectionType]$DisabledConnectionTypes, $DisableBadCredentialCache, $DisableCimPersistence, $DisableCredentialAutoRegister, $EnableCredentialFailover, $WindowsCredentialsAreBad, [Microsoft.Management.Infrastructure.Options.WSManSessionOptions]$CimWinRMOptions, [Microsoft.Management.Infrastructure.Options.DComSessionOptions]$CimDCOMOptions, $EnableException, $__disableCache, $__boundCredential, $__boundUseWindowsCredentials, $__boundOverrideExplicitCredential, $__boundDisabledConnectionTypes, $__boundDisableBadCredentialCache, $__boundDisableCimPersistence, $__boundDisableCredentialAutoRegister, $__boundEnableCredentialFailover, $__boundWindowsCredentialsAreBad, $__boundCimWinRMOptions, $__boundCimDCOMOptions, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+    param([Dataplat.Dbatools.Parameter.DbaCmConnectionParameter[]]$ComputerName, [PSCredential]$Credential, $UseWindowsCredentials, $OverrideExplicitCredential, [Dataplat.Dbatools.Connection.ManagementConnectionType]$DisabledConnectionTypes, $DisableBadCredentialCache, $DisableCimPersistence, $DisableCredentialAutoRegister, $EnableCredentialFailover, $WindowsCredentialsAreBad, [Microsoft.Management.Infrastructure.Options.WSManSessionOptions]$CimWinRMOptions, [Microsoft.Management.Infrastructure.Options.DComSessionOptions]$CimDCOMOptions, $EnableException, $__disableCache, $__boundCredential, $__boundUseWindowsCredentials, $__boundOverrideExplicitCredential, $__boundDisabledConnectionTypes, $__boundDisableBadCredentialCache, $__boundDisableCimPersistence, $__boundDisableCredentialAutoRegister, $__boundEnableCredentialFailover, $__boundWindowsCredentialsAreBad, $__boundCimWinRMOptions, $__boundCimDCOMOptions, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $disable_cache = $__disableCache
@@ -288,28 +264,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $connection
         }
     }
-} $ComputerName $Credential $UseWindowsCredentials $OverrideExplicitCredential $DisabledConnectionTypes $DisableBadCredentialCache $DisableCimPersistence $DisableCredentialAutoRegister $EnableCredentialFailover $WindowsCredentialsAreBad $CimWinRMOptions $CimDCOMOptions $EnableException $__disableCache $__boundCredential $__boundUseWindowsCredentials $__boundOverrideExplicitCredential $__boundDisabledConnectionTypes $__boundDisableBadCredentialCache $__boundDisableCimPersistence $__boundDisableCredentialAutoRegister $__boundEnableCredentialFailover $__boundWindowsCredentialsAreBad $__boundCimWinRMOptions $__boundCimDCOMOptions $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
+} $ComputerName $Credential $UseWindowsCredentials $OverrideExplicitCredential $DisabledConnectionTypes $DisableBadCredentialCache $DisableCimPersistence $DisableCredentialAutoRegister $EnableCredentialFailover $WindowsCredentialsAreBad $CimWinRMOptions $CimDCOMOptions $EnableException $__disableCache $__boundCredential $__boundUseWindowsCredentials $__boundOverrideExplicitCredential $__boundDisabledConnectionTypes $__boundDisableBadCredentialCache $__boundDisableCimPersistence $__boundDisableCredentialAutoRegister $__boundEnableCredentialFailover $__boundWindowsCredentialsAreBad $__boundCimWinRMOptions $__boundCimDCOMOptions $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the end block verbatim.
     private const string EndScript = """
-param($EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+param($EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
-# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
-# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
-# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
-# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
-if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param($EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+    param($EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     Write-Message -Level InternalComment -Message "Stopping execution" -FunctionName New-DbaCmConnection
-} $EnableException $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
+} $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

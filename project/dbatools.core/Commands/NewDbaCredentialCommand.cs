@@ -86,8 +86,7 @@ public sealed class NewDbaCredentialCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, _nameState, Identity, SecurePassword,
             MappedClassType, ProviderName ?? "", Force.ToBool(), EnableException.ToBool(),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            BoundRaw("WarningAction")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -103,15 +102,6 @@ public sealed class NewDbaCredentialCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    /// <summary>The raw bound value (or null when unbound) - the -WarningAction carrier
-    /// keeps the caller's preference exactly (codex W3-002 F3 class, all hops).</summary>
-    private object? BoundRaw(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return value;
         return null;
     }
 
@@ -143,14 +133,8 @@ public sealed class NewDbaCredentialCommand : DbaBaseCmdlet
     // create-catch's $cred interpolation is the SOURCE's own undefined-variable quirk -
     // verbatim.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Name, $Identity, $SecurePassword, $MappedClassType, $ProviderName, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+param($SqlInstance, $SqlCredential, $Name, $Identity, $SecurePassword, $MappedClassType, $ProviderName, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
-# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
-# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
-# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
-# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
-if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -158,7 +142,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Name, [string]$Identity, [Security.SecureString]$SecurePassword, [string]$MappedClassType, [string]$ProviderName, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Name, [string]$Identity, [Security.SecureString]$SecurePassword, [string]$MappedClassType, [string]$ProviderName, $Force, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if ($Force) { $ConfirmPreference = 'none' }
@@ -219,6 +203,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $SqlInstance $SqlCredential $Name $Identity $SecurePassword $MappedClassType $ProviderName $Force $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Name $Identity $SecurePassword $MappedClassType $ProviderName $Force $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

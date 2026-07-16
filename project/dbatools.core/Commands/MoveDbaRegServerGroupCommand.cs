@@ -75,8 +75,7 @@ public sealed class MoveDbaRegServerGroupCommand : DbaBaseCmdlet
         {
             foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
                 EnableException.ToBool(),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-                BoundRaw("WarningAction")))
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -118,8 +117,7 @@ public sealed class MoveDbaRegServerGroupCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Group, NewGroup, _inputObjectState,
             EnableException.ToBool(), _state, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            BoundRaw("WarningAction")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3062State"))
@@ -148,15 +146,6 @@ public sealed class MoveDbaRegServerGroupCommand : DbaBaseCmdlet
         return null;
     }
 
-    /// <summary>The raw bound value (or null when unbound) - the -WarningAction carrier
-    /// keeps the caller's preference exactly (codex W3-002 F3, swept family-wide).</summary>
-    private object? BoundRaw(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return value;
-        return null;
-    }
-
     /// <summary>Removes the silent $error copy the nested pipeline bagged for a merged-back
     /// non-terminating record (the W1-045 compensation).</summary>
     private void RemoveHopErrorBookkeeping(ErrorRecord record)
@@ -182,24 +171,18 @@ public sealed class MoveDbaRegServerGroupCommand : DbaBaseCmdlet
     // PS: the begin-block Stop-Function verbatim (message byte-exact); the C# caller
     // reproduces the function-scope latch (see _hopInterrupted).
     private const string BeginScript = """
-param($EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+param($EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
-# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
-# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
-# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
-# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
-if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param($EnableException, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+    param($EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     Stop-Function -Message "Group must be specified when using -SqlInstance" -FunctionName Move-DbaRegServerGroup
-} $EnableException $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
+} $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the ENTIRE process body VERBATIM (no early return beyond the C#-handled latch).
@@ -207,14 +190,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // Move-DbaRegServerGroup on Stop-Function/Write-Message (W1-090). The $regserver
     // interpolations in the catch are the SOURCE's own undefined-variable quirk - verbatim.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Group, $NewGroup, $InputObject, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+param($SqlInstance, $SqlCredential, $Group, $NewGroup, $InputObject, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
-# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
-# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
-# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
-# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
-if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -222,7 +199,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Group, [string]$NewGroup, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Group, [string]$NewGroup, [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup[]]$InputObject, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # restore fn-scope locals mutated by earlier records
@@ -275,6 +252,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
     @{ __w3062State = @{ InputObject = $InputObject; parentserver = $parentserver; server = $server; groupobject = $groupobject; newname = $newname; regservergroup = $regservergroup; instance = $instance } }
-} $SqlInstance $SqlCredential $Group $NewGroup $InputObject $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Group $NewGroup $InputObject $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

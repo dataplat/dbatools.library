@@ -73,8 +73,7 @@ public sealed class NewDbaCustomErrorCommand : DbaBaseCmdlet
             WithLog.ToBool(), EnableException.ToBool(),
             TestBound(nameof(Language)), TestBound(nameof(WithLog)), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            BoundRaw("WarningAction")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -90,15 +89,6 @@ public sealed class NewDbaCustomErrorCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    /// <summary>The raw bound value (or null when unbound) - the -WarningAction carrier
-    /// keeps the caller's preference exactly (codex W3-002 F3 class, all hops).</summary>
-    private object? BoundRaw(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return value;
         return null;
     }
 
@@ -128,14 +118,8 @@ public sealed class NewDbaCustomErrorCommand : DbaBaseCmdlet
     // syslanguages queries keep their source-interpolated T-SQL text (verbatim-hop
     // convention) and the .Refresh() why-comment carries as-is.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $MessageID, $Severity, $MessageText, $Language, $WithLog, $EnableException, $__boundLanguage, $__boundWithLog, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+param($SqlInstance, $SqlCredential, $MessageID, $Severity, $MessageText, $Language, $WithLog, $EnableException, $__boundLanguage, $__boundWithLog, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-# Forward ONLY Stop (the sole control-flow value): forwarding suppressing values
-# (SilentlyContinue/Ignore) would mute warnings AT THE SOURCE inside the hop, emptying the
-# caller's -WarningVariable where the engine's own machinery captures-then-suppresses
-# (codex W3-005 r2). Un-forwarded values surface via 3>&1 to the host stream, where the
-# compiled command's WarningAction/WarningVariable plumbing applies them engine-natively.
-if ("$__boundWarningAction" -eq "Stop") { $__commonParameters.WarningAction = $__boundWarningAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -143,7 +127,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [int32]$MessageID, [int32]$Severity, [String]$MessageText, [String]$Language, $WithLog, $EnableException, $__boundLanguage, $__boundWithLog, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundWarningAction)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [int32]$MessageID, [int32]$Severity, [String]$MessageText, [String]$Language, $WithLog, $EnableException, $__boundLanguage, $__boundWithLog, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($instance in $SqlInstance) {
@@ -194,6 +178,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $SqlInstance $SqlCredential $MessageID $Severity $MessageText $Language $WithLog $EnableException $__boundLanguage $__boundWithLog $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundWarningAction @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $MessageID $Severity $MessageText $Language $WithLog $EnableException $__boundLanguage $__boundWithLog $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
