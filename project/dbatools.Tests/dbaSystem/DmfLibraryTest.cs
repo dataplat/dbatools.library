@@ -9,14 +9,15 @@ namespace Dataplat.Dbatools.dbaSystem.Test
     /// <summary>
     /// TB-002 coverage for DmfLibrary.Load, the C# parity port of
     /// private/functions/Add-PbmLibrary.ps1. Assembly loading is process-global and
-    /// irreversible, so the whole load lifecycle runs in a DEDICATED CHILD PROCESS per
-    /// TFM - the edition-matched PowerShell host (Windows PowerShell 5.1 for net472,
+    /// irreversible, so each lifecycle scenario runs in a DEDICATED FRESH CHILD PROCESS
+    /// per TFM - the edition-matched PowerShell host (Windows PowerShell 5.1 for net472,
     /// pwsh 7 for net8.0, both gate currency per COORDINATION.md 7.1) loading the built
-    /// dbatools.dll exactly like production. Isolation makes the run order-independent,
-    /// leaves nothing loaded in the test host, and lets the location assertion demand
-    /// the EXACT fake-root path on both TFMs (the child has no Dmf in its deps graph).
-    /// The fake roots are built from the DMF assemblies the SqlManagementObjects package
-    /// ships into the test output for both TFMs.
+    /// dbatools.dll exactly like production. The failure legs (asymmetric missing files
+    /// proving Common-before-Dmf order) and the success legs (exact load locations of
+    /// BOTH assemblies under the complete fake root, then idempotence) each get their
+    /// own child so no leg inherits loaded state from another. The fake roots are built
+    /// from the DMF assemblies the SqlManagementObjects package ships into the test
+    /// output for both TFMs.
     /// </summary>
     [TestClass]
     public class DmfLibraryTest
@@ -48,9 +49,9 @@ namespace Dataplat.Dbatools.dbaSystem.Test
         }
 
         // The child runs on Windows (the file-copy scheme and both PS hosts are
-        // Windows-bound), so the exact-path comparison is OrdinalIgnoreCase.
+        // Windows-bound), so path comparisons are OrdinalIgnoreCase.
         private const string ChildLifecycleScript = @"
-param([string]$DbatoolsDll, [string]$CommonMissingRoot, [string]$DmfMissingRoot, [string]$CompleteRoot)
+param([string]$DbatoolsDll, [string]$Mode, [string]$CommonMissingRoot, [string]$DmfMissingRoot, [string]$CompleteRoot)
 $ErrorActionPreference = ""Stop""
 function Fail([string]$reason) { Write-Output (""FAIL: "" + $reason); exit 1 }
 function Get-DmfLoaded([string]$name) {
@@ -61,54 +62,58 @@ function Get-FileNotFound($caught) {
     while ($walker -and -not ($walker -is [System.IO.FileNotFoundException])) { $walker = $walker.InnerException }
     $walker
 }
+function Assert-ExactLocation($assembly, [string]$root, [string]$fileName) {
+    $expected = [System.IO.Path]::GetFullPath((Join-Path (Join-Path $root ""lib"") $fileName))
+    $actual = [System.IO.Path]::GetFullPath($assembly.Location)
+    if (-not [String]::Equals($actual, $expected, [StringComparison]::OrdinalIgnoreCase)) {
+        Fail ($assembly.GetName().Name + "" loaded from '"" + $actual + ""' expected '"" + $expected + ""'"")
+    }
+}
 Add-Type -Path $DbatoolsDll
 
-# Leg 1: Common missing, Dmf present -> the FIRST load fails and Dmf stays unloaded,
-# proving Load never reached the second file (Common-first order).
-$caught = $null
-try { [Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CommonMissingRoot) } catch { $caught = $_.Exception }
-$notFound = Get-FileNotFound $caught
-if (-not $notFound) { Fail ""leg1: expected FileNotFoundException for missing Dmf.Common"" }
-if ($notFound.FileName -notlike ""*Dmf.Common*"") { Fail (""leg1: wrong file failed: "" + $notFound.FileName) }
-if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf"") { Fail ""leg1: Dmf loaded despite Common failing first - order broken"" }
-if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common"") { Fail ""leg1: Common unexpectedly loaded"" }
+if ($Mode -eq ""failures"") {
+    # Leg 1: Common missing, Dmf present -> the FIRST load fails and Dmf stays unloaded,
+    # proving Load never reached the second file (Common-first order).
+    $caught = $null
+    try { [Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CommonMissingRoot) } catch { $caught = $_.Exception }
+    $notFound = Get-FileNotFound $caught
+    if (-not $notFound) { Fail ""leg1: expected FileNotFoundException for missing Dmf.Common"" }
+    if ($notFound.FileName -notlike ""*Dmf.Common*"") { Fail (""leg1: wrong file failed: "" + $notFound.FileName) }
+    if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf"") { Fail ""leg1: Dmf loaded despite Common failing first - order broken"" }
+    if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common"") { Fail ""leg1: Common unexpectedly loaded"" }
 
-# Leg 2: Common present, Dmf missing -> Common loads (first), then the SECOND load
-# fails on Dmf. Common being loaded afterward proves it was attempted before the failure.
-$caught = $null
-try { [Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($DmfMissingRoot) } catch { $caught = $_.Exception }
-$notFound = Get-FileNotFound $caught
-if (-not $notFound) { Fail ""leg2: expected FileNotFoundException for missing Dmf"" }
-if ($notFound.FileName -like ""*Dmf.Common*"") { Fail ""leg2: failure should be the Dmf load, not Common"" }
-if (-not (Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common"")) { Fail ""leg2: Common not loaded before the Dmf failure - order broken"" }
-if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf"") { Fail ""leg2: Dmf unexpectedly loaded"" }
+    # Leg 2: Common present, Dmf missing -> Common loads (first), then the SECOND load
+    # fails on Dmf. Common being loaded afterward proves it was attempted before the failure.
+    $caught = $null
+    try { [Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($DmfMissingRoot) } catch { $caught = $_.Exception }
+    $notFound = Get-FileNotFound $caught
+    if (-not $notFound) { Fail ""leg2: expected FileNotFoundException for missing Dmf"" }
+    if ($notFound.FileName -like ""*Dmf.Common*"") { Fail ""leg2: failure should be the Dmf load, not Common"" }
+    $common = Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common""
+    if (-not $common) { Fail ""leg2: Common not loaded before the Dmf failure - order broken"" }
+    Assert-ExactLocation $common $DmfMissingRoot ""Microsoft.SqlServer.Dmf.Common.DLL""
+    if (Get-DmfLoaded ""Microsoft.SqlServer.Dmf"") { Fail ""leg2: Dmf unexpectedly loaded"" }
+} else {
+    # Success legs in a FRESH process: nothing DMF is loaded yet, so BOTH assemblies
+    # must load from the exact complete-root lib paths.
+    [Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CompleteRoot)
+    $common = Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common""
+    if (-not $common) { Fail ""success: Common not loaded"" }
+    Assert-ExactLocation $common $CompleteRoot ""Microsoft.SqlServer.Dmf.Common.DLL""
+    $dmf = Get-DmfLoaded ""Microsoft.SqlServer.Dmf""
+    if (-not $dmf) { Fail ""success: Dmf not loaded"" }
+    Assert-ExactLocation $dmf $CompleteRoot ""Microsoft.SqlServer.Dmf.dll""
 
-# Leg 3: complete root -> success; Dmf must come from the EXACT fake-root lib path
-# (this child has no Dmf in its default load context, unlike the MSTest host).
-[Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CompleteRoot)
-$dmf = Get-DmfLoaded ""Microsoft.SqlServer.Dmf""
-if (-not $dmf) { Fail ""leg3: Dmf not loaded"" }
-$expected = Join-Path (Join-Path $CompleteRoot ""lib"") ""Microsoft.SqlServer.Dmf.dll""
-$actualFull = [System.IO.Path]::GetFullPath($dmf.Location)
-$expectedFull = [System.IO.Path]::GetFullPath($expected)
-if (-not [String]::Equals($actualFull, $expectedFull, [StringComparison]::OrdinalIgnoreCase)) {
-    Fail (""leg3: Dmf loaded from '"" + $actualFull + ""' expected '"" + $expectedFull + ""'"")
+    # Idempotence - re-running with everything loaded succeeds, like re-running the
+    # helper's Add-Type calls.
+    [Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CompleteRoot)
 }
-if (-not (Get-DmfLoaded ""Microsoft.SqlServer.Dmf.Common"")) { Fail ""leg3: Common not loaded"" }
-
-# Leg 4: idempotence - re-running with everything loaded succeeds, like re-running
-# the helper's Add-Type calls.
-[Dataplat.Dbatools.dbaSystem.DmfLibrary]::Load($CompleteRoot)
 Write-Output ""ALL-LEGS-PASS""
 exit 0
 ";
 
-        [TestMethod]
-        public void Load_FullLifecycle_RunsIsolatedInChildProcessPerTfm()
+        private static void RunLifecycleChild(string mode, string commonMissing, string dmfMissing, string complete)
         {
-            string commonMissing = NewRoot(false, true);
-            string dmfMissing = NewRoot(true, false);
-            string complete = NewRoot(true, true);
             string script = Path.Combine(Path.GetTempPath(), "dbatools-tests-dmf-child-" + Guid.NewGuid().ToString("N") + ".ps1");
             File.WriteAllText(script, ChildLifecycleScript);
             try
@@ -124,8 +129,8 @@ exit 0
                 ProcessStartInfo startInfo = new ProcessStartInfo();
                 startInfo.FileName = shell;
                 startInfo.Arguments = String.Format(
-                    "-NoProfile -ExecutionPolicy Bypass -File \"{0}\" -DbatoolsDll \"{1}\" -CommonMissingRoot \"{2}\" -DmfMissingRoot \"{3}\" -CompleteRoot \"{4}\"",
-                    script, dbatoolsDll, commonMissing, dmfMissing, complete);
+                    "-NoProfile -ExecutionPolicy Bypass -File \"{0}\" -DbatoolsDll \"{1}\" -Mode {2} -CommonMissingRoot \"{3}\" -DmfMissingRoot \"{4}\" -CompleteRoot \"{5}\"",
+                    script, dbatoolsDll, mode, commonMissing, dmfMissing, complete);
                 startInfo.UseShellExecute = false;
                 startInfo.RedirectStandardOutput = true;
                 startInfo.RedirectStandardError = true;
@@ -147,17 +152,44 @@ exit 0
                     string stderr = stderrTask.Result;
                     Assert.AreEqual(0, child.ExitCode, "child lifecycle failed. stdout: " + stdout + " stderr: " + stderr);
                     // The helper emits no messages, and the script prints only the
-                    // sentinel on success - anything else on either stream is a failure.
+                    // sentinel on success - the streams carry exactly that and nothing else.
                     Assert.AreEqual("ALL-LEGS-PASS", stdout.Trim(), "unexpected child stdout: " + stdout);
-                    Assert.AreEqual(String.Empty, stderr.Trim(), "unexpected child stderr: " + stderr);
+                    Assert.AreEqual(String.Empty, stderr, "unexpected child stderr: " + stderr);
                 }
+            }
+            finally
+            {
+                TryRemove(script);
+            }
+        }
+
+        [TestMethod]
+        public void Load_FailureLegs_ProveCommonLoadsFirst()
+        {
+            string commonMissing = NewRoot(false, true);
+            string dmfMissing = NewRoot(true, false);
+            try
+            {
+                RunLifecycleChild("failures", commonMissing, dmfMissing, "unused");
             }
             finally
             {
                 TryRemove(commonMissing);
                 TryRemove(dmfMissing);
+            }
+        }
+
+        [TestMethod]
+        public void Load_SuccessLegs_LoadBothFromExactLibPathsAndStayIdempotent()
+        {
+            string complete = NewRoot(true, true);
+            try
+            {
+                RunLifecycleChild("success", "unused", "unused", complete);
+            }
+            finally
+            {
                 TryRemove(complete);
-                TryRemove(script);
             }
         }
 
