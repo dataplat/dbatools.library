@@ -121,10 +121,33 @@ namespace Dataplat.Dbatools.Commands.Test
         [TestMethod]
         public void Convert_TimeBranch_UsesSevenFractionDigits()
         {
-            // The one date-family branch WITHOUT the invariant argument (source line 168);
-            // under the invariant test culture the separators are ":" either way.
+            // The one date-family branch WITHOUT the invariant argument (source line 168).
             Assert.AreEqual("'13:45:12.0000000'", One(new object[] { "13:45:12" }, "time", false).NewValue);
             Assert.AreEqual("Value '134512' is not valid TIME format (HH:mm:ss)", One(new object[] { "134512" }, "time", false).ErrorMessage);
+        }
+
+        [TestMethod]
+        public void Convert_TimeBranch_FollowsTheCurrentCultureTimeSeparator()
+        {
+            // Discriminating pin of the source's missing invariant argument (codex r1):
+            // under a culture whose TimeSeparator is ".", the ":" glyphs in the custom
+            // format map to "." - PS ground truth both editions: '13.45.12.0000000' -
+            // while the datetime branch (explicit invariant) is unaffected. A port that
+            // "fixed" the time branch to invariant would emit ':' here and fail.
+            System.Globalization.CultureInfo original = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Globalization.CultureInfo custom = (System.Globalization.CultureInfo)new System.Globalization.CultureInfo("en-US").Clone();
+                custom.DateTimeFormat.TimeSeparator = ".";
+                System.Threading.Thread.CurrentThread.CurrentCulture = custom;
+
+                Assert.AreEqual("'13.45.12.0000000'", One(new object[] { "13:45:12" }, "time", false).NewValue);
+                Assert.AreEqual("'2020-01-02 13:45:12.345'", One(new object[] { "2020-01-02 13:45:12.345" }, "datetime", false).NewValue, "the invariant datetime branch must NOT follow the culture");
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = original;
+            }
         }
 
         [TestMethod]
