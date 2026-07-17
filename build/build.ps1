@@ -237,33 +237,37 @@ try {
 Write-Host "Copying Bogus.dll..." -ForegroundColor Green
 
 # Copy Bogus.dll for .NET Framework (handle case sensitivity)
+# A missing Bogus here is fatal, not a warning: this code only runs on a full build (-CoreOnly
+# returns earlier), so the package is always expected to carry it. Warning and carrying on produced
+# a drop with no Bogus.dll in it and still exited 0, which reads as a successful build.
 if (Test-Path (Join-Path $tempPath "bogus/lib/net40/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net40/bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/net40/bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/net40/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net40/Bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/net40/Bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
 } else {
-    Write-Warning "Bogus.dll for .NET Framework (net40) not found at expected location"
+    throw "Bogus.dll for .NET Framework (net40) not found under $(Join-Path $tempPath "bogus/lib/net40"). The extracted package layout is not what this build expects."
 }
 
 # Copy Bogus.dll for .NET Core (handle case sensitivity)
 $bogusCoreCopied = $false
 # Try net6.0 first (both lowercase and uppercase)
 if (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
     $bogusCoreCopied = $true
 }
 
+# Fatal for the same reason as the .NET Framework copy above.
 if (-not $bogusCoreCopied) {
-    Write-Warning "Bogus.dll for .NET Core not found in expected locations"
+    throw "Bogus.dll for .NET Core not found under $(Join-Path $tempPath "bogus/lib") in any of the expected framework folders. The extracted package layout is not what this build expects."
 }
 
 # Core files are already in place from dotnet publish
