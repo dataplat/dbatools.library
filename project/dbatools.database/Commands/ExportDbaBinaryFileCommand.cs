@@ -22,6 +22,11 @@ namespace Dataplat.Dbatools.Commands;
 /// "if (-not $InputObject)" branch, which fires only in the non-piped single-record case, so its
 /// return just ends that one record.
 ///
+/// The begin hop carries -WhatIf/-Confirm and its inner block is SupportsShouldProcess, because the
+/// begin block's New-Item honors those preferences in the source (the function is
+/// SupportsShouldProcess, so -WhatIf/-Confirm set the preference New-Item inherits) - without the
+/// carry the port would create the -Path directory under -WhatIf.
+///
 /// The process body reads $PSBoundParameters.Query/FileNameColumn/BinaryColumn/FilePath - boundness
 /// reads that cannot ride a hop, because inside the hop $PSBoundParameters is the inner
 /// scriptblock's own positional binding where every parameter looks bound. They are carried as
@@ -103,6 +108,7 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             Path, FilePath, EnableException.ToBool(),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__exportDbaBinaryFileBegin"))
@@ -176,14 +182,16 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
     // PS: the begin block VERBATIM. Edits: -FunctionName on the direct Stop-Function/Write-Message.
     // The sentinel reports whether a direct begin Stop-Function set the function-scope interrupt.
     private const string BeginScript = """
-param($Path, $FilePath, $EnableException, $__boundVerbose, $__boundDebug)
+param($Path, $FilePath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    [CmdletBinding()]
-    param([string]$Path, [string]$FilePath, $EnableException, $__boundVerbose, $__boundDebug)
+    [CmdletBinding(SupportsShouldProcess)]
+    param([string]$Path, [string]$FilePath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
         if ($Path -and $FilePath) {
@@ -202,7 +210,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
     @{ __exportDbaBinaryFileBegin = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
-} $Path $FilePath $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $Path $FilePath $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the process block VERBATIM. Edits: $Pscmdlet.ShouldProcess -> $__realCmdlet, -FunctionName
