@@ -47,17 +47,45 @@ public sealed partial class GetDbaServiceCommand
         return result;
     }
 
+    // The source authored these method bodies inside the module function, so Add-Member
+    // attached MODULE-BOUND closures: invoked from user scope they still resolve the
+    // module's private functions (Set-ServiceStartMode, Stop-Function). A bare
+    // ScriptBlock.Create is unbound and runs in the caller's scope, where those privates
+    // do not exist - so each body is re-bound to the dbatools script module here. When
+    // the script module is not loaded (raw satellite import), the blocks stay unbound;
+    // the public Stop/Start/Restart commands still resolve through exports either way.
+    private PSModuleInfo? _scriptModule;
+    private bool _scriptModuleResolved;
+
+    private ScriptBlock BindToScriptModule(string body)
+    {
+        if (!_scriptModuleResolved)
+        {
+            _scriptModuleResolved = true;
+            foreach (PSObject? moduleItem in InvokeCommand.InvokeScript("Get-Module -Name dbatools"))
+            {
+                if (moduleItem?.BaseObject is PSModuleInfo moduleInfo && moduleInfo.ModuleType == ModuleType.Script)
+                {
+                    _scriptModule = moduleInfo;
+                    break;
+                }
+            }
+        }
+        ScriptBlock block = ScriptBlock.Create(body);
+        return _scriptModule is null ? block : _scriptModule.NewBoundScriptBlock(block);
+    }
+
     //Add other properties and methods (script methods match the PS source verbatim)
-    private static void AddScriptMethods(PSObject psObj)
+    private void AddScriptMethods(PSObject psObj)
     {
         psObj.Methods.Add(new PSScriptMethod("Stop",
-            ScriptBlock.Create("param ([bool]$Force = $false)\r\nStop-DbaService -InputObject $this -Force:$Force")));
+            BindToScriptModule("param ([bool]$Force = $false)\r\nStop-DbaService -InputObject $this -Force:$Force")));
         psObj.Methods.Add(new PSScriptMethod("Start",
-            ScriptBlock.Create("Start-DbaService -InputObject $this")));
+            BindToScriptModule("Start-DbaService -InputObject $this")));
         psObj.Methods.Add(new PSScriptMethod("Restart",
-            ScriptBlock.Create("param ([bool]$Force = $false)\r\nRestart-DbaService -InputObject $this -Force:$Force")));
+            BindToScriptModule("param ([bool]$Force = $false)\r\nRestart-DbaService -InputObject $this -Force:$Force")));
         psObj.Methods.Add(new PSScriptMethod("ChangeStartMode",
-            ScriptBlock.Create(
+            BindToScriptModule(
                 "param ([parameter(Mandatory)][string]$Mode)\r\n" +
                 "$supportedModes = @(\"Automatic\", \"Manual\", \"Disabled\")\r\n" +
                 "if ($Mode -notin $supportedModes) {\r\n" +
