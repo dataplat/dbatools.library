@@ -256,18 +256,25 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # function frame; streams and terminating errors flow through unchanged.
     function Restart-DbaService {
         param($__splat)
-        # The nested-command boundary re-wraps carried PSObjects: NoteProperties return
-        # through the engine's instance-member table (keyed on the base object), but
-        # inserted instance type names live on the wrapper and are lost in transit.
-        # Update-ServiceStatus gates on the dbatools.DbaSqlService type name, so restore
-        # it - only on objects provably carrying Get-DbaService's decoration (an adapted
-        # SqlService WMI/CIM object bearing the ServicePriority NoteProperty). Anything
-        # else keeps failing that gate exactly like it does in the function world.
+        # The nested-command boundary re-wraps carried PSObjects: NoteProperties and
+        # ScriptMethods return through the engine's instance-member table (keyed on the
+        # base object), but inserted instance type names live on the wrapper and are lost
+        # in transit. Update-ServiceStatus gates on the dbatools.DbaSqlService type name,
+        # so restore it - only on objects provably carrying Get-DbaService's decoration:
+        # the ServicePriority NoteProperty plus the ChangeStartMode ScriptMethod, on
+        # either an adapted SqlService/MSReportServer WMI/CIM object or the reporting
+        # services property-bag shape. Objects without that decoration keep failing the
+        # gate exactly like they do in the function world.
         foreach ($__carriedService in @($__splat.InputObject)) {
-            if ($null -ne $__carriedService -and
-                "dbatools.DbaSqlService" -notin $__carriedService.PSObject.TypeNames -and
-                $null -ne $__carriedService.PSObject.Properties["ServicePriority"] -and
-                ($__carriedService.PSObject.TypeNames -match "(ManagementObject|CimInstance)#.*SqlService$")) {
+            if ($null -eq $__carriedService) { continue }
+            if ("dbatools.DbaSqlService" -in $__carriedService.PSObject.TypeNames) { continue }
+            $__priorityMember = $__carriedService.PSObject.Properties["ServicePriority"]
+            $__startModeMethod = $__carriedService.PSObject.Methods["ChangeStartMode"]
+            $__adaptedServiceName = $__carriedService.PSObject.TypeNames -match "^(System\.Management\.ManagementObject|Microsoft\.Management\.Infrastructure\.CimInstance)#(root[\\/].+[\\/])?(SqlService|MSReportServer_ConfigurationSetting)$"
+            $__isPropertyBag = $__carriedService.PSObject.BaseObject -is [System.Management.Automation.PSCustomObject]
+            if ($__priorityMember -and $__priorityMember.MemberType -eq "NoteProperty" -and
+                $__startModeMethod -and $__startModeMethod.MemberType -eq "ScriptMethod" -and
+                ($__adaptedServiceName -or $__isPropertyBag)) {
                 $__carriedService.PSObject.TypeNames.Insert(0, "dbatools.DbaSqlService")
             }
         }
