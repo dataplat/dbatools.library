@@ -80,5 +80,61 @@ namespace Dataplat.Dbatools.Commands.Test
                 }
             }
         }
+
+        [TestMethod]
+        public void PhysicalFile_QueryMaskConstructsEngineRuntimeException()
+        {
+            // The query-leg mask cannot be DRIVEN offline: the version read precedes
+            // the query and requires a live connection (SMO ignores a preset
+            // ServerConnection.ServerVersion), so the thrown-mask behavior itself rides
+            // the integrator gate. This pin guards the throw-type CONVENTION statically
+            // instead: the method body must construct RuntimeException (the engine's
+            // shape for the source's bare string throw - the exception type is
+            // user-observable past the call site) and no other exception type.
+            System.Reflection.MethodInfo method = typeof(RestoreUtility).GetMethod(
+                "GetDbaDbPhysicalFile",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.IsNotNull(method, "helper resolves");
+            byte[] il = method.GetMethodBody().GetILAsByteArray();
+            System.Reflection.Module module = method.Module;
+            bool constructsRuntimeException = false;
+            bool constructsOtherException = false;
+            for (int i = 0; i < il.Length - 4; i++)
+            {
+                if (il[i] != 0x73)
+                {
+                    continue;
+                }
+                int token = BitConverter.ToInt32(il, i + 1);
+                System.Reflection.MethodBase target;
+                try
+                {
+                    target = module.ResolveMethod(token);
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+                if (!(target is System.Reflection.ConstructorInfo ctor))
+                {
+                    continue;
+                }
+                if (typeof(Exception).IsAssignableFrom(ctor.DeclaringType))
+                {
+                    if (ctor.DeclaringType == typeof(RuntimeException))
+                    {
+                        constructsRuntimeException = true;
+                    }
+                    else
+                    {
+                        constructsOtherException = true;
+                    }
+                }
+            }
+            Assert.IsTrue(constructsRuntimeException,
+                "the mask must be the engine RuntimeException, matching PS throw \"string\"");
+            Assert.IsFalse(constructsOtherException,
+                "no other exception type may replace the mask");
+        }
     }
 }
