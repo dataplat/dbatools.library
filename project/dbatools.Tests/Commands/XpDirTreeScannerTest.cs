@@ -10,9 +10,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Dataplat.Dbatools.Commands.Test
 {
     /// <summary>
-    /// Host cmdlet for XpDirTreeScanner.Scan. It drives the scanner with an s3:// path and
-    /// EnableException on: that branch rejects the path and calls Stop-Function BEFORE any
-    /// server access, so the disconnected server handed in is never touched.
+    /// Host cmdlet for XpDirTreeScanner.Scan. Drives the scanner with an s3:// path so the
+    /// s3 branch decides the outcome. The disconnected server handed in is never actually
+    /// reached: with EnableException the s3 Stop-Function throws first; without it, a
+    /// deterministic Test-DbaPath stub (registered by the test) throws a unique marker at
+    /// the first accessibility check, which sits AFTER the s3 branch and BEFORE any server
+    /// I/O - so the marker proves the s3 guard was non-terminating without depending on the
+    /// unreachable server's failure type.
     /// </summary>
     [Cmdlet("Test", "XpDirTreeScannerHost")]
     public sealed class TestXpDirTreeScannerHostCommand : DbaBaseCmdlet
@@ -37,7 +41,8 @@ namespace Dataplat.Dbatools.Commands.Test
             }
             catch (Exception ex)
             {
-                WriteObject("THREW:" + ex.GetType().Name);
+                string message = ex.Message.Split('\n')[0];
+                WriteObject("THREW:" + ex.GetType().Name + ":" + message);
             }
         }
     }
@@ -55,18 +60,23 @@ namespace Dataplat.Dbatools.Commands.Test
     /// a DBNull file flag is skipped, matching the source's Where-Object no-match; and the
     /// recursion drops EnableException and NoRecurse exactly as the source does. The live
     /// enumeration and recursion require a SQL instance and ride the integrator gate through
-    /// Get-DbaBackupInformation. The offline pin below is method-specific: an s3:// path
-    /// with EnableException terminates at the S3 guard (Stop-Function throws under
-    /// EnableException) BEFORE any server I/O, and without EnableException it does not throw
-    /// there.
+    /// Get-DbaBackupInformation. The offline pins below are method-specific and cover the
+    /// s3 branch's terminating-vs-non-terminating contract without a live server.
     /// </summary>
     [TestClass]
     public class XpDirTreeScannerTest
     {
+        // A Test-DbaPath stub that throws a marker, letting the tests observe whether
+        // control reached the first accessibility check (which sits just after the s3
+        // branch) independently of the unreachable server's failure type.
+        private const string TestPathMarker = "XPDIR_REACHED_TESTDBAPATH";
+
         private static string Invoke(string path, bool enable)
         {
             InitialSessionState iss = InitialSessionState.CreateDefault2();
             iss.Commands.Add(new SessionStateCmdletEntry("Test-XpDirTreeScannerHost", typeof(TestXpDirTreeScannerHostCommand), null));
+            iss.Commands.Add(new SessionStateFunctionEntry("Test-DbaPath",
+                "param($SqlInstance, $Path) throw '" + TestPathMarker + "'"));
             using (System.Management.Automation.Runspaces.Runspace runspace = RunspaceFactory.CreateRunspace(iss))
             {
                 runspace.Open();
@@ -84,26 +94,27 @@ namespace Dataplat.Dbatools.Commands.Test
         }
 
         [TestMethod]
-        public void XpDirTree_S3WithEnableExceptionTerminatesBeforeServerAccess()
+        public void XpDirTree_S3WithEnableExceptionTerminatesAtGuardBeforeTestDbaPath()
         {
-            // The disconnected server would fail any real access; a THREW here means the S3
-            // guard terminated first (Stop-Function throws under EnableException), never
-            // reaching the server. That is the S3-rejection contract.
+            // With EnableException the s3 Stop-Function throws immediately, before the
+            // accessibility check. The outcome must carry the s3-specific message and must
+            // NOT be the Test-DbaPath marker (control never reached it).
             string outcome = Invoke("s3://bucket/backups/", enable: true);
-            Assert.AreEqual("THREW:InnerCommandException", outcome);
+            StringAssert.StartsWith(outcome, "THREW:InnerCommandException:", "the s3 guard throws under EnableException");
+            StringAssert.Contains(outcome, "S3 path enumeration not supported", "the terminating error is the s3 guard's");
+            Assert.IsFalse(outcome.Contains(TestPathMarker), "the s3 guard must terminate before Test-DbaPath");
         }
 
         [TestMethod]
-        public void XpDirTree_S3WithoutEnableExceptionDoesNotThrowAtTheGuard()
+        public void XpDirTree_S3WithoutEnableExceptionFallsThroughToTestDbaPath()
         {
-            // Without EnableException the S3 Stop-Function is non-terminating: execution
-            // falls through (pathSep stays null) and only later fails at the server. The
-            // failure is therefore NOT the S3 guard's InnerCommandException - it is the
-            // downstream server access throwing on the unreachable instance.
+            // Without EnableException the s3 Stop-Function is non-terminating: execution
+            // falls through the path-separator block (pathSep stays null, the append is
+            // skipped) and reaches the first Test-DbaPath check, whose stub throws the
+            // marker. Observing the marker proves the s3 guard did NOT terminate the scan
+            // and that control advanced past it - independent of the server.
             string outcome = Invoke("s3://bucket/backups/", enable: false);
-            StringAssert.StartsWith(outcome, "THREW:", "the unreachable server still fails downstream");
-            Assert.AreNotEqual("THREW:InnerCommandException", outcome,
-                "without EnableException the S3 guard must not terminate the scan");
+            StringAssert.Contains(outcome, TestPathMarker, "control must reach Test-DbaPath when EnableException is off");
         }
     }
 }
