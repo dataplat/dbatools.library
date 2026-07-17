@@ -205,7 +205,22 @@ Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile (Join
 $ProgressPreference = "Continue"
 
 # Extract all packages
-7z x (Join-Path $tempPath "bogus.zip") "-o$(Join-Path $tempPath "bogus")" -y
+# A NuGet package is an ordinary zip archive, so extracting it needs no external tool. Shelling out
+# to 7z made the build depend on a program that is absent from a clean machine, and it failed late
+# and quietly: the run aborted here yet still reported a success exit code, leaving a drop with no
+# module manifest in it.
+#
+# This unpacks via the .NET API rather than Expand-Archive deliberately. The "*:Confirm" entry in
+# $PSDefaultParameterValues at the top of this script is injected into the cmdlets Expand-Archive
+# calls internally, which makes it throw "Object reference not set to an instance of an object" and
+# extract nothing. A .NET call cannot be reached by parameter defaults, so it is stable no matter
+# what this script sets. Do not "simplify" this back to Expand-Archive without removing that default.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$bogusArchive = Join-Path $tempPath "bogus.zip"
+$bogusStage = Join-Path $tempPath "bogus"
+# ExtractToDirectory will not overwrite an existing file, so start from a clean directory.
+Remove-Item -LiteralPath $bogusStage -Recurse -Force -ErrorAction SilentlyContinue
+[System.IO.Compression.ZipFile]::ExtractToDirectory($bogusArchive, $bogusStage)
 
 
 # Copy Bogus files for both frameworks
