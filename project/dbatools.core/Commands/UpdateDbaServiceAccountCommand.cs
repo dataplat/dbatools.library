@@ -20,7 +20,9 @@ public sealed partial class UpdateDbaServiceAccountCommand : DbaBaseCmdlet
     [Parameter(ParameterSetName = "ServiceName")]
     [Alias("cn", "host", "Server")]
     public DbaInstanceParameter[] ComputerName { get; set; } =
-        new DbaInstanceParameter[] { new(System.Environment.GetEnvironmentVariable("COMPUTERNAME") ?? "localhost") };
+        (DbaInstanceParameter[])LanguagePrimitives.ConvertTo(
+            System.Environment.GetEnvironmentVariable("COMPUTERNAME"),
+            typeof(DbaInstanceParameter[]), System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>Windows credential used to connect to the computers and their WMI service configuration.</summary>
     [Parameter]
