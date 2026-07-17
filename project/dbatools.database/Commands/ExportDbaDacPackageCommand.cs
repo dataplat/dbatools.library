@@ -208,6 +208,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $Path = Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport'
     }
 
+    . {
         $null = Test-ExportDirectory -Path $Path
 
         # For CMD parameter set (ExtendedParameters/ExtendedProperties), we need SqlPackage.exe
@@ -219,6 +220,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 return
             }
         }
+    }
 
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
     @{ __exportDbaDacPackageBegin = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
