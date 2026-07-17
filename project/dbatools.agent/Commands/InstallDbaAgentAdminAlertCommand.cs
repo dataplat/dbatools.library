@@ -99,11 +99,24 @@ public sealed class InstallDbaAgentAdminAlertCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // The function reassigns $Operator (to the resolved operator name) when -Operator is unbound, and
+    // reads it at the top of the NEXT pipeline record; the function scope spans the pipeline, so that
+    // value leaks forward. A per-record hop resets it, so the reassigned value is carried across records
+    // to reproduce that behavior. Starts as the bound value (null when unbound).
+    private object? _operatorState;
+    private bool _operatorInitialized;
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
         {
             return;
+        }
+
+        if (!_operatorInitialized)
+        {
+            _operatorState = Operator;
+            _operatorInitialized = true;
         }
 
         NestedCommand.InvokeScopedStreaming(this, item =>
@@ -113,12 +126,17 @@ public sealed class InstallDbaAgentAdminAlertCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
+            else if (item is not null && LanguagePrimitives.IsTrue(
+                item.Properties["__InstallDbaAgentAdminAlertProcessComplete"]?.Value))
+            {
+                _operatorState = item.Properties["Operator"]?.Value;
+            }
             else
             {
                 WriteObject(item);
             }
         }, BodyScript,
-            SqlInstance, SqlCredential, Category, Database, Operator, OperatorEmail,
+            SqlInstance, SqlCredential, Category, Database, _operatorState, OperatorEmail,
             DelayBetweenResponses, Disabled.ToBool(), EventDescriptionKeyword, EventSource,
             JobId, ExcludeSeverity, ExcludeMessageId, NotificationMessage, NotifyMethod,
             EnableException.ToBool(), BoundRaw("JobId"), BoundRaw("Category"),
@@ -364,6 +382,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
             Get-DbaAgentAlert -SqlInstance $server -Alert $name | Select-DefaultView -Property $defaults
         }
+    }
+
+    [pscustomobject]@{
+        __InstallDbaAgentAdminAlertProcessComplete = $true
+        Operator = $Operator
     }
 } $SqlInstance $SqlCredential $Category $Database $Operator $OperatorEmail $DelayBetweenResponses $Disabled $EventDescriptionKeyword $EventSource $JobId $ExcludeSeverity $ExcludeMessageId $NotificationMessage $NotifyMethod $EnableException $__boundJobId $__boundCategory $__boundDelayBetweenResponses $__boundOperator $__realCmdlet @__commonParameters 3>&1 2>&1
 """;
