@@ -95,30 +95,10 @@ namespace Dataplat.Dbatools.Commands.Test
                 "GetDbaDbPhysicalFile",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
             Assert.IsNotNull(method, "helper resolves");
-            byte[] il = method.GetMethodBody().GetILAsByteArray();
-            System.Reflection.Module module = method.Module;
             bool constructsRuntimeException = false;
             bool constructsOtherException = false;
-            for (int i = 0; i < il.Length - 4; i++)
+            foreach (System.Reflection.ConstructorInfo ctor in ConstructedBy(method))
             {
-                if (il[i] != 0x73)
-                {
-                    continue;
-                }
-                int token = BitConverter.ToInt32(il, i + 1);
-                System.Reflection.MethodBase target;
-                try
-                {
-                    target = module.ResolveMethod(token);
-                }
-                catch (Exception)
-                {
-                    continue;
-                }
-                if (!(target is System.Reflection.ConstructorInfo ctor))
-                {
-                    continue;
-                }
                 if (typeof(Exception).IsAssignableFrom(ctor.DeclaringType))
                 {
                     if (ctor.DeclaringType == typeof(RuntimeException))
@@ -135,6 +115,75 @@ namespace Dataplat.Dbatools.Commands.Test
                 "the mask must be the engine RuntimeException, matching PS throw \"string\"");
             Assert.IsFalse(constructsOtherException,
                 "no other exception type may replace the mask");
+        }
+
+        /// <summary>Decodes the method body instruction by instruction (operand widths
+        /// from the reflection-emit opcode table) and yields the constructor of every
+        /// genuine newobj instruction - a raw byte scan would also match 0x73 bytes
+        /// inside operands.</summary>
+        private static System.Collections.Generic.List<System.Reflection.ConstructorInfo> ConstructedBy(System.Reflection.MethodInfo method)
+        {
+            System.Collections.Generic.Dictionary<short, System.Reflection.Emit.OpCode> opcodeTable =
+                new System.Collections.Generic.Dictionary<short, System.Reflection.Emit.OpCode>();
+            foreach (System.Reflection.FieldInfo field in typeof(System.Reflection.Emit.OpCodes).GetFields(
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
+            {
+                if (field.FieldType == typeof(System.Reflection.Emit.OpCode))
+                {
+                    System.Reflection.Emit.OpCode opcode = (System.Reflection.Emit.OpCode)field.GetValue(null);
+                    opcodeTable[opcode.Value] = opcode;
+                }
+            }
+
+            byte[] il = method.GetMethodBody().GetILAsByteArray();
+            System.Collections.Generic.List<System.Reflection.ConstructorInfo> constructors =
+                new System.Collections.Generic.List<System.Reflection.ConstructorInfo>();
+            int i = 0;
+            while (i < il.Length)
+            {
+                short value = il[i] == 0xFE ? (short)(0xFE00 | il[i + 1]) : il[i];
+                System.Reflection.Emit.OpCode op = opcodeTable[value];
+                i += op.Size;
+                int operandLength;
+                switch (op.OperandType)
+                {
+                    case System.Reflection.Emit.OperandType.InlineNone:
+                        operandLength = 0;
+                        break;
+                    case System.Reflection.Emit.OperandType.ShortInlineBrTarget:
+                    case System.Reflection.Emit.OperandType.ShortInlineI:
+                    case System.Reflection.Emit.OperandType.ShortInlineVar:
+                        operandLength = 1;
+                        break;
+                    case System.Reflection.Emit.OperandType.InlineVar:
+                        operandLength = 2;
+                        break;
+                    case System.Reflection.Emit.OperandType.InlineI8:
+                    case System.Reflection.Emit.OperandType.InlineR:
+                        operandLength = 8;
+                        break;
+                    case System.Reflection.Emit.OperandType.InlineSwitch:
+                        operandLength = 4 + 4 * BitConverter.ToInt32(il, i);
+                        break;
+                    default:
+                        operandLength = 4;
+                        break;
+                }
+                if (op == System.Reflection.Emit.OpCodes.Newobj)
+                {
+                    int token = BitConverter.ToInt32(il, i);
+                    System.Reflection.ConstructorInfo ctor = method.Module.ResolveMethod(
+                        token,
+                        method.DeclaringType.GetGenericArguments(),
+                        method.GetGenericArguments()) as System.Reflection.ConstructorInfo;
+                    if (ctor != null)
+                    {
+                        constructors.Add(ctor);
+                    }
+                }
+                i += operandLength;
+            }
+            return constructors;
         }
     }
 }
