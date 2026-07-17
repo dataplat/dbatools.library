@@ -28,9 +28,16 @@ namespace Dataplat.Dbatools.Commands;
 /// table-typed object, enumerated table-typed objects, converted property bags at End)
 /// share NewTable/BulkCopyTable translations that preserve the nested Stop-Function
 /// EnableException interplay (a non-EE create failure still marks tableExists true - the
-/// function's quirk). ConfirmPreference=None for non-Truncate runs is UNREPRESENTABLE in a
-/// compiled cmdlet (no function-local preference); deviation only for callers running with
-/// $ConfirmPreference at Low - documented accepted class. Positions: Table 3, Schema 4
+/// function's quirk). Gate map (W1-043 re-open fix): the bulk-copy write gate lives in
+/// NESTED Invoke-BulkCopy with no SupportsShouldProcess, so it honours -WhatIf but never
+/// confirm-prompts - ported as a WhatIf-only gate (see Helpers BulkCopy); the schema/table
+/// creation gates live in nested New-Table WITH SupportsShouldProcess and the truncate gate
+/// on the function itself - both prompt normally. The REMAINING accepted deviation is
+/// narrower than this note once claimed: the function's `if (-not $Truncate)
+/// { $ConfirmPreference = "None" }` mutes the truncate/create gates' prompts on
+/// non-Truncate runs - a function-local preference write with no compiled equivalent;
+/// deviation only for callers at $ConfirmPreference Low AND not passing -Truncate, on the
+/// New-Table gates only. Positions: Table 3, Schema 4
 /// (the function's explicit pins; nothing else positional).
 /// Surface pinned by migration/baselines/Write-DbaDbTableData.json.
 /// </summary>
