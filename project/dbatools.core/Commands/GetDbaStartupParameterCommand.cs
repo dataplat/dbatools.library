@@ -1,17 +1,18 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
+using System.Collections;
 using System.Management.Automation;
-using System.Text.RegularExpressions;
 using Dataplat.Dbatools.Parameter;
-using Microsoft.SqlServer.Management.Smo.Wmi;
 
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
 /// Retrieves SQL Server startup parameters from the Windows service configuration.
 /// Port of public/Get-DbaStartupParameter.ps1; surface pinned by migration/baselines/Get-DbaStartupParameter.json.
+/// The WMI work rides the source's own Invoke-ManagedComputerCommand call so the
+/// local-DCOM-then-WinRM fallback ladder applies: a direct ManagedComputer connection
+/// throws "RPC server is unavailable" on hosts that only allow remoting, where the
+/// shipped function silently degrades to remote execution.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaStartupParameter")]
 [OutputType(typeof(PSObject))]
@@ -41,160 +42,200 @@ public sealed class GetDbaStartupParameterCommand : DbaBaseCmdlet
 
         foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            try
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+                new DbaInstanceParameter[] { instance }, Credential,
+                Simple.ToBool(), EnableException.ToBool(),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
-                string computerName = instance.ComputerName;
-                string instanceName = instance.InstanceName;
-                string ogInstance = instance.FullSmoName;
-
-                string serviceDisplayName = $"SQL Server ({instanceName})";
-
-                // This command is in the internal function
-                // It's sorta like Invoke-Command.
-                ManagedComputer wmi;
-                if (Credential is not null)
+                if (item?.BaseObject is ErrorRecord nestedError)
                 {
-                    // ManagedComputer requires a plain-text password; this is a necessary
-                    // exception — the WMI API has no secure-string overload.
-                    System.Net.NetworkCredential netCred = Credential.GetNetworkCredential();
-                    string fullUserName = string.IsNullOrEmpty(netCred.Domain)
-                        ? netCred.UserName
-                        : $"{netCred.Domain}\\{netCred.UserName}";
-                    wmi = new ManagedComputer(computerName, fullUserName, netCred.Password);
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                    continue;
                 }
-                else
-                {
-                    wmi = new ManagedComputer(computerName);
-                }
-
-                List<Service> matchingServices = new();
-                foreach (Service svc in wmi.Services)
-                {
-                    if (string.Equals(svc.DisplayName, serviceDisplayName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        matchingServices.Add(svc);
-                    }
-                }
-
-                if (matchingServices.Count == 0)
-                {
-                    throw new Exception($"SQL Server service '{serviceDisplayName}' was not found on {computerName}.");
-                }
-
-                if (matchingServices.Count > 1)
-                {
-                    throw new Exception($"Multiple SQL Server services named '{serviceDisplayName}' were found on {computerName}.");
-                }
-
-                Service wmisvc = matchingServices[0];
-
-                string[] startupParams = wmisvc.StartupParameters.Split(';');
-
-                string? masterData = null, masterLog = null, errorLog = null;
-                List<string> traceFlagRaw = new(), debugFlagRaw = new();
-
-                foreach (string p in startupParams)
-                {
-                    if (p.StartsWith("-d", StringComparison.Ordinal))
-                        masterData = p;
-                    else if (p.StartsWith("-l", StringComparison.Ordinal))
-                        masterLog = p;
-                    else if (p.StartsWith("-e", StringComparison.Ordinal))
-                        errorLog = p;
-                    else if (p.StartsWith("-T", StringComparison.Ordinal))
-                        traceFlagRaw.Add(p);
-                    else if (p.StartsWith("-t", StringComparison.Ordinal))
-                        debugFlagRaw.Add(p);
-                }
-
-                // if ($traceFlags.length -eq 0) { $traceFlags = "None" } else { $traceFlags = [int[]]$traceFlags.substring(2) }
-                object traceFlags = StartupParameterParser.FlagsOrNone(traceFlagRaw);
-
-                // if ($debugFlags.length -eq 0) { $debugFlags = "None" } else { $debugFlags = [int[]]$debugFlags.substring(2) }
-                object debugFlags = StartupParameterParser.FlagsOrNone(debugFlagRaw);
-
-                PSObject result = new();
-                result.Properties.Add(new PSNoteProperty("ComputerName", computerName));
-                result.Properties.Add(new PSNoteProperty("InstanceName", instanceName));
-                result.Properties.Add(new PSNoteProperty("SqlInstance", ogInstance));
-
-                if (Simple.IsPresent)
-                {
-                    // Simple mode returns 9 essential properties (per .OUTPUTS docs).
-                    result.Properties.Add(new PSNoteProperty("MasterData", masterData?.TrimStart('-', 'd')));
-                    result.Properties.Add(new PSNoteProperty("MasterLog", masterLog?.TrimStart('-', 'l')));
-                    result.Properties.Add(new PSNoteProperty("ErrorLog", errorLog?.TrimStart('-', 'e')));
-                    result.Properties.Add(new PSNoteProperty("TraceFlags", traceFlags));
-                    result.Properties.Add(new PSNoteProperty("DebugFlags", debugFlags));
-                    result.Properties.Add(new PSNoteProperty("ParameterString", wmisvc.StartupParameters));
-                }
-                else
-                {
-                    // From https://msdn.microsoft.com/en-us/library/ms190737.aspx
-
-                    string? commandPromptParm = null, minimalStartParm = null;
-                    string? memoryToReserveParm = null, noEventLogsParm = null;
-                    string? instanceStartParm = null, disableMonitoringParm = null, increasedExtentsParm = null;
-                    string? singleUserParm = null;
-
-                    foreach (string p in startupParams)
-                    {
-                        // PS matches -c/-f/-n/-s/-x with -eq (case-insensitive); -E with -ceq (case-sensitive);
-                        // -g/-m with .StartsWith (case-sensitive). Preserve each exactly.
-                        if (string.Equals(p, "-c", StringComparison.OrdinalIgnoreCase)) commandPromptParm = p;
-                        else if (string.Equals(p, "-f", StringComparison.OrdinalIgnoreCase)) minimalStartParm = p;
-                        else if (p.StartsWith("-g", StringComparison.Ordinal)) memoryToReserveParm = p;
-                        else if (string.Equals(p, "-n", StringComparison.OrdinalIgnoreCase)) noEventLogsParm = p;
-                        else if (string.Equals(p, "-s", StringComparison.OrdinalIgnoreCase)) instanceStartParm = p;
-                        else if (string.Equals(p, "-x", StringComparison.OrdinalIgnoreCase)) disableMonitoringParm = p;
-                        else if (p == "-E") increasedExtentsParm = p;  // case-sensitive: $_ -ceq '-E'
-                        else if (p.StartsWith("-m", StringComparison.Ordinal)) singleUserParm = p;
-                    }
-
-                    bool minimalStart = false, noEventLogs = false, instanceStart = false;
-                    bool disableMonitoring = false, increasedExtents = false, commandPrompt = false, singleUser = false;
-
-                    if (commandPromptParm is not null) commandPrompt = true;
-                    if (minimalStartParm is not null) minimalStart = true;
-                    // if ($null -eq $memoryToReserve) { $memoryToReserve = 0 }
-                    object memoryToReserve = memoryToReserveParm is null ? (object)0 : memoryToReserveParm;
-                    if (noEventLogsParm is not null) noEventLogs = true;
-                    if (instanceStartParm is not null) instanceStart = true;
-                    if (disableMonitoringParm is not null) disableMonitoring = true;
-                    if (increasedExtentsParm is not null) increasedExtents = true;
-
-                    string? singleUserDetails = null;
-                    if (singleUserParm is not null && singleUserParm.Length != 0)
-                    {
-                        singleUser = true;
-                        singleUserDetails = singleUserParm.TrimStart('-', 'm');
-                    }
-
-                    result.Properties.Add(new PSNoteProperty("MasterData", Regex.Replace(masterData ?? string.Empty, @"^-[dD]", string.Empty)));
-                    result.Properties.Add(new PSNoteProperty("MasterLog", Regex.Replace(masterLog ?? string.Empty, @"^-[lL]", string.Empty)));
-                    result.Properties.Add(new PSNoteProperty("ErrorLog", Regex.Replace(errorLog ?? string.Empty, @"^-[eE]", string.Empty)));
-                    result.Properties.Add(new PSNoteProperty("TraceFlags", traceFlags));
-                    result.Properties.Add(new PSNoteProperty("DebugFlags", debugFlags));
-                    result.Properties.Add(new PSNoteProperty("CommandPromptStart", commandPrompt));
-                    result.Properties.Add(new PSNoteProperty("MinimalStart", minimalStart));
-                    result.Properties.Add(new PSNoteProperty("MemoryToReserve", memoryToReserve));
-                    result.Properties.Add(new PSNoteProperty("SingleUser", singleUser));
-                    result.Properties.Add(new PSNoteProperty("SingleUserName", singleUserDetails));
-                    result.Properties.Add(new PSNoteProperty("NoLoggingToWinEvents", noEventLogs));
-                    result.Properties.Add(new PSNoteProperty("StartAsNamedInstance", instanceStart));
-                    result.Properties.Add(new PSNoteProperty("DisableMonitoring", disableMonitoring));
-                    result.Properties.Add(new PSNoteProperty("IncreasedExtents", increasedExtents));
-                    result.Properties.Add(new PSNoteProperty("ParameterString", wmisvc.StartupParameters));
-                }
-
-                WriteObject(result);
-            }
-            catch (Exception ex)
-            {
-                StopFunction($"{instance} failed.", target: instance, exception: ex, continueLoop: true);
-                continue;
+                WriteObject(item);
             }
         }
     }
 
+    private object? BoundCommonParameter(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+        {
+            return LanguagePrimitives.IsTrue(value);
+        }
+        return null;
+    }
+
+    private void RemoveHopErrorBookkeeping(ErrorRecord record)
+    {
+        try
+        {
+            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+                return;
+            if (errorList[0] is not ErrorRecord first)
+                return;
+            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
+                string.Equals(first.Exception?.Message, record.Exception?.Message, System.StringComparison.Ordinal))
+            {
+                errorList.RemoveAt(0);
+            }
+        }
+        catch
+        {
+            // Best-effort bookkeeping only.
+        }
+    }
+
+    // PS: the source process foreach VERBATIM, one element per hop invocation (the
+    // source loop line doubles as the guard loop, so the catch's -Continue lands on it
+    // exactly like the function world). Substitution only: -FunctionName appended to
+    // the catch-path Stop-Function (the hop scriptblock has no function frame to stamp).
+    private const string ProcessScript = """
+param($SqlInstance, $Credential, $Simple, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$Credential, $Simple, $EnableException, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    foreach ($instance in $SqlInstance) {
+        try {
+                $computerName = $instance.ComputerName
+                $instanceName = $instance.InstanceName
+                $ogInstance = $instance.FullSmoName
+
+                $scriptBlock = {
+                    $computerName = $args[0]
+                    $instanceName = $args[1]
+                    $ogInstance = $args[2]
+                    $Simple = $args[3]
+
+                    $serviceDisplayName = "SQL Server ($instanceName)"
+                    $wmisvc = @($wmi.Services | Where-Object DisplayName -eq $serviceDisplayName)
+
+                    if ($wmisvc.Count -eq 0) {
+                        throw "SQL Server service '$serviceDisplayName' was not found on $computerName."
+                    }
+
+                    if ($wmisvc.Count -gt 1) {
+                        throw "Multiple SQL Server services named '$serviceDisplayName' were found on $computerName."
+                    }
+
+                    $wmisvc = $wmisvc[0]
+
+                    $params = $wmisvc.StartupParameters -split ';'
+
+                    $masterData = $params | Where-Object { $_.StartsWith('-d') }
+                    $masterLog = $params | Where-Object { $_.StartsWith('-l') }
+                    $errorLog = $params | Where-Object { $_.StartsWith('-e') }
+                    $traceFlags = $params | Where-Object { $_.StartsWith('-T') }
+                    $debugFlags = $params | Where-Object { $_.StartsWith('-t') }
+
+                    if ($traceFlags.length -eq 0) {
+                        $traceFlags = "None"
+                    } else {
+                        $traceFlags = [int[]]$traceFlags.substring(2)
+                    }
+
+                    if ($debugFlags.length -eq 0) {
+                        $debugFlags = "None"
+                    } else {
+                        $debugFlags = [int[]]$debugFlags.substring(2)
+                    }
+
+                    if ($Simple -eq $true) {
+                        [PSCustomObject]@{
+                            ComputerName    = $computerName
+                            InstanceName    = $instanceName
+                            SqlInstance     = $ogInstance
+                            MasterData      = $masterData.TrimStart('-d')
+                            MasterLog       = $masterLog.TrimStart('-l')
+                            ErrorLog        = $errorLog.TrimStart('-e')
+                            TraceFlags      = $traceFlags
+                            DebugFlags      = $debugFlags
+                            ParameterString = $wmisvc.StartupParameters
+                        }
+                    } else {
+                        # From https://msdn.microsoft.com/en-us/library/ms190737.aspx
+
+                        $commandPromptParm = $params | Where-Object { $_ -eq '-c' }
+                        $minimalStartParm = $params | Where-Object { $_ -eq '-f' }
+                        $memoryToReserve = $params | Where-Object { $_.StartsWith('-g') }
+                        $noEventLogsParm = $params | Where-Object { $_ -eq '-n' }
+                        $instanceStartParm = $params | Where-Object { $_ -eq '-s' }
+                        $disableMonitoringParm = $params | Where-Object { $_ -eq '-x' }
+                        $increasedExtentsParm = $params | Where-Object { $_ -ceq '-E' }
+
+                        $minimalStart = $noEventLogs = $instanceStart = $disableMonitoring = $false
+                        $increasedExtents = $commandPrompt = $singleUser = $false
+
+                        if ($null -ne $commandPromptParm) {
+                            $commandPrompt = $true
+                        }
+                        if ($null -ne $minimalStartParm) {
+                            $minimalStart = $true
+                        }
+                        if ($null -eq $memoryToReserve) {
+                            $memoryToReserve = 0
+                        }
+                        if ($null -ne $noEventLogsParm) {
+                            $noEventLogs = $true
+                        }
+                        if ($null -ne $instanceStartParm) {
+                            $instanceStart = $true
+                        }
+                        if ($null -ne $disableMonitoringParm) {
+                            $disableMonitoring = $true
+                        }
+                        if ($null -ne $increasedExtentsParm) {
+                            $increasedExtents = $true
+                        }
+
+                        $singleUserParm = $params | Where-Object { $_.StartsWith('-m') }
+
+                        if ($singleUserParm.length -ne 0) {
+                            $singleUser = $true
+                            $singleUserDetails = $singleUserParm.TrimStart('-m')
+                        }
+
+                        [PSCustomObject]@{
+                            ComputerName         = $computerName
+                            InstanceName         = $instanceName
+                            SqlInstance          = $ogInstance
+                            MasterData           = $masterData -replace '^-[dD]', ''
+                            MasterLog            = $masterLog -replace '^-[lL]', ''
+                            ErrorLog             = $errorLog -replace '^-[eE]', ''
+                            TraceFlags           = $traceFlags
+                            DebugFlags           = $debugFlags
+                            CommandPromptStart   = $commandPrompt
+                            MinimalStart         = $minimalStart
+                            MemoryToReserve      = $memoryToReserve
+                            SingleUser           = $singleUser
+                            SingleUserName       = $singleUserDetails
+                            NoLoggingToWinEvents = $noEventLogs
+                            StartAsNamedInstance = $instanceStart
+                            DisableMonitoring    = $disableMonitoring
+                            IncreasedExtents     = $increasedExtents
+                            ParameterString      = $wmisvc.StartupParameters
+                        }
+                    }
+                }
+
+                # This command is in the internal function
+                # It's sorta like Invoke-Command.
+                if ($Credential) {
+                    Invoke-ManagedComputerCommand -Server $computerName -Credential $Credential -ScriptBlock $scriptBlock -ArgumentList $computerName, $instanceName, $ogInstance, $Simple
+                } else {
+                    Invoke-ManagedComputerCommand -Server $computerName -ScriptBlock $scriptBlock -ArgumentList $computerName, $instanceName, $ogInstance, $Simple
+                }
+        } catch {
+            Stop-Function -Message "$instance failed." -ErrorRecord $_ -Continue -Target $instance -FunctionName Get-DbaStartupParameter
+        }
+    }
+} $SqlInstance $Credential $Simple $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
 }
