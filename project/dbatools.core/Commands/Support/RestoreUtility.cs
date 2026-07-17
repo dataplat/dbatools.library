@@ -230,14 +230,16 @@ internal static class RestoreUtility
     /// Port of private/functions/Get-DbaDbPhysicalFile.ps1: fastest way to fetch just the
     /// paths of the physical files for every database on the instance, also for offline
     /// databases. The caller passes its live connected server (Connect pass-through).
-    /// Two intentional divergences from the source, both unobservable from the shipped
-    /// call site: the source's bare string throw surfaces as a RuntimeException where
-    /// this port throws InvalidOperationException (message identical, and nothing
-    /// catches by type on this path); and the source reads only the FIRST result table
-    /// (its Query script method returns Tables[0]) where this port flattens all tables -
-    /// identical for the single-SELECT batches this method builds. The error mask wraps
-    /// ONLY the query leg; failures before it (the version read) surface raw, matching
-    /// the source's try boundary.
+    /// The source's bare string throw is ported as RuntimeException (the engine's own
+    /// shape for throw "string"). One intentional divergence, genuinely unobservable:
+    /// the source reads only the FIRST result table (its Query script method returns
+    /// Tables[0]) where this port flattens all tables - identical for the single-SELECT
+    /// batches this method builds. The error mask wraps ONLY the query leg, matching
+    /// the source's try boundary; failures before it (the version read) are never
+    /// replaced by the mask in either world, though each world surfaces its own
+    /// wrapper type there (SMO's connection failure here, the engine's
+    /// property-getter wrapper in PS) - unreachable from the shipped call site, which
+    /// passes an already-connected server.
     /// </summary>
     internal static System.Data.DataRow[] GetDbaDbPhysicalFile(PSCmdlet host, Server server)
     {
@@ -264,7 +266,10 @@ internal static class RestoreUtility
         }
         catch
         {
-            throw new InvalidOperationException("Error enumerating files");
+            // PS: throw "Error enumerating files" - a bare string throw surfaces as
+            // RuntimeException, and $Error[0].Exception type + CategoryInfo.Reason are
+            // user-observable past the shipped call site.
+            throw new RuntimeException("Error enumerating files");
         }
     }
 
