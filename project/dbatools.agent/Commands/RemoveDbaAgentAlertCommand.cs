@@ -118,7 +118,7 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }, EndScript,
-            _dbAlerts.ToArray(), this,
+            _dbAlerts.ToArray(), EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -185,7 +185,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // -FunctionName Remove-DbaAgentAlert on the direct Stop-Function. $dbAlerts is the accumulated list
     // the C# collected across all process records.
     private const string EndScript = """
-param($dbAlerts, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($dbAlerts, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -194,7 +194,7 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param($dbAlerts, $__realCmdlet)
+    param($dbAlerts, $EnableException, $__realCmdlet)
 
     # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaAgentAlert.
     foreach ($dbAlert in $dbAlerts) {
@@ -219,6 +219,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $output
         }
     }
-} $dbAlerts $__realCmdlet @__commonParameters 3>&1 2>&1
+} $dbAlerts $EnableException $__realCmdlet @__commonParameters 3>&1 2>&1
 """;
 }
