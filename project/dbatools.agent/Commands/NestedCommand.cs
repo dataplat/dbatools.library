@@ -103,37 +103,64 @@ internal static class NestedCommand
                 "Write-Output $__nestedTerminationMarker }";
 
             ErrorRecord? terminatingError = null;
+            // Pipeline-stop parity (DEF-001 tail, W2-030): a downstream early stop -
+            // e.g. `<cmdlet> | Select-Object -First N` - makes the host's WriteObject throw
+            // PipelineStoppedException the instant it has enough. Escaping that from the
+            // DataAdded handler killed the child process outright (function world survives).
+            // Catch it, BeginStop the nested pipeline (non-blocking - a blocking Stop() from
+            // inside the pipeline's own output handler deadlocks) so upstream side effects
+            // halt exactly like the function world, then re-throw to the host after Invoke.
+            bool downstreamStopped = false;
             using PowerShell nested = PowerShell.Create(RunspaceMode.CurrentRunspace);
             using PSDataCollection<PSObject> output = new PSDataCollection<PSObject>();
             output.DataAdded += (_, eventArgs) =>
             {
+                if (downstreamStopped)
+                {
+                    return;
+                }
                 PSObject item = output[eventArgs.Index];
-                if (string.Equals(item?.BaseObject as string, terminationMarker, StringComparison.Ordinal))
+                try
                 {
-                    terminatingError = termination["ErrorRecord"] as ErrorRecord ??
-                        throw new InvalidOperationException("Nested command terminated without an ErrorRecord.");
+                    if (string.Equals(item?.BaseObject as string, terminationMarker, StringComparison.Ordinal))
+                    {
+                        terminatingError = termination["ErrorRecord"] as ErrorRecord ??
+                            throw new InvalidOperationException("Nested command terminated without an ErrorRecord.");
+                    }
+                    else if (item?.BaseObject is WarningRecord warning)
+                    {
+                        host.WriteWarning(warning.Message);
+                    }
+                    else if (item?.BaseObject is VerboseRecord verbose)
+                    {
+                        host.WriteVerbose(verbose.Message);
+                    }
+                    else if (item?.BaseObject is DebugRecord debug)
+                    {
+                        host.WriteDebug(debug.Message);
+                    }
+                    else if (item?.BaseObject is InformationRecord information)
+                    {
+                        host.WriteInformation(
+                            information.MessageData,
+                            new List<string>(information.Tags).ToArray());
+                    }
+                    else
+                    {
+                        onOutput(item!);
+                    }
                 }
-                else if (item?.BaseObject is WarningRecord warning)
+                catch (PipelineStoppedException)
                 {
-                    host.WriteWarning(warning.Message);
-                }
-                else if (item?.BaseObject is VerboseRecord verbose)
-                {
-                    host.WriteVerbose(verbose.Message);
-                }
-                else if (item?.BaseObject is DebugRecord debug)
-                {
-                    host.WriteDebug(debug.Message);
-                }
-                else if (item?.BaseObject is InformationRecord information)
-                {
-                    host.WriteInformation(
-                        information.MessageData,
-                        new List<string>(information.Tags).ToArray());
-                }
-                else
-                {
-                    onOutput(item!);
+                    downstreamStopped = true;
+                    try
+                    {
+                        nested.BeginStop(null, null);
+                    }
+                    catch (PSInvalidOperationException)
+                    {
+                        // The pipeline may already be past the stoppable state; the re-throw below still unwinds the host.
+                    }
                 }
             };
 
@@ -141,7 +168,21 @@ internal static class NestedCommand
                 .AddArgument(scriptArgs)
                 .AddArgument(termination)
                 .AddArgument(terminationMarker);
-            nested.Invoke<PSObject>(null, output, null);
+            try
+            {
+                nested.Invoke<PSObject>(null, output, null);
+            }
+            catch (PipelineStoppedException)
+            {
+                downstreamStopped = true;
+            }
+
+            if (downstreamStopped)
+            {
+                // Honor the downstream stop on the HOST pipeline - unwinds ProcessRecord
+                // exactly like the function world's StopUpstreamCommands.
+                throw new PipelineStoppedException();
+            }
 
             if (terminatingError is not null)
             {
