@@ -71,27 +71,18 @@ namespace Dataplat.Dbatools.Commands.Test
                 using (PowerShell shell = PowerShell.Create())
                 {
                     shell.Runspace = runspace;
-                    // -EnableException makes the begin-block Stop-Function terminating; the
-                    // dummy is never scripted because the interrupt fires first.
-                    shell.AddScript("'x' | Export-DbaScript -Path $args[0] -EnableException").AddArgument(file);
-                    try
-                    {
-                        shell.Invoke();
-                        Assert.IsTrue(shell.HadErrors, "an existing file -Path must surface an error");
-                    }
-                    catch (RuntimeException ex)
-                    {
-                        StringAssert.Contains(ex.Message, "must be a directory", "the stop reports the directory requirement");
-                        return;
-                    }
-                    // If Invoke did not throw, the terminating error still lands in the stream.
-                    bool sawMessage = false;
-                    foreach (ErrorRecord error in shell.Streams.Error)
-                    {
-                        if (error.ToString().Contains("must be a directory"))
-                            sawMessage = true;
-                    }
-                    Assert.IsTrue(sawMessage, "the error reports the must-be-a-directory message");
+                    // An in-PowerShell try/catch proves the begin-block Stop-Function under
+                    // -EnableException actually TERMINATED (a non-terminating error would fall
+                    // to NO-CATCH and fail the assertion). The dummy is never scripted because
+                    // the interrupt fires first.
+                    shell.AddScript(
+                        "try { 'x' | Export-DbaScript -Path $args[0] -EnableException; 'NO-CATCH' } " +
+                        "catch { 'CAUGHT:' + $_.Exception.Message }").AddArgument(file);
+                    Collection<PSObject> output = shell.Invoke();
+                    Assert.AreEqual(1, output.Count, "the script emits exactly one outcome record");
+                    string outcome = (string)output[0].BaseObject;
+                    StringAssert.StartsWith(outcome, "CAUGHT:", "the -EnableException stop must terminate and be caught");
+                    StringAssert.Contains(outcome, "must be a directory", "the stop reports the directory requirement");
                 }
             }
             finally
