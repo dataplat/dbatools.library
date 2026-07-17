@@ -10,9 +10,10 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Dataplat.Dbatools.Commands.Test
 {
     /// <summary>
-    /// Host cmdlet for RestoreUtility.GetRestoreContinuableDatabase: the helper needs a
-    /// live PSCmdlet for its Write-Message plumbing, so the test runs it in a real
-    /// in-process runspace against an unreachable server.
+    /// Host cmdlet for RestoreUtility.GetRestoreContinuableDatabase. The helper takes a
+    /// PSCmdlet but discards it (it emits no messages); the runspace host just supplies
+    /// a real invocation context to satisfy the signature. It drives the helper against
+    /// an unreachable server so the post-connection version read fails.
     /// </summary>
     [Cmdlet("Test", "RestoreContinuableHost")]
     public sealed class TestRestoreContinuableHostCommand : DbaBaseCmdlet
