@@ -218,9 +218,19 @@ $ProgressPreference = "Continue"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $bogusArchive = Join-Path $tempPath "bogus.zip"
 $bogusStage = Join-Path $tempPath "bogus"
-# ExtractToDirectory will not overwrite an existing file, so start from a clean directory.
-Remove-Item -LiteralPath $bogusStage -Recurse -Force -ErrorAction SilentlyContinue
-[System.IO.Compression.ZipFile]::ExtractToDirectory($bogusArchive, $bogusStage)
+# Both steps must fail the build loudly. A .NET method that throws while the error preference is
+# "Continue" writes an error record and then carries straight on to the next statement, so an
+# unguarded failure here yields a drop that is missing Bogus and still reports success - the exact
+# silent-partial-output problem that replacing the external extractor was meant to end.
+try {
+    # ExtractToDirectory refuses to overwrite an existing file, so start from a clean directory.
+    if (Test-Path -LiteralPath $bogusStage) {
+        Remove-Item -LiteralPath $bogusStage -Recurse -Force -ErrorAction Stop
+    }
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($bogusArchive, $bogusStage)
+} catch {
+    throw "Failed to extract $bogusArchive to $bogusStage. $($_.Exception.Message)"
+}
 
 
 # Copy Bogus files for both frameworks
