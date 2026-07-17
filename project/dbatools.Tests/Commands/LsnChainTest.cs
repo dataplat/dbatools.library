@@ -31,15 +31,18 @@ namespace Dataplat.Dbatools.Commands.Test
     /// <summary>
     /// Coverage for LsnChain.Test, the C# parity port of
     /// private/functions/Test-DbaLsnChain.ps1 (validates a restorable LSN chain of backup
-    /// headers). Expected values are ground-truthed against the PS source (probe
-    /// 2026-07-17) across full-only, full+t-logs, gaps, multi-full, multi-diff, diff+log,
-    /// and the -Continue short-circuit. The port matches BOTH PS editions on every
-    /// scenario EXCEPT the single-t-log break: there the source is edition-DIVERGENT - a
-    /// lone T-log emerging from Sort-Object is a scalar with no .Count on PS 5.1, so the
-    /// source's chain-break for-loop is skipped and a broken single-log chain wrongly
-    /// PASSES on 5.1 while it FAILS on 7; the port uses List.Count and always runs the
-    /// loop, matching the (correct) PS 7 behavior. That source divergence is filed to the
-    /// Test-DbaLsnChain owner; the pin locks the port's PS7-faithful result.
+    /// headers). The eight edition-AGNOSTIC scenarios (full-only, full+t-logs, gaps,
+    /// multi-full, multi-diff, diff+log, and the -Continue short-circuit) are ground-truthed
+    /// against the PS source on PS 5.1 AND 7.6 (probe 2026-07-17, identical both editions)
+    /// and pinned in LsnChain_GroundTruthScenarios. The single-t-log break is NOT pinned as
+    /// a contract: the source is edition-split there - a lone T-log emerging from
+    /// Sort-Object is a scalar with no .Count on PS 5.1, so the source's chain-break loop is
+    /// skipped and a broken single-log chain PASSES on 5.1 but FAILS on 7. The port uses
+    /// List.Count and returns the PS7 result on both TFMs, changing the shipped result on a
+    /// PS5.1 host. Whether to keep that unification or replicate the 5.1 loop-skip is a
+    /// preserve-vs-unify decision filed to the Test-DbaLsnChain owner and not yet ruled; the
+    /// LsnChain_SingleTLogBreak_CharacterizesOpenEditionDivergence method only characterizes
+    /// what the port currently does.
     /// </summary>
     [TestClass]
     public class LsnChainTest
