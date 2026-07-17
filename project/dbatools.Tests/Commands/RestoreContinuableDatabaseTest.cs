@@ -43,12 +43,15 @@ namespace Dataplat.Dbatools.Commands.Test
     /// line-by-line diff: the modern (VersionMajor &gt;= 9) SELECT is byte-identical to
     /// the source; the SQL 2000 branch differs only in inert leading whitespace (a DDL
     /// CREATE TABLE that returns no rows in either world); the .Tables flatten matches
-    /// the source's $dataset.Tables.Rows member enumeration. Unlike the sibling
-    /// GetDbaDbPhysicalFile this method has NO error mask - every failure propagates raw,
-    /// exactly as the source (which has no try/catch). The pin below guards that
-    /// no-mask contract offline (a disconnected server's version read throws and is NOT
-    /// swallowed into an empty result); the live SQL selection and row flatten require a
-    /// connected instance and ride the integrator gate through Restore-DbaDatabase.
+    /// the source's $dataset.Tables.Rows member enumeration. The source wraps ONLY its
+    /// Connect-DbaInstance in try/catch (Stop-Function + return on failure); that connect
+    /// and its catch are performed by the compiled caller (RestoreDbaDatabaseCommand),
+    /// not by this absorbed helper, which ports the post-connection portion the source
+    /// leaves unwrapped - so within the ported region every failure propagates raw. The
+    /// pin below guards that no-added-mask contract offline (a disconnected server's
+    /// version read throws and is NOT swallowed into an empty result); the live SQL
+    /// selection and row flatten require a connected instance and ride the integrator
+    /// gate through Restore-DbaDatabase.
     /// </summary>
     [TestClass]
     public class RestoreContinuableDatabaseTest
