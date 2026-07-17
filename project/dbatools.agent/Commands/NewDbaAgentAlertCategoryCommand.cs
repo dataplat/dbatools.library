@@ -119,6 +119,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Category, [switch]$Force, $EnableException, $__realCmdlet)
 
     if ($Force) { $ConfirmPreference = 'none' }
+    $__gate = if ($Force) { $PSCmdlet } else { $__realCmdlet }
     foreach ($instance in $SqlInstance) {
         try {
             $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
@@ -130,7 +131,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($cat -in $server.JobServer.AlertCategories.Name) {
                 Stop-Function -Message "Alert category $cat already exists on $instance" -Target $instance -Continue -FunctionName New-DbaAgentAlertCategory
             } else {
-                if ($__realCmdlet.ShouldProcess($instance, "Adding the alert category $cat")) {
+                if ($__gate.ShouldProcess($instance, "Adding the alert category $cat")) {
                     try {
                         try {
                             $alertCategory = New-Object Microsoft.SqlServer.Management.Smo.Agent.AlertCategory($server.JobServer, $cat)
