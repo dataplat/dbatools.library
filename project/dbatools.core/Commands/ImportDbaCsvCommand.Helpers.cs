@@ -776,8 +776,9 @@ public sealed partial class ImportDbaCsvCommand
     }
 
     /// <summary>Absorbed private/functions/Get-BulkRowsCopiedCount.ps1: reflection read of
-    /// SqlBulkCopy's private _rowsCopied field, -1 on any failure.</summary>
-    internal static int GetBulkRowsCopiedCount(SqlBulkCopy bulkCopy)
+    /// SqlBulkCopy's private _rowsCopied field, -1 on any failure - including a null
+    /// instance, which the source treats the same as any other reflection failure.</summary>
+    internal static int GetBulkRowsCopiedCount(SqlBulkCopy? bulkCopy)
     {
         FieldInfo? rowsCopiedField = typeof(SqlBulkCopy).GetField("_rowsCopied", BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.Instance);
         try
