@@ -116,7 +116,7 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Category, [switch]$Force, $EnableException, $__realCmdlet)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Category, $Force, $EnableException, $__realCmdlet)
 
     if ($Force) { $ConfirmPreference = 'none' }
     $__gate = if ($Force) { $PSCmdlet } else { $__realCmdlet }
