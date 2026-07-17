@@ -96,6 +96,19 @@ namespace Dataplat.Dbatools.Commands.Test
         }
 
         [TestMethod]
+        public void AdjustedRows_Int32MinValueReportedReturnsWhereScriptThrows()
+        {
+            // The accepted divergence pinned as a value contract: an Int32-typed
+            // reported value of exactly int.MinValue with a negative previous makes the
+            // PowerShell helper throw ([math]::Abs binds the Int32 overload), while the
+            // long parameters here compute Abs(previous) - Abs(reported) = -2147483643
+            // (probed on both editions). If either copy starts throwing or returning
+            // something else, the documented contract changed.
+            Assert.AreEqual(-2147483643L, ImportDbaCsvCommand.GetAdjustedTotalRowsCopied(int.MinValue, -5));
+            Assert.AreEqual(-2147483643L, WriteDbaDbTableDataCommand.GetAdjustedTotalRowsCopied(int.MinValue, -5));
+        }
+
+        [TestMethod]
         public void AdjustedRows_BothCopiesThrowAtLongMinValuePrevious()
         {
             // Math.Abs(long) guards long.MinValue with an OverflowException regardless
