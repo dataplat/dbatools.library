@@ -135,16 +135,23 @@ namespace Dataplat.Dbatools.Commands.Test
         }
 
         [TestMethod]
-        public void LsnChain_SingleTLogBreak_MatchesPS7NotPS51()
+        public void LsnChain_SingleTLogBreak_CharacterizesOpenEditionDivergence()
         {
+            // CHARACTERIZATION of an OPEN, FILED divergence - not a sanctioned contract.
             // A lone T-log whose FirstLSN (2500) exceeds the full anchor's LastLSN (2000)
-            // is a broken chain. PS7 detects it and returns false; PS5.1's scalar-.Count
-            // quirk skips the break loop and wrongly returns true. The port matches PS7.
+            // is a broken chain. The SOURCE is edition-split: PS7 returns false (break
+            // detected); PS5.1 returns true because a single Sort-Object result is a scalar
+            // with no .Count, so the source's break loop is skipped. The port uses
+            // List.Count and returns false on BOTH TFMs - which changes the shipped result
+            // on a PS5.1 host (legacy true -> compiled false). This assertion locks what
+            // the port CURRENTLY does; whether the port should keep the unified PS7 result
+            // or replicate the PS5.1 loop-skip (bug-for-bug) is a preserve-vs-unify call
+            // filed to the Test-DbaLsnChain owner (TB-092), not yet ruled.
             Assert.IsFalse(Run(new[]
             {
                 Bh("Database", 1000, 2000, 1500, 1500, "full.bak"),
                 Bh("Transaction Log", 2500, 3000, 1500, 1500, "t1.trn"),
-            }, false), "08 single-t-log break (PS7-faithful)");
+            }, false), "08 single-t-log break - current port behavior (PS7-faithful)");
         }
     }
 }
