@@ -172,7 +172,7 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string]$Alert, [string]$Category, [string]$Database, [string[]]$Operator, [int]$DelayBetweenResponses, [switch]$Disabled, [string]$EventDescriptionKeyword, [string]$EventSource, [string]$JobId, [int]$Severity, [int]$MessageId, [string]$NotificationMessage, [string]$PerformanceCondition, [string]$WmiEventNamespace, [string]$WmiEventQuery, [string]$NotifyMethod, $EnableException, $__realCmdlet)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string]$Alert, [string]$Category, [string]$Database, [string[]]$Operator, [int]$DelayBetweenResponses, $Disabled, [string]$EventDescriptionKeyword, [string]$EventSource, [string]$JobId, [int]$Severity, [int]$MessageId, [string]$NotificationMessage, [string]$PerformanceCondition, [string]$WmiEventNamespace, [string]$WmiEventQuery, [string]$NotifyMethod, $EnableException, $__realCmdlet)
 
     if ($NotifyMethod) {
         $null = Set-Variable -Name IncludeEventDescription -Value $NotifyMethod
