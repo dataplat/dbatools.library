@@ -26,6 +26,24 @@ namespace Dataplat.Dbatools.Connection.Test
         }
 
         [TestMethod]
+        public void ConvertConnectionString_CoversAllSevenSynonymsExactlyLikeThePsHelper()
+        {
+            // TB-009: private/functions/Convert-ConnectionString.ps1 parity - the three
+            // synonyms the original test did not pin, plus the exact String.Replace
+            // semantics the PS helper relies on: ORDINAL and CASE-SENSITIVE (a lowercase
+            // spelling is deliberately untouched in both worlds), every occurrence
+            // replaced, and non-matching text byte-identical.
+            string legacy = "Connect Retry Interval=10;Pool Blocking Period=Auto;Multiple Subnet Failover=True";
+            string converted = ConnectionService.ConvertConnectionString(legacy);
+            Assert.AreEqual("ConnectRetryInterval=10;PoolBlockingPeriod=Auto;MultiSubnetFailover=True", converted);
+
+            Assert.AreEqual("application intent=ReadOnly", ConnectionService.ConvertConnectionString("application intent=ReadOnly"), "String.Replace is case-sensitive in both worlds - lowercase stays");
+            Assert.AreEqual("A=ApplicationIntentApplicationIntent", ConnectionService.ConvertConnectionString("A=Application IntentApplication Intent"), "every occurrence is replaced, even mid-token");
+            Assert.AreEqual("Data Source=sql01", ConnectionService.ConvertConnectionString("Data Source=sql01"), "non-matching strings pass through byte-identical");
+            Assert.IsNull(ConnectionService.ConvertConnectionString(null), "the null early return is a documented divergence unreachable through the PS mandatory binder - pinned mechanically");
+        }
+
+        [TestMethod]
         public void NormalizeFailoverPartnerKey_RewritesCompactSpelling()
         {
             string normalized = ConnectionService.NormalizeFailoverPartnerKey("Data Source=sqlmirror;FailoverPartner=mirrorpartner");
