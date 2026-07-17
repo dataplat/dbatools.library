@@ -130,6 +130,12 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
             TrustServerCertificate = new SwitchParameter(LanguagePrimitives.IsTrue(GetConfigValue("sql.connection.trustcert")));
     }
 
+    // PS: $isAzure = $true is the only assignment in the function - FUNCTION scope, never
+    // initialized or reset, so once an Azure instance latches it every later instance and
+    // pipeline record takes the Azure auth branch too (DEF-008 re-open: a block-local flag
+    // built the wrong-auth string only where the source ALSO builds it).
+    private bool _isAzure;
+
     protected override void ProcessRecord()
     {
         foreach (DbaInstanceParameter inputInstance in SqlInstance)
@@ -323,7 +329,6 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
 
             if (ShouldProcess(PsText(instance), "Making a new Connection String"))
             {
-                bool isAzure = false;
                 object? inputObject = PsProperty.Get(instance, "InputObject");
                 bool azureName = Regex.IsMatch(instance.ComputerName ?? "", "database\\.windows\\.net", RegexOptions.IgnoreCase) ||
                     Regex.IsMatch(PsText(PsProperty.Get(inputObject, "ComputerName")), "database\\.windows\\.net", RegexOptions.IgnoreCase);
@@ -355,7 +360,7 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
                     }
                     else
                     {
-                        isAzure = true;
+                        _isAzure = true;
 
                         if (!TestBound("ConnectTimeout"))
                             ConnectTimeout = 30;
@@ -449,7 +454,7 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
                     if (LanguagePrimitives.IsTrue(ApplicationIntent))
                         connstring = connstring + ";ApplicationIntent=" + ApplicationIntent + ";";
 
-                    if (isAzure)
+                    if (_isAzure)
                     {
                         if (LanguagePrimitives.IsTrue(Credential))
                         {
