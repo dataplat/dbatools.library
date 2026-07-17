@@ -83,17 +83,12 @@ public sealed class BackupDbaDbCertificateCommand : DbaBaseCmdlet
     /// <summary>Set when the begin block stopped the command, suppressing every record.</summary>
     private bool _beginInterrupted;
 
-    /// <summary>
-    /// The interrupt flag Stop-Function sets when it is called without -Continue.
-    /// </summary>
-    /// <remarks>
-    /// In the script implementation that flag lived in the function scope, which spanned the whole
-    /// pipeline: once a per-certificate path failure set it, the next piped record returned at its
-    /// Test-FunctionInterrupt guard. Each record here runs in its own hop scope, so the flag is
-    /// reported through the process hop's completion sentinel and held here to reproduce the
-    /// original pipeline-wide behavior.
-    /// </remarks>
-    private bool _interruptLatched;
+    // There is deliberately NO cross-record interrupt field. The only latch-setting Stop-Function
+    // inside export-cert (the path-access failure) runs without -Continue, which sets the flag at
+    // that helper's own scope; the flag is discarded when the helper returns and never reaches the
+    // command scope, so it does not stop later records. This was confirmed against the script
+    // implementation: piping two certificates through an inaccessible path processes BOTH. The begin
+    // validation is the only stop that spans the pipeline, and it is carried by _beginInterrupted.
 
     /// <summary>Validates the password combination once, before any pipeline record is processed.</summary>
     protected override void BeginProcessing()
@@ -126,7 +121,7 @@ public sealed class BackupDbaDbCertificateCommand : DbaBaseCmdlet
     /// <summary>Exports the requested certificates for one pipeline record.</summary>
     protected override void ProcessRecord()
     {
-        if (_beginInterrupted || _interruptLatched || Interrupted)
+        if (_beginInterrupted || Interrupted)
             return;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
@@ -140,12 +135,6 @@ public sealed class BackupDbaDbCertificateCommand : DbaBaseCmdlet
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
-            }
-            if (item is not null && LanguagePrimitives.IsTrue(
-                item.Properties["__BackupDbaDbCertificateProcessComplete"]?.Value))
-            {
-                _interruptLatched = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
                 continue;
             }
             WriteObject(item);
@@ -354,8 +343,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-
-    [pscustomobject]@{ __BackupDbaDbCertificateProcessComplete = $true; Interrupted = [bool](Test-FunctionInterrupt) }
 } $SqlInstance $SqlCredential $Certificate $Database $ExcludeDatabase $EncryptionPassword $DecryptionPassword $Path $Suffix $FileBaseName $InputObject $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
