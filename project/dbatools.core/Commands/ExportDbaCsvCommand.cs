@@ -542,7 +542,7 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
         }
     }
 
-    private sealed class ObjectNameParts
+    internal sealed class ObjectNameParts
     {
         public string? Database;
         public string? Schema;
@@ -555,7 +555,7 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
     /// honoring bracket quoting, ]]-escapes (temporarily swapped for the first unused
     /// character) and the empty dbo schema in database..table form.
     /// </summary>
-    private static ObjectNameParts ParseObjectNameParts(string objectName)
+    internal static ObjectNameParts ParseObjectNameParts(string objectName)
     {
         string working = objectName ?? "";
         string? fixChar = null;
