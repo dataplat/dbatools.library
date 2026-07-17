@@ -14,6 +14,12 @@ namespace Dataplat.Dbatools.Commands;
 /// filtering, relationship lookup, and output shaping remain a module-scoped PowerShell
 /// compatibility hop. Surface pinned by migration/baselines/Get-DbaDbMailAccount.json.
 /// </summary>
+/// <remarks>
+/// Output streams as produced. A single record can hold several accounts (a directly bound
+/// InputObject array, or the accounts gathered across a multi-instance -SqlInstance), and an early
+/// one is emitted before a later one may throw under -EnableException; the script streamed those
+/// early results, so buffering and losing them to a later terminating failure would diverge.
+/// </remarks>
 [Cmdlet(VerbsCommon.Get, "DbaDbMailAccount")]
 public sealed class GetDbaDbMailAccountCommand : DbaBaseCmdlet
 {
@@ -46,10 +52,7 @@ public sealed class GetDbaDbMailAccountCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Account, ExcludeAccount, InputObject,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"),
-            BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -60,7 +63,10 @@ public sealed class GetDbaDbMailAccountCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, Account, ExcludeAccount, InputObject,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"),
+            BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
