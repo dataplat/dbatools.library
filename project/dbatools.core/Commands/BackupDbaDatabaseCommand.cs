@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections;
-using System.Linq;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
 
@@ -180,9 +179,14 @@ public sealed partial class BackupDbaDatabaseCommand : DbaBaseCmdlet
     // Stop-Function latch (Test-FunctionInterrupt cannot cross hops - Rename precedent).
     private Hashtable? _state;
     private bool _hopInterrupted;
+    private string[] _realBoundNames = Array.Empty<string>();
 
     protected override void BeginProcessing()
     {
+        // Bound names are invocation-stable: captured ONCE, no LINQ (satellite hot-loop rule).
+        _realBoundNames = new string[MyInvocation.BoundParameters.Count];
+        MyInvocation.BoundParameters.Keys.CopyTo(_realBoundNames, 0);
+
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             SqlInstance, SqlCredential, Database, ExcludeDatabase, Path, FilePath,
             IncrementPrefix, ReplaceInName, NoAppendDbNameInPath, CopyOnly, Type,
@@ -191,7 +195,7 @@ public sealed partial class BackupDbaDatabaseCommand : DbaBaseCmdlet
             NoRecovery, BuildPath, WithFormat, Initialize, SkipTapeHeader, TimeStampFormat,
             IgnoreFileChecks, OutputScriptOnly, EncryptionAlgorithm, EncryptionCertificate,
             Description, InputObject, EnableException.ToBool(),
-            RealBoundNames(), this,
+            _realBoundNames, this,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (ConsumeSentinel(item))
@@ -216,7 +220,7 @@ public sealed partial class BackupDbaDatabaseCommand : DbaBaseCmdlet
             NoRecovery, BuildPath, WithFormat, Initialize, SkipTapeHeader, TimeStampFormat,
             IgnoreFileChecks, OutputScriptOnly, EncryptionAlgorithm, EncryptionCertificate,
             Description, InputObject, EnableException.ToBool(),
-            _state, _hopInterrupted, RealBoundNames(), this,
+            _state, _hopInterrupted, _realBoundNames, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
@@ -233,12 +237,6 @@ public sealed partial class BackupDbaDatabaseCommand : DbaBaseCmdlet
     }
 
     // Source has NO end block - EndProcessing intentionally not overridden (plan item 7).
-
-    /// <summary>The caller's genuinely-bound parameter names for the hop prune-prologue.</summary>
-    private string[] RealBoundNames()
-    {
-        return MyInvocation.BoundParameters.Keys.ToArray();
-    }
 
     /// <summary>Folds a __w3004State sentinel back into cross-record state; true when consumed.</summary>
     private bool ConsumeSentinel(PSObject? item)
@@ -282,5 +280,5 @@ public sealed partial class BackupDbaDatabaseCommand : DbaBaseCmdlet
         }
     }
 
-    private const string ProcessScript = ProcessScriptHead + "\n" + ProcessScriptTail;
+    private const string ProcessScript = ProcessScriptHead + "\n" + ProcessScriptMid + "\n" + ProcessScriptTail;
 }
