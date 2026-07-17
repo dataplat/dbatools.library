@@ -257,6 +257,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # function frame; streams and terminating errors flow through unchanged.
     function Start-DbaService {
         param($__splat)
+        # The nested-command boundary re-wraps carried PSObjects: NoteProperties return
+        # through the engine's instance-member table (keyed on the base object), but
+        # inserted instance type names live on the wrapper and are lost in transit.
+        # Update-ServiceStatus gates on the dbatools.DbaSqlService type name, so restore
+        # it - only on objects provably carrying Get-DbaService's decoration (an adapted
+        # SqlService WMI/CIM object bearing the ServicePriority NoteProperty). Anything
+        # else keeps failing that gate exactly like it does in the function world.
+        foreach ($__carriedService in @($__splat.InputObject)) {
+            if ($null -ne $__carriedService -and
+                "dbatools.DbaSqlService" -notin $__carriedService.PSObject.TypeNames -and
+                $null -ne $__carriedService.PSObject.Properties["ServicePriority"] -and
+                ($__carriedService.PSObject.TypeNames -match "(ManagementObject|CimInstance)#.*SqlService$")) {
+                $__carriedService.PSObject.TypeNames.Insert(0, "dbatools.DbaSqlService")
+            }
+        }
         Update-ServiceStatus @__splat
     }
 
