@@ -128,20 +128,17 @@ public sealed class ExportDbaLoginCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    private readonly List<object> _collectedInput = new List<object>();
-    private bool _processRan;
+    private readonly List<object?[]?> _batches = new List<object?[]?>();
 
-    /// <summary>Collects the piped input records; the work runs once in EndProcessing.</summary>
+    /// <summary>Records each pipeline record's input as a batch; the work runs once in EndProcessing.</summary>
     protected override void ProcessRecord()
     {
         if (Interrupted)
             return;
 
-        // The process block ran for this record (or for the single non-pipeline invocation). An empty
-        // pipeline never calls ProcessRecord, which is how the script's process-vs-end split is preserved.
-        _processRan = true;
-        if (InputObject is not null)
-            _collectedInput.AddRange(InputObject);
+        // One batch per ProcessRecord call, preserving the boundaries the script's process block saw
+        // (an empty pipeline never calls ProcessRecord, so there are no batches and process never runs).
+        _batches.Add(InputObject);
     }
 
     /// <summary>Runs the begin, process, and end logic in one hop against the collected input.</summary>
@@ -151,11 +148,11 @@ public sealed class ExportDbaLoginCommand : DbaBaseCmdlet
             return;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, _collectedInput.ToArray(), Login, ExcludeLogin, Database,
+            SqlInstance, SqlCredential, _batches.ToArray(), Login, ExcludeLogin, Database,
             DefaultDatabase, Path, FilePath, Encoding, BatchSeparator, DestinationVersion,
             ExcludeJobs.ToBool(), ExcludeDatabase.ToBool(), ExcludePassword.ToBool(), NoClobber.ToBool(),
             Append.ToBool(), NoPrefix.ToBool(), Passthru.ToBool(), ObjectLevel.ToBool(),
-            IncludeRolePermissions.ToBool(), EnableException.ToBool(), this, _processRan,
+            IncludeRolePermissions.ToBool(), EnableException.ToBool(), this,
             TestBound(nameof(Path)), TestBound(nameof(BatchSeparator)), BoundValue("Path"), BoundValue("FilePath"),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
@@ -209,7 +206,7 @@ public sealed class ExportDbaLoginCommand : DbaBaseCmdlet
     // resolve the public command identity). The two config-value defaults and the process/end split
     // are hop adaptations described in the class remarks.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $InputObject, $Login, $ExcludeLogin, $Database, $DefaultDatabase, $Path, $FilePath, $Encoding, $BatchSeparator, $DestinationVersion, $ExcludeJobs, $ExcludeDatabase, $ExcludePassword, $NoClobber, $Append, $NoPrefix, $Passthru, $ObjectLevel, $IncludeRolePermissions, $EnableException, $__realCmdlet, $__processRan, $__pathBound, $__batchSepBound, $__boundPathValue, $__boundFilePathValue, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $__batches, $Login, $ExcludeLogin, $Database, $DefaultDatabase, $Path, $FilePath, $Encoding, $BatchSeparator, $DestinationVersion, $ExcludeJobs, $ExcludeDatabase, $ExcludePassword, $NoClobber, $Append, $NoPrefix, $Passthru, $ObjectLevel, $IncludeRolePermissions, $EnableException, $__realCmdlet, $__pathBound, $__batchSepBound, $__boundPathValue, $__boundFilePathValue, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -218,10 +215,9 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [object[]]$InputObject, [object[]]$Login, [object[]]$ExcludeLogin, [object[]]$Database, [string]$DefaultDatabase, [string]$Path, [string]$FilePath, [string]$Encoding, [string]$BatchSeparator, [string]$DestinationVersion, $ExcludeJobs, $ExcludeDatabase, $ExcludePassword, $NoClobber, $Append, $NoPrefix, $Passthru, $ObjectLevel, $IncludeRolePermissions, $EnableException, $__realCmdlet, $__processRan, $__pathBound, $__batchSepBound, $__boundPathValue, $__boundFilePathValue, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, $__batches, [object[]]$Login, [object[]]$ExcludeLogin, [object[]]$Database, [string]$DefaultDatabase, [string]$Path, [string]$FilePath, [string]$Encoding, [string]$BatchSeparator, [string]$DestinationVersion, $ExcludeJobs, $ExcludeDatabase, $ExcludePassword, $NoClobber, $Append, $NoPrefix, $Passthru, $ObjectLevel, $IncludeRolePermissions, $EnableException, $__realCmdlet, $__pathBound, $__batchSepBound, $__boundPathValue, $__boundFilePathValue, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    # Hop adaptation of the two config-value param defaults (applied only when the caller did not bind them, matching bind-time semantics).
     if (-not $__pathBound) { $Path = Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport' }
     if (-not $__batchSepBound) { $BatchSeparator = Get-DbatoolsConfigValue -FullName 'Formatting.BatchSeparator' }
 
@@ -238,9 +234,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     
             $eol = [System.Environment]::NewLine
 
-    # The process block ran (a non-empty or non-pipeline invocation). Its early returns are
-    # dot-sourced so they leave only the process block and the end block still runs.
-    if ($__processRan) {
+    # One process invocation per collected pipeline record (batch), matching the function's
+    # per-record process block; the body is dot-sourced so an early return leaves only the
+    # current batch and the remaining batches plus the end block still run.
+    foreach ($__batch in $__batches) {
+        $InputObject = $__batch
         . {
                 if (Test-FunctionInterrupt) { return }
         
@@ -682,6 +680,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $sql
                 }
             }
-} $SqlInstance $SqlCredential $InputObject $Login $ExcludeLogin $Database $DefaultDatabase $Path $FilePath $Encoding $BatchSeparator $DestinationVersion $ExcludeJobs $ExcludeDatabase $ExcludePassword $NoClobber $Append $NoPrefix $Passthru $ObjectLevel $IncludeRolePermissions $EnableException $__realCmdlet $__processRan $__pathBound $__batchSepBound $__boundPathValue $__boundFilePathValue $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $__batches $Login $ExcludeLogin $Database $DefaultDatabase $Path $FilePath $Encoding $BatchSeparator $DestinationVersion $ExcludeJobs $ExcludeDatabase $ExcludePassword $NoClobber $Append $NoPrefix $Passthru $ObjectLevel $IncludeRolePermissions $EnableException $__realCmdlet $__pathBound $__batchSepBound $__boundPathValue $__boundFilePathValue $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
