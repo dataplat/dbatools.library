@@ -11,12 +11,19 @@ namespace Dataplat.Dbatools.Commands;
 /// Detaches user databases. Port of public/Dismount-DbaDatabase.ps1; the workflow remains a
 /// module-scoped PowerShell compatibility hop.
 ///
-/// The process body rides one VERBATIM module hop per record. Every record is SELF-CONTAINED
-/// because the parameter sets are mutually exclusive: in the "SqlInstance" set process fires once
-/// and $InputObject accumulates only within that invocation's SqlInstance loop; in the "Pipeline"
-/// set the piped $InputObject rebinds every record - so no sentinel and no C# state field are
-/// needed (the Remove-DbaDatabase / W3-063 shape). $server is reassigned unconditionally at the top
-/// of each loop, so it never carries a stale value.
+/// The process body rides one VERBATIM module hop per record. $InputObject does not leak across
+/// records because the parameter sets are mutually exclusive: in the "SqlInstance" set process
+/// fires once and $InputObject accumulates only within that invocation's SqlInstance loop; in the
+/// "Pipeline" set the piped $InputObject rebinds every record (the Remove-DbaDatabase / W3-063
+/// shape). $server is reassigned unconditionally at the top of each loop. But ONE local does carry:
+/// $exception (see the field above) is assigned only in the AG-removal catch and read there
+/// unconditionally, so it rides the process-complete sentinel with an ExceptionAssigned flag,
+/// preserving unset-vs-assigned so an unset read walks the scope chain as the function's did.
+///
+/// The source's begin block does one thing - "if ($Force) { $ConfirmPreference = 'none' }" - and it
+/// is folded into the top of the hop body rather than run as a separate begin hop: -Force is not a
+/// pipeline parameter, so setting the preference per-record is identical to setting it once, and
+/// ShouldProcess reads $ConfirmPreference from the call-site scope (the Copy-DbaAgentAlert pattern).
 ///
 /// Every Stop-Function here is -Continue (skip the current database and keep looping), and the one
 /// bare Continue is a plain loop continue, so a failure never halts later records and there is no
@@ -61,6 +68,12 @@ public sealed class DismountDbaDatabaseCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // The source's $exception is a function-scope local: assigned only inside the AG-removal
+    // catch's "if ($_.Exception.InnerException)" and read unconditionally in that catch's
+    // Stop-Function message, so it persists across records. A record whose AG error has no inner
+    // exception reuses the previous record's parsed suffix; a hop-local would die and read empty.
+    private Hashtable? _state;
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -68,10 +81,15 @@ public sealed class DismountDbaDatabaseCommand : DbaBaseCmdlet
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, Database, InputObject, UpdateStatistics.ToBool(),
-            Force.ToBool(), EnableException.ToBool(), this,
+            Force.ToBool(), EnableException.ToBool(), _state, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__dismountDbaDatabaseState"))
+            {
+                _state = sentinel["__dismountDbaDatabaseState"] as Hashtable;
+                continue;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -114,7 +132,7 @@ public sealed class DismountDbaDatabaseCommand : DbaBaseCmdlet
     // undeclared $ExcludeDatabase reference, the bare Connect-DbaInstance, the mirror/AG/session
     // handling, the interpolated messages, and the DetachDatabase call all ride as-is.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $InputObject, $UpdateStatistics, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $InputObject, $UpdateStatistics, $Force, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -123,8 +141,17 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $UpdateStatistics, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $UpdateStatistics, $Force, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # the source's begin block, folded here (its only effect is $ConfirmPreference, stable across
+    # records because -Force is not a pipeline parameter, so per-record is identical to run-once)
+    if ($Force) { $ConfirmPreference = 'none' }
+
+    # cross-record carry of the AG-catch $exception: restore only when an earlier record assigned it
+    if ($null -ne $__state -and $__state.ExceptionAssigned) {
+        $exception = $__state.Exception
+    }
 
         foreach ($instance in $SqlInstance) {
             try {
@@ -248,6 +275,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-} $SqlInstance $SqlCredential $Database $InputObject $UpdateStatistics $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+    # carry $exception forward only if it exists at this scope (assigned by the restore above or by
+    # the AG catch this record) - Get-Variable -Scope 0 misses an up-scope $exception, so an unset
+    # local stays unset next record and reads empty, exactly as the function-scope variable does
+    $__ev = Get-Variable -Name exception -Scope 0 -ErrorAction Ignore
+    if ($__ev) {
+        @{ __dismountDbaDatabaseState = @{ Exception = $__ev.Value; ExceptionAssigned = $true } }
+    } else {
+        @{ __dismountDbaDatabaseState = @{ ExceptionAssigned = $false } }
+    }
+} $SqlInstance $SqlCredential $Database $InputObject $UpdateStatistics $Force $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
