@@ -20,10 +20,12 @@ namespace Dataplat.Dbatools.Commands;
 /// catch strips wildcard characters (* and %) from $Pattern before retrying (for users who typed LIKE
 /// wildcards). In the source's shared function scope that mutation PERSISTS across piped records; a
 /// naive per-record hop would re-initialize $Pattern from the C# property each record and lose it. The
-/// strip is idempotent and convergent, so re-deriving per record is output-equivalent - but to
-/// reproduce the shared-scope mutation exactly, the possibly-mutated $Pattern is carried record-to-record
-/// via a sentinel Hashtable (the process hop re-emits it, C# stores it in _pattern, the next record
-/// restores it). The only body edit is -FunctionName Find-DbaDatabase on the direct Stop-Function.
+/// catch is BROAD (it can also fire on transient database enumeration / property-access failures, not
+/// only on an invalid-regex pattern), so a valid `*`/`%` pattern could be stripped on one record;
+/// restoring the original pattern on a later record could then change matches. The possibly-mutated
+/// $Pattern is therefore carried record-to-record via a sentinel Hashtable (the process hop re-emits it,
+/// C# stores it in _pattern, the next record restores it) to reproduce the shared-scope behavior
+/// exactly. The only body edit is -FunctionName Find-DbaDatabase on the direct Stop-Function.
 /// Surface pinned by migration/baselines/Find-DbaDatabase.json (positions 0-3, Property ValidateSet,
 /// no ShouldProcess).
 /// </summary>
