@@ -141,9 +141,20 @@ public sealed class AddDbaServerRoleMemberCommand : DbaBaseCmdlet
         //     from SqlInstance (which overwrote the argument in place) stands for every record;
         //   - not given as an argument: each record's binding overwrites the begin assignment, and
         //     the assignment only survives when there is no pipeline input at all.
-        object[]? effectiveInputObject = _inputObjectBoundAsArgument
-            ? (_beginInputObject ?? InputObject)
-            : (InputObject ?? _beginInputObject);
+        // Whether the begin block ASSIGNED is decided by the bound flag, never by testing the
+        // assigned value for null: "-SqlInstance $null" is still BOUND, so the begin block
+        // overwrites InputObject with that null and the command must go on to do nothing. Reading
+        // the null as "no assignment" would fall back to the caller's -InputObject and add members
+        // the script implementation never adds.
+        object[]? effectiveInputObject;
+        if (_inputObjectBoundAsArgument)
+        {
+            effectiveInputObject = _sqlInstanceBoundAsArgument ? _beginInputObject : InputObject;
+        }
+        else
+        {
+            effectiveInputObject = InputObject ?? _beginInputObject;
+        }
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
             effectiveInputObject, SqlCredential, ServerRole, Login, Role,
