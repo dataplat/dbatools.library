@@ -19,12 +19,19 @@ namespace Dataplat.Dbatools.Commands;
 /// only inside the "if (-not $computername -or -not $instancename -or -not $sqlname)" branch, and
 /// then read unconditionally by the Add-Member that stamps the Server note property. So a record
 /// whose input object already carries ComputerName/InstanceName/SqlInstance skips the branch and
-/// stamps the PREVIOUS record's server - and the first such record with no earlier assignment
-/// stamps null. That stale carry is the retired function's behavior, because the local lives in the
-/// function scope which spans the whole pipeline; a hop-local would die with the hop and stamp null
-/// on every skipped-branch record instead. $server therefore rides the process-complete sentinel
-/// into a field initialized to null, and the body's own assignment overwrites it whenever the
-/// branch does run.
+/// stamps the PREVIOUS record's server. That stale carry is the retired function's behavior,
+/// because the local lives in the function scope which spans the whole pipeline; a hop-local would
+/// die with the hop and stamp the wrong value on every skipped-branch record instead.
+///
+/// The carry preserves ASSIGNMENT, not just value. A function-scope local that was never assigned
+/// is UNSET - a read walks up to a module- or global-scope $server if one exists - whereas an
+/// assignment to $null is a set local that shadows the walk. Restoring the value unconditionally
+/// would convert "never assigned" into "assigned null" and stamp null where the function would
+/// stamp an up-scope $server (reachable via a caller's $global:server, a common variable name).
+/// So the sentinel carries a ServerAssigned flag: the hop restores $server only when an earlier
+/// record actually assigned it, and reports whether $server exists at the hop's own scope after
+/// the body (set either by that restore or by the branch running this record), detected with
+/// Get-Variable -Scope 0 so an up-scope $server is not mistaken for a local one.
 ///
 /// The body has no early return, so the inner block needs no dot-source wrapper: the sentinel
 /// emission simply follows the body in the same scope, which is also what makes the body's $server
@@ -151,8 +158,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # cross-record carry: $server lives in the function scope, which spans the pipeline, and a
-    # record that skips the rebuild branch reads whatever an earlier record left there
-    if ($null -ne $__state) {
+    # record that skips the rebuild branch reads whatever an earlier record left there. Restore
+    # ONLY when an earlier record actually assigned it - restoring null unconditionally would
+    # convert the function's "unset" (which walks up to a module/global $server) into a local null.
+    if ($null -ne $__state -and $__state.ServerAssigned) {
         $server = $__state.Server
     }
 
@@ -201,7 +210,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-    @{ __addDbaExtendedPropertyState = @{ Server = $server } }
+    # Carry $server forward only if it exists at THIS scope (assigned by the restore above or by
+    # the branch this record) - Get-Variable -Scope 0 misses an up-scope $server, so an unset local
+    # stays unset next record and keeps walking up, exactly as the function-scope variable does.
+    $__serverLocal = Get-Variable -Name server -Scope 0 -ErrorAction Ignore
+    if ($__serverLocal) {
+        @{ __addDbaExtendedPropertyState = @{ Server = $__serverLocal.Value; ServerAssigned = $true } }
+    } else {
+        @{ __addDbaExtendedPropertyState = @{ ServerAssigned = $false } }
+    }
 } $SqlInstance $SqlCredential $Database $Name $Value $InputObject $EnableException $__state $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
