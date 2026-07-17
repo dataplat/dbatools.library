@@ -21,6 +21,11 @@ namespace Dataplat.Dbatools.Commands;
 /// -SqlInstance to InputObject, but that append does not leak between pipeline records: the module
 /// scope lives for one record and receives InputObject fresh from this cmdlet each record, which
 /// reproduces the function's per-record parameter rebinding. No cross-record state is carried.
+///
+/// Output streams as produced. A record can hold several mail servers (a directly bound InputObject
+/// array, or servers gathered across a multi-instance -SqlInstance), and an early one is emitted before
+/// a later one may throw under -EnableException; the script streamed those early results, so buffering
+/// and losing them to a later terminating failure would diverge.
 /// </remarks>
 [Cmdlet(VerbsCommon.Get, "DbaDbMailServer")]
 public sealed class GetDbaDbMailServerCommand : DbaBaseCmdlet
@@ -57,10 +62,7 @@ public sealed class GetDbaDbMailServerCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Server, Account, InputObject,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"),
-            BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -71,7 +73,10 @@ public sealed class GetDbaDbMailServerCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, Server, Account, InputObject,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"),
+            BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
