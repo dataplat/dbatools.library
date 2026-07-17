@@ -130,7 +130,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if (Test-Bound 'EncryptionCertificate') {
                         # PORT (contracts.md section 2, owner-locked): inline SMO lookup replaces the
                         # security-module Get-DbaDbCertificate call (source :532) - same null-when-missing contract.
-                        $tCertCheck = $server.Databases['master'].Certificates | Where-Object Name -eq $EncryptionCertificate
+                        $tCertCheck = $server.Databases["master"].Certificates | Where-Object Name -eq $EncryptionCertificate
                         if ($null -eq $tCertCheck) {
                             Write-Progress -Id $topProgressId -Activity 'Backup' -Completed
                             Stop-Function -Message "Certificate $EncryptionCertificate does not exist on $server so cannot be used for backups" -FunctionName Backup-DbaDatabase
@@ -145,7 +145,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         # Should not end up here until Key encryption in implemented
                         # PORT (contracts.md section 2, owner-locked): inline SMO lookup replaces the dead
                         # Get-DbaDbAsymmetricKey call (source :545, unreachable - EncryptionKey is never a parameter).
-                        $tKeyCheck = $server.Databases['master'].AsymmetricKeys | Where-Object Name -eq $EncrytptionKey
+                        $tKeyCheck = $server.Databases["master"].AsymmetricKeys | Where-Object Name -eq $EncrytptionKey
                         if ($null -eq $tKeyCheck) {
                             Write-Progress -Id $topProgressId -Activity 'Backup' -Completed
                             Stop-Function -Message "AsymmetricKey $Encryptionkey does not exist on $server so cannot be used for backups" -FunctionName Backup-DbaDatabase
