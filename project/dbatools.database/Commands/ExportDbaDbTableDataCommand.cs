@@ -24,7 +24,9 @@ namespace Dataplat.Dbatools.Commands;
 /// is the INNER scriptblock's own bound set, not the real cmdlet's, so it cannot be used directly.
 /// Instead the bound set is RECONSTRUCTED deterministically from explicit boundness flags (C# TestBound
 /// per parameter): InputObject is always present (Mandatory, the current record), each data parameter
-/// is added ONLY when the user bound it, and bound Verbose/Debug/Confirm ride along (WhatIf is moot -
+/// is added ONLY when the user bound it, and bound Verbose/Debug/Confirm ride along, plus bound
+/// ErrorAction/WarningAction forwarded as their raw ActionPreference values so -ErrorAction Stop /
+/// -WarningAction Stop can halt Export-DbaScript mid-artifact as the source does (WhatIf is moot -
 /// the outer ShouldProcess gate blocks the call before the forward). This reproduces the source's
 /// $PSBoundParameters exactly for the forward, with no reliance on C# MyInvocation.BoundParameters
 /// per-record or common-parameter quirks. Export-DbaScript is already a compiled cmdlet with a superset
@@ -123,7 +125,8 @@ public sealed class ExportDbaDbTableDataCommand : DbaBaseCmdlet
             TestBound(nameof(BatchSeparator)), TestBound(nameof(NoPrefix)), TestBound(nameof(Passthru)),
             TestBound(nameof(NoClobber)), TestBound(nameof(Append)), TestBound(nameof(EnableException)),
             _state, this,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"), BoundCommonParameter("Confirm")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"), BoundCommonParameter("Confirm"),
+            BoundCommonParameterValue("ErrorAction"), BoundCommonParameterValue("WarningAction")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -139,6 +142,16 @@ public sealed class ExportDbaDbTableDataCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    // ErrorAction/WarningAction must forward their raw ActionPreference value (not a bool): a bound
+    // -ErrorAction Stop / -WarningAction Stop makes Export-DbaScript halt immediately on the error/
+    // warning path, which can change the produced artifact.
+    private object? BoundCommonParameterValue(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return value;
         return null;
     }
 
@@ -188,14 +201,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // @PSBoundParameters -> the reconstructed @__splat (bound-only, built from the carried boundness
     // flags). The scripting-options object is restored from the carried sentinel state.
     private const string ProcessScript = """
-param($InputObject, $Path, $FilePath, $Encoding, $BatchSeparator, $NoPrefix, $Passthru, $NoClobber, $Append, $EnableException, $__boundPath, $__boundFilePath, $__boundEncoding, $__boundBatchSeparator, $__boundNoPrefix, $__boundPassthru, $__boundNoClobber, $__boundAppend, $__boundEnableException, $__state, $__realCmdlet, $__boundVerbose, $__boundDebug, $__boundConfirm)
+param($InputObject, $Path, $FilePath, $Encoding, $BatchSeparator, $NoPrefix, $Passthru, $NoClobber, $Append, $EnableException, $__boundPath, $__boundFilePath, $__boundEncoding, $__boundBatchSeparator, $__boundNoPrefix, $__boundPassthru, $__boundNoClobber, $__boundAppend, $__boundEnableException, $__state, $__realCmdlet, $__boundVerbose, $__boundDebug, $__boundConfirm, $__boundErrorAction, $__boundWarningAction)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Microsoft.SqlServer.Management.Smo.Table[]]$InputObject, [string]$Path, [string]$FilePath, [string]$Encoding, [string]$BatchSeparator, $NoPrefix, $Passthru, $NoClobber, $Append, $EnableException, $__boundPath, $__boundFilePath, $__boundEncoding, $__boundBatchSeparator, $__boundNoPrefix, $__boundPassthru, $__boundNoClobber, $__boundAppend, $__boundEnableException, $__state, $__realCmdlet, $__boundVerbose, $__boundDebug, $__boundConfirm)
+    param([Microsoft.SqlServer.Management.Smo.Table[]]$InputObject, [string]$Path, [string]$FilePath, [string]$Encoding, [string]$BatchSeparator, $NoPrefix, $Passthru, $NoClobber, $Append, $EnableException, $__boundPath, $__boundFilePath, $__boundEncoding, $__boundBatchSeparator, $__boundNoPrefix, $__boundPassthru, $__boundNoClobber, $__boundAppend, $__boundEnableException, $__state, $__realCmdlet, $__boundVerbose, $__boundDebug, $__boundConfirm, $__boundErrorAction, $__boundWarningAction)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $ScriptingOptionsObject = $__state.ScriptingOptionsObject
@@ -214,10 +227,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundVerbose) { $__splat.Verbose = [bool]$__boundVerbose }
     if ($null -ne $__boundDebug) { $__splat.Debug = [bool]$__boundDebug }
     if ($null -ne $__boundConfirm) { $__splat.Confirm = [bool]$__boundConfirm }
+    if ($null -ne $__boundErrorAction) { $__splat.ErrorAction = $__boundErrorAction }
+    if ($null -ne $__boundWarningAction) { $__splat.WarningAction = $__boundWarningAction }
 
     if ($__realCmdlet.ShouldProcess($env:computername, "Exporting $InputObject")) {
         Export-DbaScript @__splat -ScriptingOptionsObject $ScriptingOptionsObject
     }
-} $InputObject $Path $FilePath $Encoding $BatchSeparator $NoPrefix $Passthru $NoClobber $Append $EnableException $__boundPath $__boundFilePath $__boundEncoding $__boundBatchSeparator $__boundNoPrefix $__boundPassthru $__boundNoClobber $__boundAppend $__boundEnableException $__state $__realCmdlet $__boundVerbose $__boundDebug $__boundConfirm @__commonParameters 3>&1 2>&1
+} $InputObject $Path $FilePath $Encoding $BatchSeparator $NoPrefix $Passthru $NoClobber $Append $EnableException $__boundPath $__boundFilePath $__boundEncoding $__boundBatchSeparator $__boundNoPrefix $__boundPassthru $__boundNoClobber $__boundAppend $__boundEnableException $__state $__realCmdlet $__boundVerbose $__boundDebug $__boundConfirm $__boundErrorAction $__boundWarningAction @__commonParameters 3>&1 2>&1
 """;
 }
