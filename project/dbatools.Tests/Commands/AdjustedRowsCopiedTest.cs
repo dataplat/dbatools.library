@@ -93,22 +93,24 @@ namespace Dataplat.Dbatools.Commands.Test
         }
 
         [TestMethod]
-        public void AdjustedRows_FullWrapCycleAccumulatesTrueTotal()
+        public void AdjustedRows_FullWrapCycleAccumulatesShippedTotals()
         {
             // Drive a simulated counter through a full wrap the way the bulk copy event
             // stream does: accumulate deltas across the positive climb, the wrap to
-            // int.MinValue, and the climb back toward zero. The accumulated total must
-            // equal the true (unwrapped) number of rows.
+            // int.MinValue, and the climb back toward zero. Totals match the true
+            // (unwrapped) row count at every step EXCEPT a zero report: a counter that
+            // reaches exactly 0 again (2^32 rows) hits the helper's reported==0
+            // short-circuit and the completing row is not counted - the source behaves
+            // the same way, so the undercount is pinned as shipped behavior, not fixed.
             long total = 0;
             long previous = 0;
             long[] reportedSequence = new[] { 1000000000L, 2000000000L, 2147483647L, -2147483648L, -2000000000L, -1L, 0L };
-            long[] trueTotals = new[] { 1000000000L, 2000000000L, 2147483647L, 2147483648L, 2294967296L, 4294967295L, 4294967295L };
+            long[] expectedTotals = new[] { 1000000000L, 2000000000L, 2147483647L, 2147483648L, 2294967296L, 4294967295L, 4294967295L };
             for (int i = 0; i < reportedSequence.Length; i++)
             {
                 total += ImportDbaCsvCommand.GetAdjustedTotalRowsCopied(reportedSequence[i], previous);
                 previous = reportedSequence[i];
-                // The trailing zero report adds nothing; the total keeps the last value.
-                Assert.AreEqual(trueTotals[i], total, $"after reported={reportedSequence[i]}");
+                Assert.AreEqual(expectedTotals[i], total, $"after reported={reportedSequence[i]}");
             }
         }
     }
