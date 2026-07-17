@@ -196,7 +196,7 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string]$Category, [string]$Database, [string]$Operator, [string]$OperatorEmail, [int]$DelayBetweenResponses, [switch]$Disabled, [string]$EventDescriptionKeyword, [string]$EventSource, [string]$JobId, [int[]]$ExcludeSeverity, [int[]]$ExcludeMessageId, [string]$NotificationMessage, [string]$NotifyMethod, $EnableException, $__boundJobId, $__boundCategory, $__boundDelayBetweenResponses, $__boundOperator, $__realCmdlet)
 
     $namehash = @{
