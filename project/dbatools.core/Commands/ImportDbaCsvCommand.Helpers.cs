@@ -743,7 +743,7 @@ public sealed partial class ImportDbaCsvCommand
 
     /// <summary>Absorbed private/functions/Get-AdjustedTotalRowsCopied.ps1: adjusts for the
     /// legacy 4-byte rows-copied counter wrapping (dataplat/dbatools#6927).</summary>
-    private static long GetAdjustedTotalRowsCopied(long reportedRowsCopied, long previousRowsCopied)
+    internal static long GetAdjustedTotalRowsCopied(long reportedRowsCopied, long previousRowsCopied)
     {
         long newRowCountAdded = 0;
 
