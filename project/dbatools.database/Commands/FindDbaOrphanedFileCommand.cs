@@ -13,13 +13,18 @@ namespace Dataplat.Dbatools.Commands;
 /// a module-scoped PowerShell compatibility hop.
 ///
 /// A 3-hop begin+process+end port (SqlInstance is ValueFromPipeline, so process fires per record). The
-/// source begin block defines three PURE nested helper functions (Get-SQLDirTreeQuery, Get-SqlFileStructure,
-/// Format-Path - all inputs via parameters, no closure over begin state) and builds one-time constants:
-/// the $systemfiles list, the $FileType += "mdf","ldf","ndf" mutation, and $fileTypeComparison. Because
-/// hop scopes do not share function definitions across begin->process, the three helpers are RELOCATED
-/// into the process hop (redefined per record - functionally identical since they are pure); the one-time
-/// $FileType mutation and derived constants stay in BEGIN (recomputing per record would re-append the
-/// extensions), carried begin->process one-way via the sentinel ($systemfiles, $fileTypeComparison).
+/// source begin block defines three nested helper functions (Get-SQLDirTreeQuery, Get-SqlFileStructure,
+/// Format-Path) and builds one-time constants: the $systemfiles list, the $FileType += "mdf","ldf","ndf"
+/// mutation, and $fileTypeComparison. The helpers take their inputs via parameters and close over NO
+/// begin-only state, so they are RELOCATED into the process hop (redefined per record) since hop scopes
+/// do not share function definitions across begin->process. This is behaviorally identical to the source:
+/// PowerShell resolves free variables by dynamic (caller) scope, and both helper definitions are only ever
+/// CALLED from process, where the relevant state lives. Note Get-SqlFileStructure has a source quirk - at
+/// its full-text branch it reads the ambient $server.VersionMajor (line 297) rather than its own parameter
+/// $smoserver; $server is the process-scope variable and is the same SMO object passed as $smoserver, so
+/// the reference resolves the same whether the helper is defined in begin (source) or process (this port).
+/// The one-time $FileType mutation and derived constants stay in BEGIN (recomputing per record would
+/// re-append the extensions), carried begin->process one-way via the sentinel ($systemfiles, $fileTypeComparison).
 ///
 /// The end block writes "No orphaned files found" when $result.count -eq 0. $result is a scalar reassigned
 /// per matching file and is NOT in the per-record array reset, so in the source's shared scope it persists
