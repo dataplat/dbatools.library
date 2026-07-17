@@ -14,8 +14,10 @@ namespace Dataplat.Dbatools.Commands;
 /// Port of public/Add-DbaAgDatabase.ps1; surface pinned by
 /// migration/baselines/Add-DbaAgDatabase.json.
 /// </summary>
-[Cmdlet(VerbsCommon.Add, "DbaAgDatabase", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Low, DefaultParameterSetName = "NonPipeline")]
-[OutputType(typeof(PSObject))]
+// The source declares NO default parameter set and NO output type: an ambiguous
+// invocation must fail set resolution exactly like the function, and Get-Command
+// metadata must not grow an OutputType the function never declared.
+[Cmdlet(VerbsCommon.Add, "DbaAgDatabase", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Low)]
 public sealed partial class AddDbaAgDatabaseCommand : DbaBaseCmdlet
 {
     /// <summary>The primary SQL Server instance hosting the availability group.</summary>
