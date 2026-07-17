@@ -62,9 +62,14 @@ public sealed partial class GetDbaServiceCommand
         if (!_scriptModuleResolved)
         {
             _scriptModuleResolved = true;
-            foreach (PSObject? moduleItem in InvokeCommand.InvokeScript("Get-Module -Name dbatools"))
+            // Among loaded script modules named dbatools, bind to the one whose session
+            // state actually owns the private machinery these bodies call - the same
+            // identity the source's in-module closures carried. A stale second copy
+            // (e.g. a Gallery install) without the private is never selected.
+            foreach (PSObject? moduleItem in InvokeCommand.InvokeScript(
+                "Get-Module -Name dbatools | Where-Object ModuleType -eq \"Script\" | Where-Object { & $_ { Test-Path function:Set-ServiceStartMode } } | Select-Object -First 1"))
             {
-                if (moduleItem?.BaseObject is PSModuleInfo moduleInfo && moduleInfo.ModuleType == ModuleType.Script)
+                if (moduleItem?.BaseObject is PSModuleInfo moduleInfo)
                 {
                     _scriptModule = moduleInfo;
                     break;
