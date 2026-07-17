@@ -7,15 +7,21 @@ namespace Dataplat.Dbatools.Commands.Test
     /// Covers the absorbed Get-AdjustedTotalRowsCopied helper carried by both
     /// ImportDbaCsvCommand and WriteDbaDbTableDataCommand. The legacy bulk copy library
     /// tracks rows copied in a 4-byte counter that wraps past int.MaxValue
-    /// (dataplat/dbatools#6927); the helper reconstructs the true rows-added delta from
+    /// (dataplat/dbatools#6927); the helper reconstructs the rows-added delta from
     /// the wrapped reported value and the previously reported value. Expected values are
     /// ground-truthed against the PowerShell helper on both editions with Int64-typed
-    /// inputs - the only input type the compiled call sites produce, since both commands
-    /// feed SqlRowsCopiedEventArgs.RowsCopied (Int64) and a long field into every call.
-    /// The PowerShell helper additionally throws for an Int32-typed previous value of
-    /// exactly int.MinValue ([math]::Abs binds the Int32 overload and overflows); that
-    /// input type cannot reach these methods, whose long parameters never bind the
-    /// throwing overload.
+    /// inputs. Three call sites feed these methods: both commands' progress handlers pass
+    /// SqlRowsCopiedEventArgs.RowsCopied (Int64) and a long previous field, and
+    /// ImportDbaCsvCommand's final count passes the int result of the reflection read
+    /// (GetBulkRowsCopiedCount, -1 on failure) widened to long - so every compiled input
+    /// arrives as long and stays inside the int32 counter domain plus the -1 sentinel.
+    /// Known divergence, accepted: the PowerShell helper receives that final count
+    /// Int32-typed, and for a reported value of exactly int.MinValue with a negative
+    /// previous, [math]::Abs binds the Int32 overload and throws OverflowException where
+    /// this long version returns a negative delta (probed on both editions). Reaching it
+    /// requires the reflected counter to read exactly int.MinValue at the final read.
+    /// Math.Abs(long) has the same guard at long.MinValue - both copies throw there -
+    /// but that magnitude is outside anything a wrapped int32 counter can produce.
     /// </summary>
     [TestClass]
     public class AdjustedRowsCopiedTest
@@ -32,6 +38,11 @@ namespace Dataplat.Dbatools.Commands.Test
             new[] { 0L, -12345L, 0L },
             new[] { 7L, -2147483648L, 2147483655L },
             new[] { -2147483000L, 1000000L, 2146484296L },
+            // The reflection-read failure sentinel: -1 reported with a non-negative
+            // previous takes the positive-to-negative wrap branch and adds 4294967295
+            // phantom rows to the total. The PowerShell source does the same; the
+            // shipped behavior is pinned, not fixed.
+            new[] { -1L, 0L, 4294967295L },
             // A counter moving backward while negative yields a NEGATIVE delta in the
             // source; the shipped behavior is preserved rather than clamped.
             new[] { -10L, -5L, -5L },
@@ -60,9 +71,12 @@ namespace Dataplat.Dbatools.Commands.Test
         [TestMethod]
         public void AdjustedRows_BothCopiesAgreeAcrossBoundarySweep()
         {
-            // The two absorbed copies must never drift apart. Sweep a boundary-heavy
-            // grid: every combination of values around 0, +/-1, the int32 extremes and
-            // near-extremes, and mid-range magnitudes on both sides.
+            // Pure drift guard: the two copies are character-identical today, so equal
+            // outputs carry no correctness signal - the sweep exists to catch a future
+            // edit landing in one copy only. Values outside the int32 counter domain
+            // wrap unchecked, identically in both copies. long.MinValue is excluded
+            // here because Math.Abs throws on it in both copies; that shape is pinned
+            // separately below.
             long[] interesting = new[]
             {
                 long.MinValue + 1, (long)int.MinValue, int.MinValue + 1L, -2147483000L,
@@ -79,6 +93,20 @@ namespace Dataplat.Dbatools.Commands.Test
                         $"copy drift at reported={reported} previous={previous}");
                 }
             }
+        }
+
+        [TestMethod]
+        public void AdjustedRows_BothCopiesThrowAtLongMinValuePrevious()
+        {
+            // Math.Abs(long) guards long.MinValue with an OverflowException regardless
+            // of checked context; a positive report with a long.MinValue previous hits
+            // Math.Abs(previous) in both copies. The magnitude is outside anything a
+            // wrapped int32 counter can produce - pinned so a future rewrite that stops
+            // throwing is a visible contract change, not silent drift.
+            Assert.ThrowsException<System.OverflowException>(
+                () => ImportDbaCsvCommand.GetAdjustedTotalRowsCopied(7, long.MinValue));
+            Assert.ThrowsException<System.OverflowException>(
+                () => WriteDbaDbTableDataCommand.GetAdjustedTotalRowsCopied(7, long.MinValue));
         }
 
         [TestMethod]
