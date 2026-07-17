@@ -230,6 +230,14 @@ internal static class RestoreUtility
     /// Port of private/functions/Get-DbaDbPhysicalFile.ps1: fastest way to fetch just the
     /// paths of the physical files for every database on the instance, also for offline
     /// databases. The caller passes its live connected server (Connect pass-through).
+    /// Two intentional divergences from the source, both unobservable from the shipped
+    /// call site: the source's bare string throw surfaces as a RuntimeException where
+    /// this port throws InvalidOperationException (message identical, and nothing
+    /// catches by type on this path); and the source reads only the FIRST result table
+    /// (its Query script method returns Tables[0]) where this port flattens all tables -
+    /// identical for the single-SELECT batches this method builds. The error mask wraps
+    /// ONLY the query leg; failures before it (the version read) surface raw, matching
+    /// the source's try boundary.
     /// </summary>
     internal static System.Data.DataRow[] GetDbaDbPhysicalFile(PSCmdlet host, Server server)
     {
