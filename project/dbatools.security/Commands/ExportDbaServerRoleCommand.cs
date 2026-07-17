@@ -94,7 +94,6 @@ public sealed class ExportDbaServerRoleCommand : DbaBaseCmdlet
 
     /// <summary>Prevents overwriting an existing output file.</summary>
     [Parameter]
-    [Alias("NoOverwrite")]
     public SwitchParameter NoClobber { get; set; }
 
     /// <summary>Appends to the output file instead of replacing it.</summary>
