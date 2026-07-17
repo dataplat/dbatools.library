@@ -43,9 +43,10 @@ namespace Dataplat.Dbatools.Commands.Test
     /// private/functions/Get-DbaDbPhysicalFile.ps1. The offline-observable contract is
     /// STRUCTURAL: the fixed "Error enumerating files" mask wraps ONLY the query leg -
     /// in the PowerShell source the try covers only the $server.Query call, with the
-    /// version-branch read outside it, and the port mirrors that boundary. So a failure
-    /// BEFORE the query (here: the version read on an unreachable server) must surface
-    /// as the raw SMO error, never as the mask. The masked query-leg wrap itself and
+    /// version-branch read outside it, and the port mirrors that boundary. A failure
+    /// BEFORE the query (here: the version read on an unreachable server) is therefore
+    /// never replaced by the mask; each world surfaces its own wrapper type at that
+    /// boundary, so only mask-absence is pinned. The masked query-leg wrap itself and
     /// the live result shape require a connected instance and ride the integrator gate
     /// through Test-DbaBackupInformation.
     /// </summary>
@@ -67,8 +68,13 @@ namespace Dataplat.Dbatools.Commands.Test
                     Collection<PSObject> output = shell.Invoke();
                     Assert.AreEqual(1, output.Count, "host cmdlet emits exactly one outcome record");
                     string outcome = (string)output[0].BaseObject;
-                    StringAssert.StartsWith(outcome, "THREW:ConnectionFailureException:",
-                        "a pre-query failure must surface as the raw SMO error");
+                    // The structural claim is TFM-durable: something threw, and the
+                    // query-leg mask did not replace it. The concrete type observed on
+                    // both current TFMs is ConnectionFailureException, but SMO owns
+                    // that choice (and PS surfaces its own property-getter wrapper at
+                    // the same boundary), so the type is deliberately not pinned.
+                    StringAssert.StartsWith(outcome, "THREW:",
+                        "an unreachable server must fail before any rows are produced");
                     Assert.IsFalse(outcome.Contains("Error enumerating files"),
                         "the fixed mask belongs to the query leg only");
                 }
