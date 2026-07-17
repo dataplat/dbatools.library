@@ -24,6 +24,10 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// Output streams as it is produced, so warnings, verbose and debug records interleave with the
 /// emitted categories in the order the script implementation produced them.
+///
+/// The script implementation's scope spans a whole pipeline, so the category loop variable it
+/// names in a retrieval failure survives from one input record to the next. A module-scoped hop
+/// gets a fresh scope per record, so that variable is carried across records explicitly.
 /// </remarks>
 [Cmdlet(VerbsCommon.Get, "DbaAgentAlertCategory")]
 public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
@@ -42,6 +46,10 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // The category the retrieval loop last reached, carried between pipeline records because the
+    // hop's scope does not outlive one record. Starts null, matching an untouched local.
+    private object? _cat;
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -56,13 +64,19 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
+            else if (item is not null && LanguagePrimitives.IsTrue(
+                item.Properties["__GetDbaAgentAlertCategoryProcessComplete"]?.Value))
+            {
+                object? catState = item.Properties["Cat"]?.Value;
+                _cat = catState is PSObject wrapper ? wrapper.BaseObject : catState;
+            }
             else
             {
                 WriteObject(item);
             }
         }, BodyScript,
             SqlInstance, SqlCredential, Category, EnableException.ToBool(),
-            TestBound(nameof(Category)), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            TestBound(nameof(Category)), _cat, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -99,15 +113,16 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Category, $EnableException, $__boundCategory, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Category, $EnableException, $__boundCategory, $Cat, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Category, $EnableException, $__boundCategory)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Category, $EnableException, $__boundCategory, $Cat)
 
+    $cat = $Cat
     foreach ($instance in $SqlInstance) {
         try {
             $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
@@ -137,6 +152,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Something went wrong getting the alert category $cat on $instance" -Target $cat -Continue -ErrorRecord $_ -FunctionName Get-DbaAgentAlertCategory
         }
     }
-} $SqlInstance $SqlCredential $Category $EnableException $__boundCategory @__commonParameters 3>&1 2>&1
+
+    [pscustomobject]@{
+        __GetDbaAgentAlertCategoryProcessComplete = $true
+        Cat = $cat
+    }
+} $SqlInstance $SqlCredential $Category $EnableException $__boundCategory $Cat @__commonParameters 3>&1 2>&1
 """;
 }
