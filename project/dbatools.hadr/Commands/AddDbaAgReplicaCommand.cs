@@ -113,11 +113,11 @@ public sealed partial class AddDbaAgReplicaCommand : DbaBaseCmdlet
         if (ConfigurationHost.Configurations.TryGetValue(fullName, out Config? config) && config?.Value is not null)
         {
             string text = LanguagePrimitives.ConvertTo<string>(config.Value);
-            if (string.Equals(text, "Mandatory", System.StringComparison.Ordinal))
+            if (string.Equals(text, "Mandatory", System.StringComparison.OrdinalIgnoreCase))
             {
                 return LanguagePrimitives.ConvertTo<string>(true);
             }
-            if (string.Equals(text, "Optional", System.StringComparison.Ordinal))
+            if (string.Equals(text, "Optional", System.StringComparison.OrdinalIgnoreCase))
             {
                 return LanguagePrimitives.ConvertTo<string>(false);
             }
