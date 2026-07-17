@@ -247,7 +247,7 @@ public sealed partial class AddDbaAgDatabaseCommand
         reportSeeding          = $reportSeeding
         skipReuse              = [bool]$SkipReuseSourceFolderStructure
     } }
-} $SqlInstance $SqlCredential $AvailabilityGroup $Database $Secondary $SecondarySqlCredential $InputObject $SeedingMode $SharedPath $UseLastBackup $AdvancedBackupParams $NoWait $MasterKeySecurePassword $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $AvailabilityGroup $Database $Secondary $SecondarySqlCredential $InputObject $SeedingMode $SharedPath $UseLastBackup $AdvancedBackupParams $NoWait $MasterKeySecurePassword $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__boundProgressAction @__commonParameters 3>&1 2>&1
 """;
 
     private static string ProcessScript => ProcessScriptHead + "\n" + ProcessScriptTail;

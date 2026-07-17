@@ -14,8 +14,9 @@ public sealed partial class AddDbaAgDatabaseCommand
     // from state at hop top and writes back at the tail - the source mutates that
     // parameter in function scope, which persists across records.
     private const string ProcessScriptHead = """
-param($SqlInstance, $SqlCredential, $AvailabilityGroup, $Database, $Secondary, $SecondarySqlCredential, $InputObject, $SeedingMode, $SharedPath, $UseLastBackup, $AdvancedBackupParams, $NoWait, $MasterKeySecurePassword, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $AvailabilityGroup, $Database, $Secondary, $SecondarySqlCredential, $InputObject, $SeedingMode, $SharedPath, $UseLastBackup, $AdvancedBackupParams, $NoWait, $MasterKeySecurePassword, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundProgressAction)
 $__commonParameters = @{}
+if ($null -ne $__boundProgressAction) { $__commonParameters.ProgressAction = $__boundProgressAction }
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
@@ -23,7 +24,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [string]$AvailabilityGroup, [string[]]$Database, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Secondary, [PSCredential]$SecondarySqlCredential, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [string]$SeedingMode, [string]$SharedPath, $UseLastBackup, [hashtable]$AdvancedBackupParams, $NoWait, [Security.SecureString]$MasterKeySecurePassword, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [string]$AvailabilityGroup, [string[]]$Database, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Secondary, [PSCredential]$SecondarySqlCredential, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [string]$SeedingMode, [string]$SharedPath, $UseLastBackup, [hashtable]$AdvancedBackupParams, $NoWait, [Security.SecureString]$MasterKeySecurePassword, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__boundProgressAction)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $timeoutExisting = $__state.timeoutExisting

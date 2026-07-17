@@ -135,7 +135,8 @@ public sealed partial class AddDbaAgDatabaseCommand : DbaBaseCmdlet
             UseLastBackup.ToBool(), AdvancedBackupParams, NoWait.ToBool(),
             MasterKeySecurePassword, EnableException.ToBool(), _state, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            BoundRawParameter("ProgressAction")))
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w4001State"))
@@ -151,6 +152,11 @@ public sealed partial class AddDbaAgDatabaseCommand : DbaBaseCmdlet
             }
             WriteObject(item);
         }
+    }
+
+    private object? BoundRawParameter(string name)
+    {
+        return MyInvocation.BoundParameters.TryGetValue(name, out object? value) ? value : null;
     }
 
     private object? BoundCommonParameter(string name)
