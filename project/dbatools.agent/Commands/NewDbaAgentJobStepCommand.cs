@@ -146,7 +146,10 @@ public sealed class NewDbaAgentJobStepCommand : DbaBaseCmdlet
     // -Continue). It halts the process and end hops.
     private bool _interrupted;
     // StepName carried across process records: the source reassigns it in the -StepId -Force branch and
-    // later records read the reassigned value through the shared scope. Null until the first record runs.
+    // later records read the reassigned value through the shared scope. The reassignment can legitimately
+    // yield null (no step has id 1), so the carried value is tracked with a separate flag rather than a
+    // null sentinel - null-once-carried must win over the originally bound StepName.
+    private bool _stepNameCarried;
     private string? _stepName;
 
     protected override void BeginProcessing()
@@ -186,8 +189,9 @@ public sealed class NewDbaAgentJobStepCommand : DbaBaseCmdlet
             return;
         }
 
-        // First record uses the bound StepName; later records use the value the previous record left.
-        string? stepNameForThisRecord = _stepName ?? StepName;
+        // First record uses the bound StepName; later records use the value the previous record left
+        // (which may legitimately be null - hence the flag, not a null-coalesce).
+        string? stepNameForThisRecord = _stepNameCarried ? _stepName : StepName;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
@@ -196,6 +200,7 @@ public sealed class NewDbaAgentJobStepCommand : DbaBaseCmdlet
                 if (sentinel["__newDbaAgentJobStepProcess"] is Hashtable state)
                 {
                     _stepName = state["StepName"] as string;
+                    _stepNameCarried = true;
                 }
                 return;
             }
