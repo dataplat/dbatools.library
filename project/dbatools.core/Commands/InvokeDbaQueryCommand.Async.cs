@@ -274,7 +274,7 @@ public sealed partial class InvokeDbaQueryCommand
     }
 
     /// <summary>The embedded DBNullScrubber (props to Dave Wyatt), native.</summary>
-    private static PSObject DataRowToPSObject(DataRow row)
+    internal static PSObject DataRowToPSObject(DataRow row)
     {
         PSObject psObject = new();
 
