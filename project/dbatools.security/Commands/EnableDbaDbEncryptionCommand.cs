@@ -22,7 +22,10 @@ namespace Dataplat.Dbatools.Commands;
 /// Get-DbaDatabase within that record - so no cross-record state is carried. Force and EnableException
 /// are switch parameters on the cmdlet but are carried into the hop as plain (untyped) values, because
 /// a [switch] parameter in the inner [CmdletBinding()] scriptblock is excluded from positional binding
-/// and would shift every following argument.
+/// and would shift every following argument. Output streams out of the hop object by object rather than
+/// being buffered, so each database's result reaches the pipeline before a later database in the same
+/// record can raise a terminating -EnableException failure; a buffered collection would be discarded on
+/// that throw and lose the earlier databases' output.
 /// </para>
 /// </remarks>
 [Cmdlet(VerbsLifecycle.Enable, "DbaDbEncryption", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High, DefaultParameterSetName = "Default")]
@@ -61,20 +64,22 @@ public sealed class EnableDbaDbEncryptionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, EncryptorName, InputObject, Force.ToBool(),
-            EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
             }
-            WriteObject(item);
-        }
+            else
+            {
+                WriteObject(item);
+            }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, EncryptorName, InputObject, Force.ToBool(),
+            EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

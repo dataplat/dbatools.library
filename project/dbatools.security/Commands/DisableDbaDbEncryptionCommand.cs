@@ -19,7 +19,10 @@ namespace Dataplat.Dbatools.Commands;
 /// <para>
 /// The command is process-only, so it ships as a single hop per record. Database objects piped through
 /// InputObject bind per record; when SqlInstance is supplied instead, the body fills InputObject from
-/// Get-DbaDatabase within that record - so no cross-record state is carried.
+/// Get-DbaDatabase within that record - so no cross-record state is carried. Output streams out of the
+/// hop object by object rather than being buffered, so each database's result reaches the pipeline
+/// before a later database in the same record can raise a terminating -EnableException failure; a
+/// buffered collection would be discarded on that throw and lose the earlier databases' output.
 /// </para>
 /// </remarks>
 [Cmdlet(VerbsLifecycle.Disable, "DbaDbEncryption", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High, DefaultParameterSetName = "Default")]
@@ -53,20 +56,22 @@ public sealed class DisableDbaDbEncryptionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, InputObject, NoEncryptionKeyDrop.ToBool(),
-            EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
             }
-            WriteObject(item);
-        }
+            else
+            {
+                WriteObject(item);
+            }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, InputObject, NoEncryptionKeyDrop.ToBool(),
+            EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
