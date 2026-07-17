@@ -33,6 +33,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__state) {
         $EndpointUrl = $__state.endpointUrl
         $Endpoint = $__state.endpoint
+        $epUrl = $__state.epUrl
     }
     . {
         if ($EndpointUrl) {
@@ -257,6 +258,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     @{ __w4003State = @{
         endpointUrl = $EndpointUrl
         endpoint    = $Endpoint
+        epUrl       = $epUrl
     } }
 } $SqlInstance $SqlCredential $Name $ClusterType $AvailabilityMode $FailoverMode $BackupPriority $ConnectionModeInPrimaryRole $ConnectionModeInSecondaryRole $SeedingMode $Endpoint $EndpointUrl $Passthru $ReadOnlyRoutingList $ReadonlyRoutingConnectionUrl $Certificate $ConfigureXESession $SessionTimeout $InputObject $EnableException $__state $__realCmdlet $__boundName $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;

@@ -104,12 +104,24 @@ public sealed partial class AddDbaAgReplicaCommand : DbaBaseCmdlet
 
     // The source evaluates two parameter defaults through Get-DbatoolsConfigValue at bind
     // time; the property initializers read the same configuration store the compiled
-    // config commands already use, with the source's fallbacks.
+    // config commands already use, with the source's fallbacks and its existing-value
+    // coercions: a stored "Mandatory" becomes $true and "Optional" becomes $false before
+    // the [string] parameter constraint stringifies them (True/False), exactly like the
+    // function's switch-parse guard.
     private static string ConfigValueOrFallback(string fullName, string fallback)
     {
         if (ConfigurationHost.Configurations.TryGetValue(fullName, out Config? config) && config?.Value is not null)
         {
-            return LanguagePrimitives.ConvertTo<string>(config.Value);
+            string text = LanguagePrimitives.ConvertTo<string>(config.Value);
+            if (string.Equals(text, "Mandatory", System.StringComparison.Ordinal))
+            {
+                return LanguagePrimitives.ConvertTo<string>(true);
+            }
+            if (string.Equals(text, "Optional", System.StringComparison.Ordinal))
+            {
+                return LanguagePrimitives.ConvertTo<string>(false);
+            }
+            return text;
         }
         return fallback;
     }
