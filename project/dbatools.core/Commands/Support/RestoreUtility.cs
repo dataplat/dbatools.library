@@ -44,10 +44,16 @@ internal static class RestoreUtility
     /// <summary>
     /// Port of private/functions/Convert-DbVersionToSqlVersion.ps1: makes db versions
     /// human readable. Unknown versions fall through unchanged, exactly like the PS switch
-    /// default.
+    /// default. The case labels are QUOTED STRINGS on purpose: the PS switch compares its
+    /// integer case literals against the [string] subject with the SUBJECT's type winning,
+    /// so only exact digit strings match — "0869", " 869" and "869 " pass through verbatim
+    /// (a numeric-parse or trimming rewrite diverges; the TB-014 pins fail it).
     /// </summary>
-    internal static string ConvertDbVersionToSqlVersion(string dbversion)
+    internal static string ConvertDbVersionToSqlVersion(string? dbversion)
     {
+        // PS binding parity (opus TB-014): an unbound/null-bound [string] is empty in PS,
+        // never null — PsString on entry per this file's convention (see PsString doc).
+        dbversion = PsString(dbversion);
         return dbversion switch
         {
             "869" => "SQL Server 2017",
@@ -77,10 +83,17 @@ internal static class RestoreUtility
     /// [System.Convert]::ToString($str, 16), the len-14 substring off-by-one, and PadLeft
     /// AFTER the base conversion. Returns null after the Stop-Function site fired
     /// (non-EnableException); throws InnerCommandException under EnableException.
+    /// Documented divergence (opus TB-011): when a numeric section overflows Int64 the PS
+    /// binder raises MethodException where long.Parse raises OverflowException - and the
+    /// compiled caller catches only InnerCommandException (the PS caller's bare catch took
+    /// anything), so an overflow would escape unhandled. Unreachable today: the sole
+    /// caller pre-filters pure numerics away from this helper entirely, and hex sections
+    /// are regex-capped at 8 digits.
     /// </summary>
     internal static LsnConversion? ConvertDbaLsn(PSCmdlet host, string lsn, bool enableException)
     {
         const string functionName = "Convert-DbaLSN";
+        lsn = PsString(lsn);
         string? hexadecimal = null;
         string? numeric = null;
 

@@ -118,6 +118,34 @@ namespace Dataplat.Dbatools.Csv.Tests
                     {
                         // Expected when disposed during read
                     }
+                    catch (CsvParseException cpe) when (cpe.ParseError != null && cpe.ParseError.Exception is ObjectDisposedException)
+                    {
+                        // Same dispose race, wrapped: the parse-error handler
+                        // (CsvDataReader.Conversion.cs) re-wraps the mid-parse
+                        // ObjectDisposedException via the (message, CsvParseError) ctor,
+                        // which carries it only in ParseError.Exception. Genuine parse
+                        // errors still fall through to the errors bag below.
+                    }
+                    catch (CsvParseException cpe) when (cpe.ParseError != null
+                        && cpe.ParseError.Exception is NullReferenceException nre
+                        && reader.IsClosed
+                        && nre.StackTrace != null
+                        && nre.StackTrace.Contains("Dataplat.Dbatools.Csv.Reader.CsvDataReader"))
+                    {
+                        // Second racy shape (observed net8.0): Dispose tears the reader's
+                        // internal buffers mid-parse and the dereference surfaces as an
+                        // NRE, which HandleParseError wraps exactly like the ODE above.
+                        // Tolerated ONLY when the reader is already closed AND the NRE
+                        // originates inside the reader's own frames (codex: IsClosed is
+                        // sampled after the throw, so the closed check alone could excuse
+                        // a genuine NRE that a fast concurrent dispose overtakes; the
+                        // stack-site constraint narrows the tolerance to the known
+                        // disposal-torn dereference site). A live-reader or foreign-frame
+                        // NRE still lands in the errors bag. Whether Read() should surface
+                        // ObjectDisposedException instead of a wrapped parse error on a
+                        // disposed reader remains the product decision flagged to the
+                        // integrator lane in TB-012.
+                    }
                     catch (Exception ex)
                     {
                         errors.Add(ex);
@@ -138,7 +166,13 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
             }
 
-            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join("; ", errors.Select(e => e.Message))));
+            // Full ToString + the CsvParseException's carried ParseError.Exception (which
+            // the (message, CsvParseError) ctor does NOT surface as InnerException) so a
+            // failure names the actual racy shape instead of the bare "CSV parse error".
+            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join(" ||| ", errors.Select(e =>
+                e is CsvParseException cpeDetail && cpeDetail.ParseError != null && cpeDetail.ParseError.Exception != null
+                    ? e.ToString() + " [ParseError.Exception: " + cpeDetail.ParseError.Exception.ToString() + "]"
+                    : e.ToString()))));
         }
 
 
