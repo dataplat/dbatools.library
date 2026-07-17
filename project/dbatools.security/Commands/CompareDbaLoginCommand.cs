@@ -13,37 +13,36 @@ namespace Dataplat.Dbatools.Commands;
 /// <remarks>
 /// The workflow remains a module-scoped PowerShell compatibility hop so that login discovery, the
 /// comparison, output shape, and dbatools stream and error handling stay observable-identical to the
-/// script implementation. The command takes no pipeline input, so its begin and process blocks each
-/// run exactly once; they are shipped as a single hop, which preserves the source's reliance on the
-/// source-server lookup from the begin block being visible to the process block through one shared
-/// scope. The begin connection failure sets the interrupt flag and returns before the comparison
-/// runs, exactly as in the source.
+/// script implementation. The command is shipped as TWO hops to preserve the script's lifecycle: the
+/// begin hop connects to the source and gathers its logins EXACTLY ONCE - so it still runs when the
+/// upstream pipeline is empty, matching the function - and the process hop compares against each
+/// destination. The source server and its logins are carried between the hops as fields.
 /// </remarks>
 [Cmdlet(VerbsData.Compare, "DbaLogin")]
 public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
 {
     /// <summary>The source SQL Server instance.</summary>
-    [Parameter(Mandatory = true)]
+    [Parameter(Mandatory = true, Position = 0)]
     public DbaInstanceParameter Source { get; set; } = null!;
 
     /// <summary>Alternative credential for the source instance.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? SourceSqlCredential { get; set; }
 
     /// <summary>The destination SQL Server instance or instances.</summary>
-    [Parameter(Mandatory = true)]
+    [Parameter(Mandatory = true, Position = 2)]
     public DbaInstanceParameter[] Destination { get; set; } = null!;
 
     /// <summary>Alternative credential for the destination instances.</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     public PSCredential? DestinationSqlCredential { get; set; }
 
     /// <summary>The login or logins to compare; all logins are compared when omitted.</summary>
-    [Parameter]
+    [Parameter(Position = 4)]
     public string[]? Login { get; set; }
 
     /// <summary>Logins to exclude from the comparison.</summary>
-    [Parameter]
+    [Parameter(Position = 5)]
     public string[]? ExcludeLogin { get; set; }
 
     /// <summary>Excludes system logins from the comparison.</summary>
@@ -52,15 +51,55 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    /// <summary>Runs the comparison. Fires once because the command takes no pipeline input.</summary>
+    /// <summary>Set when the begin block stopped the command (source connection failure).</summary>
+    private bool _beginInterrupted;
+
+    /// <summary>The source server and its logins, gathered once in begin and read by each record.</summary>
+    private object? _sourceServer;
+    private object? _sourceLogins;
+
+    /// <summary>Connects to the source and gathers its logins once, before any record.</summary>
+    protected override void BeginProcessing()
+    {
+        bool completed = false;
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
+            Source, SourceSqlCredential, Login, ExcludeLogin, ExcludeSystemLogin.ToBool(),
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+            }
+            else if (item is not null && LanguagePrimitives.IsTrue(
+                item.Properties["__CompareDbaLoginBeginComplete"]?.Value))
+            {
+                completed = true;
+                object? server = item.Properties["SourceServer"]?.Value;
+                _sourceServer = server is PSObject serverWrapper ? serverWrapper.BaseObject : server;
+                object? logins = item.Properties["SourceLogins"]?.Value;
+                _sourceLogins = logins is PSObject loginsWrapper ? loginsWrapper.BaseObject : logins;
+            }
+            else if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }
+
+        // The sentinel is the last statement of the begin body, so it is absent exactly when that
+        // body returned early - which it does only after a source connection failure stopped the command.
+        _beginInterrupted = !completed;
+    }
+
+    /// <summary>Compares the source logins against each destination for one pipeline record.</summary>
     protected override void ProcessRecord()
     {
-        if (Interrupted)
+        if (_beginInterrupted || Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Source, SourceSqlCredential, Destination, DestinationSqlCredential, Login, ExcludeLogin,
-            ExcludeSystemLogin.ToBool(), EnableException.ToBool(),
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+            Destination, DestinationSqlCredential, Login, ExcludeLogin, ExcludeSystemLogin.ToBool(),
+            _sourceServer, _sourceLogins, EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
@@ -100,21 +139,19 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin body followed by the process body, VERBATIM. The two blocks are concatenated
-    // because the command has no pipeline input, so each ran once and shared one scope - the process
-    // block reads $sourceServer and $sourceLogins that the begin block set. Substitutions only:
-    // -FunctionName on the two direct Stop-Function calls. The begin catch keeps its explicit return,
-    // which now exits the hop before the process body, matching the source (begin failure sets the
-    // interrupt flag and the process block's Test-FunctionInterrupt guard would have returned anyway).
-    private const string BodyScript = """
-param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $Login, $ExcludeLogin, $ExcludeSystemLogin, $EnableException, $__boundVerbose, $__boundDebug)
+    // PS: the begin body VERBATIM. Substitution only: -FunctionName on the direct Stop-Function call.
+    // The begin catch keeps its explicit return, which skips the trailing sentinel - that absence is
+    // how BeginProcessing learns the source connection failed. The source server and its logins are
+    // emitted through the sentinel so the process hop can read them (a hop scope dies between hops).
+    private const string BeginScript = """
+param($Source, $SourceSqlCredential, $Login, $ExcludeLogin, $ExcludeSystemLogin, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [PSCredential]$SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, [PSCredential]$DestinationSqlCredential, [string[]]$Login, [string[]]$ExcludeLogin, $ExcludeSystemLogin, $EnableException, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [PSCredential]$SourceSqlCredential, [string[]]$Login, [string[]]$ExcludeLogin, $ExcludeSystemLogin, $EnableException, $__boundVerbose, $__boundDebug)
 
     try {
         $sourceServer = Connect-DbaInstance -SqlInstance $Source -SqlCredential $SourceSqlCredential
@@ -134,6 +171,24 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $splatGetSource["ExcludeLogin"] = $ExcludeLogin
     }
     $sourceLogins = Get-DbaLogin @splatGetSource
+
+    [pscustomobject]@{ __CompareDbaLoginBeginComplete = $true; SourceServer = $sourceServer; SourceLogins = $sourceLogins }
+} $Source $SourceSqlCredential $Login $ExcludeLogin $ExcludeSystemLogin $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+
+    // PS: the process body VERBATIM. Substitution only: -FunctionName on the direct Stop-Function call.
+    // $sourceServer and $sourceLogins are received from the begin hop rather than a shared function
+    // scope. The Test-FunctionInterrupt guard is preserved verbatim; the begin stop is carried by
+    // _beginInterrupted, so this record only runs when begin completed.
+    private const string ProcessScript = """
+param($Destination, $DestinationSqlCredential, $Login, $ExcludeLogin, $ExcludeSystemLogin, $sourceServer, $sourceLogins, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, [PSCredential]$DestinationSqlCredential, [string[]]$Login, [string[]]$ExcludeLogin, $ExcludeSystemLogin, $sourceServer, $sourceLogins, $EnableException, $__boundVerbose, $__boundDebug)
 
     if (Test-FunctionInterrupt) { return }
 
@@ -191,6 +246,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $Login $ExcludeLogin $ExcludeSystemLogin $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $Destination $DestinationSqlCredential $Login $ExcludeLogin $ExcludeSystemLogin $sourceServer $sourceLogins $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
