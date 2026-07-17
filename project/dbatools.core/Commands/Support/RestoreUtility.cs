@@ -31,10 +31,15 @@ internal static class RestoreUtility
 {
     /// <summary>
     /// Port of private/functions/Get-DbaPathSep.ps1: the instance path separator, if
-    /// exists, or the default one. IsNullOrEmpty is exact parity with the source's
-    /// Length-eq-0 test: PowerShell special-cases Length on $null (0 since v3), so a
-    /// null server, a null separator and an empty separator all take the default there
-    /// too - probed on both editions.
+    /// exists, or the default one. Over every input the Server? signature can carry,
+    /// IsNullOrEmpty matches the source's Length-eq-0 test: PowerShell special-cases
+    /// Length on $null (0 since v3), so a null server, a null separator and an empty
+    /// separator all take the default there too - probed on both editions. (The
+    /// source's [object] parameter additionally admits non-string separators with
+    /// their own Length semantics; no caller in either world produces one.) On a
+    /// disconnected server the separator read fails BEFORE the default logic in both
+    /// worlds - each surfaces its own wrapper type there, unreachable from the
+    /// shipped call sites, which all pass a connected server.
     /// </summary>
     internal static string GetPathSep(Server? server)
     {
