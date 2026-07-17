@@ -175,7 +175,7 @@ public sealed class ExportDbaDbRoleCommand : DbaBaseCmdlet
             return;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            Passthru.ToBool(), Path, FilePath, BatchSeparator, TestBound(nameof(BatchSeparator)),
+            Passthru.ToBool(), Path, TestBound(nameof(Path)), FilePath, BatchSeparator, TestBound(nameof(BatchSeparator)),
             NoPrefix.ToBool(), Encoding, NoClobber.ToBool(), Append.ToBool(), _state,
             TestBound(nameof(Path)) ? (object?)Path : null, TestBound(nameof(FilePath)) ? (object?)FilePath : null,
             EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
@@ -244,7 +244,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } else {
             $executingUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
         }
-        $commandName = $MyInvocation.MyCommand.Name
+        $commandName = "Export-DbaDbRole"
 
         $roleSQL = "SELECT
                         N'/*RoleName*/' AS RoleName,
@@ -456,18 +456,23 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // PS: the end block VERBATIM. Edits: Get-ExportFilePath routed through the named wrapper
     // Export-DbaDbRole; $PSBoundParameters.Path/.FilePath -> carried bound values; -FunctionName on
     // direct Stop-Function/Write-Message. The accumulator and the executingUser/commandName/
-    // outputFileArray constants are restored from the carried state; BatchSeparator's config default
-    // is reproduced when unbound.
+    // outputFileArray constants are restored from the carried state; the Path and BatchSeparator
+    // config defaults are reproduced when unbound (Path drives the file-vs-pipeline branch, which the
+    // source's param-level default makes always-file).
     private const string EndScript = """
-param($Passthru, $Path, $FilePath, $BatchSeparator, $__boundBatchSeparator, $NoPrefix, $Encoding, $NoClobber, $Append, $__state, $__boundPathValue, $__boundFilePathValue, $EnableException, $__boundVerbose, $__boundDebug)
+param($Passthru, $Path, $__boundPath, $FilePath, $BatchSeparator, $__boundBatchSeparator, $NoPrefix, $Encoding, $NoClobber, $Append, $__state, $__boundPathValue, $__boundFilePathValue, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param($Passthru, [string]$Path, [string]$FilePath, [string]$BatchSeparator, $__boundBatchSeparator, $NoPrefix, [string]$Encoding, $NoClobber, $Append, $__state, $__boundPathValue, $__boundFilePathValue, $EnableException, $__boundVerbose, $__boundDebug)
+    param($Passthru, [string]$Path, $__boundPath, [string]$FilePath, [string]$BatchSeparator, $__boundBatchSeparator, $NoPrefix, [string]$Encoding, $NoClobber, $Append, $__state, $__boundPathValue, $__boundFilePathValue, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    if (-not $__boundPath) {
+        $Path = Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport'
+    }
 
     if (-not $__boundBatchSeparator) {
         $BatchSeparator = Get-DbatoolsConfigValue -FullName 'Formatting.BatchSeparator'
@@ -534,6 +539,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-} $Passthru $Path $FilePath $BatchSeparator $__boundBatchSeparator $NoPrefix $Encoding $NoClobber $Append $__state $__boundPathValue $__boundFilePathValue $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $Passthru $Path $__boundPath $FilePath $BatchSeparator $__boundBatchSeparator $NoPrefix $Encoding $NoClobber $Append $__state $__boundPathValue $__boundFilePathValue $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
