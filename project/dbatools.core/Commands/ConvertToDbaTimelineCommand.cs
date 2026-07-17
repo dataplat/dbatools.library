@@ -474,6 +474,13 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
     /// exactly two output classes: the complete string, or empty.
     /// Internal (not private) so the TB-017 offline pins can drive it directly, including
     /// the culture swaps; the date logic touches no SessionState.
+    /// NO array guard on purpose (opus TB-017, probe-settled): unlike the [string] sibling
+    /// above - where LanguagePrimitives $OFS-joins what the binder rejects, forcing the
+    /// explicit Array early-return - LanguagePrimitives.ConvertTo REFUSES array-to-DateTime
+    /// (probed both editions, single-element and empty), so the catch below already renders
+    /// the same EMPTY the PS binder rejection produces. The string conversion is likewise
+    /// INVARIANT in the PS binder (probed: en-GB "16/07/2026" fails and renders empty),
+    /// matching the InvariantCulture argument here.
     /// </summary>
     internal static string ConvertToJsDate(object? inputDate)
     {
