@@ -145,7 +145,9 @@ namespace Dataplat.Dbatools.Commands.Test
             PSObject b = new PSObject();
             Collection<PSObject> many = new Collection<PSObject> { a, b };
             object shaped = InvokeDbaQueryCommand.ShapePipelineValue(many);
-            Assert.IsInstanceOfType(shaped, typeof(object[]), "many -> object[], not PSObject[]");
+            // Exact runtime type, not IsInstanceOfType: a PSObject[] is covariantly an
+            // object[], but the source's element type is object[] and GetType is observable.
+            Assert.AreEqual(typeof(object[]), shaped.GetType(), "many -> object[], not PSObject[]");
             object[] arr = (object[])shaped;
             Assert.AreEqual(2, arr.Length);
             Assert.AreSame(a, arr[0]);
