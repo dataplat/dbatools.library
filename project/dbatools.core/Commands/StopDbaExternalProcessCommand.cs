@@ -49,14 +49,19 @@ public sealed class StopDbaExternalProcessCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
+        // Codex r1: a fresh reference-identity marker instead of a keyed Hashtable -
+        // command output (Invoke-Command2's flows to the pipeline here) can never
+        // collide with an object the caller just allocated (smoke S9 regression-pins a
+        // deliberately colliding hashtable passing through as ordinary output).
+        object continueMarker = new object();
         bool continueEscaped = false;
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             ComputerName, Credential, ProcessId, EnableException.ToBool(), this,
+            continueMarker,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
-            Hashtable? sentinel = item?.BaseObject as Hashtable;
-            if (sentinel is not null && sentinel.ContainsKey("__w3102Continue"))
+            if (ReferenceEquals(item?.BaseObject, continueMarker))
             {
                 continueEscaped = true;
                 continue;
@@ -118,7 +123,7 @@ continue
     // $Pscmdlet -> $__realCmdlet on the gate and explicit -FunctionName
     // Stop-DbaExternalProcess on the hop-frame Stop-Function (W1-090).
     private const string ProcessScript = """
-param($ComputerName, $Credential, $ProcessId, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($ComputerName, $Credential, $ProcessId, $EnableException, $__realCmdlet, $__continueMarker, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -127,7 +132,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$ComputerName, [PSCredential]$Credential, [int]$ProcessId, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$ComputerName, [PSCredential]$Credential, [int]$ProcessId, $EnableException, $__realCmdlet, $__continueMarker, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # CONTINUE RELAY, script half (this row's r2/r3 finding): the source's catch runs
@@ -163,7 +168,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         $__continueEscaped = $false
     }
-    if ($__continueEscaped) { @{ __w3102Continue = $true } }
-} $ComputerName $Credential $ProcessId $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    if ($__continueEscaped) { $__continueMarker }
+} $ComputerName $Credential $ProcessId $EnableException $__realCmdlet $__continueMarker $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
