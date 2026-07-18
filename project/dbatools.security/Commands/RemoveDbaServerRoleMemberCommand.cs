@@ -74,6 +74,9 @@ public sealed class RemoveDbaServerRoleMemberCommand : DbaBaseCmdlet
     /// <summary>The InputObject seen at the previous ProcessRecord, to detect a genuine pipeline rebind.</summary>
     private object? _prevInputObject;
 
+    /// <summary>The by-name InputObject value snapshotted at begin (the hop's initial $InputObject).</summary>
+    private object? _byNameInputObject;
+
     private bool _sqlInstanceByName;
     private bool _serverRoleByName;
     private bool _loginByName;
@@ -84,6 +87,11 @@ public sealed class RemoveDbaServerRoleMemberCommand : DbaBaseCmdlet
         _sqlInstanceByName = MyInvocation.BoundParameters.ContainsKey("SqlInstance");
         _serverRoleByName = MyInvocation.BoundParameters.ContainsKey("ServerRole");
         _loginByName = MyInvocation.BoundParameters.ContainsKey("Login");
+        // Snapshot the by-name InputObject (null unless -InputObject was passed by name). It is both the hop's
+        // initial $InputObject and the rebind baseline, so the FIRST record's by-name value is NOT mistaken for
+        // a pipeline rebind (which would defeat the begin block's $InputObject = $SqlInstance state-copy).
+        _byNameInputObject = InputObject;
+        _prevInputObject = InputObject;
     }
 
     /// <summary>Records each pipeline record's input as a batch; the work runs once in EndProcessing.</summary>
@@ -104,7 +112,7 @@ public sealed class RemoveDbaServerRoleMemberCommand : DbaBaseCmdlet
             return;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            _batches.ToArray(), SqlInstance, SqlCredential, ServerRole, Login, Role, EnableException.ToBool(), this,
+            _batches.ToArray(), _byNameInputObject, SqlInstance, SqlCredential, ServerRole, Login, Role, EnableException.ToBool(), this,
             _sqlInstanceByName, _serverRoleByName, _loginByName,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
@@ -152,7 +160,7 @@ public sealed class RemoveDbaServerRoleMemberCommand : DbaBaseCmdlet
     // ShouldProcess gates); Test-Bound SqlInstance/ServerRole/Login -> carried by-name flags; -FunctionName on the
     // 15 DIRECT Stop-Function/Write-Message calls. EnableException received untyped.
     private const string ProcessScript = """
-param($__batches, $SqlInstance, $SqlCredential, $ServerRole, $Login, $Role, $EnableException, $__realCmdlet, $__sqlInstanceByName, $__serverRoleByName, $__loginByName, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($__batches, $__byNameInputObject, $SqlInstance, $SqlCredential, $ServerRole, $Login, $Role, $EnableException, $__realCmdlet, $__sqlInstanceByName, $__serverRoleByName, $__loginByName, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -161,9 +169,10 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param($__batches, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$ServerRole, [string[]]$Login, [string[]]$Role, $EnableException, $__realCmdlet, $__sqlInstanceByName, $__serverRoleByName, $__loginByName, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param($__batches, $__byNameInputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$ServerRole, [string[]]$Login, [string[]]$Role, $EnableException, $__realCmdlet, $__sqlInstanceByName, $__serverRoleByName, $__loginByName, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+        $InputObject = $__byNameInputObject
         if ( (-not $__sqlInstanceByName) -and (-not $__serverRoleByName) -and (-not $__loginByName) ) {
             Stop-Function -Message "You must pipe in a ServerRole, Login, or specify a SqlInstance" -FunctionName Remove-DbaServerRoleMember
             return
@@ -253,7 +262,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
             }
         }
-} $__batches $SqlInstance $SqlCredential $ServerRole $Login $Role $EnableException $__realCmdlet $__sqlInstanceByName $__serverRoleByName $__loginByName $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $__batches $__byNameInputObject $SqlInstance $SqlCredential $ServerRole $Login $Role $EnableException $__realCmdlet $__sqlInstanceByName $__serverRoleByName $__loginByName $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
 }
