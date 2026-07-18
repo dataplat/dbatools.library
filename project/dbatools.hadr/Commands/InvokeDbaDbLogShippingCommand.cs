@@ -170,94 +170,30 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
+    // ONLY the caller-bound parameters ride the splat (minus engine common
+    // parameters, which travel separately via @__commonParameters): the source reads
+    // $PSBoundParameters.ContainsKey("AzureBaseUrl") at line 627 and truthiness-gates
+    // several params - splatting all 84 values would make every key count as bound.
+    // The typed inner param blocks give unbound parameters their function-world
+    // defaults exactly.
+    private static readonly System.Collections.Generic.HashSet<string> CommonParameterNames =
+        new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
+        {
+            "Verbose", "Debug", "ErrorAction", "WarningAction", "InformationAction", "ProgressAction",
+            "ErrorVariable", "WarningVariable", "InformationVariable", "OutVariable", "OutBuffer",
+            "PipelineVariable", "WhatIf", "Confirm"
+        };
+
     private Hashtable BuildParameterTable()
     {
         Hashtable parameters = new Hashtable(System.StringComparer.OrdinalIgnoreCase);
-        parameters["SourceSqlInstance"] = SourceSqlInstance;
-        parameters["DestinationSqlInstance"] = DestinationSqlInstance;
-        parameters["SourceSqlCredential"] = SourceSqlCredential;
-        parameters["SourceCredential"] = SourceCredential;
-        parameters["DestinationSqlCredential"] = DestinationSqlCredential;
-        parameters["DestinationCredential"] = DestinationCredential;
-        parameters["Database"] = Database;
-        parameters["SharedPath"] = SharedPath;
-        parameters["LocalPath"] = LocalPath;
-        parameters["AzureBaseUrl"] = AzureBaseUrl;
-        parameters["AzureCredential"] = AzureCredential;
-        parameters["BackupJob"] = BackupJob;
-        parameters["BackupRetention"] = BackupRetention;
-        parameters["BackupSchedule"] = BackupSchedule;
-        parameters["BackupScheduleFrequencyType"] = BackupScheduleFrequencyType;
-        parameters["BackupScheduleFrequencyInterval"] = BackupScheduleFrequencyInterval;
-        parameters["BackupScheduleFrequencySubdayType"] = BackupScheduleFrequencySubdayType;
-        parameters["BackupScheduleFrequencySubdayInterval"] = BackupScheduleFrequencySubdayInterval;
-        parameters["BackupScheduleFrequencyRelativeInterval"] = BackupScheduleFrequencyRelativeInterval;
-        parameters["BackupScheduleFrequencyRecurrenceFactor"] = BackupScheduleFrequencyRecurrenceFactor;
-        parameters["BackupScheduleStartDate"] = BackupScheduleStartDate;
-        parameters["BackupScheduleEndDate"] = BackupScheduleEndDate;
-        parameters["BackupScheduleStartTime"] = BackupScheduleStartTime;
-        parameters["BackupScheduleEndTime"] = BackupScheduleEndTime;
-        parameters["BackupThreshold"] = BackupThreshold;
-        parameters["CopyDestinationFolder"] = CopyDestinationFolder;
-        parameters["CopyJob"] = CopyJob;
-        parameters["CopyRetention"] = CopyRetention;
-        parameters["CopySchedule"] = CopySchedule;
-        parameters["CopyScheduleFrequencyType"] = CopyScheduleFrequencyType;
-        parameters["CopyScheduleFrequencyInterval"] = CopyScheduleFrequencyInterval;
-        parameters["CopyScheduleFrequencySubdayType"] = CopyScheduleFrequencySubdayType;
-        parameters["CopyScheduleFrequencySubdayInterval"] = CopyScheduleFrequencySubdayInterval;
-        parameters["CopyScheduleFrequencyRelativeInterval"] = CopyScheduleFrequencyRelativeInterval;
-        parameters["CopyScheduleFrequencyRecurrenceFactor"] = CopyScheduleFrequencyRecurrenceFactor;
-        parameters["CopyScheduleStartDate"] = CopyScheduleStartDate;
-        parameters["CopyScheduleEndDate"] = CopyScheduleEndDate;
-        parameters["CopyScheduleStartTime"] = CopyScheduleStartTime;
-        parameters["CopyScheduleEndTime"] = CopyScheduleEndTime;
-        parameters["FullBackupPath"] = FullBackupPath;
-        parameters["HistoryRetention"] = HistoryRetention;
-        parameters["PrimaryMonitorServer"] = PrimaryMonitorServer;
-        parameters["PrimaryMonitorCredential"] = PrimaryMonitorCredential;
-        parameters["PrimaryMonitorServerSecurityMode"] = PrimaryMonitorServerSecurityMode;
-        parameters["RestoreDataFolder"] = RestoreDataFolder;
-        parameters["RestoreLogFolder"] = RestoreLogFolder;
-        parameters["RestoreDelay"] = RestoreDelay;
-        parameters["RestoreAlertThreshold"] = RestoreAlertThreshold;
-        parameters["RestoreJob"] = RestoreJob;
-        parameters["RestoreRetention"] = RestoreRetention;
-        parameters["RestoreSchedule"] = RestoreSchedule;
-        parameters["RestoreScheduleFrequencyType"] = RestoreScheduleFrequencyType;
-        parameters["RestoreScheduleFrequencyInterval"] = RestoreScheduleFrequencyInterval;
-        parameters["RestoreScheduleFrequencySubdayType"] = RestoreScheduleFrequencySubdayType;
-        parameters["RestoreScheduleFrequencySubdayInterval"] = RestoreScheduleFrequencySubdayInterval;
-        parameters["RestoreScheduleFrequencyRelativeInterval"] = RestoreScheduleFrequencyRelativeInterval;
-        parameters["RestoreScheduleFrequencyRecurrenceFactor"] = RestoreScheduleFrequencyRecurrenceFactor;
-        parameters["RestoreScheduleStartDate"] = RestoreScheduleStartDate;
-        parameters["RestoreScheduleEndDate"] = RestoreScheduleEndDate;
-        parameters["RestoreScheduleStartTime"] = RestoreScheduleStartTime;
-        parameters["RestoreScheduleEndTime"] = RestoreScheduleEndTime;
-        parameters["RestoreThreshold"] = RestoreThreshold;
-        parameters["SecondaryDatabasePrefix"] = SecondaryDatabasePrefix;
-        parameters["SecondaryDatabaseSuffix"] = SecondaryDatabaseSuffix;
-        parameters["SecondaryMonitorServer"] = SecondaryMonitorServer;
-        parameters["SecondaryMonitorCredential"] = SecondaryMonitorCredential;
-        parameters["SecondaryMonitorServerSecurityMode"] = SecondaryMonitorServerSecurityMode;
-        parameters["StandbyDirectory"] = StandbyDirectory;
-        parameters["UseBackupFolder"] = UseBackupFolder;
-        parameters["BackupScheduleDisabled"] = BackupScheduleDisabled.ToBool();
-        parameters["CompressBackup"] = CompressBackup.ToBool();
-        parameters["CopyScheduleDisabled"] = CopyScheduleDisabled.ToBool();
-        parameters["DisconnectUsers"] = DisconnectUsers.ToBool();
-        parameters["Force"] = Force.ToBool();
-        parameters["GenerateFullBackup"] = GenerateFullBackup.ToBool();
-        parameters["IgnoreFileChecks"] = IgnoreFileChecks.ToBool();
-        parameters["NoInitialization"] = NoInitialization.ToBool();
-        parameters["NoRecovery"] = NoRecovery.ToBool();
-        parameters["PrimaryThresholdAlertEnabled"] = PrimaryThresholdAlertEnabled.ToBool();
-        parameters["RestoreScheduleDisabled"] = RestoreScheduleDisabled.ToBool();
-        parameters["SecondaryThresholdAlertEnabled"] = SecondaryThresholdAlertEnabled.ToBool();
-        parameters["Standby"] = Standby.ToBool();
-        parameters["UseExistingFullBackup"] = UseExistingFullBackup.ToBool();
-
-        parameters["EnableException"] = EnableException.ToBool();
+        foreach (System.Collections.Generic.KeyValuePair<string, object> bound in MyInvocation.BoundParameters)
+        {
+            if (!CommonParameterNames.Contains(bound.Key))
+            {
+                parameters[bound.Key] = bound.Value;
+            }
+        }
         return parameters;
     }
 }
