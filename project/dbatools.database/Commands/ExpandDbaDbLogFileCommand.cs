@@ -92,21 +92,24 @@ public sealed class ExpandDbaDbLogFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, TargetLogSize, IncrementSize,
-            TargetVlfCount, LogFileId, ShrinkLogFile.ToBool(), ShrinkSize, BackupDirectory,
-            ExcludeDiskSpaceValidation.ToBool(), EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // Streaming, not buffered (DEF-001): the command mutates log files database-by-database and
+        // emits one result per database; buffered InvokeScoped discarded the results of databases
+        // already grown when a later database's failure terminated the hop under -EnableException.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, TargetLogSize, IncrementSize,
+            TargetVlfCount, LogFileId, ShrinkLogFile.ToBool(), ShrinkSize, BackupDirectory,
+            ExcludeDiskSpaceValidation.ToBool(), EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
