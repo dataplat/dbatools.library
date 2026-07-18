@@ -34,9 +34,12 @@ namespace Dataplat.Dbatools.Commands;
 /// -Force parameter of this command (there is none). Nothing reads Test-FunctionInterrupt (the one
 /// Stop-Function is -Continue) -> no interrupt/Interrupted guard. $InputObject is only READ -> no
 /// cross-record carry. Three parameter sets: Session (default), All, Object; StartAt/StopAt are
-/// __AllParameterSets. Each re-queried/started session is emitted before a later Start may fail under
-/// -EnableException (DEF-001), so the process hop uses InvokeScopedStreaming. Surface pinned by
-/// migration/baselines/Start-DbaXESession.json.
+/// __AllParameterSets. StartAt/StopAt bind with the invariant culture (matching the script binder) and
+/// are passed into the hop as $null when unbound: the source gates its Agent-job scheduling branches on
+/// the parameters' truthiness, and an unbound [datetime] is $null (falsy) in the script world, where
+/// the compiled property's default would be a truthy date. Each re-queried/started session is emitted
+/// before a later Start may fail under -EnableException (DEF-001), so the process hop uses
+/// InvokeScopedStreaming. Surface pinned by migration/baselines/Start-DbaXESession.json.
 /// </remarks>
 [Cmdlet(VerbsLifecycle.Start, "DbaXESession", DefaultParameterSetName = "Session", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class StartDbaXESessionCommand : DbaBaseCmdlet
@@ -59,10 +62,12 @@ public sealed class StartDbaXESessionCommand : DbaBaseCmdlet
 
     /// <summary>Schedule the session to start at this time (via an Agent job).</summary>
     [Parameter]
+    [PsDateTimeCast]
     public DateTime StartAt { get; set; }
 
     /// <summary>Schedule the session to stop at this time (via an Agent job).</summary>
     [Parameter]
+    [PsDateTimeCast]
     public DateTime StopAt { get; set; }
 
     /// <summary>Start all non-system Extended Events sessions.</summary>
@@ -78,6 +83,12 @@ public sealed class StartDbaXESessionCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
+        // An unbound [datetime] is $null in the script world and falsy; the C# property default
+        // (DateTime.MinValue) is truthy to PowerShell and would wrongly take the "if ($StartAt)"
+        // Agent-job scheduling branches. Pass null when unbound so the hop's truthiness gates match.
+        object? startAt = TestBound(nameof(StartAt)) ? StartAt : null;
+        object? stopAt = TestBound(nameof(StopAt)) ? StopAt : null;
+
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
@@ -90,7 +101,7 @@ public sealed class StartDbaXESessionCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }, ProcessScript,
-            InputObject, SqlInstance, SqlCredential, Session, StartAt, StopAt, AllSessions.ToBool(),
+            InputObject, SqlInstance, SqlCredential, Session, startAt, stopAt, AllSessions.ToBool(),
             EnableException.ToBool(), this, BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -141,7 +152,7 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param([Microsoft.SqlServer.Management.XEvent.Session[]]$InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [object[]]$Session, [datetime]$StartAt, [datetime]$StopAt, $AllSessions, $EnableException, $__realCmdlet)
+    param([Microsoft.SqlServer.Management.XEvent.Session[]]$InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [object[]]$Session, $StartAt, $StopAt, $AllSessions, $EnableException, $__realCmdlet)
     function Start-XESessions {
         [CmdletBinding(SupportsShouldProcess)]
         param ([Microsoft.SqlServer.Management.XEvent.Session[]]$xeSessions)
