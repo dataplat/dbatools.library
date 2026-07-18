@@ -31,7 +31,15 @@ internal static class RestoreUtility
 {
     /// <summary>
     /// Port of private/functions/Get-DbaPathSep.ps1: the instance path separator, if
-    /// exists, or the default one.
+    /// exists, or the default one. Over every input the Server? signature can carry,
+    /// IsNullOrEmpty matches the source's Length-eq-0 test: PowerShell special-cases
+    /// Length on $null (0 since v3), so a null server, a null separator and an empty
+    /// separator all take the default there too - probed on both editions. (The
+    /// source's [object] parameter additionally admits non-string separators with
+    /// their own Length semantics; no caller in either world produces one.) On a
+    /// disconnected server the separator read fails BEFORE the default logic in both
+    /// worlds - each surfaces its own wrapper type there, unreachable from the
+    /// shipped call sites, which all pass a connected server.
     /// </summary>
     internal static string GetPathSep(Server? server)
     {
@@ -230,6 +238,16 @@ internal static class RestoreUtility
     /// Port of private/functions/Get-DbaDbPhysicalFile.ps1: fastest way to fetch just the
     /// paths of the physical files for every database on the instance, also for offline
     /// databases. The caller passes its live connected server (Connect pass-through).
+    /// The source's bare string throw is ported as RuntimeException (the engine's own
+    /// shape for throw "string"). One intentional divergence, genuinely unobservable:
+    /// the source reads only the FIRST result table (its Query script method returns
+    /// Tables[0]) where this port flattens all tables - identical for the single-SELECT
+    /// batches this method builds. The error mask wraps ONLY the query leg, matching
+    /// the source's try boundary; failures before it (the version read) are never
+    /// replaced by the mask in either world, though each world surfaces its own
+    /// wrapper type there (SMO's connection failure here, the engine's
+    /// property-getter wrapper in PS) - unreachable from the shipped call site, which
+    /// passes an already-connected server.
     /// </summary>
     internal static System.Data.DataRow[] GetDbaDbPhysicalFile(PSCmdlet host, Server server)
     {
@@ -256,7 +274,10 @@ internal static class RestoreUtility
         }
         catch
         {
-            throw new InvalidOperationException("Error enumerating files");
+            // PS: throw "Error enumerating files" - a bare string throw surfaces as
+            // RuntimeException, and $Error[0].Exception type + CategoryInfo.Reason are
+            // user-observable past the shipped call site.
+            throw new RuntimeException("Error enumerating files");
         }
     }
 

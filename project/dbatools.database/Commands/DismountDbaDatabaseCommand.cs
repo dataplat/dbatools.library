@@ -79,25 +79,30 @@ public sealed class DismountDbaDatabaseCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, InputObject, UpdateStatistics.ToBool(),
-            Force.ToBool(), EnableException.ToBool(), _state, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // Streaming, not buffered (DEF-001): this is a DESTRUCTIVE command whose per-database
+        // result objects are the audit trail of what was detached. Buffered InvokeScoped only
+        // returns output after the whole hop completes, so a terminating error mid-loop (under
+        // -EnableException) discarded the records for databases ALREADY DETACHED. Streaming
+        // emits each result as produced, exactly as the function world did.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__dismountDbaDatabaseState"))
             {
                 _state = sentinel["__dismountDbaDatabaseState"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, InputObject, UpdateStatistics.ToBool(),
+            Force.ToBool(), EnableException.ToBool(), _state, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

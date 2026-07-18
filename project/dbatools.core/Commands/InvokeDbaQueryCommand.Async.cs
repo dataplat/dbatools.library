@@ -274,7 +274,7 @@ public sealed partial class InvokeDbaQueryCommand
     }
 
     /// <summary>The embedded DBNullScrubber (props to Dave Wyatt), native.</summary>
-    private static PSObject DataRowToPSObject(DataRow row)
+    internal static PSObject DataRowToPSObject(DataRow row)
     {
         PSObject psObject = new();
 
@@ -393,7 +393,7 @@ public sealed partial class InvokeDbaQueryCommand
     }
 
     /// <summary>PS pipeline-assignment shaping of a nested result (null/single/array).</summary>
-    private static object? ShapePipelineValue(Collection<PSObject> raw)
+    internal static object? ShapePipelineValue(Collection<PSObject> raw)
     {
         if (raw.Count == 0)
             return null;

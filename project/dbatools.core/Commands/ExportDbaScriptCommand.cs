@@ -580,8 +580,12 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
         return SessionState.Path.GetUnresolvedProviderPathFromPSPath(finalpath);
     }
 
-    /// <summary>Get-Date -UFormat token subset covering the shipped Formatting.UFormat values.</summary>
-    private static string FormatUFormat(DateTime moment, string format)
+    /// <summary>Get-Date -UFormat token subset covering the shipped Formatting.UFormat values.
+    /// Only Y y m d H M S and %% are implemented (the default config is %Y%m%d%H%M%S). Any other
+    /// token is emitted literally with its % - which diverges from Get-Date -UFormat, both for
+    /// tokens PowerShell knows (%Z, %A, %j expand there) and for ones it does not (%Q renders as
+    /// "Q" there, the % dropped). Reachable only through a customized Formatting.UFormat.</summary>
+    internal static string FormatUFormat(DateTime moment, string format)
     {
         StringBuilder output = new StringBuilder();
         for (int i = 0; i < format.Length; i++)
