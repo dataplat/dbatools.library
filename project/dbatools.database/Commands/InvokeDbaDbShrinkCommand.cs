@@ -119,8 +119,14 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
 
     // Begin-computed constants (step size, timeout, WAIT clause, fragmentation SQL), carried opaque.
     private Hashtable? _beginState;
-    // The SqlInstance-set $InputObject accumulator carried across records (bug-for-bug); opaque.
+    // The $InputObject accumulator carried across records (bug-for-bug); opaque.
     private Hashtable? _state;
+    // The InputObject value seen on the previous record. PowerShell rewrites a parameter each
+    // ProcessRecord ONLY when that parameter is the one receiving pipeline input; an explicitly
+    // supplied -InputObject (or an unbound one) keeps the same reference, and the source's
+    // function-scope variable therefore keeps the body's mutations. Reference-identity across
+    // records is exactly that distinction, so it - not boundness - decides whether to reseed.
+    private object? _lastInputObject;
     // A begin -StepSize failure, or a process no-target/EnableException failure on an earlier record.
     private bool _interrupted;
 
@@ -158,6 +164,13 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
+        // Did the binder rewrite InputObject for this record (pipeline input bound to it)? If not,
+        // the source's function-scope $InputObject still holds the previous record's mutations, so
+        // the hop must seed from the carried accumulator instead of the parameter value.
+        bool rebound = !ReferenceEquals(InputObject, _lastInputObject);
+        _lastInputObject = InputObject;
+        bool seedFromCarry = !rebound;
+
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__invokeDbaDbShrinkProcess"))
@@ -180,7 +193,7 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Database, ExcludeDatabase, AllUserDatabases.ToBool(),
             PercentFreeSpace, ShrinkMethod, FileType, StatementTimeout, WaitAtLowPriority.ToBool(),
             ExcludeIndexStats.ToBool(), ExcludeUpdateUsage.ToBool(), EnableException.ToBool(),
-            InputObject, MyInvocation.BoundParameters.ContainsKey("InputObject"), _beginState, _state,
+            InputObject, seedFromCarry, _beginState, _state,
             this, BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -259,11 +272,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // PS: the process block VERBATIM per record, dot-sourced (InvokeScopedStreaming). Edits:
     // $Pscmdlet -> $__realCmdlet on the one ShouldProcess gate, -FunctionName on the 26 direct
     // Stop-Function/Write-Message calls. Begin constants restore at the top; the $InputObject
-    // accumulator is seeded from the carried state only when InputObject was NOT bound this record
-    // (SqlInstance set), reproducing the source's grow-and-reprocess quirk; the bound (Pipeline)
-    // case rebinds fresh. The sentinel snapshots the accumulator and the interrupt.
+    // accumulator is seeded from the carried state whenever the binder did NOT rewrite InputObject
+    // this record, reproducing the source's grow-and-reprocess quirk; a genuine pipeline rebind of
+    // InputObject uses this record's value. The sentinel snapshots the accumulator and the interrupt.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $AllUserDatabases, $PercentFreeSpace, $ShrinkMethod, $FileType, $StatementTimeout, $WaitAtLowPriority, $ExcludeIndexStats, $ExcludeUpdateUsage, $EnableException, $InputObject, $__boundInputObject, $__beginState, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $AllUserDatabases, $PercentFreeSpace, $ShrinkMethod, $FileType, $StatementTimeout, $WaitAtLowPriority, $ExcludeIndexStats, $ExcludeUpdateUsage, $EnableException, $InputObject, $__seedFromCarry, $__beginState, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -272,7 +285,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, $AllUserDatabases, [int]$PercentFreeSpace, [string]$ShrinkMethod, [string]$FileType, [int]$StatementTimeout, $WaitAtLowPriority, $ExcludeIndexStats, $ExcludeUpdateUsage, $EnableException, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $__boundInputObject, $__beginState, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, $AllUserDatabases, [int]$PercentFreeSpace, [string]$ShrinkMethod, [string]$FileType, [int]$StatementTimeout, $WaitAtLowPriority, $ExcludeIndexStats, $ExcludeUpdateUsage, $EnableException, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $__seedFromCarry, $__beginState, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # begin-computed constants (constant across records)
@@ -281,9 +294,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $walp = $__beginState.Walp
     $sql = $__beginState.Sql
 
-    # $InputObject cross-record accumulator: seed from the carry only in the SqlInstance set (unbound
-    # InputObject), where the source accumulates and reprocesses; the bound Pipeline set rebinds fresh
-    if (-not $__boundInputObject -and $null -ne $__state -and $__state.ContainsKey("Accumulator")) {
+    # $InputObject cross-record accumulator. C# decides by reference-identity whether the binder
+    # rewrote InputObject this record: if it did NOT (an unbound InputObject in the SqlInstance set,
+    # or an explicitly supplied -InputObject while SqlInstance pipes), the source's function-scope
+    # variable still holds the previous record's mutations, so seed from the carry; if it DID
+    # rebind (InputObject itself piped), use this record's value.
+    if ($__seedFromCarry -and $null -ne $__state -and $__state.ContainsKey("Accumulator")) {
         $InputObject = $__state.Accumulator
     }
 
@@ -502,6 +518,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
     @{ __invokeDbaDbShrinkProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value); State = @{ Accumulator = $InputObject } } }
-} $SqlInstance $SqlCredential $Database $ExcludeDatabase $AllUserDatabases $PercentFreeSpace $ShrinkMethod $FileType $StatementTimeout $WaitAtLowPriority $ExcludeIndexStats $ExcludeUpdateUsage $EnableException $InputObject $__boundInputObject $__beginState $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $ExcludeDatabase $AllUserDatabases $PercentFreeSpace $ShrinkMethod $FileType $StatementTimeout $WaitAtLowPriority $ExcludeIndexStats $ExcludeUpdateUsage $EnableException $InputObject $__seedFromCarry $__beginState $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
