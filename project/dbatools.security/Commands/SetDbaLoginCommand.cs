@@ -24,11 +24,17 @@ namespace Dataplat.Dbatools.Commands;
 /// derives $NewSecurePassword (from a PSCredential or SecureString, which rides live and is never flattened)
 /// and arms the Stop-Function interrupt latch that the process block checks via Test-FunctionInterrupt - a
 /// scope-relative variable, not a callstack lookup. A per-record hop would lose all of that, so the port is
-/// COLLECT-THEN-ENDPROCESSING in one scope (the W2-241/W2-208 shape): BeginProcessing captures the by-name
-/// bound flags, ProcessRecord collects one batch per record flagging a genuine InputObject rebind by reference
-/// change (the by-name value seeds the rebind baseline so a first-record by-name InputObject is not mistaken
-/// for a pipeline rebind), and EndProcessing runs ONE hop - the begin block, then a per-batch dot-sourced
-/// replay of the process body. $InputObject is a typed local ([Smo.Login[]]) so the body's += keeps the
+/// COLLECT-THEN-ENDPROCESSING in one scope: BeginProcessing captures the by-name bound flags, ProcessRecord
+/// collects one batch per record, and EndProcessing runs ONE hop - the begin block, then a per-batch
+/// dot-sourced replay of the process body. InputObject is the only pipeline-bound parameter, so every
+/// pipeline record is a rebind (the engine reassigns the parameter before each process invocation even when
+/// the same array instance arrives twice, discarding the body's += mutation like the function world does);
+/// only a by-name InputObject persists across the whole run, and it seeds the hop unoverridden.
+/// KNOWN DIVERGENCE of this architecture: the work runs at end-of-pipeline, so an upstream producer is
+/// fully enumerated before the first emission, where the script function emits during each process
+/// invocation - a downstream early stop (Select-Object -First 1) therefore stops the producer later than
+/// in the function world. The cross-record state above cannot ride per-record hops without sentinel
+/// machinery, so the single shared scope is the lesser divergence. $InputObject is a typed local ([Smo.Login[]]) so the body's += keeps the
 /// source's typed-array re-coercion. The dot-source keeps each record's return local to that batch, and the
 /// interrupt latch, $passwordChanged, $instance, and the per-batch $allLogins re-init all behave natively in
 /// the shared scope.
@@ -115,11 +121,13 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
 
     /// <summary>Server-level roles to grant to the login.</summary>
     [Parameter(Position = 7)]
+    [PsStringArrayCast]
     [ValidateSet("bulkadmin", "dbcreator", "diskadmin", "processadmin", "public", "securityadmin", "serveradmin", "setupadmin", "sysadmin")]
     public string[]? AddRole { get; set; }
 
     /// <summary>Server-level roles to revoke from the login.</summary>
     [Parameter(Position = 8)]
+    [PsStringArrayCast]
     [ValidateSet("bulkadmin", "dbcreator", "diskadmin", "processadmin", "public", "securityadmin", "serveradmin", "setupadmin", "sysadmin")]
     public string[]? RemoveRole { get; set; }
 
@@ -136,8 +144,8 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
     /// <summary>One batch per pipeline record: { inputRebound, InputObject }.</summary>
     private readonly List<object?[]?> _batches = new List<object?[]?>();
 
-    /// <summary>The InputObject seen at the previous ProcessRecord, to detect a genuine pipeline rebind.</summary>
-    private object? _prevInputObject;
+    /// <summary>Whether -InputObject was bound by name (captured before any pipeline record arrives).</summary>
+    private bool _inputObjectByName;
 
     /// <summary>The by-name InputObject value snapshotted at begin (the hop's initial $InputObject).</summary>
     private object? _byNameInputObject;
@@ -176,11 +184,14 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
         _passwordPolicyEnforcedBound = MyInvocation.BoundParameters.ContainsKey("PasswordPolicyEnforced");
         _passwordExpirationEnabledBound = MyInvocation.BoundParameters.ContainsKey("PasswordExpirationEnabled");
         _forceBound = MyInvocation.BoundParameters.ContainsKey("Force");
-        // Snapshot the by-name InputObject (null unless -InputObject was passed by name). It is both the hop's
-        // initial $InputObject and the rebind baseline, so the FIRST record's by-name value is NOT mistaken for
-        // a pipeline rebind.
+        // InputObject is the command's ONLY pipeline-bound parameter, so binding is bimodal: bound by name
+        // (one ProcessRecord, the by-name value seeds the hop and is never overridden) or bound per pipeline
+        // record (EVERY record is a rebind - the engine reassigns the parameter before each process
+        // invocation even when the same array instance arrives twice, which discards the body's += mutation
+        // exactly like the function world). Reference-identity detection would miss that same-instance case
+        // and leak the previous record's expanded $InputObject.
+        _inputObjectByName = MyInvocation.BoundParameters.ContainsKey("InputObject");
         _byNameInputObject = InputObject;
-        _prevInputObject = InputObject;
     }
 
     /// <summary>Records each pipeline record's input as a batch; the work runs once in EndProcessing.</summary>
@@ -189,9 +200,7 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        bool inputRebound = !ReferenceEquals(InputObject, _prevInputObject);
-        _prevInputObject = InputObject;
-        _batches.Add(new object?[] { inputRebound, InputObject });
+        _batches.Add(new object?[] { !_inputObjectByName, InputObject });
     }
 
     /// <summary>Runs the begin block once, then replays the process body per batch, in one shared scope.</summary>
