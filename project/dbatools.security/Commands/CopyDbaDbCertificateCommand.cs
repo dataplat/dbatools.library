@@ -157,9 +157,29 @@ public sealed class CopyDbaDbCertificateCommand : DbaBaseCmdlet
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
+    /// <summary>
+    /// Unwraps a value the begin hop carried out through its sentinel.
+    /// </summary>
+    /// <remarks>
+    /// A filter that matched nothing leaves the script variable holding AutomationNull, which behaves
+    /// as $null in PowerShell but unwraps to a truthy, property-less object - so it comes back as null
+    /// instead, and the process replay sees the emptiness the script saw. Otherwise the value is
+    /// unwrapped ONLY when the wrapper adds nothing: note properties (whether Add-Member decoration on
+    /// an SMO object or the members of a [PSCustomObject]) live on the PSObject wrapper rather than the
+    /// BaseObject, so unwrapping such a value silently discards them.
+    /// </remarks>
     private static object? Unwrap(object? value)
     {
-        return value is PSObject wrapper ? wrapper.BaseObject : value;
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        foreach (PSMemberInfo member in wrapper.Members)
+        {
+            if (member is PSNoteProperty)
+                return wrapper;
+        }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -236,7 +256,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         return
     }
 
-    [pscustomobject]@{ __CopyDbaDbCertificateBeginComplete = $true; SourceCertificates = $sourcecertificates; DbsNames = $dbsnames; SourceServer = $server; BackupEncryptionPassword = $backupEncryptionPassword }
+    # The two collections are normalized with @() so the seam carries cardinality unambiguously: a
+    # filter that matched nothing becomes an empty array rather than AutomationNull, which the process
+    # replay would otherwise receive as a truthy, property-less object and iterate over.
+    [pscustomobject]@{ __CopyDbaDbCertificateBeginComplete = $true; SourceCertificates = @($sourcecertificates); DbsNames = @($dbsnames); SourceServer = $server; BackupEncryptionPassword = $backupEncryptionPassword }
 } $Source $SourceSqlCredential $Database $ExcludeDatabase $Certificate $ExcludeCertificate $SharedPath $EncryptionPassword $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
@@ -469,3 +492,4 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $Destination $DestinationSqlCredential $SharedPath $MasterKeyPassword $DecryptionPassword $sourcecertificates $dbsnames $server $backupEncryptionPassword $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
+
