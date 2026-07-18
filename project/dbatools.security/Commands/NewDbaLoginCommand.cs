@@ -221,6 +221,16 @@ public sealed class NewDbaLoginCommand : DbaBaseCmdlet
             Disabled.ToBool(), DenyWindowsLogin.ToBool(), NewSid.ToBool(), ExternalProvider.ToBool(),
             InputObject, LoginRenameHashtable, Force.ToBool(), EnableException.ToBool(), this,
             TestBound(nameof(DenyWindowsLogin)),
+            // The body reads $PsCmdlet.ParameterSetName and $PSBoundParameters DIRECTLY. Inside the hop
+            // both belong to the INNER scriptblock rather than to this cmdlet: that scriptblock declares
+            // no parameter sets (so ParameterSetName is always __AllParameterSets) and every parameter is
+            // passed to it positionally (so EVERY key counts as bound). The caller's real values are
+            // therefore carried in explicitly.
+            ParameterSetName,
+            TestBound(nameof(PasswordExpirationEnabled)), TestBound(nameof(PasswordPolicyEnforced)),
+            TestBound(nameof(PasswordMustChange)), TestBound(nameof(MapToAsymmetricKey)),
+            TestBound(nameof(MapToCertificate)), TestBound(nameof(MapToCredential)),
+            TestBound(nameof(Disabled)),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -325,7 +335,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
 
 
-param($SqlInstance, $SqlCredential, $Login, $SecurePassword, $HashedPassword, $MapToCertificate, $MapToAsymmetricKey, $MapToCredential, $Sid, $DefaultDatabase, $Language, $PasswordExpirationEnabled, $PasswordPolicyEnforced, $PasswordMustChange, $Disabled, $DenyWindowsLogin, $NewSid, $ExternalProvider, $InputObject, $LoginRenameHashtable, $Force, $EnableException, $__realCmdlet, $__denyWindowsLoginBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Login, $SecurePassword, $HashedPassword, $MapToCertificate, $MapToAsymmetricKey, $MapToCredential, $Sid, $DefaultDatabase, $Language, $PasswordExpirationEnabled, $PasswordPolicyEnforced, $PasswordMustChange, $Disabled, $DenyWindowsLogin, $NewSid, $ExternalProvider, $InputObject, $LoginRenameHashtable, $Force, $EnableException, $__realCmdlet, $__denyWindowsLoginBound, $__parameterSetName, $__boundPasswordExpirationEnabled, $__boundPasswordPolicyEnforced, $__boundPasswordMustChange, $__boundMapToAsymmetricKey, $__boundMapToCertificate, $__boundMapToCredential, $__boundDisabled, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -334,7 +344,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param($SqlInstance, $SqlCredential, $Login, $SecurePassword, $HashedPassword, $MapToCertificate, $MapToAsymmetricKey, $MapToCredential, $Sid, $DefaultDatabase, $Language, $PasswordExpirationEnabled, $PasswordPolicyEnforced, $PasswordMustChange, $Disabled, $DenyWindowsLogin, $NewSid, $ExternalProvider, $InputObject, $LoginRenameHashtable, $Force, $EnableException, $__realCmdlet, $__denyWindowsLoginBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param($SqlInstance, $SqlCredential, $Login, $SecurePassword, $HashedPassword, $MapToCertificate, $MapToAsymmetricKey, $MapToCredential, $Sid, $DefaultDatabase, $Language, $PasswordExpirationEnabled, $PasswordPolicyEnforced, $PasswordMustChange, $Disabled, $DenyWindowsLogin, $NewSid, $ExternalProvider, $InputObject, $LoginRenameHashtable, $Force, $EnableException, $__realCmdlet, $__denyWindowsLoginBound, $__parameterSetName, $__boundPasswordExpirationEnabled, $__boundPasswordPolicyEnforced, $__boundPasswordMustChange, $__boundMapToAsymmetricKey, $__boundMapToCertificate, $__boundMapToCredential, $__boundDisabled, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # The begin block's -Force fold rides at process-hop top, where the ShouldProcess gates read it.
@@ -430,8 +440,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $loginName = $loginItem
                     $currentSid = $currentDefaultDatabase = $currentLanguage = $currentPasswordExpirationEnabled = $currentAsymmetricKey = $currentCertificate = $currentCredential = $currentDisabled = $currentPasswordPolicyEnforced = $currentDenyWindowsLogin = $null
 
-                    if ($PsCmdlet.ParameterSetName -eq "MapToCertificate") { $loginType = 'Certificate' }
-                    elseif ($PsCmdlet.ParameterSetName -eq "MapToAsymmetricKey") { $loginType = 'AsymmetricKey' }
+                    if ($__parameterSetName -eq "MapToCertificate") { $loginType = 'Certificate' }
+                    elseif ($__parameterSetName -eq "MapToAsymmetricKey") { $loginType = 'AsymmetricKey' }
                     elseif ($ExternalProvider) { $loginType = 'ExternalUser' } # Before 'SqlLogin' check otherwise will assume it's a SqlLogin and will rquest pwd
                     elseif ($loginItem.IndexOf('\') -eq -1) { $loginType = 'SqlLogin' }
                     else { $loginType = 'WindowsUser' }
@@ -450,29 +460,29 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($Language) {
                     $currentLanguage = $Language
                 }
-                if ($PSBoundParameters.Keys -contains 'PasswordExpirationEnabled') {
+                if ($__boundPasswordExpirationEnabled) {
                     $currentPasswordExpirationEnabled = $PasswordExpirationEnabled
                 }
-                if ($PSBoundParameters.Keys -contains 'PasswordPolicyEnforced') {
+                if ($__boundPasswordPolicyEnforced) {
                     $currentPasswordPolicyEnforced = $PasswordPolicyEnforced
                 }
-                if ($PSBoundParameters.Keys -contains 'PasswordMustChange') {
+                if ($__boundPasswordMustChange) {
                     $currentPasswordMustChange = $PasswordMustChange
                     # Enforce Expiration and Policy properties as they are needed when we want to use "Must Change" property
                     Write-Message -Level Verbose -Message "Forcing 'Expiration' and 'Policy' properties to 'ON' because MustChange was specified." -FunctionName New-DbaLogin -ModuleName "dbatools"
                     $currentPasswordExpirationEnabled = $true
                     $currentPasswordPolicyEnforced = $true
                 }
-                if ($PSBoundParameters.Keys -contains 'MapToAsymmetricKey') {
+                if ($__boundMapToAsymmetricKey) {
                     $currentAsymmetricKey = $MapToAsymmetricKey
                 }
-                if ($PSBoundParameters.Keys -contains 'MapToCertificate') {
+                if ($__boundMapToCertificate) {
                     $currentCertificate = $MapToCertificate
                 }
-                if ($PSBoundParameters.Keys -contains 'MapToCredential') {
+                if ($__boundMapToCredential) {
                     $currentCredential = $MapToCredential
                 }
-                if ($PSBoundParameters.Keys -contains 'Disabled') {
+                if ($__boundDisabled) {
                     $currentDisabled = $Disabled
                 }
                 if ($__denyWindowsLoginBound) {
@@ -704,7 +714,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-} $SqlInstance $SqlCredential $Login $SecurePassword $HashedPassword $MapToCertificate $MapToAsymmetricKey $MapToCredential $Sid $DefaultDatabase $Language $PasswordExpirationEnabled $PasswordPolicyEnforced $PasswordMustChange $Disabled $DenyWindowsLogin $NewSid $ExternalProvider $InputObject $LoginRenameHashtable $Force $EnableException $__realCmdlet $__denyWindowsLoginBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Login $SecurePassword $HashedPassword $MapToCertificate $MapToAsymmetricKey $MapToCredential $Sid $DefaultDatabase $Language $PasswordExpirationEnabled $PasswordPolicyEnforced $PasswordMustChange $Disabled $DenyWindowsLogin $NewSid $ExternalProvider $InputObject $LoginRenameHashtable $Force $EnableException $__realCmdlet $__denyWindowsLoginBound $__parameterSetName $__boundPasswordExpirationEnabled $__boundPasswordPolicyEnforced $__boundPasswordMustChange $__boundMapToAsymmetricKey $__boundMapToCertificate $__boundMapToCredential $__boundDisabled $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
 }
