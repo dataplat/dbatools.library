@@ -42,7 +42,7 @@ public sealed class TestDbaConnectionAuthSchemeCommand : DbaInstanceCmdlet
     {
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
             SqlInstance, SqlCredential, Kerberos.ToBool(), Ntlm.ToBool(),
-            EnableException.ToBool(), BoundVerbose()))
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -56,11 +56,12 @@ public sealed class TestDbaConnectionAuthSchemeCommand : DbaInstanceCmdlet
         }
     }
 
-    /// <summary>A bound -Verbose carrier for the module-scoped process body.</summary>
-    private object? BoundVerbose()
+    /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
+    /// Verbose+Debug per the W1-112/W1-124..128 Debug-forwarding class fix).</summary>
+    private object? BoundCommonParameter(string name)
     {
-        if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))
-            return LanguagePrimitives.IsTrue(verbose);
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
         return null;
     }
 
@@ -86,11 +87,14 @@ public sealed class TestDbaConnectionAuthSchemeCommand : DbaInstanceCmdlet
     }
 
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Kerberos, $Ntlm, $EnableException, $__boundVerbose)
+param($SqlInstance, $SqlCredential, $Kerberos, $Ntlm, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($SqlInstance, $SqlCredential, $Kerberos, $Ntlm, $EnableException, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($SqlInstance, $SqlCredential, $Kerberos, $Ntlm, $EnableException)
 
     $sql = "SELECT  SERVERPROPERTY('MachineName') AS ComputerName,
                         ISNULL(SERVERPROPERTY('InstanceName'), 'MSSQLSERVER') AS InstanceName,
@@ -135,6 +139,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Select-DefaultView -InputObject $results -Property ComputerName, InstanceName, SqlInstance, Transport, AuthScheme
         }
     }
-} $SqlInstance $SqlCredential $Kerberos $Ntlm $EnableException $__boundVerbose 3>&1 2>&1
+} $SqlInstance $SqlCredential $Kerberos $Ntlm $EnableException @__commonParameters 3>&1 2>&1
 """;
 }

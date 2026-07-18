@@ -72,6 +72,7 @@ public sealed class FindDbaAgentJobCommand : DbaBaseCmdlet
 
     /// <summary>Find jobs whose last run is on or after this value.</summary>
     [Parameter(Position = 8)]
+    [PsDateTimeCast]
     public DateTime Since { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.

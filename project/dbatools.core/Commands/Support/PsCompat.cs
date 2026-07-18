@@ -197,14 +197,53 @@ internal static class PsOps
 /// functions convert the argument BEFORE mandatory validation, so a null ELEMENT becomes
 /// "" and the mandatory rejection reports "empty string" exactly like the function (the
 /// compiled binder would otherwise validate the raw null and report "null" - lab-proven
-/// divergence, W1-035). A null or already-converted argument passes through unchanged.</summary>
+/// divergence, W1-035). CONSERVATIVE ON PURPOSE (W3-076 fix round): it converts ONLY an
+/// array carrying a null element - the exact W1-035 divergence input - and passes every
+/// other value through untouched. A blanket ConvertTo also "succeeded" for a piped
+/// PSCustomObject during the pipeline BY-VALUE attempt, stringifying the whole object
+/// and silently preempting the ByPropertyName binding the script function performs
+/// (smoke-caught on W3-076: the ByPropertyName scenario removed nothing).</summary>
 internal sealed class PsStringArrayCastAttribute : ArgumentTransformationAttribute
 {
     public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
     {
         if (inputData is null)
             return null;
-        return LanguagePrimitives.ConvertTo(inputData, typeof(string[]), CultureInfo.InvariantCulture);
+        object bare = inputData is PSObject pso ? pso.BaseObject : inputData;
+        if (bare is not System.Collections.IList list)
+            return inputData;
+        foreach (object? element in list)
+        {
+            object? bareElement = element is PSObject p ? p.BaseObject : element;
+            if (bareElement is null)
+                return LanguagePrimitives.ConvertTo(inputData, typeof(string[]), CultureInfo.InvariantCulture);
+        }
+        return inputData;
+    }
+}
+
+/// <summary>The int-array sibling of PsStringArrayCast (W1-043 class over arrays): the
+/// script [int[]] cast converts a null ELEMENT to 0 BEFORE validation attributes run,
+/// so ValidateRange rejects with the RANGE message where the compiled binder would
+/// report null. CONSERVATIVE like the string sibling (the W3-076 lesson): converts
+/// ONLY an array carrying a null element and passes every other value through so
+/// pipeline BY-VALUE binding attempts are never preempted.</summary>
+internal sealed class PsIntArrayCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        if (inputData is null)
+            return null;
+        object bare = inputData is PSObject pso ? pso.BaseObject : inputData;
+        if (bare is not System.Collections.IList list)
+            return inputData;
+        foreach (object? element in list)
+        {
+            object? bareElement = element is PSObject p ? p.BaseObject : element;
+            if (bareElement is null)
+                return LanguagePrimitives.ConvertTo(inputData, typeof(int[]), CultureInfo.InvariantCulture);
+        }
+        return inputData;
     }
 }
 

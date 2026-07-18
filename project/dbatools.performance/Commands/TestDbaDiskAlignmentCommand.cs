@@ -54,7 +54,7 @@ public sealed class TestDbaDiskAlignmentCommand : DbaBaseCmdlet
     {
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             ComputerName, Credential, SqlCredential, NoSqlCheck.ToBool(),
-            EnableException.ToBool(), _sessionOption, BoundVerbose()))
+            EnableException.ToBool(), _sessionOption, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -68,10 +68,12 @@ public sealed class TestDbaDiskAlignmentCommand : DbaBaseCmdlet
         }
     }
 
-    private object? BoundVerbose()
+    /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
+    /// Verbose+Debug per the W1-112/W1-124..128 Debug-forwarding class fix).</summary>
+    private object? BoundCommonParameter(string name)
     {
-        if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))
-            return LanguagePrimitives.IsTrue(verbose);
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
         return null;
     }
 
@@ -103,11 +105,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     private const string ProcessScript = """
-param($ComputerName, $Credential, $SqlCredential, $NoSqlCheck, $EnableException, $sessionoption, $__boundVerbose)
+param($ComputerName, $Credential, $SqlCredential, $NoSqlCheck, $EnableException, $sessionoption, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($ComputerName, $Credential, $SqlCredential, $NoSqlCheck, $EnableException, $sessionoption, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($ComputerName, $Credential, $SqlCredential, $NoSqlCheck, $EnableException, $sessionoption)
 
         function Get-DiskAlignment {
             [CmdletBinding()]
@@ -325,6 +330,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-} $ComputerName $Credential $SqlCredential $NoSqlCheck $EnableException $sessionoption $__boundVerbose 3>&1 2>&1
+} $ComputerName $Credential $SqlCredential $NoSqlCheck $EnableException $sessionoption @__commonParameters 3>&1 2>&1
 """;
 }

@@ -38,10 +38,12 @@ public sealed class GetDbaAgentJobHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Earliest history timestamp to return.</summary>
     [Parameter]
+    [PsDateTimeCast]
     public DateTime StartDate { get; set; } = new(1900, 1, 1);
 
     /// <summary>Latest history timestamp to return.</summary>
     [Parameter]
+    [PsDateTimeCast]
     public DateTime EndDate { get; set; } = DateTime.Now;
 
     /// <summary>Completion result to return.</summary>
@@ -297,7 +299,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         } catch {
-            Stop-Function -Message "Could not get Agent Job History from $instance" -Target $instance -Continue -FunctionName Get-DbaAgentJobHistory
+            Stop-Function -Message "Could not get Agent Job History from $instance" -Target $instance -Continue -FunctionName Get-JobHistory
         }
     }
 

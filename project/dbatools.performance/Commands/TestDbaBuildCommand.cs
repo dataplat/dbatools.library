@@ -60,6 +60,11 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
     private object? _parsedMaxBehind;
     private object? _parsedMaxTimeBehind;
     private object? _indexReference;
+
+    // PS: $BuildVersions is branch-assigned ($Build / $SqlInstance) but read UNCONDITIONALLY
+    // by the foreach - at FUNCTION scope a record binding neither re-reads the PREVIOUS
+    // record's builds. Carried like $IdxRef two lines above it (DEF-008 re-open #3).
+    private object? _buildVersions;
     private bool _skipProcessing;
 
     protected override void BeginProcessing()
@@ -68,7 +73,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             MaxBehind, MaxTimeBehind,
             TestBound("MinimumBuild"), TestBound("MaxBehind"),
             TestBound("MaxTimeBehind"), TestBound("Latest"),
-            EnableException.ToBool(), BoundVerbose()))
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -97,7 +102,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             Build, MinimumBuild, MaxBehind, MaxTimeBehind, Latest.ToBool(),
             SqlInstance, SqlCredential, Update.ToBool(), Quiet.ToBool(),
             EnableException.ToBool(), _parsedMaxBehind, _parsedMaxTimeBehind,
-            _indexReference, BoundVerbose()))
+            _indexReference, _buildVersions, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -107,6 +112,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             else if (IsCarrier(item, ProcessCarrierMarker))
             {
                 _indexReference = item!.Properties["IndexReference"]?.Value;
+                _buildVersions = item.Properties["BuildVersions"]?.Value;
             }
             else
             {
@@ -121,10 +127,12 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
                LanguagePrimitives.IsTrue(item.Properties[marker].Value);
     }
 
-    private object? BoundVerbose()
+    /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
+    /// Verbose+Debug per the W1-112/W1-124..128 Debug-forwarding class fix).</summary>
+    private object? BoundCommonParameter(string name)
     {
-        if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))
-            return LanguagePrimitives.IsTrue(verbose);
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
         return null;
     }
 
@@ -152,11 +160,14 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
     private const string ProcessCarrierMarker = "__dbatoolsW1124ProcessCarrier";
 
     private const string BeginScript = """
-param($MaxBehind, $MaxTimeBehind, $__minimumBuildBound, $__maxBehindBound, $__maxTimeBehindBound, $__latestBound, $EnableException, $__boundVerbose)
+param($MaxBehind, $MaxTimeBehind, $__minimumBuildBound, $__maxBehindBound, $__maxTimeBehindBound, $__latestBound, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($MaxBehind, $MaxTimeBehind, $__minimumBuildBound, $__maxBehindBound, $__maxTimeBehindBound, $__latestBound, $EnableException, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($MaxBehind, $MaxTimeBehind, $__minimumBuildBound, $__maxBehindBound, $__maxTimeBehindBound, $__latestBound, $EnableException)
 
     $ComplianceSpec = @()
     if ($__minimumBuildBound) { $ComplianceSpec += 'MinimumBuild' }
@@ -224,15 +235,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     [pscustomobject]@{ __dbatoolsW1124BeginCarrier = $true; SkipProcessing = $false; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $ParsedMaxTimeBehind }
-} $MaxBehind $MaxTimeBehind $__minimumBuildBound $__maxBehindBound $__maxTimeBehindBound $__latestBound $EnableException $__boundVerbose 3>&1 2>&1
+} $MaxBehind $MaxTimeBehind $__minimumBuildBound $__maxBehindBound $__maxTimeBehindBound $__latestBound $EnableException @__commonParameters 3>&1 2>&1
 """;
 
     private const string ProcessScript = """
-param($Build, $MinimumBuild, $MaxBehind, $MaxTimeBehind, $Latest, $SqlInstance, $SqlCredential, $Update, $Quiet, $EnableException, $ParsedMaxBehind, $ParsedMaxTimeBehind, $IdxRef, $__boundVerbose)
+param($Build, $MinimumBuild, $MaxBehind, $MaxTimeBehind, $Latest, $SqlInstance, $SqlCredential, $Update, $Quiet, $EnableException, $ParsedMaxBehind, $ParsedMaxTimeBehind, $IdxRef, $BuildVersions, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Build, $MinimumBuild, $MaxBehind, $MaxTimeBehind, $Latest, $SqlInstance, $SqlCredential, $Update, $Quiet, $EnableException, $ParsedMaxBehind, $ParsedMaxTimeBehind, $IdxRef, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($Build, $MinimumBuild, $MaxBehind, $MaxTimeBehind, $Latest, $SqlInstance, $SqlCredential, $Update, $Quiet, $EnableException, $ParsedMaxBehind, $ParsedMaxTimeBehind, $IdxRef, $BuildVersions)
 
     function Get-DbaBuildReferenceIndex {
         [CmdletBinding()]
@@ -243,7 +257,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     if (Test-FunctionInterrupt) {
-        [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef }
+        [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
         return
     }
     $hiddenProps = @()
@@ -268,7 +282,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $IdxRef = Get-DbaBuildReferenceIndex
         } catch {
             Stop-Function -Message "Error loading SQL build reference" -ErrorRecord $_ -FunctionName Test-DbaBuild
-            [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef }
+            [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
             return
         }
     }
@@ -378,7 +392,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $BuildVersion | Select-Object * | Select-DefaultView -ExcludeProperty $hiddenProps
         }
     }
-    [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef }
-} $Build $MinimumBuild $MaxBehind $MaxTimeBehind $Latest $SqlInstance $SqlCredential $Update $Quiet $EnableException $ParsedMaxBehind $ParsedMaxTimeBehind $IdxRef $__boundVerbose 3>&1 2>&1
+    [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
+} $Build $MinimumBuild $MaxBehind $MaxTimeBehind $Latest $SqlInstance $SqlCredential $Update $Quiet $EnableException $ParsedMaxBehind $ParsedMaxTimeBehind $IdxRef $BuildVersions @__commonParameters 3>&1 2>&1
 """;
 }

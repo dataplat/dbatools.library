@@ -158,18 +158,27 @@ public sealed partial class InvokeDbaAdvancedRestoreCommand
                 }
                 else if (!string.IsNullOrEmpty(StopMark))
                 {
-                    // PS: $null -ne $StopAfterDate is always true for the [datetime] parameter
-                    // (unbound reads as DateTime.MinValue), so the AfterDate is always assigned.
+                    // PS: an unbound [datetime]$StopAfterDate reads $null (NOT DateTime.MinValue -
+                    // lane-B empirical proof on PS 7.6.3, W3-058 reopen 2026-07-16), so the source's
+                    // `$null -ne $StopAfterDate` gate skips the AfterDate assignment entirely unless
+                    // the parameter was bound; a bound null is impossible ([datetime] rejects it at
+                    // binding), so TestBound is exactly the source's gate.
                     if (StopBefore.ToBool())
                     {
                         restore.StopBeforeMarkName = StopMark;
-                        // SMO's AfterDate properties are strings; PS coerced the DateTime the same way.
-                        restore.StopBeforeMarkAfterDate = (string)LanguagePrimitives.ConvertTo(StopAfterDate, typeof(string), System.Globalization.CultureInfo.InvariantCulture);
+                        if (TestBound(nameof(StopAfterDate)))
+                        {
+                            // SMO's AfterDate properties are strings; PS coerced the DateTime the same way.
+                            restore.StopBeforeMarkAfterDate = (string)LanguagePrimitives.ConvertTo(StopAfterDate, typeof(string), System.Globalization.CultureInfo.InvariantCulture);
+                        }
                     }
                     else
                     {
                         restore.StopAtMarkName = StopMark;
-                        restore.StopAtMarkAfterDate = (string)LanguagePrimitives.ConvertTo(StopAfterDate, typeof(string), System.Globalization.CultureInfo.InvariantCulture);
+                        if (TestBound(nameof(StopAfterDate)))
+                        {
+                            restore.StopAtMarkAfterDate = (string)LanguagePrimitives.ConvertTo(StopAfterDate, typeof(string), System.Globalization.CultureInfo.InvariantCulture);
+                        }
                     }
                 }
                 else if (RestoreTime > DateTime.Now

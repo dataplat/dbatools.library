@@ -34,6 +34,7 @@ public sealed class GetDbaSsisExecutionHistoryCommand : DbaInstanceCmdlet
 
     /// <summary>Limits results to executions that started on or after this date and time.</summary>
     [Parameter(Position = 2)]
+    [PsDateTimeCast]
     public DateTime Since { get; set; }
 
     /// <summary>Filters results to specific execution statuses.</summary>

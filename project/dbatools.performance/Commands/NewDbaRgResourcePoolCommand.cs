@@ -118,7 +118,7 @@ public sealed class NewDbaRgResourcePoolCommand : DbaBaseCmdlet
                 MinimumMemoryPercentage, MaximumMemoryPercentage,
                 MinimumIOPSPerVolume, MaximumIOPSPerVolume, MaximumProcesses,
                 SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
-                this, BoundVerbose()))
+                this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -133,12 +133,12 @@ public sealed class NewDbaRgResourcePoolCommand : DbaBaseCmdlet
         }
     }
 
-    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
-    private object? BoundVerbose()
+    /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
+    /// Verbose+Debug per the W1-112/W1-124..128 Debug-forwarding class fix).</summary>
+    private object? BoundCommonParameter(string name)
     {
-        object? verbose;
-        if (MyInvocation.BoundParameters.TryGetValue("Verbose", out verbose))
-            return LanguagePrimitives.IsTrue(verbose);
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
         return null;
     }
 
@@ -169,11 +169,14 @@ public sealed class NewDbaRgResourcePoolCommand : DbaBaseCmdlet
     // inside the hop so the Stop-Function -Continues target their real enclosing
     // loop; ShouldProcess routes to the real cmdlet.
     private const string BodyScript = """
-param($server, $instance, $ResourcePool, $Type, $MinimumCpuPercentage, $MaximumCpuPercentage, $CapCpuPercentage, $MinimumMemoryPercentage, $MaximumMemoryPercentage, $MinimumIOPSPerVolume, $MaximumIOPSPerVolume, $MaximumProcesses, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose)
+param($server, $instance, $ResourcePool, $Type, $MinimumCpuPercentage, $MaximumCpuPercentage, $CapCpuPercentage, $MinimumMemoryPercentage, $MaximumMemoryPercentage, $MinimumIOPSPerVolume, $MaximumIOPSPerVolume, $MaximumProcesses, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $instance, $ResourcePool, $Type, $MinimumCpuPercentage, $MaximumCpuPercentage, $CapCpuPercentage, $MinimumMemoryPercentage, $MaximumMemoryPercentage, $MinimumIOPSPerVolume, $MaximumIOPSPerVolume, $MaximumProcesses, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($server, $instance, $ResourcePool, $Type, $MinimumCpuPercentage, $MaximumCpuPercentage, $CapCpuPercentage, $MinimumMemoryPercentage, $MaximumMemoryPercentage, $MinimumIOPSPerVolume, $MaximumIOPSPerVolume, $MaximumProcesses, $SkipReconfigure, $Force, $EnableException, $__realCmdlet)
     foreach ($resPool in $ResourcePool) {
             $existingResourcePool = Get-DbaRgResourcePool -SqlInstance $server -Type $Type | Where-Object Name -eq $resPool
             if ($null -ne $existingResourcePool) {
@@ -238,6 +241,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         Get-DbaRgResourcePool -SqlInstance $server -Type $Type | Where-Object Name -eq $resPool
     }
-} $server $instance $ResourcePool $Type $MinimumCpuPercentage $MaximumCpuPercentage $CapCpuPercentage $MinimumMemoryPercentage $MaximumMemoryPercentage $MinimumIOPSPerVolume $MaximumIOPSPerVolume $MaximumProcesses $SkipReconfigure $Force $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $server $instance $ResourcePool $Type $MinimumCpuPercentage $MaximumCpuPercentage $CapCpuPercentage $MinimumMemoryPercentage $MaximumMemoryPercentage $MinimumIOPSPerVolume $MaximumIOPSPerVolume $MaximumProcesses $SkipReconfigure $Force $EnableException $__realCmdlet @__commonParameters 3>&1 2>&1
 """;
 }

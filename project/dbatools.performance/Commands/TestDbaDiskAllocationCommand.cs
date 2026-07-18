@@ -52,7 +52,7 @@ public sealed class TestDbaDiskAllocationCommand : DbaBaseCmdlet
     {
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             ComputerName, NoSqlCheck.ToBool(), SqlCredential, Credential,
-            EnableException.ToBool(), _sessionOptions, BoundVerbose()))
+            EnableException.ToBool(), _sessionOptions, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -66,10 +66,12 @@ public sealed class TestDbaDiskAllocationCommand : DbaBaseCmdlet
         }
     }
 
-    private object? BoundVerbose()
+    /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
+    /// Verbose+Debug per the W1-112/W1-124..128 Debug-forwarding class fix).</summary>
+    private object? BoundCommonParameter(string name)
     {
-        if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))
-            return LanguagePrimitives.IsTrue(verbose);
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
         return null;
     }
 
@@ -101,11 +103,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     private const string ProcessScript = """
-param($ComputerName, $NoSqlCheck, $SqlCredential, $Credential, $EnableException, $sessionoptions, $__boundVerbose)
+param($ComputerName, $NoSqlCheck, $SqlCredential, $Credential, $EnableException, $sessionoptions, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($ComputerName, $NoSqlCheck, $SqlCredential, $Credential, $EnableException, $sessionoptions, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($ComputerName, $NoSqlCheck, $SqlCredential, $Credential, $EnableException, $sessionoptions)
 
         foreach ($computer in $ComputerName) {
             $fullComputerName = Resolve-DbaComputerName -ComputerName $computer -Credential $Credential
@@ -216,6 +221,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-} $ComputerName $NoSqlCheck $SqlCredential $Credential $EnableException $sessionoptions $__boundVerbose 3>&1 2>&1
+} $ComputerName $NoSqlCheck $SqlCredential $Credential $EnableException $sessionoptions @__commonParameters 3>&1 2>&1
 """;
 }

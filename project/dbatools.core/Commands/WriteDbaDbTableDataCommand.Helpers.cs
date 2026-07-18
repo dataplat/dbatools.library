@@ -328,7 +328,18 @@ public sealed partial class WriteDbaDbTableDataCommand
             rowCount = 1;
         _currentRowCount = rowCount;
 
-        if (ShouldProcess(PSObject.AsPSObject(SqlInstance).ToString(), "Writing " + rowCount + " rows to " + _fqtn))
+        // PS: this gate lives in NESTED Invoke-BulkCopy, whose [CmdletBinding()] has NO
+        // SupportsShouldProcess - its $Pscmdlet.ShouldProcess honours -WhatIf (message +
+        // skip) but can NEVER confirm-prompt, whatever ConfirmPreference is (B's probe:
+        // source prompts=0 at ConfirmPreference=Low; DEF-008 W1-043 re-open - a port
+        // prompt here after a confirmed -Truncate leaves the table truncated-and-empty
+        // on No, where the source repopulates it). WhatIf-only gate: call ShouldProcess
+        // only when WhatIf is live (it never prompts under WhatIf), else proceed
+        // unprompted exactly like the nested function.
+        bool bulkCopyWhatIf = MyInvocation.BoundParameters.TryGetValue("WhatIf", out object? boundWhatIf)
+            ? LanguagePrimitives.IsTrue(boundWhatIf)
+            : LanguagePrimitives.IsTrue(GetVariableValue("WhatIfPreference"));
+        if (!bulkCopyWhatIf || ShouldProcess(PSObject.AsPSObject(SqlInstance).ToString(), "Writing " + rowCount + " rows to " + _fqtn))
         {
             if (LanguagePrimitives.IsTrue(ColumnMap))
             {

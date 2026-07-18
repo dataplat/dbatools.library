@@ -70,7 +70,7 @@ public sealed class TestDbaDbCompressionCommand : DbaInstanceCmdlet
     {
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             Schema, Table, ResultSize, Rank, FilterBy, BoundParameterNames(),
-            EnableException.ToBool(), BoundVerbose()))
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -95,7 +95,7 @@ public sealed class TestDbaDbCompressionCommand : DbaInstanceCmdlet
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, Database, ExcludeDatabase,
             TestBound("ExcludeDatabase"), _sqlSchemaWhere, _sqlTableWhere, _sqlRestrict,
-            _staleDatabase, EnableException.ToBool(), BoundVerbose()))
+            _staleDatabase, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -121,10 +121,12 @@ public sealed class TestDbaDbCompressionCommand : DbaInstanceCmdlet
         return names.ToArray();
     }
 
-    private object? BoundVerbose()
+    /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
+    /// Verbose+Debug per the W1-112/W1-124..128 Debug-forwarding class fix).</summary>
+    private object? BoundCommonParameter(string name)
     {
-        if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))
-            return LanguagePrimitives.IsTrue(verbose);
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
         return null;
     }
 
@@ -158,11 +160,14 @@ public sealed class TestDbaDbCompressionCommand : DbaInstanceCmdlet
     private const string ProcessCarrierMarker = "__dbatoolsW1126ProcessCarrier";
 
     private const string BeginScript = """
-param($Schema, $Table, $ResultSize, $Rank, $FilterBy, $__boundParameterNames, $EnableException, $__boundVerbose)
+param($Schema, $Table, $ResultSize, $Rank, $FilterBy, $__boundParameterNames, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Schema, $Table, $ResultSize, $Rank, $FilterBy, $__boundParameterNames, $EnableException, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($Schema, $Table, $ResultSize, $Rank, $FilterBy, $__boundParameterNames, $EnableException)
     Write-Message -Level System -Message "Bound parameters: $($__boundParameterNames -join ", ")" -FunctionName Test-DbaDbCompression
 
         if ($Schema) {
@@ -260,15 +265,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         SqlTableWhere = $sqlTableWhere
         SqlRestrict = $sqlRestrict
     }
-} $Schema $Table $ResultSize $Rank $FilterBy $__boundParameterNames $EnableException $__boundVerbose 3>&1 2>&1
+} $Schema $Table $ResultSize $Rank $FilterBy $__boundParameterNames $EnableException @__commonParameters 3>&1 2>&1
 """;
 
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $__excludeDatabaseBound, $sqlSchemaWhere, $sqlTableWhere, $sqlRestrict, $StaleDatabase, $EnableException, $__boundVerbose)
+param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $__excludeDatabaseBound, $sqlSchemaWhere, $sqlTableWhere, $sqlRestrict, $StaleDatabase, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $__excludeDatabaseBound, $sqlSchemaWhere, $sqlTableWhere, $sqlRestrict, $StaleDatabase, $EnableException, $__boundVerbose)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    [CmdletBinding()]
+    param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $__excludeDatabaseBound, $sqlSchemaWhere, $sqlTableWhere, $sqlRestrict, $StaleDatabase, $EnableException)
     $db = $StaleDatabase
 
         foreach ($instance in $SqlInstance) {
@@ -721,6 +729,6 @@ IF OBJECT_ID('tempdb..##tmpEstimatePage', 'U') IS NOT NULL
         __dbatoolsW1126ProcessCarrier = $true
         StaleDatabase = $db
     }
-} $SqlInstance $SqlCredential $Database $ExcludeDatabase $__excludeDatabaseBound $sqlSchemaWhere $sqlTableWhere $sqlRestrict $StaleDatabase $EnableException $__boundVerbose 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $ExcludeDatabase $__excludeDatabaseBound $sqlSchemaWhere $sqlTableWhere $sqlRestrict $StaleDatabase $EnableException @__commonParameters 3>&1 2>&1
 """;
 }

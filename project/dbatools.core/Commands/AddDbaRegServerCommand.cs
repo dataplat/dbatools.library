@@ -89,6 +89,15 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
     private object? _nameState;
     private object? _serverNameState;
     private bool _bindInitialized;
+    private bool _inputObjectNamedBound;
+
+    protected override void BeginProcessing()
+    {
+        // Pipeline bindings are absent at begin time, so this pins whether InputObject was
+        // NAMED-bound - the discriminator for the per-record rebind reset (codex W3-002 F1:
+        // the same array INSTANCE piped twice defeats a pure ReferenceEquals check).
+        _inputObjectNamedBound = TestBound("InputObject");
+    }
 
     protected override void ProcessRecord()
     {
@@ -96,8 +105,10 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
             return;
 
         // PS: named $InputObject keeps ONE array reference across records (the += growth
-        // persists); a piped ServerGroup re-binds a fresh array per record (W1-070).
-        if (!ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
+        // persists); a piped ServerGroup re-binds EVERY record it arrives in - even the
+        // same instance again (W1-070 + codex W3-002 F1).
+        if ((!_inputObjectNamedBound && TestBound("InputObject")) ||
+            !ReferenceEquals(InputObject, _lastBoundInputObject) || !_bindInitialized)
         {
             _inputObjectState = InputObject;
             _lastBoundInputObject = InputObject;
@@ -188,6 +199,12 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $ServerName, $Name, $Description, $Group, $ActiveDirectoryTenant, $ActiveDirectoryUserId, $ConnectionString, $OtherParams, $InputObject, $ServerObject, $EnableException, $__state, $__boundServerName, $__boundServerObject, $__boundName, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
+# WarningAction is deliberately NOT forwarded into the hop (codex W3-005 r1-r3 arc):
+# forwarding suppressing values empties the caller's -WarningVariable, and forwarding Stop
+# terminates inside the hop BEFORE the warning reaches the host stream (same capture loss).
+# All values ride the host's own machinery at the 3>&1 replay, preserving WarningVariable
+# and display parity for every value; the at-emission vs at-replay TIMING difference is the
+# recorded InvokeScoped buffered-output SYSTEMIC (integrator-owned architecture item).
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
