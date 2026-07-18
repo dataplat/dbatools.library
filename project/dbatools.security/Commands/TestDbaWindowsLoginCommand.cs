@@ -34,7 +34,8 @@ namespace Dataplat.Dbatools.Commands;
 /// </para>
 /// <para>
 /// No ShouldProcess (the command only reads). The guard's Test-Bound maps to the two carried per-batch
-/// flags (bound-count greater than one fails). The dot-source keeps each batch's guard return local. The
+/// flags: Test-Bound defaults to -Min 1, so with -Max 1 the source accepts EXACTLY ONE bound parameter -
+/// zero bound (a bare invocation) fails the guard just like two. The dot-source keeps each batch's guard return local. The
 /// only other edits are message attribution: -FunctionName on the 2 direct Stop-Function calls and
 /// -FunctionName plus -ModuleName "dbatools" on the 21 direct Write-Message calls. Buffered InvokeScoped
 /// is deliberate: the command emits only from EndProcessing after all input is collected, so there is no
@@ -200,7 +201,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance = $__batch[2]
             [Microsoft.SqlServer.Management.Smo.Login[]]$InputObject = $__batch[3]
             . {
-        if (-not (([int]$__sqlBound + [int]$__inputBound) -le 1)) {
+        if (-not (([int]$__sqlBound + [int]$__inputBound) -eq 1)) {
             Stop-Function -Message "You must supply either -SqlInstance or an Input Object" -FunctionName Test-DbaWindowsLogin
             return
         }
