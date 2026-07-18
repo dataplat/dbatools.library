@@ -280,5 +280,5 @@ public sealed partial class NewDbaAvailabilityGroupCommand : DbaBaseCmdlet
         }
     }
 
-    private const string ProcessScript = ProcessScriptHead + "\n" + ProcessScriptTail;
+    private const string ProcessScript = ProcessScriptHead + "\r\n" + ProcessScriptTail;
 }

@@ -30,7 +30,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # cross-record PARAMETER state: the source shifts $EndpointUrl destructively once per
     # replica, and parameters are fn-scope, so a later piped record starts from the SHORTENED
     # array (and then trips the element-count validation). Seed it before the body runs.
-    if ($null -ne $__state -and $null -ne $__state.endpointUrl) {
+    if ($null -ne $__state -and $__state.ContainsKey('endpointUrl')) {
+        # assign even when the carried value is $null: the per-replica shifts can CONSUME the
+        # array entirely, and that consumed state is exactly what the next record must observe -
+        # it is what makes the element-count validation fire on the following record
         $EndpointUrl = $__state.endpointUrl
     }
 
