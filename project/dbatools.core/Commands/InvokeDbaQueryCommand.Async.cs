@@ -393,7 +393,7 @@ public sealed partial class InvokeDbaQueryCommand
     }
 
     /// <summary>PS pipeline-assignment shaping of a nested result (null/single/array).</summary>
-    private static object? ShapePipelineValue(Collection<PSObject> raw)
+    internal static object? ShapePipelineValue(Collection<PSObject> raw)
     {
         if (raw.Count == 0)
             return null;
