@@ -32,8 +32,8 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// INTERRUPT CARRY (vestigial here, preserved verbatim). Stop-Function sets the module interrupt
 /// flag ONLY on its non-Continue path; a "Stop-Function -Continue" warns and calls continue without
-/// ever setting it. EVERY Stop-Function in this command - the begin export-dir failure and all ten
-/// process failures - is -Continue, so the interrupt flag is never raised and the source's
+/// ever setting it. EVERY Stop-Function in this command - the one begin export-dir failure and all
+/// eight process failures - is -Continue, so the interrupt flag is never raised and the source's
 /// process-top "if (Test-FunctionInterrupt) { return }" never fires. The port keeps that check
 /// verbatim and threads the flag through each hop's Get-Variable -Scope 0 sentinel anyway, so the
 /// machinery stays byte-faithful to the source; it simply never triggers for this command. A begin
