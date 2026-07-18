@@ -27,8 +27,9 @@ namespace Dataplat.Dbatools.Commands;
 /// would reset it to the bound value, so the C# seeds $Name from a carried value (initialized to the bound
 /// Name) and captures the re-emitted value after each record. The source's "$PSBoundParameters.Name" (the
 /// FIRST conflict probe) reads the IMMUTABLE originally-bound name, distinct from the mutable $Name, so it
-/// is carried separately as $__boundName. Records that hit the wrong-type or version guard "return" before
-/// the sentinel, leaving the carrier unchanged - which is correct, since those paths never reassign $Name.
+/// is carried separately as $__boundName. The carrier sentinel rides a finally around the foreach, so an
+/// early "return" on a LATER array element still carries the $Name mutations an EARLIER element made in the
+/// same record (the source keeps $Name on the persistent function scope regardless of the return).
 ///
 /// There is no cross-record interrupt guard in the source (the no-Continue Stop-Functions arm an interrupt
 /// nothing reads), so none is carried. $InputObject is value-from-pipeline and only read per record. Each
@@ -176,9 +177,12 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([object[]]$InputObject, $__carriedName, [string]$__boundName, $SqlCredential, [switch]$OutputScriptOnly, $rawsql, $EnableException)
+    param([object[]]$InputObject, $__carriedName, [string]$__boundName, $SqlCredential, $OutputScriptOnly, $rawsql, $EnableException)
     # Seed the carried cross-record state of $Name (source keeps it in the shared process scope).
     $Name = $__carriedName
+    # The sentinel rides a finally so an early return on a LATER array element still carries the $Name
+    # mutations an EARLIER element made (the source keeps $Name on the persistent function scope).
+    try {
     foreach ($trace in $InputObject) {
         if (-not $trace.id -and -not $trace.Parent) {
             Stop-Function -Message "Input is of the wrong type. Use Get-DbaTrace." -Continue -FunctionName ConvertTo-DbaXESession
@@ -247,7 +251,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Get-DbaXESession @splatGetSession
         }
     }
-    @{ __convertToDbaXESessionProcess = @{ Name = $Name } }
+    } finally {
+        @{ __convertToDbaXESessionProcess = @{ Name = $Name } }
+    }
 } $InputObject $__carriedName $__boundName $SqlCredential $OutputScriptOnly $rawsql $EnableException @__commonParameters 3>&1 2>&1
 """;
 }
