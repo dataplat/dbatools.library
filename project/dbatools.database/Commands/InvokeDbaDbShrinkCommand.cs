@@ -121,12 +121,7 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
     private Hashtable? _beginState;
     // The $InputObject accumulator carried across records (bug-for-bug); opaque.
     private Hashtable? _state;
-    // Which parameter the pipeline feeds is fixed for the whole invocation, so it is decided ONCE
-    // on the first record rather than re-derived per record (per-record heuristics kept missing
-    // shapes: an explicitly supplied -InputObject looks unbound-ish, a repeated array instance
-    // looks unchanged, and an empty SqlInstance record mid-pipeline looks like a different set).
-    private bool _pipeTargetDecided;
-    private bool _inputObjectIsPipeTarget;
+    // (no rebind-detection state: see the seeding comment in ProcessRecord)
     // A begin -StepSize failure, or a process no-target/EnableException failure on an earlier record.
     private bool _interrupted;
 
@@ -164,24 +159,26 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
-        // $InputObject must behave like the source's FUNCTION-SCOPE variable: the binder overwrites
-        // it each record only when InputObject is the parameter the pipeline feeds; otherwise it
+        // $InputObject behaves like the source's FUNCTION-SCOPE variable: the binder overwrites it
+        // each record only when InputObject is the parameter receiving pipeline input; otherwise it
         // keeps the body's mutations, which is what makes the SqlInstance branch accumulate and
-        // reprocess earlier instances' databases. Which parameter the pipeline feeds is fixed for
-        // the whole invocation, so decide it ONCE on the first record and apply it to every record.
-        // RESIDUAL (documented): piping the SAME non-enumerated Database[] instance as repeated
-        // records while ALSO supplying -SqlInstance is read here as SqlInstance-fed, so it seeds
-        // where the source would rebind. codex confirms that shape is not reachable through the
-        // documented usages, and erring toward the carry only re-applies the source's own
-        // accumulate-and-reprocess quirk rather than inventing behavior.
-        if (!_pipeTargetDecided)
-        {
-            _pipeTargetDecided = true;
-            _inputObjectIsPipeTarget = MyInvocation.ExpectingInput
-                && InputObject is not null && InputObject.Length > 0
-                && (SqlInstance is null || SqlInstance.Length == 0);
-        }
-        bool seedFromCarry = !_inputObjectIsPipeTarget;
+        // reprocess earlier instances' databases (a source quirk, reproduced not fixed).
+        //
+        // PowerShell does not expose which parameter the binder wrote for a given record, so this
+        // uses the one signal that is both stable and correct for every shape reachable from the
+        // documented usages: whether -InputObject was bound at all. Unbound means the SqlInstance
+        // branch owns $InputObject and its appends must carry; bound means the caller supplied or
+        // piped databases and each record starts from that binding.
+        //
+        // KNOWN DIVERGENCE (documented, routed to the coordinator - do not "fix" by adding
+        // rebind heuristics): when -InputObject is EXPLICITLY supplied *and* SqlInstance is piped,
+        // the source keeps the body's mutations across records while this port restarts each record
+        // from the bound value. Successive attempts to detect that case by reference identity, by
+        // the append path, and by latching the pipeline target each introduced NEW divergence in
+        // more common shapes, because every one of them infers a binder write that cannot be
+        // observed. The divergence direction here is fail-safe: fewer redundant shrink attempts on
+        // databases an earlier record already processed, never a missed database.
+        bool seedFromCarry = !MyInvocation.BoundParameters.ContainsKey("InputObject");
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
