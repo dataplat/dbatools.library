@@ -68,9 +68,9 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
                 item.Properties["__GetDbaAgentAlertCategoryProcessComplete"]?.Value))
             {
                 // $cat is a DECORATED SMO AlertCategory: the Add-Member note properties and the
-                // Select-DefaultView live on the PSObject wrapper, not the BaseObject, and the
-                // source keeps them on $cat across records. Unwrapping would strip them, so this
-                // carrier is passed through wrapped - see UnwrapHopValue's limits in comms/lanes/e.md.
+                // Select-DefaultView live on the PSObject wrapper, not on the BaseObject, and the
+                // script function keeps them on $cat across records. Unwrapping to the BaseObject
+                // would silently strip them, so this value is carried through still wrapped.
                 _cat = item.Properties["Cat"]?.Value;
             }
             else
