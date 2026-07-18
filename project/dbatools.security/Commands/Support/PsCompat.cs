@@ -19,6 +19,16 @@ internal sealed class PsDateTimeCastAttribute : ArgumentTransformationAttribute
     }
 }
 
+/// <summary>The scalar sibling of PsStringArrayCast: PS [string] converts at BIND time, so
+/// an explicit null argument becomes "" before mandatory/validation runs.</summary>
+internal sealed class PsStringCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        return LanguagePrimitives.ConvertTo(inputData, typeof(string), CultureInfo.InvariantCulture);
+    }
+}
+
 /// <summary>Reproduces the PS [string[]] bind-time cast for compiled parameters: script
 /// functions convert the argument BEFORE mandatory validation, so a null ELEMENT becomes
 /// "" and the mandatory rejection reports "empty string" exactly like the function (the
