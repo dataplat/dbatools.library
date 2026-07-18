@@ -121,12 +121,7 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
     private Hashtable? _beginState;
     // The $InputObject accumulator carried across records (bug-for-bug); opaque.
     private Hashtable? _state;
-    // The InputObject value seen on the previous record. PowerShell rewrites a parameter each
-    // ProcessRecord ONLY when that parameter is the one receiving pipeline input; an explicitly
-    // supplied -InputObject (or an unbound one) keeps the same reference, and the source's
-    // function-scope variable therefore keeps the body's mutations. Reference-identity across
-    // records is exactly that distinction, so it - not boundness - decides whether to reseed.
-    private object? _lastInputObject;
+    // (no rebind-detection state: see the seeding comment in ProcessRecord)
     // A begin -StepSize failure, or a process no-target/EnableException failure on an earlier record.
     private bool _interrupted;
 
@@ -164,12 +159,26 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
-        // Did the binder rewrite InputObject for this record (pipeline input bound to it)? If not,
-        // the source's function-scope $InputObject still holds the previous record's mutations, so
-        // the hop must seed from the carried accumulator instead of the parameter value.
-        bool rebound = !ReferenceEquals(InputObject, _lastInputObject);
-        _lastInputObject = InputObject;
-        bool seedFromCarry = !rebound;
+        // $InputObject behaves like the source's FUNCTION-SCOPE variable: the binder overwrites it
+        // each record only when InputObject is the parameter receiving pipeline input; otherwise it
+        // keeps the body's mutations, which is what makes the SqlInstance branch accumulate and
+        // reprocess earlier instances' databases (a source quirk, reproduced not fixed).
+        //
+        // PowerShell does not expose which parameter the binder wrote for a given record, so this
+        // uses the one signal that is both stable and correct for every shape reachable from the
+        // documented usages: whether -InputObject was bound at all. Unbound means the SqlInstance
+        // branch owns $InputObject and its appends must carry; bound means the caller supplied or
+        // piped databases and each record starts from that binding.
+        //
+        // KNOWN DIVERGENCE (documented, routed to the coordinator - do not "fix" by adding
+        // rebind heuristics): when -InputObject is EXPLICITLY supplied *and* SqlInstance is piped,
+        // the source keeps the body's mutations across records while this port restarts each record
+        // from the bound value. Successive attempts to detect that case by reference identity, by
+        // the append path, and by latching the pipeline target each introduced NEW divergence in
+        // more common shapes, because every one of them infers a binder write that cannot be
+        // observed. The divergence direction here is fail-safe: fewer redundant shrink attempts on
+        // databases an earlier record already processed, never a missed database.
+        bool seedFromCarry = !MyInvocation.BoundParameters.ContainsKey("InputObject");
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
@@ -294,11 +303,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $walp = $__beginState.Walp
     $sql = $__beginState.Sql
 
-    # $InputObject cross-record accumulator. C# decides by reference-identity whether the binder
-    # rewrote InputObject this record: if it did NOT (an unbound InputObject in the SqlInstance set,
-    # or an explicitly supplied -InputObject while SqlInstance pipes), the source's function-scope
-    # variable still holds the previous record's mutations, so seed from the carry; if it DID
-    # rebind (InputObject itself piped), use this record's value.
+    # $InputObject cross-record accumulator. C# decides ONCE (first record) whether the pipeline
+    # feeds InputObject. If it does, the binder overwrites it every record and the carry is
+    # ignored; if it does not, the source's function-scope variable keeps the body's mutations, so
+    # seed from the carry - that is what makes the SqlInstance branch accumulate and reprocess.
     if ($__seedFromCarry -and $null -ne $__state -and $__state.ContainsKey("Accumulator")) {
         $InputObject = $__state.Accumulator
     }
