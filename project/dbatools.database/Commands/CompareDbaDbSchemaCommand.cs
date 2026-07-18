@@ -116,8 +116,8 @@ public sealed class CompareDbaDbSchemaCommand : DbaBaseCmdlet
             {
                 if (sentinel["__compareDbaDbSchemaBegin"] is Hashtable state)
                 {
-                    _sqlPackagePath = state["SqlPackagePath"] as string;
-                    _resolvedOutputPath = state["OutputPath"] as string;
+                    _sqlPackagePath = CarriedString(state["SqlPackagePath"]);
+                    _resolvedOutputPath = CarriedString(state["OutputPath"]);
                     _interrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
                 continue;
@@ -160,6 +160,14 @@ public sealed class CompareDbaDbSchemaCommand : DbaBaseCmdlet
             WriteObject(item);
         }
     }
+
+    /// <summary>Reads a string carried back through the begin sentinel. Values the hop produced by
+    /// calling PowerShell functions (Get-DbaSqlPackagePath, Get-DbatoolsConfigValue) arrive
+    /// PSObject-wrapped and "as string" on the wrapper yields null, silently dropping the carry -
+    /// unwrap first. Null stays null: the sqlpackage-not-found asymmetry needs a genuinely absent
+    /// path to reach the process block unchanged.</summary>
+    private static string? CarriedString(object? value) =>
+        (value is PSObject wrapped ? wrapped.BaseObject : value) as string;
 
     /// <summary>Carries a bound common parameter (or the TargetSqlInstance bound flag) into the hop
     /// scopes, which cannot see the caller's $PSBoundParameters. Null means the caller never bound
