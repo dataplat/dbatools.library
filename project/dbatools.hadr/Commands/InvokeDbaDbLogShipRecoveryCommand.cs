@@ -44,6 +44,16 @@ public sealed class InvokeDbaDbLogShipRecoveryCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    private Hashtable? _state;
+
+    protected override void BeginProcessing()
+    {
+        base.BeginProcessing();
+
+        // C1 transplant condition: loud fail before any record if the engine field is gone.
+        PromptStateTransplant.AssertResolvable("Invoke-DbaDbLogShipRecovery");
+    }
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -54,14 +64,27 @@ public sealed class InvokeDbaDbLogShipRecoveryCommand : DbaBaseCmdlet
         // WHOLE-RECORD hop per the W3-005/W4-011 convention: the begin block's
         // Force -> ConfirmPreference suppression and $stepCounter seed ride at the
         // hop top, and every ShouldProcess gate runs on the INNER scriptblock's own
-        // $Pscmdlet. The loop-less validation Stop-Function+return sites exit the
-        // record via the dot-block frame; the -Continue sites are loop-local.
+        // $Pscmdlet - the suppression is hop-scope-local, so -Force still silences
+        // the prompt (the ratified Copy-family/W3-005 handling; NOT routed to
+        // $__realCmdlet, which reads the outer preference and would re-prompt under
+        // -Force). Because InputObject is a per-record VFP axis, the ShouldProcess
+        // Yes/No-to-All answer must survive BETWEEN piped records the way the
+        // source's single function-scope $Pscmdlet does: the W3-082 prompt-state
+        // transplant carries lastShouldProcessContinueStatus through the
+        // __w4039State sentinel. The loop-less validation Stop-Function+return sites
+        // exit the record via the dot-block frame; the -Continue sites are loop-local.
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, Database, SqlCredential, NoRecovery.ToBool(), Force.ToBool(),
-            InputObject, Delay, EnableException.ToBool(),
+            InputObject, Delay, EnableException.ToBool(), _state,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w4039State"))
+            {
+                _state = sentinel["__w4039State"] as Hashtable;
+                continue;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -110,7 +133,7 @@ public sealed class InvokeDbaDbLogShipRecoveryCommand : DbaBaseCmdlet
     // Write-Progress percent (progress stream, not probe-visible) and is dispositioned
     // per the W4-001 Write-Progress precedent - no named-wrapper shim.
     private const string ProcessScript = """
-param($SqlInstance, $Database, $SqlCredential, $NoRecovery, $Force, $InputObject, $Delay, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $Database, $SqlCredential, $NoRecovery, $Force, $InputObject, $Delay, $EnableException, $__state, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -119,12 +142,23 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [string[]]$Database, [PSCredential]$SqlCredential, $NoRecovery, $Force, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [int]$Delay, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [string[]]$Database, [PSCredential]$SqlCredential, $NoRecovery, $Force, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [int]$Delay, $EnableException, $__state, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if ($Force) { $ConfirmPreference = 'none' }
 
     $stepCounter = 0
+
+    # cross-record engine-state restore: the ShouldProcess Yes/No-to-All answer spans the
+    # pipeline in the source (one CommandRuntime); the transplant field name is identical
+    # on PS 5.1 and PS 7 (W3-082 mechanism, empirically verified)
+    $__spField = $Pscmdlet.CommandRuntime.GetType().GetField("lastShouldProcessContinueStatus", [System.Reflection.BindingFlags]"NonPublic,Instance")
+    if ($null -eq $__spField) {
+        throw "Invoke-DbaDbLogShipRecovery: prompt-state transplant field lastShouldProcessContinueStatus not resolvable on this engine (C1 assert)."
+    }
+    if ($null -ne $__state -and $null -ne $__state.shouldProcessContinueStatus) {
+        $__spField.SetValue($Pscmdlet.CommandRuntime, [Enum]::Parse($__spField.FieldType, $__state.shouldProcessContinueStatus))
+    }
 
     . {
         foreach ($instance in $SqlInstance) {
@@ -343,6 +377,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $stepCounter = 0
         }
     }
-} $SqlInstance $Database $SqlCredential $NoRecovery $Force $InputObject $Delay $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+    @{ __w4039State = @{ shouldProcessContinueStatus = $(if ($null -ne $__spField) { "$($__spField.GetValue($Pscmdlet.CommandRuntime))" } else { $null }) } }
+} $SqlInstance $Database $SqlCredential $NoRecovery $Force $InputObject $Delay $EnableException $__state $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

@@ -46,6 +46,16 @@ public sealed class GrantDbaAgPermissionCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    private Hashtable? _state;
+
+    protected override void BeginProcessing()
+    {
+        base.BeginProcessing();
+
+        // C1 transplant condition: loud fail before any record if the engine field is gone.
+        PromptStateTransplant.AssertResolvable("Grant-DbaAgPermission");
+    }
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -56,18 +66,28 @@ public sealed class GrantDbaAgPermissionCommand : DbaBaseCmdlet
         // Whole-record hop per the W4-011 mutating convention: both ShouldProcess gates
         // run on the INNER hop scriptblock's own $Pscmdlet (the inner block re-declares
         // SupportsShouldProcess + ConfirmImpact Low - never prompting by default,
-        // exactly like the function; bound WhatIf/Confirm forward raw). The source's
-        // three validation returns and the two mid-loop catch returns exit the whole
-        // record via the dot-block frame; the $InputObject += accumulation and the
+        // exactly like the function; bound WhatIf/Confirm forward raw). Because
+        // InputObject is a per-record VFP axis, an explicit -Confirm answer of
+        // Yes/No-to-All must survive BETWEEN piped records the way the source's single
+        // function-scope $Pscmdlet does: the W3-082 prompt-state transplant carries
+        // lastShouldProcessContinueStatus through the __w4036State sentinel. The
+        // source's three validation returns and the two mid-loop catch returns exit the
+        // whole record via the dot-block frame; the $InputObject += accumulation and the
         // account loop share record scope. The plain Stop-Function sites' interrupt
         // flags are write-only inert (no Test-FunctionInterrupt in source).
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, Login, AvailabilityGroup, Type, Permission,
             InputObject, EnableException.ToBool(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)), _state,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w4036State"))
+            {
+                _state = sentinel["__w4036State"] as Hashtable;
+                continue;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -112,7 +132,7 @@ public sealed class GrantDbaAgPermissionCommand : DbaBaseCmdlet
     // rewrite (SOURCE comment). ShouldProcess gates use the inner block's own
     // $Pscmdlet; the dot-block preserves the source's early returns.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Login, $AvailabilityGroup, $Type, $Permission, $InputObject, $EnableException, $__boundSqlInstance, $__boundInputObject, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Login, $AvailabilityGroup, $Type, $Permission, $InputObject, $EnableException, $__boundSqlInstance, $__boundInputObject, $__state, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -121,8 +141,19 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Low')]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Login, [string[]]$AvailabilityGroup, [string[]]$Type, [string[]]$Permission, [Microsoft.SqlServer.Management.Smo.Login[]]$InputObject, $EnableException, $__boundSqlInstance, $__boundInputObject, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Login, [string[]]$AvailabilityGroup, [string[]]$Type, [string[]]$Permission, [Microsoft.SqlServer.Management.Smo.Login[]]$InputObject, $EnableException, $__boundSqlInstance, $__boundInputObject, $__state, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # cross-record engine-state restore: the ShouldProcess Yes/No-to-All answer spans the
+    # pipeline in the source (one CommandRuntime); the transplant field name is identical
+    # on PS 5.1 and PS 7 (W3-082 mechanism, empirically verified)
+    $__spField = $Pscmdlet.CommandRuntime.GetType().GetField("lastShouldProcessContinueStatus", [System.Reflection.BindingFlags]"NonPublic,Instance")
+    if ($null -eq $__spField) {
+        throw "Grant-DbaAgPermission: prompt-state transplant field lastShouldProcessContinueStatus not resolvable on this engine (C1 assert)."
+    }
+    if ($null -ne $__state -and $null -ne $__state.shouldProcessContinueStatus) {
+        $__spField.SetValue($Pscmdlet.CommandRuntime, [Enum]::Parse($__spField.FieldType, $__state.shouldProcessContinueStatus))
+    }
 
     . {
         if (-not ($__boundSqlInstance -or $__boundInputObject)) { # SOURCE: if (Test-Bound -Not SqlInstance, InputObject) {
@@ -235,6 +266,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $SqlInstance $SqlCredential $Login $AvailabilityGroup $Type $Permission $InputObject $EnableException $__boundSqlInstance $__boundInputObject $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+    @{ __w4036State = @{ shouldProcessContinueStatus = $(if ($null -ne $__spField) { "$($__spField.GetValue($Pscmdlet.CommandRuntime))" } else { $null }) } }
+} $SqlInstance $SqlCredential $Login $AvailabilityGroup $Type $Permission $InputObject $EnableException $__boundSqlInstance $__boundInputObject $__state $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
