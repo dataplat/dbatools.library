@@ -56,11 +56,9 @@ public sealed class GetDbaXESessionTemplateCommand : DbaBaseCmdlet
 
     protected override void BeginProcessing()
     {
-        if (Interrupted)
-        {
-            return;
-        }
-
+        // No interrupt is read anywhere in this command (the one Stop-Function is -Continue), and the
+        // base Interrupted flag is never set by a hop (it uses the module-scope PS Stop-Function, not the
+        // C# StopFunction), so there is no guard here - the once-only begin hop must always run.
         object? moduleRoot = null;
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript))
         {
