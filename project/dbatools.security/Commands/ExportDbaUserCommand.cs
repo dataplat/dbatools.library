@@ -118,8 +118,11 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     [Parameter]
     public SwitchParameter ExcludeGoBatchSeparator { get; set; }
 
-    /// <summary>One batch per pipeline record, capturing that record's SqlInstance and InputObject bindings.</summary>
+    /// <summary>One batch per pipeline record: { inputRebound, SqlInstance, InputObject }.</summary>
     private readonly List<object?[]?> _batches = new List<object?[]?>();
+
+    /// <summary>The InputObject value seen at the previous ProcessRecord, to detect a genuine pipeline rebind.</summary>
+    private object? _prevInputObject;
 
     /// <summary>Records each pipeline record's input as a batch; the work runs once in EndProcessing.</summary>
     protected override void ProcessRecord()
@@ -129,8 +132,15 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
 
         // One batch per ProcessRecord call, preserving the boundaries the script's process block saw (an
         // empty pipeline never calls ProcessRecord, so there are no batches and the process body never runs -
-        // but the begin block, run once in EndProcessing, still does, matching the script).
-        _batches.Add(new object?[] { SqlInstance, InputObject });
+        // but the begin block, run once in EndProcessing, still does, matching the script). InputObject is
+        // ValueFromPipeline and is mutated by the body ($InputObject += Get-DbaDatabase); when a record does
+        // NOT rebind it (for example instances piped to SqlInstance), the script RETAINS and accumulates it
+        // across records. A genuine rebind produces a new array reference, so a reference change flags it; the
+        // replay then resets $InputObject only on a rebind and otherwise lets the accumulation persist,
+        // matching the function scope. SqlInstance is never mutated, so its captured value replays as-is.
+        bool inputRebound = !ReferenceEquals(InputObject, _prevInputObject);
+        _prevInputObject = InputObject;
+        _batches.Add(new object?[] { inputRebound, SqlInstance, InputObject });
     }
 
     /// <summary>Runs the begin block once and replays the process body per collected batch, in one scope.</summary>
@@ -253,9 +263,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         $eol = [System.Environment]::NewLine
+        $InputObject = $null
         foreach ($__batch in $__batches) {
-            $SqlInstance = $__batch[0]
-            $InputObject = $__batch[1]
+            $SqlInstance = $__batch[1]
+            if ($__batch[0]) { $InputObject = $__batch[2] }
             . {
         if (Test-FunctionInterrupt) { return }
 
