@@ -27,7 +27,11 @@ namespace Dataplat.Dbatools.Commands;
 /// no interrupt to carry and no Interrupted guard.
 ///
 /// Two parameter sets: -SqlInstance (set "instance") or piped -InputObject sessions (set "piped"), default
-/// "Default". Each target is emitted before a later instance may fail under -EnableException (a nested
+/// "Default". $InputObject is carried across records: in the "instance" set it is UNBOUND and the body's
+/// "$InputObject += Get-DbaXESession ..." accumulates across piped SqlInstance records (function scope), so
+/// the C# seeds each record's $InputObject from the fresh VFP binding when present (piped set) else from the
+/// carried accumulation (instance set), and captures the re-emitted value from the process sentinel.
+/// Each target is emitted before a later instance may fail under -EnableException (a nested
 /// Get-DbaXESession connect failure throws terminating under EE) (DEF-001), so the process hop uses
 /// InvokeScopedStreaming. Surface pinned by migration/baselines/Get-DbaXESessionTarget.json.
 /// </remarks>
@@ -58,10 +62,29 @@ public sealed class GetDbaXESessionTargetCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - the source declares it bare (no set named), which
     // reflects as __AllParameterSets and matches the inherited [Parameter]; no per-set override needed.
 
+    // $InputObject is a function-scope parameter variable. In the "piped" set it is VFP (rebound each
+    // record); in the "instance" set it is UNBOUND and the body's "$InputObject += Get-DbaXESession ..."
+    // ACCUMULATES across records (function scope persists across ProcessRecord). So it is carried record
+    // to record: seeded from the fresh VFP binding when present (piped set), else from the carried value
+    // (instance-set accumulation), and re-emitted from each record's sentinel.
+    private object? _inputObject;
+
     protected override void ProcessRecord()
     {
+        // piped set: InputObject is bound (non-null) -> use the fresh VFP value (overwrites the carry).
+        // instance set: InputObject is null -> use the carried accumulation.
+        object? inputSeed = (object?)InputObject ?? _inputObject;
+
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__getDbaXESessionTargetProcess"))
+            {
+                if (sentinel["__getDbaXESessionTargetProcess"] is Hashtable state)
+                {
+                    _inputObject = state["InputObject"];
+                }
+                return;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -72,7 +95,7 @@ public sealed class GetDbaXESessionTargetCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }, ProcessScript,
-            SqlInstance, SqlCredential, Session, Target, InputObject, EnableException.ToBool(),
+            SqlInstance, SqlCredential, Session, Target, inputSeed, EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
@@ -177,6 +200,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $InputObject += Get-DbaXESession -SqlInstance $instance -SqlCredential $SqlCredential -Session $Session
     }
     Get-Target -Sessions $InputObject -Session $Session -Target $Target
+    @{ __getDbaXESessionTargetProcess = @{ InputObject = $InputObject } }
 } $SqlInstance $SqlCredential $Session $Target $InputObject $EnableException @__commonParameters 3>&1 2>&1
 """;
 }
