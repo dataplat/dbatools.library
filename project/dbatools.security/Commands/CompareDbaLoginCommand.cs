@@ -115,13 +115,14 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
     /// Unwraps a value the begin hop carried out through its sentinel.
     /// </summary>
     /// <remarks>
-    /// Two shapes must survive this seam. A command that produced NO output leaves the script
-    /// variable holding AutomationNull, which behaves as $null in PowerShell; it has to come back as
-    /// null, or the process replay iterates over a phantom element and emits a nameless result row
-    /// the script never produces. And a [PSCustomObject] value keeps its note properties on the
-    /// PSObject WRAPPER - its BaseObject is only an empty marker - so such a value is returned
-    /// wrapped: unwrapping it would silently discard the payload and leave the same truthy,
-    /// property-less object. Anything else unwraps to its base value as before.
+    /// A command that produced NO output leaves the script variable holding AutomationNull, which
+    /// behaves as $null in PowerShell but unwraps to a truthy, property-less object - so it comes
+    /// back as null instead. A [PSCustomObject] value is returned still WRAPPED, because its note
+    /// properties live on the PSObject wrapper and its BaseObject is only an empty marker:
+    /// unwrapping such a value would silently discard the payload. Anything else unwraps to its
+    /// base value. Cardinality is settled at the sentinel (the carried collection is normalized
+    /// with @()), never inferred here - a genuinely empty [pscustomobject]@{} and a no-output
+    /// result are indistinguishable by shape, and only the sentinel knows which it holds.
     /// </remarks>
     private static object? UnwrapHopValue(object? value)
     {
@@ -129,16 +130,7 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
             return null;
         if (value is not PSObject wrapper)
             return value;
-        if (wrapper.BaseObject is PSCustomObject)
-        {
-            foreach (PSPropertyInfo property in wrapper.Properties)
-            {
-                if (property is not null)
-                    return wrapper;
-            }
-            return null;
-        }
-        return wrapper.BaseObject;
+        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -201,7 +193,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     $sourceLogins = Get-DbaLogin @splatGetSource
 
-    [pscustomobject]@{ __CompareDbaLoginBeginComplete = $true; SourceServer = $sourceServer; SourceLogins = $sourceLogins }
+    # SourceLogins is normalized to an array so the seam carries cardinality unambiguously: a
+    # no-output result becomes an empty array rather than AutomationNull, which the process replay
+    # would otherwise receive as a truthy, property-less object and iterate over.
+    [pscustomobject]@{ __CompareDbaLoginBeginComplete = $true; SourceServer = $sourceServer; SourceLogins = @($sourceLogins) }
 } $Source $SourceSqlCredential $Login $ExcludeLogin $ExcludeSystemLogin $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
