@@ -9,10 +9,12 @@ public sealed partial class InvokeDbaDbLogShippingCommand
 {
     [Parameter(Position = 0, Mandatory = true)]
     [Alias("Source", "SourceServerInstance", "SourceSqlServerSqlServer")]
+    [ValidateNotNullOrEmpty]
     public DbaInstanceParameter? SourceSqlInstance { get; set; }
 
     [Parameter(Position = 1, Mandatory = true)]
     [Alias("Destination", "DestinationServerInstance", "DestinationSqlServer")]
+    [ValidateNotNullOrEmpty]
     public DbaInstanceParameter[]? DestinationSqlInstance { get; set; }
 
     [Parameter(Position = 2)]
@@ -54,18 +56,21 @@ public sealed partial class InvokeDbaDbLogShippingCommand
     public string? BackupSchedule { get; set; }
 
     [Parameter(Position = 14)]
+    [ValidateSet("Daily", "Weekly", "AgentStart", "IdleComputer")]
     public object? BackupScheduleFrequencyType { get; set; }
 
     [Parameter(Position = 15)]
     public object[]? BackupScheduleFrequencyInterval { get; set; }
 
     [Parameter(Position = 16)]
+    [ValidateSet("Time", "Seconds", "Minutes", "Hours")]
     public object? BackupScheduleFrequencySubdayType { get; set; }
 
     [Parameter(Position = 17)]
     public int BackupScheduleFrequencySubdayInterval { get; set; }
 
     [Parameter(Position = 18)]
+    [ValidateSet("Unused", "First", "Second", "Third", "Fourth", "Last")]
     public object? BackupScheduleFrequencyRelativeInterval { get; set; }
 
     [Parameter(Position = 19)]
@@ -99,18 +104,21 @@ public sealed partial class InvokeDbaDbLogShippingCommand
     public string? CopySchedule { get; set; }
 
     [Parameter(Position = 29)]
+    [ValidateSet("Daily", "Weekly", "AgentStart", "IdleComputer")]
     public object? CopyScheduleFrequencyType { get; set; }
 
     [Parameter(Position = 30)]
     public object[]? CopyScheduleFrequencyInterval { get; set; }
 
     [Parameter(Position = 31)]
+    [ValidateSet("Time", "Seconds", "Minutes", "Hours")]
     public object? CopyScheduleFrequencySubdayType { get; set; }
 
     [Parameter(Position = 32)]
     public int CopyScheduleFrequencySubdayInterval { get; set; }
 
     [Parameter(Position = 33)]
+    [ValidateSet("Unused", "First", "Second", "Third", "Fourth", "Last")]
     public object? CopyScheduleFrequencyRelativeInterval { get; set; }
 
     [Parameter(Position = 34)]
@@ -141,6 +149,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
     public PSCredential? PrimaryMonitorCredential { get; set; }
 
     [Parameter(Position = 43)]
+    [ValidateSet("0", "sqlserver", "1", "windows")]
     public object? PrimaryMonitorServerSecurityMode { get; set; }
 
     [Parameter(Position = 44)]
@@ -165,18 +174,21 @@ public sealed partial class InvokeDbaDbLogShippingCommand
     public string? RestoreSchedule { get; set; }
 
     [Parameter(Position = 51)]
+    [ValidateSet("Daily", "Weekly", "AgentStart", "IdleComputer")]
     public object? RestoreScheduleFrequencyType { get; set; }
 
     [Parameter(Position = 52)]
     public object[]? RestoreScheduleFrequencyInterval { get; set; }
 
     [Parameter(Position = 53)]
+    [ValidateSet("Time", "Seconds", "Minutes", "Hours")]
     public object? RestoreScheduleFrequencySubdayType { get; set; }
 
     [Parameter(Position = 54)]
     public int RestoreScheduleFrequencySubdayInterval { get; set; }
 
     [Parameter(Position = 55)]
+    [ValidateSet("Unused", "First", "Second", "Third", "Fourth", "Last")]
     public object? RestoreScheduleFrequencyRelativeInterval { get; set; }
 
     [Parameter(Position = 56)]
@@ -210,6 +222,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
     public PSCredential? SecondaryMonitorCredential { get; set; }
 
     [Parameter(Position = 66)]
+    [ValidateSet("0", "sqlserver", "1", "windows")]
     public object? SecondaryMonitorServerSecurityMode { get; set; }
 
     [Parameter(Position = 67)]
