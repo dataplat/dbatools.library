@@ -150,8 +150,11 @@ public sealed class ConvertToDbaXESessionCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin block VERBATIM ($script:PSModuleRoot resolves in the module scope), returning $rawsql via
-    // a sentinel. Runs once in BeginProcessing.
+    // PS: the begin block, returning $rawsql via a sentinel. Runs once in BeginProcessing. The source reads
+    // the conversion script from $script:PSModuleRoot; the module's script scope is NOT reliably visible
+    // inside the nested hop under the gate harness (it resolved EMPTY there, making the path CWD-relative -
+    // A's discriminator on W2-252), so the module root is passed in as $__moduleRoot from the already-resolved
+    // $__dbatoolsModule.ModuleBase. Same value, resolved through the module object instead of its script scope.
     private const string BeginScript = """
 param($__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -159,7 +162,8 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    $rawpath = [IO.Path]::Combine($script:PSModuleRoot, "bin", "sp_SQLskills_ConvertTraceToEEs.sql")
+    $__moduleRoot = (Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1).ModuleBase
+    $rawpath = [IO.Path]::Combine($__moduleRoot, "bin", "sp_SQLskills_ConvertTraceToEEs.sql")
     $rawsql = Get-Content $rawpath -Raw
     @{ __convertToDbaXESessionBegin = @{ RawSql = $rawsql } }
 } @__commonParameters 3>&1 2>&1

@@ -107,7 +107,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 & $__dbatoolsModule {
     [CmdletBinding()]
     param([string[]]$Path, [string]$Destination, $EnableException, $__boundPath, $__boundDestination)
-    if (-not $__boundPath) { $Path = "$script:PSModuleRoot\bin\XEtemplates" }
+    $__moduleRoot = (Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1).ModuleBase
+    if (-not $__boundPath) { $Path = "$__moduleRoot\bin\XEtemplates" }
     if (-not $__boundDestination) { $Destination = "$home\Documents\SQL Server Management Studio\Templates\XEventTemplates" }
     if (Test-FunctionInterrupt) { return }
     foreach ($destinstance in $Destination) {
