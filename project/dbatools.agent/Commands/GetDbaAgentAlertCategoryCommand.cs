@@ -67,7 +67,11 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
             else if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__GetDbaAgentAlertCategoryProcessComplete"]?.Value))
             {
-                _cat = UnwrapHopValue(item.Properties["Cat"]?.Value);
+                // $cat is a DECORATED SMO AlertCategory: the Add-Member note properties and the
+                // Select-DefaultView live on the PSObject wrapper, not the BaseObject, and the
+                // source keeps them on $cat across records. Unwrapping would strip them, so this
+                // carrier is passed through wrapped - see UnwrapHopValue's limits in comms/lanes/e.md.
+                _cat = item.Properties["Cat"]?.Value;
             }
             else
             {
@@ -76,17 +80,6 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
         }, BodyScript,
             SqlInstance, SqlCredential, Category, EnableException.ToBool(),
             TestBound(nameof(Category)), _cat, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
-    }
-
-    // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
-    // wrapper rather than the BaseObject, so unwrapping one would discard it - keep it wrapped.
-    private static object? UnwrapHopValue(object? value)
-    {
-        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
-            return null;
-        if (value is not PSObject wrapper)
-            return value;
-        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
