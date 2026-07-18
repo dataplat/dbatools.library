@@ -7,9 +7,13 @@ public sealed partial class InvokeDbaDbLogShippingCommand
     // PS: the begin block VERBATIM, first half (composed as BeginScript = head +
     // newline + tail; re-parsed at build verification), CRLF-preserved. The hop runs
     // ONCE (side-effectful begin: source+destination connects, 28 validation sites).
-    // Frame: the 84-value parameter-table splat (values, not bound-ness - begin's
-    // default logic is truthiness-based; the single bound-ness site rides the
-    // carried $__boundSharedAzureExactlyOne flag) and the W3-102 continue-relay
+    // Frame: the caller-bound parameter-table splat (ONLY MyInvocation.BoundParameters
+    // minus engine commons - the typed inner params supply function-world defaults for
+    // everything unbound). Two sites are bound-ness-sensitive and depend on that
+    // contract: the source line-627 $PSBoundParameters.ContainsKey("AzureBaseUrl")
+    // read, truthful only because unbound params never enter the table, and the
+    // Test-Bound count-window, which rides the carried $__boundSharedAzureExactlyOne
+    // flag. Plus the W3-102 continue-relay
     // guard for the loop-less line-692 -Continue. Substitutions across both halves:
     // 75 -FunctionName appends + the one Test-Bound count-window rewrite (SOURCE
     // comment); stripping reproduces the source bytes cmp-exact.
