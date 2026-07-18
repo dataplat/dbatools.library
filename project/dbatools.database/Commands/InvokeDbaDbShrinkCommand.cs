@@ -121,12 +121,12 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
     private Hashtable? _beginState;
     // The $InputObject accumulator carried across records (bug-for-bug); opaque.
     private Hashtable? _state;
-    // The InputObject value seen on the previous record. PowerShell rewrites a parameter each
-    // ProcessRecord ONLY when that parameter is the one receiving pipeline input; an explicitly
-    // supplied -InputObject (or an unbound one) keeps the same reference, and the source's
-    // function-scope variable therefore keeps the body's mutations. Reference-identity across
-    // records is exactly that distinction, so it - not boundness - decides whether to reseed.
-    private object? _lastInputObject;
+    // Which parameter the pipeline feeds is fixed for the whole invocation, so it is decided ONCE
+    // on the first record rather than re-derived per record (per-record heuristics kept missing
+    // shapes: an explicitly supplied -InputObject looks unbound-ish, a repeated array instance
+    // looks unchanged, and an empty SqlInstance record mid-pipeline looks like a different set).
+    private bool _pipeTargetDecided;
+    private bool _inputObjectIsPipeTarget;
     // A begin -StepSize failure, or a process no-target/EnableException failure on an earlier record.
     private bool _interrupted;
 
@@ -164,22 +164,24 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
-        // Decide whether the hop must seed $InputObject from the carried accumulator. The
-        // accumulation only exists because the SqlInstance branch appends the server's databases to
-        // $InputObject and the source never resets it, so the carry applies exactly when that append
-        // path is live AND the binder did not rewrite InputObject for this record. PowerShell
-        // rewrites a parameter per record only when that parameter receives the pipeline input, so
-        // an unbound InputObject (SqlInstance set) or an explicitly supplied one keeps its reference.
-        // RESIDUAL (documented, routed): if the caller pipes the SAME Database[] instance as repeated
-        // records while ALSO supplying -SqlInstance, the binder does rebind but the reference is
-        // unchanged, so this seeds when the source would have rebound. That shape requires re-emitting
-        // one array instance as multiple records with both inputs supplied; it is not reachable from
-        // the documented usages, and erring toward the carry there only re-applies the source's own
-        // accumulate-and-reprocess quirk rather than inventing new behavior.
-        bool inputObjectRebound = !ReferenceEquals(InputObject, _lastInputObject);
-        _lastInputObject = InputObject;
-        bool appendPathLive = SqlInstance is not null && SqlInstance.Length > 0;
-        bool seedFromCarry = !inputObjectRebound && appendPathLive;
+        // $InputObject must behave like the source's FUNCTION-SCOPE variable: the binder overwrites
+        // it each record only when InputObject is the parameter the pipeline feeds; otherwise it
+        // keeps the body's mutations, which is what makes the SqlInstance branch accumulate and
+        // reprocess earlier instances' databases. Which parameter the pipeline feeds is fixed for
+        // the whole invocation, so decide it ONCE on the first record and apply it to every record.
+        // RESIDUAL (documented): piping the SAME non-enumerated Database[] instance as repeated
+        // records while ALSO supplying -SqlInstance is read here as SqlInstance-fed, so it seeds
+        // where the source would rebind. codex confirms that shape is not reachable through the
+        // documented usages, and erring toward the carry only re-applies the source's own
+        // accumulate-and-reprocess quirk rather than inventing behavior.
+        if (!_pipeTargetDecided)
+        {
+            _pipeTargetDecided = true;
+            _inputObjectIsPipeTarget = MyInvocation.ExpectingInput
+                && InputObject is not null && InputObject.Length > 0
+                && (SqlInstance is null || SqlInstance.Length == 0);
+        }
+        bool seedFromCarry = !_inputObjectIsPipeTarget;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
@@ -304,11 +306,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $walp = $__beginState.Walp
     $sql = $__beginState.Sql
 
-    # $InputObject cross-record accumulator. C# decides by reference-identity whether the binder
-    # rewrote InputObject this record: if it did NOT (an unbound InputObject in the SqlInstance set,
-    # or an explicitly supplied -InputObject while SqlInstance pipes), the source's function-scope
-    # variable still holds the previous record's mutations, so seed from the carry; if it DID
-    # rebind (InputObject itself piped), use this record's value.
+    # $InputObject cross-record accumulator. C# decides ONCE (first record) whether the pipeline
+    # feeds InputObject. If it does, the binder overwrites it every record and the carry is
+    # ignored; if it does not, the source's function-scope variable keeps the body's mutations, so
+    # seed from the carry - that is what makes the SqlInstance branch accumulate and reprocess.
     if ($__seedFromCarry -and $null -ne $__state -and $__state.ContainsKey("Accumulator")) {
         $InputObject = $__state.Accumulator
     }
