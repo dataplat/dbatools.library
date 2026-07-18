@@ -127,7 +127,7 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([object[]]$Path, [switch]$Raw, $EnableException)
+    param([object[]]$Path, $Raw, $EnableException)
     if (Test-FunctionInterrupt) { return }
     foreach ($pathObject in $Path) {
         # in order to ensure CSV gets all fields, all columns will be
