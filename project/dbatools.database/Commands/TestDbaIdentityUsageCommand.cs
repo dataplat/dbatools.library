@@ -12,18 +12,24 @@ namespace Dataplat.Dbatools.Commands;
 /// public/Test-DbaIdentityUsage.ps1; the workflow remains a module-scoped PowerShell
 /// compatibility hop.
 ///
-/// -SqlInstance takes pipeline input, so the process body rides ONE hop per record and the blocks
-/// are NOT folded the way a non-pipeline command's would be. The source's begin block does exactly
-/// one thing - assign the $sql query text - and that assignment is placed at the top of the hop
-/// body instead of running as a separate begin hop. $sql is a deterministic constant with no
-/// dependence on any parameter or on prior records, so computing it per record is identical to
-/// computing it once, and it avoids a state sentinel purely to ferry a literal string.
+/// -SqlInstance takes pipeline input, so the blocks are NOT folded the way a non-pipeline
+/// command's would be, and the hop runs once PER INSTANCE rather than once per whole array: the
+/// source foreaches $SqlInstance with no cross-instance state in the loop body, and a whole-array
+/// hop would batch that loop's Verbose output ahead of all its result objects, where the script
+/// function interleaves verbose-then-output for each instance in turn.
+///
+/// The source's begin block builds the $sql query text, and that construction is placed at the top
+/// of the hop body instead of running as a separate begin hop. $sql is NOT parameter-independent -
+/// begin appends either a "WHERE [PercentUsed] >= $Threshold ORDER BY" or a bare "ORDER BY" clause
+/// to it. Rebuilding it per hop is still identical to building it once, for two reasons: -Threshold
+/// is not a pipeline parameter, so it is bound once and every hop sees the same value; and the hop
+/// re-assigns $sql from its string literal before appending, so the append can never compound the
+/// way it would if $sql were carried across hops and appended to again.
 ///
 /// No local needs a cross-record carry. Every process-block local ($instance, $server, $dbs, $db,
 /// $results, $row) is assigned and read within the same loop iteration. $server is assigned in the
 /// connection try and read further down, but every failure path is Stop-Function -Continue, which
-/// skips the rest of that iteration before any read - so a stale $server from a previous record is
-/// never observable.
+/// skips the rest of that iteration before any read - so a stale $server is never observable.
 ///
 /// Parameter positions are pinned from the golden baseline rather than left to default: a
 /// PowerShell advanced function gets implicit positional binding, so the script function bound
@@ -81,19 +87,30 @@ public sealed class TestDbaIdentityUsageCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        NestedCommand.InvokeScopedStreaming(this, item =>
+        // One hop PER INSTANCE, not one hop for the whole array: the source's instance loop keeps
+        // no cross-instance state, and batching every instance into a single hop would emit that
+        // loop's verbose messages ahead of all of its output instead of interleaving them per
+        // instance the way the script function does. The body still foreaches $SqlInstance, so a
+        // single-element array runs exactly one iteration.
+        foreach (DbaInstanceParameter instance in SqlInstance ?? Array.Empty<DbaInstanceParameter>())
         {
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
+            if (Interrupted)
                 return;
-            }
-            WriteObject(item);
-        }, BodyScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Threshold,
-            ExcludeSystem.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+
+            NestedCommand.InvokeScopedStreaming(this, item =>
+            {
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                    return;
+                }
+                WriteObject(item);
+            }, BodyScript,
+                new[] { instance }, SqlCredential, Database, ExcludeDatabase, Threshold,
+                ExcludeSystem.ToBool(), EnableException.ToBool(),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+        }
     }
 
     private object? BoundCommonParameter(string name)
