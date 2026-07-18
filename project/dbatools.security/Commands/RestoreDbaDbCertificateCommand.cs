@@ -159,9 +159,11 @@ public sealed class RestoreDbaDbCertificateCommand : DbaBaseCmdlet
     // The source's DecryptionPassword parameter default, run in BeginProcessing when the parameter is
     // unbound so the prompt fires once per invocation like a script parameter default. It evaluates
     // INSIDE the dbatools module scope, exactly where the script function's default expression runs -
-    // a caller-local Read-Host function or alias is invisible there in both worlds.
+    // a caller-local Read-Host function or alias is invisible there in both worlds. The discovery
+    // commands are module-qualified so a caller-local Get-Module/Where-Object/Select-Object shim
+    // cannot divert the lookup either.
     private const string DecryptionPasswordPromptScript = """
-$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+$__dbatoolsModule = Microsoft.PowerShell.Core\Get-Module -Name dbatools | Microsoft.PowerShell.Core\Where-Object ModuleType -eq "Script" | Microsoft.PowerShell.Utility\Select-Object -First 1
 & $__dbatoolsModule { Read-Host "Decryption password" -AsSecureString }
 """;
 
