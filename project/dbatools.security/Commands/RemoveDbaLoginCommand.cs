@@ -28,8 +28,9 @@ namespace Dataplat.Dbatools.Commands;
 /// suppresses the confirm prompt exactly as the script does (the same technique as the CLEAN Copy-Dba* hops).
 /// The callback dispatches ErrorRecords to WriteError, else WriteObject. EnableException and Force are carried
 /// as plain (untyped) values, because a switch in the inner CmdletBinding scriptblock is excluded from
-/// positional binding. The four DIRECT Stop-Function/Write-Message calls take -FunctionName; $Pscmdlet is
-/// redirected to the real cmdlet ($__realCmdlet) for the ShouldProcess gate. Stop-DbaProcess and
+/// positional binding. The three DIRECT Stop-Function/Write-Message calls take -FunctionName; $Pscmdlet is
+/// redirected to the real cmdlet ($__realCmdlet) for the ShouldProcess gate (that redirect is the fourth
+/// edit). Stop-DbaProcess and
 /// Remove-TeppCacheItem are nested calls, left unedited.
 /// </para>
 /// </remarks>
@@ -109,8 +110,8 @@ public sealed class RemoveDbaLoginCommand : DbaBaseCmdlet
     }
 
     // PS: the begin block (if ($Force) { $ConfirmPreference = 'none' }) folded verbatim, then the process body
-    // VERBATIM. Substitutions only: $Pscmdlet -> $__realCmdlet (the ShouldProcess gate); -FunctionName on the
-    // four DIRECT Stop-Function/Write-Message calls. EnableException and Force received untyped.
+    // VERBATIM. Four edits: $Pscmdlet -> $__realCmdlet (the ShouldProcess gate) plus -FunctionName on the
+    // three DIRECT Stop-Function/Write-Message calls. EnableException and Force received untyped.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Login, $InputObject, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
