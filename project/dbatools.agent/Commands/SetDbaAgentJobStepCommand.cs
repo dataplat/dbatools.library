@@ -145,7 +145,7 @@ public sealed class SetDbaAgentJobStepCommand : DbaBaseCmdlet
         }
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            OnSuccessAction, OnSuccessStepId, OnFailAction, OnFailStepId, Subsystem, SubsystemServer,
+            SqlInstance, OnSuccessAction, OnSuccessStepId, OnFailAction, OnFailStepId, Subsystem, SubsystemServer,
             EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
@@ -252,14 +252,14 @@ public sealed class SetDbaAgentJobStepCommand : DbaBaseCmdlet
     // The "if (\$Force) { \$ConfirmPreference = 'none' }" line is folded into the process hop. Dot-sourced so
     // the validation returns still emit the interrupt sentinel.
     private const string BeginScript = """
-param($OnSuccessAction, $OnSuccessStepId, $OnFailAction, $OnFailStepId, $Subsystem, $SubsystemServer, $EnableException, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $OnSuccessAction, $OnSuccessStepId, $OnFailAction, $OnFailStepId, $Subsystem, $SubsystemServer, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([string]$OnSuccessAction, [int]$OnSuccessStepId, [string]$OnFailAction, [int]$OnFailStepId, [string]$Subsystem, [string]$SubsystemServer, $EnableException)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [string]$OnSuccessAction, [int]$OnSuccessStepId, [string]$OnFailAction, [int]$OnFailStepId, [string]$Subsystem, [string]$SubsystemServer, $EnableException)
     . {
         # Check the parameter on success step id
         if (($OnSuccessAction -ne 'GoToStep') -and ($OnSuccessStepId -ge 1)) {
@@ -282,7 +282,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
     @{ __setDbaAgentJobStepBegin = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
-} $OnSuccessAction $OnSuccessStepId $OnFailAction $OnFailStepId $Subsystem $SubsystemServer $EnableException @__commonParameters 3>&1 2>&1
+} $SqlInstance $OnSuccessAction $OnSuccessStepId $OnFailAction $OnFailStepId $Subsystem $SubsystemServer $EnableException @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the process block VERBATIM apart from $PSCmdlet.ShouldProcess -> $__gate.ShouldProcess, the three
