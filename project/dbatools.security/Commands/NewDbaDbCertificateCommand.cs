@@ -101,32 +101,45 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
     /// <summary>Resolves the computed date defaults before any pipeline record is processed.</summary>
     protected override void BeginProcessing()
     {
-        // The script's (Get-Date) and $StartDate.AddYears(5) defaults evaluate during binding, BEFORE
-        // pipeline enumeration - and ExpirationDate is derived from the resolved StartDate, so resolving
-        // either per record would let a slow pipeline drift them apart.
-        _resolvedStartDate = TestBound(nameof(StartDate)) ? StartDate : DateTime.Now;
+        bool startBound = TestBound(nameof(StartDate));
+        bool expirationBound = TestBound(nameof(ExpirationDate));
 
-        if (TestBound(nameof(ExpirationDate)))
+        // Both defaults are PowerShell EXPRESSIONS - (Get-Date) and $StartDate.AddYears(5) - evaluated by
+        // the engine in the function's own module scope during binding. Computing them in C# instead
+        // diverges twice over: DateTime.Now bypasses command resolution, so a module-scoped override or
+        // Pester mock of Get-Date that the script honours would be invisible; and DateTime.AddYears
+        // surfaces a raw ArgumentOutOfRangeException on overflow where the script's method binder surfaces
+        // MethodInvocationException (measured with -StartDate ([datetime]::MaxValue)). So the whole default
+        // chain is evaluated BY PowerShell, in dbatools module scope, in the script's own order - the
+        // ExpirationDate expression reading whatever StartDate resolved to.
+        //
+        // This runs in BeginProcessing, which like binding happens before ANY record, so an overflow still
+        // throws on an empty pipeline and a slow pipeline still cannot drift the two dates apart.
+        foreach (PSObject item in NestedCommand.InvokeScoped(this, DefaultDateScript,
+            startBound ? StartDate : null, expirationBound ? ExpirationDate : null, startBound, expirationBound))
         {
-            _resolvedExpirationDate = ExpirationDate;
-            return;
-        }
+            if (item?.BaseObject is not PSCustomObject)
+                continue;
 
-        // The default is the PowerShell expression $StartDate.AddYears(5), and it must be evaluated BY
-        // PowerShell. Calling DateTime.AddYears from C# surfaces a raw ArgumentOutOfRangeException when
-        // the addition overflows, where the script's method binder surfaces MethodInvocationException
-        // carrying the bare "ArgumentOutOfRangeException" fully-qualified error id - a divergence in the
-        // exception contract that a typed catch can see. Measured with -StartDate ([datetime]::MaxValue).
-        foreach (PSObject item in NestedCommand.InvokeScoped(this, DefaultExpirationScript, _resolvedStartDate))
-        {
-            if (item?.BaseObject is DateTime computed)
-                _resolvedExpirationDate = computed;
+            // Convert rather than type-test: Get-Date emits a PSObject-WRAPPED DateTime (it carries a
+            // DisplayHint note property), so an "is DateTime" test silently misses and leaves the date at
+            // DateTime.MinValue - which SQL Server rejects with "An invalid date or time was specified".
+            if (LanguagePrimitives.TryConvertTo(item.Properties["StartDate"]?.Value, out DateTime resolvedStart))
+                _resolvedStartDate = resolvedStart;
+            if (LanguagePrimitives.TryConvertTo(item.Properties["ExpirationDate"]?.Value, out DateTime resolvedExpiration))
+                _resolvedExpirationDate = resolvedExpiration;
         }
     }
 
-    private const string DefaultExpirationScript = """
-param($StartDate)
-$StartDate.AddYears(5)
+    private const string DefaultDateScript = """
+param($BoundStartDate, $BoundExpirationDate, $StartDateBound, $ExpirationDateBound)
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    param($BoundStartDate, $BoundExpirationDate, $StartDateBound, $ExpirationDateBound)
+    $StartDate = if ($StartDateBound) { $BoundStartDate } else { (Get-Date) }
+    $ExpirationDate = if ($ExpirationDateBound) { $BoundExpirationDate } else { $StartDate.AddYears(5) }
+    [pscustomobject]@{ StartDate = $StartDate; ExpirationDate = $ExpirationDate }
+} $BoundStartDate $BoundExpirationDate $StartDateBound $ExpirationDateBound
 """;
 
     /// <summary>Creates the certificates for the databases bound to the current record.</summary>
@@ -142,7 +155,12 @@ $StartDate.AddYears(5)
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
-            else if (item is not null && LanguagePrimitives.IsTrue(
+            // The sentinel must be identified by SHAPE as well as by marker property. Matching on the
+            // property alone lets any emitted object that happens to carry that name be swallowed as
+            // bookkeeping - Update-TypeData can graft a property onto every SMO Certificate, and the
+            // created certificate would then be silently consumed instead of returned. The hop's sentinel
+            // is always a [pscustomobject]; a real payload never is.
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__NewDbaDbCertificateProcessComplete"]?.Value))
             {
                 _smocertState = UnwrapHopValue(item.Properties["Smocert"]?.Value);
