@@ -34,14 +34,14 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class SetDbaAgentJobOutputFileCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0)]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0, HelpMessage = "The SQL Server Instance")]
     [ValidateNotNull]
     [ValidateNotNullOrEmpty]
     [PsDbaInstanceArrayCast]
     public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
 
     /// <summary>Login to the target instance using alternative credentials.</summary>
-    [Parameter(ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
+    [Parameter(ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, HelpMessage = "SQL Credential")]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>The SQL Server Agent job name whose step output files to configure.</summary>
@@ -49,13 +49,13 @@ public sealed class SetDbaAgentJobOutputFileCommand : DbaBaseCmdlet
     public object[]? Job { get; set; }
 
     /// <summary>Which job step(s) within the target job should have their output file configured.</summary>
-    [Parameter(ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
+    [Parameter(ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, HelpMessage = "The Job Step name")]
     [ValidateNotNull]
     [ValidateNotNullOrEmpty]
     public object[]? Step { get; set; }
 
     /// <summary>The complete file path where SQL Agent should write job step output and error messages.</summary>
-    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, HelpMessage = "The Full Output File Path")]
     [ValidateNotNull]
     [ValidateNotNullOrEmpty]
     public string OutputFile { get; set; } = null!;
