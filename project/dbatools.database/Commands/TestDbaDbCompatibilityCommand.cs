@@ -22,12 +22,14 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// Surface pinned by migration/baselines/Test-DbaDbCompatibility.json: SqlInstance Mandatory
 /// ValueFromPipeline at position 0, SqlCredential 1, Database 2, ExcludeDatabase 3 (both Object[],
-/// not string[]), no parameter sets, no ShouldProcess. The source also declares
-/// [OutputType("System.Collections.ArrayList")] even though it emits PSCustomObject records; that
-/// declaration is cosmetic metadata on the function and is not reproduced as behavior here - the
-/// emitted objects are what the tests and the baseline pin.
+/// not string[]), no parameter sets, no ShouldProcess. The baseline also records
+/// outputType ["System.Collections.ArrayList"], so the OutputType declaration is reproduced below:
+/// it is discoverable command metadata that the surface pins, even though the command actually
+/// emits PSCustomObject records - reproducing the original declaration is what parity requires,
+/// and "correcting" it here would be an unrequested surface change.
 /// </summary>
 [Cmdlet(VerbsDiagnostic.Test, "DbaDbCompatibility")]
+[OutputType(typeof(System.Collections.ArrayList))]
 public sealed class TestDbaDbCompatibilityCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
