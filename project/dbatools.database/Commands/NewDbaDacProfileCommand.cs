@@ -37,6 +37,15 @@ namespace Dataplat.Dbatools.Commands;
 /// earlier record already handled. Because the mutated variable can never be the pipeline target,
 /// the carry is unconditional and needs no rebind detection - the cheap branch of that question.
 ///
+/// $server is deliberately NOT carried, and this is the second row where a reviewer has read it as
+/// a cross-record carry, so the reasoning is recorded here. It is assigned inside a try whose catch
+/// is Stop-Function -Continue, and a continue inside a catch skips the rest of that loop iteration -
+/// measured, see migration/logs/probe-20260718-continue-in-catch - so the
+/// "$ConnectionString += $server..." line below is unreachable after a connection failure and can
+/// never read a stale server. The second loop reassigns $server before use. GENERAL RULE:
+/// "assigned in a try, read after the catch" is only a real carry when the catch neither continues
+/// nor throws; check the catch disposition before adding such a variable to a sentinel.
+///
 /// The one $Pscmdlet.ShouldProcess gate routes to the real cmdlet via $__realCmdlet. Both process
 /// Stop-Function calls carry -Continue (skip this instance / this profile and keep looping), so
 /// they do not set the interrupt; only the begin guards do. In-hop Stop-Function/Write-Message
