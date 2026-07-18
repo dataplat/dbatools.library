@@ -164,12 +164,22 @@ public sealed class InvokeDbaDbShrinkCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
-        // Did the binder rewrite InputObject for this record (pipeline input bound to it)? If not,
-        // the source's function-scope $InputObject still holds the previous record's mutations, so
-        // the hop must seed from the carried accumulator instead of the parameter value.
-        bool rebound = !ReferenceEquals(InputObject, _lastInputObject);
+        // Decide whether the hop must seed $InputObject from the carried accumulator. The
+        // accumulation only exists because the SqlInstance branch appends the server's databases to
+        // $InputObject and the source never resets it, so the carry applies exactly when that append
+        // path is live AND the binder did not rewrite InputObject for this record. PowerShell
+        // rewrites a parameter per record only when that parameter receives the pipeline input, so
+        // an unbound InputObject (SqlInstance set) or an explicitly supplied one keeps its reference.
+        // RESIDUAL (documented, routed): if the caller pipes the SAME Database[] instance as repeated
+        // records while ALSO supplying -SqlInstance, the binder does rebind but the reference is
+        // unchanged, so this seeds when the source would have rebound. That shape requires re-emitting
+        // one array instance as multiple records with both inputs supplied; it is not reachable from
+        // the documented usages, and erring toward the carry there only re-applies the source's own
+        // accumulate-and-reprocess quirk rather than inventing new behavior.
+        bool inputObjectRebound = !ReferenceEquals(InputObject, _lastInputObject);
         _lastInputObject = InputObject;
-        bool seedFromCarry = !rebound;
+        bool appendPathLive = SqlInstance is not null && SqlInstance.Length > 0;
+        bool seedFromCarry = !inputObjectRebound && appendPathLive;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
