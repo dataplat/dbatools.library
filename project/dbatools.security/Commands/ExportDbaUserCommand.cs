@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
 
@@ -18,28 +19,29 @@ namespace Dataplat.Dbatools.Commands;
 /// observable-identical to the script implementation.
 /// </para>
 /// <para>
-/// The script's begin block validates (and creates) the export directory once - before any record, and even
-/// for an empty pipeline - so that side effect ships in a BeginProcessing hop that runs EXACTLY ONCE and
-/// emits a sentinel as its last statement. The version-map hashtables and accumulators the process body
-/// reads are rebuilt inside the per-record hop (they are deterministic), because a separate begin hop runs
-/// in its own scope and those variables would not survive into the process hop. The -Path config default is
-/// resolved inside the begin hop (module scope) exactly as the script's parameter default does; the process
-/// hop instead receives the raw bound Path/FilePath values, because Get-ExportFilePath consumes
-/// $PSBoundParameters.Path/.FilePath (the bound values, not the resolved default).
+/// The script keeps rich cross-record state in its single function scope: $instanceArray (which instances
+/// have already opened their single output file, so a later record appends rather than clobbers),
+/// $ScriptingOptionsObject (created once from the first record's server version and reused), and $Append
+/// (set true when a user recurs and then retained). A per-record hop would give each record a fresh scope
+/// and silently drop all of that. So the port collects one batch per ProcessRecord (each batch captures
+/// that record's SqlInstance and InputObject bindings, both ValueFromPipeline) and runs ONE hop in
+/// EndProcessing that executes the begin block once and then replays the process body per batch, exactly
+/// as W2-205 Export-DbaLogin does. All batches run in the one scope, so every cross-record variable
+/// persists identically to the script.
 /// </para>
 /// <para>
-/// ProcessRecord output is streamed through InvokeScopedStreaming: the body emits per user (passthru) and
-/// per instance (the written file listing), so a later record's terminating -EnableException failure or a
-/// downstream early stop must not discard or overrun the earlier output. The one genuine cross-record state,
-/// $instanceArray (which instances have already had their single output file opened, so a second record
-/// targeting the same -FilePath appends rather than clobbers), is carried across records: it rides in as
-/// $__instanceArrayCarry and each hop emits its updated value on a sentinel consumed here, never reaching
-/// the pipeline. $script:pathcollection is initialized by the script but never read, and $GenerateFilePerUser
-/// is a deterministic function of FilePath being bound, so neither needs to be carried. Switches are carried
-/// as plain (untyped) values, because a switch in the inner CmdletBinding scriptblock is excluded from
-/// positional binding. Only the three DIRECT begin/process Stop-Function/Write-Message calls take
+/// Each batch's process body is DOT-SOURCED (. { ... }) so an early Test-FunctionInterrupt return leaves
+/// only the current batch and the remaining batches still run - matching the per-record process block,
+/// where return skips one record but the pipeline continues. Because the begin block (including
+/// Test-ExportDirectory, which CREATES the export directory) runs once inside the single EndProcessing hop
+/// - which fires even for an empty pipeline - the directory side effect and the begin-set interrupt both
+/// behave exactly as the script's begin/process ordering. The -Path config default (Path.DbatoolsExport)
+/// is resolved in module scope as the script's parameter default does; Get-ExportFilePath still consumes
+/// the bound $PSBoundParameters.Path/.FilePath, carried as $__boundPathValue/$__boundFilePathValue.
+/// Switches are carried as plain (untyped) values, because a switch in the inner CmdletBinding scriptblock
+/// is excluded from positional binding. Only the three DIRECT process Stop-Function/Write-Message calls take
 /// -FunctionName; Test-ExportDirectory's own nested Stop-Function attributes to that helper in both worlds
-/// and is left unedited.
+/// and is left unedited. There is no ShouldProcess in the source.
 /// </para>
 /// </remarks>
 [Cmdlet(VerbsData.Export, "DbaUser", DefaultParameterSetName = "Default")]
@@ -116,89 +118,43 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     [Parameter]
     public SwitchParameter ExcludeGoBatchSeparator { get; set; }
 
-    /// <summary>Set when the begin block stopped the command (the export directory could not be validated).</summary>
-    private bool _beginInterrupted;
+    /// <summary>One batch per pipeline record, capturing that record's SqlInstance and InputObject bindings.</summary>
+    private readonly List<object?[]?> _batches = new List<object?[]?>();
 
-    /// <summary>The instances whose single output file has already been opened, carried across records.</summary>
-    private object?[] _instanceArray = System.Array.Empty<object?>();
-
-    /// <summary>Validates the export directory once, before any records are processed.</summary>
-    protected override void BeginProcessing()
+    /// <summary>Records each pipeline record's input as a batch; the work runs once in EndProcessing.</summary>
+    protected override void ProcessRecord()
     {
-        bool completed = false;
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, EnableException.ToBool(), MyInvocation.BoundParameters.ContainsKey("Path"),
+        if (Interrupted)
+            return;
+
+        // One batch per ProcessRecord call, preserving the boundaries the script's process block saw (an
+        // empty pipeline never calls ProcessRecord, so there are no batches and the process body never runs -
+        // but the begin block, run once in EndProcessing, still does, matching the script).
+        _batches.Add(new object?[] { SqlInstance, InputObject });
+    }
+
+    /// <summary>Runs the begin block once and replays the process body per collected batch, in one scope.</summary>
+    protected override void EndProcessing()
+    {
+        if (Interrupted)
+            return;
+
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+            _batches.ToArray(), SqlCredential, Database, ExcludeDatabase, User, DestinationVersion,
+            Path, FilePath, Encoding, NoClobber.ToBool(), Append.ToBool(), Passthru.ToBool(), Template.ToBool(),
+            EnableException.ToBool(), ScriptingOptionsObject, ExcludeGoBatchSeparator.ToBool(),
+            TestBound(nameof(Path)), TestBound(nameof(FilePath)), TestBound(nameof(ScriptingOptionsObject)),
+            BoundValue("Path"), BoundValue("FilePath"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
+                continue;
             }
-            else if (item is not null && LanguagePrimitives.IsTrue(
-                item.Properties["__ExportDbaUserBeginComplete"]?.Value))
-            {
-                completed = true;
-            }
-            else if (item is not null)
-            {
-                WriteObject(item);
-            }
+            WriteObject(item);
         }
-
-        // The sentinel is the last statement of the begin body, so it is absent exactly when that body
-        // threw (the export directory could not be validated); ProcessRecord then does no work.
-        _beginInterrupted = !completed;
-    }
-
-    /// <summary>Exports users for one pipeline record.</summary>
-    protected override void ProcessRecord()
-    {
-        if (_beginInterrupted || Interrupted)
-            return;
-
-        NestedCommand.InvokeScopedStreaming(this, item =>
-        {
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-            }
-            else if (item is not null && LanguagePrimitives.IsTrue(
-                item.Properties["__ExportDbaUserProcessComplete"]?.Value))
-            {
-                _instanceArray = NormalizeCarry(item.Properties["InstanceArray"]?.Value);
-            }
-            else if (item is not null)
-            {
-                WriteObject(item);
-            }
-        }, ProcessScript,
-            SqlInstance, InputObject, SqlCredential, Database, ExcludeDatabase, User, DestinationVersion,
-            FilePath, Encoding, NoClobber.ToBool(), Append.ToBool(), Passthru.ToBool(), Template.ToBool(),
-            EnableException.ToBool(), ScriptingOptionsObject, ExcludeGoBatchSeparator.ToBool(),
-            MyInvocation.BoundParameters.ContainsKey("FilePath"),
-            MyInvocation.BoundParameters.ContainsKey("ScriptingOptionsObject"),
-            BoundValue("Path"), BoundValue("FilePath"), _instanceArray,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
-    }
-
-    private static object?[] NormalizeCarry(object? value)
-    {
-        if (value is null)
-            return System.Array.Empty<object?>();
-        if (value is PSObject pso)
-            value = pso.BaseObject;
-        if (value is object?[] array)
-            return array;
-        if (value is System.Collections.IEnumerable enumerable and not string)
-        {
-            var list = new System.Collections.Generic.List<object?>();
-            foreach (object? element in enumerable)
-                list.Add(element is PSObject p ? p.BaseObject : element);
-            return list.ToArray();
-        }
-        return new[] { value };
     }
 
     private object? BoundValue(string name)
@@ -233,44 +189,28 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin block's export-directory validation VERBATIM (its -Path default resolved in module
-    // scope), then a sentinel.
-    private const string BeginScript = """
-param($Path, $EnableException, $__pathBound, $__boundVerbose, $__boundDebug)
-$__commonParameters = @{}
-if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
-if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
-$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
-& $__dbatoolsModule {
-    [CmdletBinding()]
-    param([string]$Path, $EnableException, $__pathBound, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-
-    if (-not $__pathBound) { $Path = Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport' }
-    $null = Test-ExportDirectory -Path $Path
-    [PSCustomObject]@{ __ExportDbaUserBeginComplete = $true }
-} $Path $EnableException $__pathBound $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
-
-""";
-
-    // PS: the begin block's version maps and accumulators (rebuilt per record) then the process body,
-    // VERBATIM except the 8 reverse-diff-verified edits ($instanceArray carry-in; -FunctionName on the 3
-    // direct Stop-Function/Write-Message calls; Test-Bound FilePath/ScriptingOptionsObject -> carried
-    // flags; Get-ExportFilePath $PSBoundParameters.Path/.FilePath -> carried bound values), then a sentinel
-    // carrying the updated $instanceArray out.
+    // PS: the begin block VERBATIM (its -Path default resolved in module scope), then a per-batch replay of
+    // the process body VERBATIM except the 7 reverse-diff-verified edits (-FunctionName on the 3 direct
+    // Stop-Function/Write-Message calls; Test-Bound FilePath/ScriptingOptionsObject -> carried flags;
+    // Get-ExportFilePath $PSBoundParameters.Path/.FilePath -> carried bound values). The process body is
+    // dot-sourced so an early Test-FunctionInterrupt return skips only the current batch. $SqlInstance and
+    // $InputObject are set from each batch; all other cross-record state persists across batches in this
+    // one shared scope.
     private const string ProcessScript = """
-param($SqlInstance, $InputObject, $SqlCredential, $Database, $ExcludeDatabase, $User, $DestinationVersion, $FilePath, $Encoding, $NoClobber, $Append, $Passthru, $Template, $EnableException, $ScriptingOptionsObject, $ExcludeGoBatchSeparator, $__filePathBound, $__scriptingBound, $__boundPathValue, $__boundFilePathValue, $__instanceArrayCarry, $__boundVerbose, $__boundDebug)
+param($__batches, $SqlCredential, $Database, $ExcludeDatabase, $User, $DestinationVersion, $Path, $FilePath, $Encoding, $NoClobber, $Append, $Passthru, $Template, $EnableException, $ScriptingOptionsObject, $ExcludeGoBatchSeparator, $__pathBound, $__filePathBound, $__scriptingBound, $__boundPathValue, $__boundFilePathValue, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Database, [string[]]$ExcludeDatabase, [string[]]$User, [string]$DestinationVersion, [string]$FilePath, [string]$Encoding, $NoClobber, $Append, $Passthru, $Template, $EnableException, [Microsoft.SqlServer.Management.Smo.ScriptingOptions]$ScriptingOptionsObject, $ExcludeGoBatchSeparator, $__filePathBound, $__scriptingBound, $__boundPathValue, $__boundFilePathValue, $__instanceArrayCarry, $__boundVerbose, $__boundDebug)
+    param($__batches, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Database, [string[]]$ExcludeDatabase, [string[]]$User, [string]$DestinationVersion, [string]$Path, [string]$FilePath, [string]$Encoding, $NoClobber, $Append, $Passthru, $Template, $EnableException, [Microsoft.SqlServer.Management.Smo.ScriptingOptions]$ScriptingOptionsObject, $ExcludeGoBatchSeparator, $__pathBound, $__filePathBound, $__scriptingBound, $__boundPathValue, $__boundFilePathValue, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        $outsql = $script:pathcollection = @()
-        $instanceArray = @() + $__instanceArrayCarry
+        if (-not $__pathBound) { $Path = Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport' }
+        $null = Test-ExportDirectory -Path $Path
+
+        $outsql = $script:pathcollection = $instanceArray = @()
         $GenerateFilePerUser = $false
 
         $versions = @{
@@ -313,6 +253,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         $eol = [System.Environment]::NewLine
+        foreach ($__batch in $__batches) {
+            $SqlInstance = $__batch[0]
+            $InputObject = $__batch[1]
+            . {
         if (Test-FunctionInterrupt) { return }
 
         foreach ($instance in $SqlInstance) {
@@ -728,8 +672,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if (-Not $GenerateFilePerUser -and $FilePath) {
             Get-ChildItem -Path $FilePath
         }
-        [PSCustomObject]@{ __ExportDbaUserProcessComplete = $true; InstanceArray = $instanceArray }
-} $SqlInstance $InputObject $SqlCredential $Database $ExcludeDatabase $User $DestinationVersion $FilePath $Encoding $NoClobber $Append $Passthru $Template $EnableException $ScriptingOptionsObject $ExcludeGoBatchSeparator $__filePathBound $__scriptingBound $__boundPathValue $__boundFilePathValue $__instanceArrayCarry $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+            }
+        }
+} $__batches $SqlCredential $Database $ExcludeDatabase $User $DestinationVersion $Path $FilePath $Encoding $NoClobber $Append $Passthru $Template $EnableException $ScriptingOptionsObject $ExcludeGoBatchSeparator $__pathBound $__filePathBound $__scriptingBound $__boundPathValue $__boundFilePathValue $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
 }
