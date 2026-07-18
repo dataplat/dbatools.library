@@ -46,11 +46,30 @@ public sealed class CompareDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // The function's process-scope $Type persists across pipeline records: an "All"
+    // expansion at record 1 REBINDS the local so later records keep the expanded
+    // array even if the caller mutates the originally bound array mid-pipeline,
+    // while a never-expanded $Type stays the live caller reference. The carrier
+    // reproduces that scoping: seeded from the bound parameter once, re-checked and
+    // rebound per record exactly like the source's pre-loop expansion (codex r1).
+    private string[]? _typeCarrier;
+    private bool _typeCarrierSeeded;
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
         {
             return;
+        }
+
+        if (!_typeCarrierSeeded)
+        {
+            _typeCarrier = Type;
+            _typeCarrierSeeded = true;
+        }
+        if (_typeCarrier is not null && System.Array.IndexOf(_typeCarrier, "All") >= 0)
+        {
+            _typeCarrier = new[] { "AgentJob", "Login", "Credential", "Operator" };
         }
 
         if (SqlInstance is null)
@@ -62,7 +81,7 @@ public sealed class CompareDbaAvailabilityGroupCommand : DbaBaseCmdlet
         {
             foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
                 new DbaInstanceParameter[] { instance }, SqlCredential, AvailabilityGroup,
-                Type, ExcludeSystemJob.ToBool(), ExcludeSystemLogin.ToBool(),
+                _typeCarrier, ExcludeSystemJob.ToBool(), ExcludeSystemLogin.ToBool(),
                 IncludeModifiedDate.ToBool(), EnableException.ToBool(),
                 BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
             {
