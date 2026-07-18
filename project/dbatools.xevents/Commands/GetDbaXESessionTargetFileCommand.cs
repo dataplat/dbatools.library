@@ -16,8 +16,8 @@ namespace Dataplat.Dbatools.Commands;
 /// Get-ChildItem enumeration all run the original dbatools PowerShell body VERBATIM inside the dbatools
 /// module scope rather than being reimplemented in C#, so the engine decides the observable details.
 ///
-/// Two parameter sets: -SqlInstance (set "instance") or piped -InputObject (set "piped"), default "Default".
-/// $InputObject is carried across records: in the "instance" set it is UNBOUND and the body's
+/// Three parameter sets: -SqlInstance (set "instance"), piped -InputObject (set "piped"), or the default
+/// "Default". $InputObject is carried across records: in the "instance" set it is UNBOUND and the body's
 /// "$InputObject += Get-DbaXESessionTarget ..." accumulates across piped SqlInstance records (function
 /// scope), so the C# seeds each record's $InputObject from the fresh VFP binding when present (piped set)
 /// else from the carried accumulation (instance set), and captures the re-emitted value.
