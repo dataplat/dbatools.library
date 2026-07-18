@@ -65,9 +65,13 @@ public sealed class SetDbaAgentJobOwnerCommand : DbaBaseCmdlet
     // inherited [Parameter] (no ParameterSetName) already matches; no override needed.
 
     // $status/$notes carried across records: the catch path leaves them unset, and the source's shared
-    // process scope keeps the previous value; a per-record hop scope would reset them.
+    // process scope keeps the previous value; a per-record hop scope would reset them. $instance is the
+    // first loop's variable, read as the ShouldProcess target in the second loop; an InputObject-only
+    // record (SqlInstance empty) never re-enters the first loop, so in the shared scope it keeps the prior
+    // record's $instance - carried the same way.
     private string? _status;
     private string? _notes;
+    private object? _instance;
 
     protected override void ProcessRecord()
     {
@@ -84,6 +88,7 @@ public sealed class SetDbaAgentJobOwnerCommand : DbaBaseCmdlet
                 {
                     _status = state["Status"] as string;
                     _notes = state["Notes"] as string;
+                    _instance = state["Instance"];
                 }
                 return;
             }
@@ -96,7 +101,7 @@ public sealed class SetDbaAgentJobOwnerCommand : DbaBaseCmdlet
             WriteObject(item);
         }, BodyScript,
             SqlInstance, SqlCredential, Job, ExcludeJob, InputObject, Login, EnableException.ToBool(),
-            _status, _notes, this,
+            _status, _notes, _instance, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -139,7 +144,7 @@ public sealed class SetDbaAgentJobOwnerCommand : DbaBaseCmdlet
     // are seeded from the carried values at the top and re-emitted in a sentinel at the end so the source's
     // cross-record leak of those locals is reproduced.
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Job, $ExcludeJob, $InputObject, $Login, $EnableException, $__carriedStatus, $__carriedNotes, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Job, $ExcludeJob, $InputObject, $Login, $EnableException, $__carriedStatus, $__carriedNotes, $__carriedInstance, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -148,10 +153,11 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [object[]]$Job, [object[]]$ExcludeJob, [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject, [string]$Login, $EnableException, $__carriedStatus, $__carriedNotes, $__realCmdlet)
-    # Seed the carried cross-record state of $status/$notes (source keeps them in the shared process scope).
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [object[]]$Job, [object[]]$ExcludeJob, [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject, [string]$Login, $EnableException, $__carriedStatus, $__carriedNotes, $__carriedInstance, $__realCmdlet)
+    # Seed the carried cross-record state of $status/$notes/$instance (source keeps them in the shared process scope).
     $status = $__carriedStatus
     $notes = $__carriedNotes
+    $instance = $__carriedInstance
     foreach ($instance in $SqlInstance) {
         try {
             $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
@@ -224,7 +230,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         Select-DefaultView -InputObject $agentJob -Property ComputerName, InstanceName, SqlInstance, Name, Category, OwnerLoginName, Status, Notes
     }
 
-    @{ __setDbaAgentJobOwnerState = @{ Status = $status; Notes = $notes } }
-} $SqlInstance $SqlCredential $Job $ExcludeJob $InputObject $Login $EnableException $__carriedStatus $__carriedNotes $__realCmdlet @__commonParameters 3>&1 2>&1
+    @{ __setDbaAgentJobOwnerState = @{ Status = $status; Notes = $notes; Instance = $instance } }
+} $SqlInstance $SqlCredential $Job $ExcludeJob $InputObject $Login $EnableException $__carriedStatus $__carriedNotes $__carriedInstance $__realCmdlet @__commonParameters 3>&1 2>&1
 """;
 }
