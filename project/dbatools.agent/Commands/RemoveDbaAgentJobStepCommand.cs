@@ -1,0 +1,212 @@
+#nullable enable
+
+using System;
+using System.Collections;
+using System.Management.Automation;
+using Dataplat.Dbatools.Parameter;
+
+namespace Dataplat.Dbatools.Commands;
+
+/// <summary>
+/// Removes specified job steps from SQL Server Agent jobs.
+/// </summary>
+/// <remarks>
+/// The instance connection, the job/step validation, the confirmation gate, and the Drop all run the
+/// original dbatools PowerShell body inside the dbatools module scope rather than being reimplemented
+/// in C#, so the engine decides the observable details. The process hop is whole-array: the
+/// confirmation gate sits inside the instance/job loops, routed to this cmdlet's real ShouldProcess
+/// runtime (ConfirmImpact High), and the two loops must share one invocation so a labeled continue
+/// unwinds both of them exactly as it does in the script (see below). The hop is buffered - the body
+/// emits no success output (the function returns nothing), so there is no output to lose to a later
+/// terminating failure.
+///
+/// Known behavioral note, preserved deliberately: both validation failures call
+/// Stop-Function -Continue -ContinueLabel main, but NO enclosing loop carries a :main label - the
+/// label is dangling in the original source and is kept verbatim here. In the script world an
+/// unmatched labeled continue unwinds past every enclosing loop and the function itself, silently
+/// terminating the whole invocation: with several instances PIPED in, a missing job or step on one
+/// record also kills every later record and skips the end block. In this compiled cmdlet each
+/// pipeline record runs its own hop invocation, which CONTAINS the unwind: within one record
+/// (array-valued -SqlInstance or -Job) the remaining items are skipped exactly like the source, but
+/// later piped records still process and the end block's closing verbose message still appears. That
+/// containment matches the evident intent of the source ("skip to the next item"); the
+/// whole-invocation abort is a source bug not replicated here, because the escape leaves no
+/// detectable signal in the wrapper (it returns normally, no error record, no exception) and adding
+/// the missing label would change the script world's behavior.
+///
+/// Surface pinned by migration/baselines/Remove-DbaAgentJobStep.json.
+/// </remarks>
+[Cmdlet(VerbsCommon.Remove, "DbaAgentJobStep", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
+public sealed class RemoveDbaAgentJobStepCommand : DbaBaseCmdlet
+{
+    /// <summary>The target SQL Server instance or instances.</summary>
+    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
+    [PsDbaInstanceArrayCast]
+    public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
+
+    /// <summary>Login to the target instance using alternative credentials.</summary>
+    [Parameter(Position = 1)]
+    public PSCredential? SqlCredential { get; set; }
+
+    /// <summary>The SQL Agent job(s) from which to remove the step.</summary>
+    [Parameter(Mandatory = true, Position = 2)]
+    [ValidateNotNullOrEmpty]
+    public object[] Job { get; set; } = null!;
+
+    /// <summary>The exact name of the job step to remove from the specified jobs.</summary>
+    [Parameter(Mandatory = true, Position = 3)]
+    [ValidateNotNullOrEmpty]
+    public string StepName { get; set; } = null!;
+
+    // EnableException is inherited from DbaBaseCmdlet - the source declares it bare, which the
+    // inherited [Parameter] already matches; no override needed.
+
+    protected override void ProcessRecord()
+    {
+        if (Interrupted)
+        {
+            return;
+        }
+
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+            SqlInstance, SqlCredential, Job, StepName, EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
+            }
+            if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }
+    }
+
+    protected override void EndProcessing()
+    {
+        if (Interrupted)
+        {
+            return;
+        }
+
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
+            EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
+            }
+            if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }
+    }
+
+    private object? BoundCommonParameter(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+        {
+            return LanguagePrimitives.IsTrue(value);
+        }
+        return null;
+    }
+
+    private void RemoveHopErrorBookkeeping(ErrorRecord record)
+    {
+        try
+        {
+            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+            {
+                return;
+            }
+            if (errorList[0] is not ErrorRecord first)
+            {
+                return;
+            }
+            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
+                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
+            {
+                errorList.RemoveAt(0);
+            }
+        }
+        catch
+        {
+            // Best-effort bookkeeping only.
+        }
+    }
+
+    // PS: the process block VERBATIM apart from $PSCmdlet.ShouldProcess -> $__realCmdlet.ShouldProcess
+    // and -FunctionName Remove-DbaAgentJobStep (+ -ModuleName "dbatools" on Write-Message, whose
+    // metadata otherwise resolves from the generated scriptblock frame) on the direct
+    // Stop-Function/Write-Message sites. The dangling -ContinueLabel main is preserved as-is (see the
+    // class remarks). EnableException is bound so Stop-Function's scope-walking default inherits it.
+    private const string ProcessScript = """
+param($SqlInstance, $SqlCredential, $Job, $StepName, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [object[]]$Job, [string]$StepName, $EnableException, $__realCmdlet)
+    foreach ($instance in $SqlInstance) {
+
+        try {
+            $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
+        } catch {
+            Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Remove-DbaAgentJobStep
+        }
+
+        foreach ($j in $Job) {
+            Write-Message -Level Verbose -Message "Processing job $j" -FunctionName Remove-DbaAgentJobStep -ModuleName "dbatools"
+            # Check if the job exists
+            if ($Server.JobServer.Jobs.Name -notcontains $j) {
+                Stop-Function -Message "Job $j doesnn't exist on $instance." -Continue -ContinueLabel main -Target $instance -Category InvalidData -FunctionName Remove-DbaAgentJobStep
+            } else {
+                # Check if the job step exists
+                if ($Server.JobServer.Jobs[$j].JobSteps.Name -notcontains $StepName) {
+                    Stop-Function -Message "Step $StepName doesn't exist for $job on $instance." -Continue -ContinueLabel main -Target $instance -Category InvalidData -FunctionName Remove-DbaAgentJobStep
+                } else {
+                    # Execute
+                    if ($__realCmdlet.ShouldProcess($instance, "Removing the job step $StepName for job $j")) {
+                        try {
+                            $JobStep = $Server.JobServer.Jobs[$j].JobSteps[$StepName]
+                            Write-Message -Level SomewhatVerbose -Message "Removing the job step $StepName for job $j." -FunctionName Remove-DbaAgentJobStep -ModuleName "dbatools"
+                            $JobStep.Drop()
+                        } catch {
+                            Stop-Function -Message "Something went wrong removing the job step" -Target $JobStep -Continue -ErrorRecord $_ -FunctionName Remove-DbaAgentJobStep
+                            Write-Message -Level Verbose -Message "Could not remove the job step $StepName from $j" -FunctionName Remove-DbaAgentJobStep -ModuleName "dbatools"
+                        }
+                    }
+                }
+            }
+        }
+    }
+} $SqlInstance $SqlCredential $Job $StepName $EnableException $__realCmdlet @__commonParameters 3>&1 2>&1
+""";
+
+    // PS: the end block VERBATIM apart from -FunctionName/-ModuleName on the Write-Message.
+    // EnableException is bound so the hop scope mirrors the source function scope.
+    private const string EndScript = """
+param($EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param($EnableException)
+    Write-Message -Message "Finished removing the jobs step(s)" -Level Verbose -FunctionName Remove-DbaAgentJobStep -ModuleName "dbatools"
+} $EnableException @__commonParameters 3>&1 2>&1
+""";
+}
