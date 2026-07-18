@@ -183,6 +183,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if (-not $__pathBound) { $Path = Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport' }
     if (-not $__batchSepBound) { $BatchSeparator = Get-DbatoolsConfigValue -FullName 'Formatting.BatchSeparator' }
 
+    # Named-wrapper shim (mandatory per-row checklist item: grep Get-PSCallStack in every helper the source
+    # calls). Get-ExportFilePath derives a FILENAME segment from (Get-PSCallStack)[1].Command - in the
+    # function world that frame is Export-DbaXESession, giving "...-xesession.sql". Called directly from the
+    # hop scriptblock the frame is "<ScriptBlock>", producing "...-<scriptblock>.sql", which contains
+    # characters Windows rejects, so the export throws (the failure the gate found on Export-DbaUser).
+    # Routing the call through a wrapper whose NAME is the real command restores the exact function-world
+    # segment; the wrapper is local to this hop invocation and shadows nothing beyond it.
+    function Export-DbaXESession {
+        param($Path, $FilePath, $Type, $ServerName)
+        Get-ExportFilePath -Path $Path -FilePath $FilePath -Type $Type -ServerName $ServerName
+    }
+
     $null = Test-ExportDirectory -Path $Path
     $instanceArray = @()
     $SessionCollection = New-Object System.Collections.ArrayList
@@ -252,7 +264,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($null -ne $prefix) {
                     $sql = "$prefix$eol$sql"
                 }
-                $scriptPath = Get-ExportFilePath -Path $__boundPathValue -FilePath $__boundFilePathValue -Type sql -ServerName $SessionObject.Instance
+                $scriptPath = Export-DbaXESession -Path $__boundPathValue -FilePath $__boundFilePathValue -Type sql -ServerName $SessionObject.Instance
                 if ((Test-Path -Path $scriptPath) -and $NoClobber) {
                     Stop-Function -Message "File already exists. If you want to overwrite it remove the -NoClobber parameter. If you want to append data, please Use -Append parameter." -Target $scriptPath -Continue -FunctionName Export-DbaXESession
                 }
