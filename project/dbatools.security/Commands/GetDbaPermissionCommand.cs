@@ -63,6 +63,42 @@ public sealed class GetDbaPermissionCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    /// <summary>The T-SQL templates the begin block builds, captured ONCE before any record.</summary>
+    private string? _servPermSql;
+    private string? _dbPermSql;
+
+    /// <summary>
+    /// Builds the begin block''s T-SQL templates once, in module scope, before any pipeline record.
+    /// </summary>
+    /// <remarks>
+    /// When -ExcludeSystemObjects is absent the script leaves $ExcludeSystemObjectssql UNASSIGNED, so the
+    /// interpolation that builds the server template scope-walks to whatever the caller has in scope. The
+    /// script resolves that ONCE in its begin block; rebuilding the templates per record would instead
+    /// re-resolve it per record and pick up any mutation the caller made between records.
+    /// </remarks>
+    protected override void BeginProcessing()
+    {
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
+            ExcludeSystemObjects.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+            }
+            else if (item is not null && LanguagePrimitives.IsTrue(
+                item.Properties["__GetDbaPermissionBeginComplete"]?.Value))
+            {
+                _servPermSql = item.Properties["ServPermsql"]?.Value as string;
+                _dbPermSql = item.Properties["DBPermsql"]?.Value as string;
+            }
+            else if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }
+    }
+
     /// <summary>Returns the permissions for the instances bound to the current record.</summary>
     protected override void ProcessRecord()
     {
@@ -82,7 +118,7 @@ public sealed class GetDbaPermissionCommand : DbaBaseCmdlet
             }
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, ExcludeDatabase, IncludeServerLevel.ToBool(),
-            ExcludeSystemObjects.ToBool(), EnableException.ToBool(),
+            _servPermSql, _dbPermSql, EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
@@ -113,18 +149,17 @@ public sealed class GetDbaPermissionCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin block's T-SQL templates, then the process body VERBATIM. Substitutions only:
-    // -FunctionName on the two DIRECT Stop-Function calls; -FunctionName + -ModuleName "dbatools" on the
-    // five DIRECT Write-Message calls. Switches and EnableException are received untyped.
-    private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $IncludeServerLevel, $ExcludeSystemObjects, $EnableException, $__boundVerbose, $__boundDebug)
+    // PS: the begin block VERBATIM, run once in module scope; it hands the two templates the process
+    // body consumes back through a sentinel.
+    private const string BeginScript = """
+param($ExcludeSystemObjects, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, $IncludeServerLevel, $ExcludeSystemObjects, $EnableException, $__boundVerbose, $__boundDebug)
+    param($ExcludeSystemObjects, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
         if ($ExcludeSystemObjects) {
@@ -329,6 +364,24 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 AND name NOT IN ('dbo', 'guest', 'INFORMATION_SCHEMA', 'sys')
                 ;"
 
+    [pscustomobject]@{ __GetDbaPermissionBeginComplete = $true; ServPermsql = $ServPermsql; DBPermsql = $DBPermsql }
+} $ExcludeSystemObjects $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+""";
+
+    // PS: the process body VERBATIM, with the templates supplied by the begin hop. Substitutions only:
+    // -FunctionName on the two DIRECT Stop-Function calls; -FunctionName + -ModuleName "dbatools" on the
+    // five DIRECT Write-Message calls. Switches and EnableException are received untyped.
+    private const string ProcessScript = """
+param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $IncludeServerLevel, $ServPermsql, $DBPermsql, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, $IncludeServerLevel, [string]$ServPermsql, [string]$DBPermsql, $EnableException, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
         foreach ($instance in $SqlInstance) {
             try {
                 $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential -MinimumVersion 9
@@ -377,7 +430,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-} $SqlInstance $SqlCredential $Database $ExcludeDatabase $IncludeServerLevel $ExcludeSystemObjects $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $ExcludeDatabase $IncludeServerLevel $ServPermsql $DBPermsql $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
 }
