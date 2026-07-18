@@ -115,8 +115,15 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
         //
         // This runs in BeginProcessing, which like binding happens before ANY record, so an overflow still
         // throws on an empty pipeline and a slow pipeline still cannot drift the two dates apart.
-        foreach (PSObject item in NestedCommand.InvokeScoped(this, DefaultDateScript,
-            startBound ? StartDate : null, expirationBound ? ExpirationDate : null, startBound, expirationBound))
+        // Only the BOUND dates go in: an unbound one must be absent so the resolver's own default
+        // expression fires for it, exactly as an unsupplied parameter does in the script.
+        Hashtable splatDates = new Hashtable();
+        if (startBound)
+            splatDates["StartDate"] = StartDate;
+        if (expirationBound)
+            splatDates["ExpirationDate"] = ExpirationDate;
+
+        foreach (PSObject item in NestedCommand.InvokeScoped(this, DefaultDateScript, splatDates))
         {
             if (item?.BaseObject is not PSCustomObject)
                 continue;
@@ -124,6 +131,8 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
             // Convert rather than type-test: Get-Date emits a PSObject-WRAPPED DateTime (it carries a
             // DisplayHint note property), so an "is DateTime" test silently misses and leaves the date at
             // DateTime.MinValue - which SQL Server rejects with "An invalid date or time was specified".
+            // The script's [datetime] binder already rejected anything unconvertible before this point, so
+            // these conversions cannot fail; they only strip the PSObject wrapper.
             if (LanguagePrimitives.TryConvertTo(item.Properties["StartDate"]?.Value, out DateTime resolvedStart))
                 _resolvedStartDate = resolvedStart;
             if (LanguagePrimitives.TryConvertTo(item.Properties["ExpirationDate"]?.Value, out DateTime resolvedExpiration))
@@ -131,15 +140,28 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
         }
     }
 
+    // The dates are resolved by a FUNCTION whose param block MIRRORS the source's own: same [datetime]
+    // types, same default expressions, same order. That hands the whole job to the PowerShell PARAMETER
+    // BINDER, which is what the script uses - so the defaults resolve through normal command resolution
+    // AND a value the binder cannot convert fails the way the script fails it.
+    //
+    // It must be a FUNCTION, not the scriptblock this hop otherwise uses. Measured: invoking a scriptblock
+    // through & $module { param(...) } binds its defaults LENIENTLY - a Get-Date shadowed to return two
+    // dates leaves $StartDate null and the next default then dies on InvokeMethodOnNull. The identical
+    // param block on a function binds strictly and raises ParameterBindingArgumentTransformationException,
+    // which is exactly what the script raises. Bound values are splatted in so unbound ones fall through
+    // to their defaults, mirroring how the script's own binding behaves.
     private const string DefaultDateScript = """
-param($BoundStartDate, $BoundExpirationDate, $StartDateBound, $ExpirationDateBound)
+param($__splatDates)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($BoundStartDate, $BoundExpirationDate, $StartDateBound, $ExpirationDateBound)
-    $StartDate = if ($StartDateBound) { $BoundStartDate } else { (Get-Date) }
-    $ExpirationDate = if ($ExpirationDateBound) { $BoundExpirationDate } else { $StartDate.AddYears(5) }
-    [pscustomobject]@{ StartDate = $StartDate; ExpirationDate = $ExpirationDate }
-} $BoundStartDate $BoundExpirationDate $StartDateBound $ExpirationDateBound
+    param($__splatDates)
+    function __Resolve-DbaDbCertificateDate {
+        param([datetime]$StartDate = (Get-Date), [datetime]$ExpirationDate = $StartDate.AddYears(5))
+        [pscustomobject]@{ StartDate = $StartDate; ExpirationDate = $ExpirationDate }
+    }
+    __Resolve-DbaDbCertificateDate @__splatDates
+} $__splatDates
 """;
 
     /// <summary>Creates the certificates for the databases bound to the current record.</summary>
