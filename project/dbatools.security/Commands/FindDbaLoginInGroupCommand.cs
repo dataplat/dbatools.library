@@ -18,24 +18,24 @@ namespace Dataplat.Dbatools.Commands;
 /// stay observable-identical to the script implementation.
 /// </para>
 /// <para>
-/// The script's begin block does two deterministic things - it loads the AccountManagement assembly and
-/// defines the recursive Get-AllLogins helper - and its process block emits per instance. The begin work
-/// is folded into the per-record hop rather than a separate BeginProcessing hop: Add-Type is idempotent
-/// (loading an already-loaded assembly is a no-op) and the helper definition is deterministic, so
-/// per-record == run-once, and the helper MUST be defined in the same scope that calls it (Get-AllLogins
-/// reads $server from the process scope by dynamic scoping). The only non-parity edge - the begin's
-/// "Failed to load Assembly needed" stop would warn once per record instead of once - is unreachable in
-/// practice because that assembly is always present on a Windows host running SQL Server tooling.
+/// The script's begin block loads the AccountManagement assembly (and, on failure, stops the command)
+/// and defines the recursive Get-AllLogins helper; the process block emits per instance. The port keeps
+/// the assembly load in a BeginProcessing hop so it runs EXACTLY ONCE, including for a zero-record
+/// pipeline, matching the script's begin semantics; that hop emits a sentinel as its last statement, so
+/// its absence tells the cmdlet the begin stopped (assembly-load failure) and ProcessRecord then does no
+/// work. The Get-AllLogins helper definition stays folded into the ProcessRecord hop because the helper
+/// reads $server (assigned in the process body) by dynamic scoping and so must be defined in the scope
+/// that calls it; defining it per record is deterministic and silent, so it is observably identical.
 /// </para>
 /// <para>
-/// Output is streamed through InvokeScopedStreaming: SqlInstance binds an array within a record and the
-/// body emits one result per instance, so a later instance's terminating -EnableException failure (the
-/// connection Stop-Function) or a downstream early stop must not discard or overrun the earlier instances'
-/// output - streaming reaches the pipeline as produced and honors the stop. EnableException is carried as
-/// a plain (untyped) value, because a switch in the inner CmdletBinding scriptblock is excluded from
-/// positional binding. Only the three DIRECT begin/process Stop-Function/Write-Message calls take
-/// -FunctionName; the nested Get-AllLogins calls already attribute to "Get-AllLogins" in both worlds
-/// (the helper name is preserved verbatim) and are left unedited.
+/// ProcessRecord output is streamed through InvokeScopedStreaming: SqlInstance binds an array within a
+/// record and the body emits one result per instance, so a later instance's terminating -EnableException
+/// failure (the connection Stop-Function) or a downstream early stop must not discard or overrun the
+/// earlier instances' output. EnableException is carried as a plain (untyped) value, because a switch in
+/// the inner CmdletBinding scriptblock is excluded from positional binding. Only the three DIRECT
+/// begin/process Stop-Function/Write-Message calls take -FunctionName; the nested Get-AllLogins calls
+/// already attribute to "Get-AllLogins" in both worlds (the helper name is preserved verbatim) and are
+/// left unedited.
 /// </para>
 /// </remarks>
 [Cmdlet(VerbsCommon.Find, "DbaLoginInGroup")]
@@ -55,10 +55,41 @@ public sealed class FindDbaLoginInGroupCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    /// <summary>Set when the begin block stopped the command (the assembly failed to load).</summary>
+    private bool _beginInterrupted;
+
+    /// <summary>Loads the AccountManagement assembly once, before any records are processed.</summary>
+    protected override void BeginProcessing()
+    {
+        bool completed = false;
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+            }
+            else if (item is not null && LanguagePrimitives.IsTrue(
+                item.Properties["__FindDbaLoginInGroupBeginComplete"]?.Value))
+            {
+                completed = true;
+            }
+            else if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }
+
+        // The sentinel is the last statement of the begin body, so it is absent exactly when that body
+        // returned early - which it does only after the assembly-load Stop-Function.
+        _beginInterrupted = !completed;
+    }
+
     /// <summary>Expands group logins for one pipeline record.</summary>
     protected override void ProcessRecord()
     {
-        if (Interrupted)
+        if (_beginInterrupted || Interrupted)
             return;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
@@ -104,11 +135,32 @@ public sealed class FindDbaLoginInGroupCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin body (Add-Type + the Get-AllLogins helper) and the process body VERBATIM, folded into
-    // one per-record hop. Substitutions only: -FunctionName on the 3 DIRECT Stop-Function/Write-Message
-    // calls (the begin assembly-load stop and the process connection stop + group message). The nested
-    // Get-AllLogins calls are unedited - they attribute to the helper in both worlds. No ShouldProcess,
-    // Test-Bound, config defaults, or bound carries.
+    // PS: the begin body's assembly load VERBATIM (its Stop-Function takes -FunctionName), then a sentinel.
+    private const string BeginScript = """
+param($EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param($EnableException, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+        try {
+            Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+        } catch {
+            Stop-Function -Message "Failed to load Assembly needed" -ErrorRecord $_ -FunctionName Find-DbaLoginInGroup
+            return
+        }
+    [PSCustomObject]@{ __FindDbaLoginInGroupBeginComplete = $true }
+} $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+""";
+
+    // PS: the Get-AllLogins helper (folded here for dynamic $server) then the process body VERBATIM.
+    // Substitutions only: -FunctionName on the 2 DIRECT process Stop-Function/Write-Message calls; the
+    // nested Get-AllLogins calls attribute to "Get-AllLogins" in both worlds and are unedited.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Login, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -119,13 +171,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Login, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-
-        try {
-            Add-Type -AssemblyName System.DirectoryServices.AccountManagement
-        } catch {
-            Stop-Function -Message "Failed to load Assembly needed" -ErrorRecord $_ -FunctionName Find-DbaLoginInGroup
-            return
-        }
 
         function Get-AllLogins {
             param
