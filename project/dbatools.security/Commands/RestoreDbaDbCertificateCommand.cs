@@ -30,9 +30,10 @@ namespace Dataplat.Dbatools.Commands;
 /// </para>
 /// <para>
 /// DecryptionPassword has an INTERACTIVE computed default - (Read-Host -AsSecureString) evaluated only when
-/// the parameter is unbound - so it threads as null-when-unbound and the hop scaffold evaluates the same
-/// Read-Host expression at invocation time, preserving the script's parameter-default semantics (the
-/// accepted interactive-prompt deviation class). Both SecureStrings ride live; the source's own
+/// the parameter is unbound - so BeginProcessing resolves it ONCE per invocation through a Read-Host
+/// mini-hop, exactly like a script parameter default: a multi-record pipeline prompts once, and an
+/// explicitly bound value (including null) suppresses the prompt (the accepted interactive-prompt
+/// deviation class). Both SecureStrings ride live; the source's own
 /// ConvertFrom-SecurePass flattens them only inside the ShouldProcess gate, so -WhatIf never materializes a
 /// password. The $PSBoundParameters.Name truthiness read carries as the raw bound value. The single
 /// $Pscmdlet.ShouldProcess gate routes to $__realCmdlet (ConfirmImpact High).
@@ -80,6 +81,28 @@ public sealed class RestoreDbaDbCertificateCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    /// <summary>DecryptionPassword resolved once per invocation, exactly like the script's parameter default.</summary>
+    private System.Security.SecureString? _resolvedDecryptionPassword;
+
+    /// <summary>Resolves the DecryptionPassword default before any pipeline record arrives.</summary>
+    protected override void BeginProcessing()
+    {
+        // The script's (Read-Host -AsSecureString) parameter default evaluates ONCE per invocation and
+        // ONLY when the parameter is unbound - an explicitly bound value, including null, suppresses it.
+        // Resolving here keeps a multi-record pipeline from prompting once per record.
+        if (TestBound(nameof(DecryptionPassword)))
+        {
+            _resolvedDecryptionPassword = DecryptionPassword;
+        }
+        else
+        {
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, DecryptionPasswordPromptScript))
+            {
+                _resolvedDecryptionPassword = item?.BaseObject as System.Security.SecureString;
+            }
+        }
+    }
+
     /// <summary>Imports the certificates for the current pipeline record.</summary>
     protected override void ProcessRecord()
     {
@@ -99,7 +122,7 @@ public sealed class RestoreDbaDbCertificateCommand : DbaBaseCmdlet
             }
         }, ProcessScript,
             SqlInstance, SqlCredential, Path, KeyFilePath, EncryptionPassword, Database, Name,
-            TestBound(nameof(DecryptionPassword)) ? DecryptionPassword : null,
+            _resolvedDecryptionPassword,
             TestBound(nameof(Name)) ? Name : null,
             EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
@@ -133,11 +156,17 @@ public sealed class RestoreDbaDbCertificateCommand : DbaBaseCmdlet
         }
     }
 
+    // The source's DecryptionPassword parameter default, run in BeginProcessing when the parameter is
+    // unbound so the prompt fires once per invocation like a script parameter default.
+    private const string DecryptionPasswordPromptScript = """
+Read-Host "Decryption password" -AsSecureString
+""";
+
     // PS: the process body VERBATIM, dot-sourced for the early return. Substitutions only: $Pscmdlet ->
     // $__realCmdlet (the ShouldProcess gate); $PSBoundParameters.Name -> the carried raw bound value;
     // -FunctionName on the 4 DIRECT Stop-Function calls; -FunctionName + -ModuleName "dbatools" on the 5
-    // DIRECT Write-Message calls. DecryptionPassword arrives null when unbound and the scaffold evaluates
-    // the source's Read-Host parameter default.
+    // DIRECT Write-Message calls. DecryptionPassword always arrives resolved (bound value, or the
+    // once-per-invocation Read-Host default from BeginProcessing).
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Path, $KeyFilePath, $EncryptionPassword, $Database, $Name, $DecryptionPassword, $__rawBoundName, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -151,7 +180,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Path, [string[]]$KeyFilePath, [System.Security.SecureString]$EncryptionPassword, [string]$Database, [string]$Name, $DecryptionPassword, $__rawBoundName, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        if ($null -eq $DecryptionPassword) { [Security.SecureString]$DecryptionPassword = (Read-Host "Decryption password" -AsSecureString) }
         . {
         try {
             $server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential
