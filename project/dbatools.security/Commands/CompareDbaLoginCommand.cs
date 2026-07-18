@@ -75,10 +75,8 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
                 item.Properties["__CompareDbaLoginBeginComplete"]?.Value))
             {
                 completed = true;
-                object? server = item.Properties["SourceServer"]?.Value;
-                _sourceServer = server is PSObject serverWrapper ? serverWrapper.BaseObject : server;
-                object? logins = item.Properties["SourceLogins"]?.Value;
-                _sourceLogins = logins is PSObject loginsWrapper ? loginsWrapper.BaseObject : logins;
+                _sourceServer = UnwrapHopValue(item.Properties["SourceServer"]?.Value);
+                _sourceLogins = UnwrapHopValue(item.Properties["SourceLogins"]?.Value);
             }
             else if (item is not null)
             {
@@ -108,8 +106,39 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
                 WriteError(nestedError);
                 continue;
             }
-            WriteObject(item);
+            if (item is not null)
+                WriteObject(item);
         }
+    }
+
+    /// <summary>
+    /// Unwraps a value the begin hop carried out through its sentinel.
+    /// </summary>
+    /// <remarks>
+    /// Two shapes must survive this seam. A command that produced NO output leaves the script
+    /// variable holding AutomationNull, which behaves as $null in PowerShell; it has to come back as
+    /// null, or the process replay iterates over a phantom element and emits a nameless result row
+    /// the script never produces. And a [PSCustomObject] value keeps its note properties on the
+    /// PSObject WRAPPER - its BaseObject is only an empty marker - so such a value is returned
+    /// wrapped: unwrapping it would silently discard the payload and leave the same truthy,
+    /// property-less object. Anything else unwraps to its base value as before.
+    /// </remarks>
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        if (wrapper.BaseObject is PSCustomObject)
+        {
+            foreach (PSPropertyInfo property in wrapper.Properties)
+            {
+                if (property is not null)
+                    return wrapper;
+            }
+            return null;
+        }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
