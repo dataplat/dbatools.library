@@ -40,9 +40,9 @@ namespace Dataplat.Dbatools.Commands;
 /// common-parameter splat for the nested mutators to honor (the Stop-DbaDbEncryption sibling's shape). The two
 /// Mandatory SecureStrings ride live end to end - never converted, logged, or persisted - including across the
 /// runspace boundary in the -Parallel path, which is source behavior replicated as-is. The two [datetime]
-/// parameters carry [PsDateTimeCast] for invariant-culture bind parity and thread as null when unbound so the
-/// hop can evaluate the source's computed defaults ((Get-Date) / (Get-Date).AddYears(5)) at invocation time,
-/// exactly like the script's parameter defaults. The command emits per database and a later record can
+/// parameters carry [PsDateTimeCast] for invariant-culture bind parity; when unbound, their computed defaults
+/// ((Get-Date) / (Get-Date).AddYears(5)) are resolved in BeginProcessing - during binding, before pipeline
+/// enumeration - exactly like the script's parameter defaults, so a slow pipeline cannot drift the dates. The command emits per database and a later record can
 /// Stop-Function-terminate under -EnableException, so it streams through InvokeScopedStreaming. The only body
 /// edits are message attribution: -FunctionName on the 12 direct Stop-Function calls and -FunctionName plus
 /// -ModuleName "dbatools" on the 24 direct Write-Message calls - the runspace scriptblock's inner emissions
@@ -67,6 +67,7 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
 
     /// <summary>Whether the encryptor is a certificate or an asymmetric key.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("AsymmetricKey", "Certificate")]
     public string? EncryptorType { get; set; } = "Certificate";
 
@@ -80,6 +81,7 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
 
     /// <summary>Path where the master key and certificate backups are written.</summary>
     [Parameter(Mandatory = true, Position = 6)]
+    [PsStringCast]
     public string? BackupPath { get; set; }
 
     /// <summary>Password protecting the service master key.</summary>
@@ -135,9 +137,20 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
     /// <summary>The by-name InputObject value snapshotted at begin (the hop's initial $InputObject).</summary>
     private object? _byNameInputObject;
 
+    /// <summary>Certificate start date resolved at bind time, exactly like the script's parameter default.</summary>
+    private DateTime _resolvedStartDate;
+
+    /// <summary>Certificate expiration date resolved at bind time, exactly like the script's parameter default.</summary>
+    private DateTime _resolvedExpirationDate;
+
     /// <summary>Captures the by-name InputObject before any pipeline record arrives.</summary>
     protected override void BeginProcessing()
     {
+        // The script's (Get-Date) / (Get-Date).AddYears(5) parameter defaults evaluate during binding,
+        // BEFORE pipeline enumeration - resolving them here keeps the dates from drifting by the
+        // collection duration of a slow pipeline.
+        _resolvedStartDate = TestBound(nameof(CertificateStartDate)) ? CertificateStartDate : DateTime.Now;
+        _resolvedExpirationDate = TestBound(nameof(CertificateExpirationDate)) ? CertificateExpirationDate : DateTime.Now.AddYears(5);
         // InputObject is the command's ONLY pipeline-bound parameter, so binding is bimodal: bound by name
         // (one ProcessRecord, the by-name value seeds the hop and is never overridden) or bound per pipeline
         // record (EVERY record is a rebind - the engine reassigns the parameter before each process
@@ -177,8 +190,7 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
         }, ProcessScript,
             _batches.ToArray(), _byNameInputObject, SqlInstance, SqlCredential, EncryptorName, EncryptorType, Database, ExcludeDatabase,
             BackupPath, MasterKeySecurePassword, CertificateSubject,
-            TestBound(nameof(CertificateStartDate)) ? (object)CertificateStartDate : null,
-            TestBound(nameof(CertificateExpirationDate)) ? (object)CertificateExpirationDate : null,
+            _resolvedStartDate, _resolvedExpirationDate,
             CertificateActiveForServiceBrokerDialog.ToBool(), BackupSecurePassword, AllUserDatabases.ToBool(), Force.ToBool(), Parallel.ToBool(), EnableException.ToBool(),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
@@ -214,7 +226,7 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
     // PS: a per-batch dot-sourced replay of the process body, all in one scope. Substitutions only:
     // -FunctionName on the 12 DIRECT Stop-Function calls; -FunctionName + -ModuleName "dbatools" on the 24
     // DIRECT Write-Message calls. No ShouldProcess redirect (no direct gate in the body). The datetime
-    // parameters arrive null when unbound and the scaffold evaluates the source's computed defaults.
+    // parameters always arrive resolved (bound value, or the bind-time default from BeginProcessing).
     private const string ProcessScript = """
 param($__batches, $__byNameInputObject, $SqlInstance, $SqlCredential, $EncryptorName, $EncryptorType, $Database, $ExcludeDatabase, $BackupPath, $MasterKeySecurePassword, $CertificateSubject, $CertificateStartDate, $CertificateExpirationDate, $CertificateActiveForServiceBrokerDialog, $BackupSecurePassword, $AllUserDatabases, $Force, $Parallel, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -228,8 +240,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__batches, $__byNameInputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string]$EncryptorName, [string]$EncryptorType, [string[]]$Database, [string[]]$ExcludeDatabase, [string]$BackupPath, [System.Security.SecureString]$MasterKeySecurePassword, [string]$CertificateSubject, $CertificateStartDate, $CertificateExpirationDate, $CertificateActiveForServiceBrokerDialog, [System.Security.SecureString]$BackupSecurePassword, $AllUserDatabases, $Force, $Parallel, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        if ($null -eq $CertificateStartDate) { $CertificateStartDate = (Get-Date) }
-        if ($null -eq $CertificateExpirationDate) { $CertificateExpirationDate = (Get-Date).AddYears(5) }
         [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject = $__byNameInputObject
 
         foreach ($__batch in $__batches) {
