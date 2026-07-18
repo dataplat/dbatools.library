@@ -78,7 +78,10 @@ public sealed partial class InvokeDbaDbLogShippingCommand : DbaBaseCmdlet
 
     protected override void EndProcessing()
     {
-        if (Interrupted || _hopInterrupted)
+        // The source END block has NO Test-FunctionInterrupt guard - its verbose
+        // "Finished..." message emits even after a begin/process latch (codex r2), so
+        // only the native Interrupted flag gates here, never _hopInterrupted.
+        if (Interrupted)
         {
             return;
         }
