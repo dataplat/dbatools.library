@@ -52,7 +52,7 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class TestDbaDbDataGeneratorConfigCommand : DbaBaseCmdlet
 {
     /// <summary>Path to the JSON configuration file to validate.</summary>
-    [Parameter(Mandatory = true)]
+    [Parameter(Mandatory = true, Position = 0)]
     public string? FilePath { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
