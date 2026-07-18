@@ -116,8 +116,8 @@ public sealed class CompareDbaDbSchemaCommand : DbaBaseCmdlet
             {
                 if (sentinel["__compareDbaDbSchemaBegin"] is Hashtable state)
                 {
-                    _sqlPackagePath = state["SqlPackagePath"] as string;
-                    _resolvedOutputPath = state["OutputPath"] as string;
+                    _sqlPackagePath = CarriedString(state["SqlPackagePath"]);
+                    _resolvedOutputPath = CarriedString(state["OutputPath"]);
                     _interrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
                 continue;
@@ -159,6 +159,18 @@ public sealed class CompareDbaDbSchemaCommand : DbaBaseCmdlet
             }
             WriteObject(item);
         }
+    }
+
+    /// <summary>Reads a string carried back through the begin sentinel. A value emitted by a
+    /// PowerShell function inside the hop (Get-DbaSqlPackagePath, Get-DbatoolsConfigValue) transits
+    /// the pipeline and arrives PSObject-wrapped, so a direct "as string" on it yields null and
+    /// silently drops the carry. Null stays null: the sqlpackage-not-found asymmetry needs a
+    /// genuinely absent path to reach the process block unchanged.</summary>
+    private static string? CarriedString(object? value)
+    {
+        if (value is PSObject wrapped)
+            value = wrapped.BaseObject;
+        return value as string;
     }
 
     /// <summary>Carries a bound common parameter (or the TargetSqlInstance bound flag) into the hop
