@@ -26,13 +26,23 @@ namespace Dataplat.Dbatools.Commands;
 /// exactly once. Either way the body's "$InputObject += $server.Databases" cannot accumulate across
 /// records the way Invoke-DbaDbShrink's does.
 ///
-/// CROSS-RECORD STATE. The six per-step result variables DO carry. Each is assigned only inside its
-/// own ShouldProcess gate (or the matching no-change branch), so whenever a gate is DECLINED - which
-/// is every gate under -WhatIf - that variable is not assigned for the current database and keeps
-/// the value from the previous database or the previous RECORD, while all six are read
-/// unconditionally by the emitted object. They ride the state sentinel with per-name Assigned flags
-/// so unset-vs-assigned survives. (Found by re-running the full local enumeration after the same
-/// class produced a P1 on Move-DbaDbFile; a parameter-only check does not surface it.)
+/// CROSS-RECORD STATE. FIVE per-step result variables carry: CompatibilityResult,
+/// targetRecoveryTimeResult, DataPurityResult, UpdateUsageResult and UpdateStatsResult. Each is
+/// assigned ONLY INSIDE its own ShouldProcess gate (or the matching skip branch), so a DECLINED
+/// gate - every gate under -WhatIf - leaves it unassigned for the current database, holding the
+/// previous database's or previous RECORD's value, while all of them are read unconditionally by
+/// the emitted object. They ride the state sentinel with per-name Assigned flags so
+/// unset-vs-assigned survives.
+///
+/// RefreshViewResult deliberately does NOT carry, and the contrast is the point: it is assigned
+/// "Success" BEFORE its per-view gates and "Skipped" in the alternative branch, so one branch
+/// always assigns it and a declined gate can only prevent the "Fail" overwrite. Assigned-inside-
+/// the-gate is what makes a variable carry; assigned-before-the-gate does not.
+///
+/// $server does NOT carry either. It is assigned in a try whose catch is Stop-Function -Continue,
+/// and a continue inside a catch skips the rest of that loop iteration - measured, not assumed -
+/// so the "$InputObject += $server.Databases" line below it is unreachable after a connection
+/// failure and can never read a stale server. The second assignment ($db.Parent) is unconditional.
 ///
 /// TEST-BOUND NEVER RIDES A HOP - it scope-walks the caller, and inside the hop that caller is the
 /// generated scriptblock. The two guards use the multi-name "-not" form, so five boundness flags are
@@ -195,7 +205,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # gate (or no-change branch), so a declined gate leaves it holding the previous database's or
     # previous record's value - which the emitted object then reports.
     if ($null -ne $__state) {
-        foreach ($__name in "CompatibilityResult", "targetRecoveryTimeResult", "DataPurityResult", "UpdateUsageResult", "UpdateStatsResult", "RefreshViewResult") {
+        foreach ($__name in "CompatibilityResult", "targetRecoveryTimeResult", "DataPurityResult", "UpdateUsageResult", "UpdateStatsResult") {
             if ($__state[$__name + "Assigned"]) { Set-Variable -Name $__name -Value $__state[$__name] }
         }
     }
@@ -377,7 +387,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     $__snap = @{}
-    foreach ($__name in "CompatibilityResult", "targetRecoveryTimeResult", "DataPurityResult", "UpdateUsageResult", "UpdateStatsResult", "RefreshViewResult") {
+    foreach ($__name in "CompatibilityResult", "targetRecoveryTimeResult", "DataPurityResult", "UpdateUsageResult", "UpdateStatsResult") {
         $__v = Get-Variable -Name $__name -Scope 0 -ErrorAction Ignore
         if ($__v) { $__snap[$__name + "Assigned"] = $true; $__snap[$__name] = $__v.Value } else { $__snap[$__name + "Assigned"] = $false }
     }
