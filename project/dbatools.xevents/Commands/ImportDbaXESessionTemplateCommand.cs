@@ -194,7 +194,8 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    $xmlpath = Join-DbaPath $script:PSModuleRoot "bin" "xetemplates-metadata.xml"
+    $__moduleRoot = (Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1).ModuleBase
+    $xmlpath = Join-DbaPath $__moduleRoot "bin" "xetemplates-metadata.xml"
     $metadata = Import-Clixml $xmlpath
     @{ __importDbaXESessionTemplateBegin = @{ Metadata = $metadata } }
 } @__commonParameters 3>&1 2>&1
@@ -213,6 +214,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 & $__dbatoolsModule {
     [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Path, [string[]]$Template, [string]$StartUpState, $metadata, $EnableException, $__carriedName, $__carriedTargetFilePath, $__carriedTargetFileMetadataPath, $__carriedServer, $__carriedStore, $__carriedXml, $__carriedBasename, $__carriedTempfile, $__pathBound, $__templateBound, $__nameBound, $__targetFilePathBound, $__targetFileMetadataPathBound)
+    $__moduleRoot = (Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1).ModuleBase
     # Seed the carried cross-record function-scope locals (the source keeps them on the persistent scope).
     $Name = $__carriedName
     $TargetFilePath = $__carriedTargetFilePath
@@ -244,7 +246,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $store = New-Object Microsoft.SqlServer.Management.XEvent.XEStore $SqlStoreConnection
 
         foreach ($file in $template) {
-            $templatepath = Join-DbaPath $script:PSModuleRoot "bin" "XEtemplates" "$file.xml"
+            $templatepath = Join-DbaPath $__moduleRoot "bin" "XEtemplates" "$file.xml"
             if ((Test-Path $templatepath)) {
                 $Path += $templatepath
             } else {
