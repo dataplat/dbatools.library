@@ -140,11 +140,16 @@ public sealed class CompareDbaAvailabilityGroupCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the source process block VERBATIM (the pre-loop Type expansion plus the
-    // foreach; per-element hop, so the expansion re-runs per element - idempotent by
-    // construction, matching the function world where the expanded value persists).
-    // ZERO substitutions: the source has no Stop-Function, no gates, no Test-Bound -
-    // the body is the source bytes unmodified.
+    // PS: the source process foreach VERBATIM. ONE structural substitution (codex
+    // r3): the source's pre-loop Type expansion is EXCISED from the hop and lives
+    // solely in the per-record _typeCarrier above - in the source it runs once per
+    // process invocation, but a per-element hop would re-run it per SqlInstance
+    // element. Restoring these source lines ahead of the foreach reproduces the
+    // source bytes exactly:
+    // SOURCE:  if ("All" -in $Type) {
+    // SOURCE:      $Type = @("AgentJob", "Login", "Credential", "Operator")
+    // SOURCE:  }
+    // No other substitutions: no Stop-Function, no gates, no Test-Bound.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $AvailabilityGroup, $Type, $ExcludeSystemJob, $ExcludeSystemLogin, $IncludeModifiedDate, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -155,10 +160,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$AvailabilityGroup, [string[]]$Type, $ExcludeSystemJob, $ExcludeSystemLogin, $IncludeModifiedDate, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-
-        if ("All" -in $Type) {
-            $Type = @("AgentJob", "Login", "Credential", "Operator")
-        }
 
         foreach ($instance in $SqlInstance) {
             if ("AgentJob" -in $Type) {
