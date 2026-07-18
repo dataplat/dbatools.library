@@ -60,8 +60,8 @@ public sealed class GetDbaAgentOperatorCommand : DbaBaseCmdlet
                 else if (item is not null && LanguagePrimitives.IsTrue(
                     item.Properties["__GetDbaAgentOperatorProcessComplete"]?.Value))
                 {
-                    _server = Unwrap(item.Properties["Server"]?.Value);
-                    _alertLastEmail = Unwrap(item.Properties["AlertLastEmail"]?.Value);
+                    _server = UnwrapHopValue(item.Properties["Server"]?.Value);
+                    _alertLastEmail = UnwrapHopValue(item.Properties["AlertLastEmail"]?.Value);
                 }
                 else
                 {
@@ -71,9 +71,16 @@ public sealed class GetDbaAgentOperatorCommand : DbaBaseCmdlet
         }
     }
 
-    private static object? Unwrap(object? value) => value is PSObject wrapper
-        ? wrapper.BaseObject
-        : value;
+    // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
+    // wrapper rather than the BaseObject, so unwrapping one would discard it - keep it wrapped.
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
+    }
 
     private object? BoundCommonParameter(string name)
     {

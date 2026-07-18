@@ -67,8 +67,7 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
             else if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__GetDbaAgentAlertCategoryProcessComplete"]?.Value))
             {
-                object? catState = item.Properties["Cat"]?.Value;
-                _cat = catState is PSObject wrapper ? wrapper.BaseObject : catState;
+                _cat = UnwrapHopValue(item.Properties["Cat"]?.Value);
             }
             else
             {
@@ -77,6 +76,17 @@ public sealed class GetDbaAgentAlertCategoryCommand : DbaBaseCmdlet
         }, BodyScript,
             SqlInstance, SqlCredential, Category, EnableException.ToBool(),
             TestBound(nameof(Category)), _cat, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+    }
+
+    // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
+    // wrapper rather than the BaseObject, so unwrapping one would discard it - keep it wrapped.
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)

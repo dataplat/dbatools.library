@@ -69,9 +69,7 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
                     ? null
                     : (SmoAgentJob[]?)LanguagePrimitives.ConvertTo(
                         inputState, typeof(SmoAgentJob[]), CultureInfo.InvariantCulture);
-                _server = item.Properties["Server"]?.Value;
-                if (_server is PSObject serverWrapper)
-                    _server = serverWrapper.BaseObject;
+                _server = UnwrapHopValue(item.Properties["Server"]?.Value);
             }
             else
             {
@@ -100,6 +98,17 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }
+    }
+
+    // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
+    // wrapper rather than the BaseObject, so unwrapping one would discard it - keep it wrapped.
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
