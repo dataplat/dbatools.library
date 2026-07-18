@@ -2,8 +2,10 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 
 namespace Dataplat.Dbatools.Commands;
 
@@ -144,6 +146,163 @@ internal static class NestedCommand
                     output.Add(item!);
             }
             return output;
+        }
+    }
+
+    /// <summary>
+    /// Runs a script - typically a module-scoped hop - and forwards its output through the supplied
+    /// callback as each object is produced, rather than buffering it until the script completes.
+    /// </summary>
+    /// <param name="host">The calling cmdlet.</param>
+    /// <param name="onOutput">Receives each success-stream object as it is produced.</param>
+    /// <param name="scriptText">The script to run.</param>
+    /// <param name="scriptArgs">Arguments splatted positionally into the script.</param>
+    /// <remarks>
+    /// For hop bodies that emit output before a later record can terminate the run. Buffering the
+    /// whole collection would discard everything already produced once the script throws, so output
+    /// streams out as it arrives and a terminating error is captured and re-raised only after the
+    /// earlier output has left. Warning, verbose, debug, and information records re-emit through the
+    /// host's matching streams for -WarningVariable and preference parity; every other object goes to
+    /// the callback. The argument array travels as a SINGLE element so null elements survive the
+    /// object[] unpacking, then splats positionally into the wrapper's real scope. A terminating
+    /// failure is carried out as a marker object so the buffered collection is never the sole record
+    /// of it, then re-thrown in the caller's scope to propagate exactly as the script raised it. A
+    /// downstream early stop (a consumer taking only the first N objects) is caught, stops the nested
+    /// pipeline, and re-throws to the host so upstream side effects halt exactly as they do for the script.
+    /// </remarks>
+    internal static void InvokeScopedStreaming(
+        PSCmdlet host,
+        Action<PSObject> onOutput,
+        string scriptText,
+        params object?[] scriptArgs)
+    {
+        using (ShieldDefaultParameterValues(host))
+        {
+            Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
+            string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
+            string wrapper =
+                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\ntry { & {\n" + scriptText +
+                "\n} @__nestedCommandArguments 6>&1 5>&1 4>&1 3>&1 2>&1 } catch { " +
+                "$__nestedTermination.ErrorRecord = $PSItem; " +
+                "Write-Output $__nestedTerminationMarker }";
+
+            ErrorRecord? terminatingError = null;
+            // Pipeline-stop parity: a downstream early stop - e.g. `<command> | Select-Object -First N` -
+            // makes the host's WriteObject throw PipelineStoppedException the instant it has enough.
+            // Letting that escape the DataAdded handler kills the child process outright, where the
+            // script implementation survives. Catch it, BeginStop the nested pipeline (non-blocking - a
+            // blocking Stop() from inside the pipeline's own output handler deadlocks) so upstream side
+            // effects halt exactly as they do for the script, then re-throw to the host after Invoke.
+            bool downstreamStopped = false;
+            using PowerShell nested = PowerShell.Create(RunspaceMode.CurrentRunspace);
+            using PSDataCollection<PSObject> output = new PSDataCollection<PSObject>();
+            output.DataAdded += (_, eventArgs) =>
+            {
+                if (downstreamStopped)
+                {
+                    return;
+                }
+                PSObject item = output[eventArgs.Index];
+                try
+                {
+                    if (string.Equals(item?.BaseObject as string, terminationMarker, StringComparison.Ordinal))
+                    {
+                        terminatingError = termination["ErrorRecord"] as ErrorRecord ??
+                            throw new InvalidOperationException("Nested command terminated without an ErrorRecord.");
+                    }
+                    else if (item?.BaseObject is WarningRecord warning)
+                    {
+                        host.WriteWarning(warning.Message);
+                    }
+                    else if (item?.BaseObject is VerboseRecord verbose)
+                    {
+                        host.WriteVerbose(verbose.Message);
+                    }
+                    else if (item?.BaseObject is DebugRecord debug)
+                    {
+                        host.WriteDebug(debug.Message);
+                    }
+                    else if (item?.BaseObject is InformationRecord information)
+                    {
+                        host.WriteInformation(
+                            information.MessageData,
+                            new List<string>(information.Tags).ToArray());
+                    }
+                    else
+                    {
+                        onOutput(item!);
+                    }
+                }
+                catch (PipelineStoppedException)
+                {
+                    downstreamStopped = true;
+                    try
+                    {
+                        nested.BeginStop(null, null);
+                    }
+                    catch (PSInvalidOperationException)
+                    {
+                        // The pipeline may already be past the stoppable state; the re-throw below still unwinds the host.
+                    }
+                }
+            };
+
+            nested.AddScript(wrapper, useLocalScope: false)
+                .AddArgument(scriptArgs)
+                .AddArgument(termination)
+                .AddArgument(terminationMarker);
+            try
+            {
+                nested.Invoke<PSObject>(null, output, null);
+            }
+            catch (PipelineStoppedException)
+            {
+                downstreamStopped = true;
+            }
+
+            if (downstreamStopped)
+            {
+                // Honor the downstream stop on the HOST pipeline - unwinds ProcessRecord exactly as the
+                // script implementation's StopUpstreamCommands does.
+                throw new PipelineStoppedException();
+            }
+
+            if (terminatingError is not null)
+            {
+                RemoveCapturedErrorBookkeeping(host, terminatingError);
+                host.InvokeCommand.InvokeScript(
+                    false,
+                    ScriptBlock.Create("param($__record) throw $__record"),
+                    null,
+                    new object?[] { terminatingError });
+                throw new InvalidOperationException("Nested terminating ErrorRecord unexpectedly returned.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes the ErrorRecord a nested terminating failure left at the head of the automatic $Error
+    /// list, so the caller's own ThrowTerminatingError does not record the same failure twice.
+    /// </summary>
+    /// <param name="host">The cmdlet whose session state holds $Error.</param>
+    /// <param name="record">The terminating record captured from the nested run.</param>
+    private static void RemoveCapturedErrorBookkeeping(PSCmdlet host, ErrorRecord record)
+    {
+        try
+        {
+            if (host.SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+                return;
+            if (errorList[0] is not ErrorRecord first)
+                return;
+            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
+                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
+            {
+                errorList.RemoveAt(0);
+            }
+        }
+        catch
+        {
+            // The caller's ThrowTerminatingError records the final failure; this de-dup is best-effort only.
         }
     }
 
