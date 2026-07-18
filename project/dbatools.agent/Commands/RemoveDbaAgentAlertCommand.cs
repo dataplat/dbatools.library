@@ -60,8 +60,13 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
     [Parameter(ParameterSetName = "Pipeline", Mandatory = true, ValueFromPipeline = true)]
     public SmoAlert[]? InputObject { get; set; }
 
-    // EnableException is inherited from DbaBaseCmdlet - never redeclared. With no ParameterSetName it
-    // belongs to every set, matching the source's explicit [NonPipeline][Pipeline] declaration.
+    /// <summary>By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message. Using this switch turns this "nice by default" feature off and enables you to catch exceptions with your own try/catch.</summary>
+    // EnableException is inherited from DbaBaseCmdlet (virtual); the source declares it in BOTH named
+    // sets explicitly, so it is overridden here with the per-set [Parameter] attributes to match that
+    // surface exactly (the inherited bare declaration would reflect as __AllParameterSets and diverge).
+    [Parameter(ParameterSetName = "NonPipeline")]
+    [Parameter(ParameterSetName = "Pipeline")]
+    public override SwitchParameter EnableException { get; set; }
 
     // The pipeline-spanning accumulator: the source's begin "$dbAlerts = @()", filled across process
     // records, drained in end.
