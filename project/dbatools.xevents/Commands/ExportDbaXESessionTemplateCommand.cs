@@ -33,8 +33,12 @@ namespace Dataplat.Dbatools.Commands;
 /// interrupt before it within a record). $InputObject is not carried across records: SqlInstance is not
 /// pipeline-bound, so only the InputObject-piped path produces multiple records and each is self-contained.
 ///
-/// The "$PSBoundParameters.FilePath" test becomes the carried $__boundFilePath flag (Test-Bound never rides
-/// the hop). Each exported FileInfo emits before a later session may fail under -EnableException (DEF-001),
+/// The source's "if (-not $PSBoundParameters.FilePath)" tests the ORIGINAL bound value's TRUTHINESS (not
+/// mere presence) and re-reads it every $xes iteration - so an explicitly bound "" or $null recomputes, and
+/// once $FilePath is reassigned the immutable $PSBoundParameters.FilePath keeps every later session
+/// recomputing too. That is carried as the immutable $__boundFilePath = IsTrue(FilePath) flag (Test-Bound
+/// never rides the hop; TestBound presence would wrongly retain a bound-empty FilePath). Each exported
+/// FileInfo emits before a later session may fail under -EnableException (DEF-001),
 /// so the process hop uses InvokeScopedStreaming. Surface pinned by
 /// migration/baselines/Export-DbaXESessionTemplate.json.
 /// </remarks>
@@ -129,7 +133,7 @@ public sealed class ExportDbaXESessionTemplateCommand : DbaBaseCmdlet
             }
         }, ProcessScript,
             SqlInstance, SqlCredential, Session, _path, FilePath, InputObject,
-            TestBound("FilePath"), EnableException.ToBool(),
+            LanguagePrimitives.IsTrue(FilePath), EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
