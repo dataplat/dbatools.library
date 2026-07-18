@@ -17,8 +17,14 @@ namespace Dataplat.Dbatools.Commands;
 /// $ConfirmPreference = 'none' }` convention (begin) - so the ShouldProcess gate runs
 /// on the INNER hop scriptblock's own $Pscmdlet under its own
 /// [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")] (the ratified
-/// Copy-family/W3-005 handling; NOT routed to $__realCmdlet - the suppression is
-/// hop-scope-local), with the convention line REPEATED at the end hop's top because
+/// Copy-family/W3-005 handling; NOT routed to $__realCmdlet). CORRECTION, coordinator
+/// ruling 2026-07-18: the rationale previously stated here - "the suppression is
+/// hop-scope-local", i.e. that routing to $__realCmdlet would break the
+/// $Force -> ConfirmPreference suppression - was an UNPROVEN mechanism claim, written
+/// from a design comment rather than a measurement, and lane F's binary-cmdlet probe
+/// refuted it. The mechanism is UNPROVEN-EITHER-WAY. This row's handling rests on the
+/// ratified Copy-family convention alone, never on that claim. Comment-only correction:
+/// no IL change, no re-gate. The convention line is REPEATED at the end hop's top because
 /// the source's begin-scope assignment spans to end in the function scope while hop
 /// scopes die per block (single gate - no cross-instance prompt-state exposure); the
 /// Force dependent-service expansion covers ONLY Agent+PolyBase (no Launchpad, no
