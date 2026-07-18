@@ -5,39 +5,40 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
-using SmoAlert = Microsoft.SqlServer.Management.Smo.Agent.Alert;
+using SmoMailProfile = Microsoft.SqlServer.Management.Smo.Mail.MailProfile;
 
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Removes SQL Server Agent alerts.
+/// Removes database mail profiles.
 /// </summary>
 /// <remarks>
-/// The alert lookup (Get-DbaAgentAlert), the confirmation gate, the Drop, and the result-object shaping
-/// all run the original dbatools PowerShell body inside the dbatools module scope rather than being
-/// reimplemented in C#, so the engine decides the observable details.
+/// The profile lookup (Get-DbaDbMailProfile), the confirmation gate, the Drop, and the result-object
+/// shaping all run the original dbatools PowerShell body inside the dbatools module scope rather than
+/// being reimplemented in C#, so the engine decides the observable details.
 ///
-/// The function deliberately collects every alert across the whole pipeline in its begin/process blocks
-/// and only drops them in end, to avoid "Collection was modified" when piped directly from
-/// Get-DbaAgentAlert. The accumulator ($dbAlerts) is the pipeline-spanning state that a per-record hop
-/// scope cannot hold, so it lives in C#: begin seeds an empty list, each process record contributes its
-/// alerts (a Get-DbaAgentAlert lookup in the SqlInstance parameter set, or the bound InputObject in the
-/// pipeline set), and the end hop receives the full list to drop.
+/// The function collects every profile across the whole pipeline in its begin/process blocks and only
+/// drops them in end, to avoid "Collection was modified" when piped directly from Get-DbaDbMailProfile.
+/// The accumulator ($dbMailProfiles) is pipeline-spanning state a per-record hop scope cannot hold, so it
+/// lives in C#: begin seeds an empty list, each process record contributes its profiles (a
+/// Get-DbaDbMailProfile lookup in the SqlInstance parameter set, or the bound InputObject in the pipeline
+/// set), and the end hop receives the full list to drop.
 ///
 /// The SqlInstance path reproduces the source's "$params = $PSBoundParameters; remove WhatIf/Confirm;
-/// Get-DbaAgentAlert @params" by receiving this cmdlet's own MyInvocation.BoundParameters and splatting
-/// it, so Get-DbaAgentAlert sees exactly the bound Alert/ExcludeAlert/SqlCredential/EnableException the
-/// caller supplied.
+/// Get-DbaDbMailProfile @params" by receiving this cmdlet's own MyInvocation.BoundParameters and splatting
+/// it, so the lookup sees exactly the bound Profile/ExcludeProfile/SqlCredential/EnableException supplied.
+/// The two parameter sets are mutually exclusive (SqlInstance is not pipeline-bound), so the SqlInstance
+/// lookup runs at most once - appending its single result equals the source's assignment.
 ///
-/// The end hop streams: it emits a result object per alert as each Drop runs, before a later Drop may
-/// throw under -EnableException, so buffering would hide alerts that were actually dropped. The process
-/// hop is buffered - Get-DbaAgentAlert is read-only, the mutation is entirely in end.
+/// The end hop streams: it emits a result object per profile as each Drop runs, before a later Drop may
+/// throw under -EnableException, so buffering would hide profiles that were actually dropped. The process
+/// hop is buffered - Get-DbaDbMailProfile is read-only, the mutation is entirely in end.
 ///
 /// This cmdlet supplies the real ShouldProcess runtime to the end hop (ConfirmImpact High, no -Force).
-/// Surface pinned by migration/baselines/Remove-DbaAgentAlert.json.
+/// Surface pinned by migration/baselines/Remove-DbaDbMailProfile.json.
 /// </remarks>
-[Cmdlet(VerbsCommon.Remove, "DbaAgentAlert", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
-public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
+[Cmdlet(VerbsCommon.Remove, "DbaDbMailProfile", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
+public sealed class RemoveDbaDbMailProfileCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
     [Parameter(ParameterSetName = "NonPipeline", Mandatory = true, Position = 0)]
@@ -48,17 +49,17 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
     [Parameter(ParameterSetName = "NonPipeline")]
     public PSCredential? SqlCredential { get; set; }
 
-    /// <summary>Only remove these named alerts.</summary>
+    /// <summary>Only remove these named database mail profiles.</summary>
     [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? Alert { get; set; }
+    public string[]? Profile { get; set; }
 
-    /// <summary>Remove all alerts except these named ones.</summary>
+    /// <summary>Remove all database mail profiles except these named ones.</summary>
     [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? ExcludeAlert { get; set; }
+    public string[]? ExcludeProfile { get; set; }
 
-    /// <summary>Agent alert objects piped in from Get-DbaAgentAlert.</summary>
+    /// <summary>Database mail profile objects piped in from Get-DbaDbMailProfile.</summary>
     [Parameter(ParameterSetName = "Pipeline", Mandatory = true, ValueFromPipeline = true)]
-    public SmoAlert[]? InputObject { get; set; }
+    public SmoMailProfile[]? InputObject { get; set; }
 
     /// <summary>By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message. Using this switch turns this "nice by default" feature off and enables you to catch exceptions with your own try/catch.</summary>
     // EnableException is inherited from DbaBaseCmdlet (virtual); the source declares it in BOTH named
@@ -68,13 +69,13 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
     [Parameter(ParameterSetName = "Pipeline")]
     public override SwitchParameter EnableException { get; set; }
 
-    // The pipeline-spanning accumulator: the source's begin "$dbAlerts = @()", filled across process
+    // The pipeline-spanning accumulator: the source's begin "$dbMailProfiles = @()", filled across process
     // records, drained in end.
-    private List<PSObject> _dbAlerts = null!;
+    private List<PSObject> _dbMailProfiles = null!;
 
     protected override void BeginProcessing()
     {
-        _dbAlerts = new List<PSObject>();
+        _dbMailProfiles = new List<PSObject>();
     }
 
     protected override void ProcessRecord()
@@ -99,7 +100,7 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
             }
             if (item is not null)
             {
-                _dbAlerts.Add(item);
+                _dbMailProfiles.Add(item);
             }
         }
     }
@@ -123,7 +124,7 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }, EndScript,
-            _dbAlerts.ToArray(), EnableException.ToBool(), this,
+            _dbMailProfiles.ToArray(), EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -161,10 +162,10 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the process block. The source assigns/appends to $dbAlerts; here it EMITS the alerts and the C#
-    // accumulates them, because the accumulator must span the pipeline (which a per-record hop scope
-    // cannot). The SqlInstance branch splats the caller's bound parameters (minus WhatIf/Confirm) to
-    // Get-DbaAgentAlert exactly as the source's $PSBoundParameters re-splat did.
+    // PS: the process block. The source assigns/appends to $dbMailProfiles; here it EMITS the profiles and
+    // the C# accumulates them, because the accumulator must span the pipeline. The SqlInstance branch
+    // splats the caller's bound parameters (minus WhatIf/Confirm) to Get-DbaDbMailProfile exactly as the
+    // source's $PSBoundParameters re-splat did.
     private const string ProcessScript = """
 param($SqlInstance, $InputObject, $__bound, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -173,13 +174,13 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [Microsoft.SqlServer.Management.Smo.Agent.Alert[]]$InputObject, [hashtable]$__bound)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [Microsoft.SqlServer.Management.Smo.Mail.MailProfile[]]$InputObject, [hashtable]$__bound)
 
     if ($SqlInstance) {
         $params = $__bound
         $null = $params.Remove('WhatIf')
         $null = $params.Remove('Confirm')
-        Get-DbaAgentAlert @params
+        Get-DbaDbMailProfile @params
     } else {
         $InputObject
     }
@@ -187,10 +188,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     // PS: the end block VERBATIM apart from $PSCmdlet.ShouldProcess -> $__realCmdlet.ShouldProcess and
-    // -FunctionName Remove-DbaAgentAlert on the direct Stop-Function. $dbAlerts is the accumulated list
-    // the C# collected across all process records.
+    // -FunctionName Remove-DbaDbMailProfile on the direct Stop-Function. $dbMailProfiles is the accumulated
+    // list. EnableException is bound so Stop-Function's scope-walking default inherits the caller's value.
     private const string EndScript = """
-param($dbAlerts, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($dbMailProfiles, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -199,31 +200,31 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param($dbAlerts, $EnableException, $__realCmdlet)
+    param($dbMailProfiles, $EnableException, $__realCmdlet)
 
-    # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaAgentAlert.
-    foreach ($dbAlert in $dbAlerts) {
-        if ($__realCmdlet.ShouldProcess($dbAlert.Parent.Parent.Name, "Removing the SQL Agent alert $($dbAlert.Name) on $($dbAlert.Parent.Parent.Name)")) {
+    # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaDbMailProfile.
+    foreach ($dbMailProfile in $dbMailProfiles) {
+        if ($__realCmdlet.ShouldProcess($dbMailProfile.Parent.Parent.Name, "Removing the database mail profile $($dbMailProfile.Name) on $($dbMailProfile.Parent.Parent.Name)")) {
             $output = [PSCustomObject]@{
-                ComputerName = $dbAlert.Parent.Parent.ComputerName
-                InstanceName = $dbAlert.Parent.Parent.ServiceName
-                SqlInstance  = $dbAlert.Parent.Parent.DomainInstanceName
-                Name         = $dbAlert.Name
+                ComputerName = $dbMailProfile.Parent.Parent.ComputerName
+                InstanceName = $dbMailProfile.Parent.Parent.ServiceName
+                SqlInstance  = $dbMailProfile.Parent.Parent.DomainInstanceName
+                Name         = $dbMailProfile.Name
                 Status       = $null
                 IsRemoved    = $false
             }
             try {
-                $dbAlert.Drop()
+                $dbMailProfile.Drop()
                 $output.Status = "Dropped"
                 $output.IsRemoved = $true
             } catch {
-                Stop-Function -Message "Failed removing the SQL Agent alert $($dbAlert.Name) on $($dbAlert.Parent.Parent.Name)" -ErrorRecord $_ -FunctionName Remove-DbaAgentAlert
+                Stop-Function -Message "Failed removing the database mail profile $($dbMailProfile.Name) on $($dbMailProfile.Parent.Parent.Name)" -ErrorRecord $_ -FunctionName Remove-DbaDbMailProfile
                 $output.Status = (Get-ErrorMessage -Record $_)
                 $output.IsRemoved = $false
             }
             $output
         }
     }
-} $dbAlerts $EnableException $__realCmdlet @__commonParameters 3>&1 2>&1
+} $dbMailProfiles $EnableException $__realCmdlet @__commonParameters 3>&1 2>&1
 """;
 }

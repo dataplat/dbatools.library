@@ -5,76 +5,74 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
-using SmoAlert = Microsoft.SqlServer.Management.Smo.Agent.Alert;
+using SmoProxyAccount = Microsoft.SqlServer.Management.Smo.Agent.ProxyAccount;
 
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Removes SQL Server Agent alerts.
+/// Removes SQL Server Agent proxies.
 /// </summary>
 /// <remarks>
-/// The alert lookup (Get-DbaAgentAlert), the confirmation gate, the Drop, and the result-object shaping
+/// The proxy lookup (Get-DbaAgentProxy), the confirmation gate, the Drop, and the result-object shaping
 /// all run the original dbatools PowerShell body inside the dbatools module scope rather than being
 /// reimplemented in C#, so the engine decides the observable details.
 ///
-/// The function deliberately collects every alert across the whole pipeline in its begin/process blocks
-/// and only drops them in end, to avoid "Collection was modified" when piped directly from
-/// Get-DbaAgentAlert. The accumulator ($dbAlerts) is the pipeline-spanning state that a per-record hop
-/// scope cannot hold, so it lives in C#: begin seeds an empty list, each process record contributes its
-/// alerts (a Get-DbaAgentAlert lookup in the SqlInstance parameter set, or the bound InputObject in the
-/// pipeline set), and the end hop receives the full list to drop.
+/// The function collects every proxy across the whole pipeline in its begin/process blocks and only
+/// drops them in end, to avoid "Collection was modified" when piped directly from Get-DbaAgentProxy. The
+/// accumulator ($dbProxies) is pipeline-spanning state a per-record hop scope cannot hold, so it lives in
+/// C#: begin seeds an empty list, each process record contributes its proxies (a Get-DbaAgentProxy lookup
+/// when -SqlInstance is supplied, or the bound InputObject otherwise), and the end hop receives the full
+/// list to drop.
 ///
 /// The SqlInstance path reproduces the source's "$params = $PSBoundParameters; remove WhatIf/Confirm;
-/// Get-DbaAgentAlert @params" by receiving this cmdlet's own MyInvocation.BoundParameters and splatting
-/// it, so Get-DbaAgentAlert sees exactly the bound Alert/ExcludeAlert/SqlCredential/EnableException the
-/// caller supplied.
+/// Get-DbaAgentProxy @params" by receiving this cmdlet's own MyInvocation.BoundParameters and splatting
+/// it, so the lookup sees exactly the bound Proxy/ExcludeProxy/SqlCredential supplied.
 ///
-/// The end hop streams: it emits a result object per alert as each Drop runs, before a later Drop may
-/// throw under -EnableException, so buffering would hide alerts that were actually dropped. The process
-/// hop is buffered - Get-DbaAgentAlert is read-only, the mutation is entirely in end.
+/// The end hop streams: it emits a result object per proxy as each Drop runs, before a later Drop may
+/// throw under -EnableException, so buffering would hide proxies that were actually dropped. The process
+/// hop is buffered - Get-DbaAgentProxy is read-only, the mutation is entirely in end.
 ///
 /// This cmdlet supplies the real ShouldProcess runtime to the end hop (ConfirmImpact High, no -Force).
-/// Surface pinned by migration/baselines/Remove-DbaAgentAlert.json.
+/// Surface pinned by migration/baselines/Remove-DbaAgentProxy.json.
 /// </remarks>
-[Cmdlet(VerbsCommon.Remove, "DbaAgentAlert", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
-public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
+[Cmdlet(VerbsCommon.Remove, "DbaAgentProxy", SupportsShouldProcess = true, DefaultParameterSetName = "Default", ConfirmImpact = ConfirmImpact.High)]
+public sealed class RemoveDbaAgentProxyCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(ParameterSetName = "NonPipeline", Mandatory = true, Position = 0)]
+    [Parameter]
     [PsDbaInstanceArrayCast]
-    public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
+    public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Login to the target instance using alternative credentials.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
+    [Parameter]
     public PSCredential? SqlCredential { get; set; }
 
-    /// <summary>Only remove these named alerts.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? Alert { get; set; }
+    /// <summary>Only remove these named proxies.</summary>
+    [Parameter]
+    public string[]? Proxy { get; set; }
 
-    /// <summary>Remove all alerts except these named ones.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? ExcludeAlert { get; set; }
+    /// <summary>Remove all proxies except these named ones.</summary>
+    [Parameter]
+    public string[]? ExcludeProxy { get; set; }
 
-    /// <summary>Agent alert objects piped in from Get-DbaAgentAlert.</summary>
+    /// <summary>Agent proxy objects piped in from Get-DbaAgentProxy.</summary>
     [Parameter(ParameterSetName = "Pipeline", Mandatory = true, ValueFromPipeline = true)]
-    public SmoAlert[]? InputObject { get; set; }
+    public SmoProxyAccount[]? InputObject { get; set; }
 
     /// <summary>By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message. Using this switch turns this "nice by default" feature off and enables you to catch exceptions with your own try/catch.</summary>
-    // EnableException is inherited from DbaBaseCmdlet (virtual); the source declares it in BOTH named
-    // sets explicitly, so it is overridden here with the per-set [Parameter] attributes to match that
-    // surface exactly (the inherited bare declaration would reflect as __AllParameterSets and diverge).
-    [Parameter(ParameterSetName = "NonPipeline")]
+    // EnableException is inherited from DbaBaseCmdlet (virtual); the source declares it ONLY in the
+    // Pipeline set, so it is overridden here with that single per-set [Parameter] attribute to match the
+    // baseline exactly (the inherited bare declaration would reflect as __AllParameterSets and diverge).
     [Parameter(ParameterSetName = "Pipeline")]
     public override SwitchParameter EnableException { get; set; }
 
-    // The pipeline-spanning accumulator: the source's begin "$dbAlerts = @()", filled across process
+    // The pipeline-spanning accumulator: the source's begin "$dbProxies = @()", filled across process
     // records, drained in end.
-    private List<PSObject> _dbAlerts = null!;
+    private List<PSObject> _dbProxies = null!;
 
     protected override void BeginProcessing()
     {
-        _dbAlerts = new List<PSObject>();
+        _dbProxies = new List<PSObject>();
     }
 
     protected override void ProcessRecord()
@@ -87,6 +85,7 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
         // Reproduce "$params = $PSBoundParameters" faithfully: this cmdlet's own bound parameters.
         Hashtable bound = new Hashtable(MyInvocation.BoundParameters);
 
+        List<PSObject> recordItems = new List<PSObject>();
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, InputObject, bound,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
@@ -99,8 +98,21 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
             }
             if (item is not null)
             {
-                _dbAlerts.Add(item);
+                recordItems.Add(item);
             }
+        }
+
+        // Match the source's assignment semantics: the SqlInstance branch does "$dbProxies = Get-..."
+        // (REPLACE), the InputObject branch does "$dbProxies += $InputObject" (APPEND). When -SqlInstance
+        // is combined with piped records the lookup runs per record and replaces each time, so appending
+        // would accumulate duplicate proxies and Drop() them repeatedly.
+        if (SqlInstance != null && SqlInstance.Length > 0)
+        {
+            _dbProxies = recordItems;
+        }
+        else
+        {
+            _dbProxies.AddRange(recordItems);
         }
     }
 
@@ -123,7 +135,7 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }, EndScript,
-            _dbAlerts.ToArray(), EnableException.ToBool(), this,
+            _dbProxies.ToArray(), EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -161,10 +173,10 @@ public sealed class RemoveDbaAgentAlertCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the process block. The source assigns/appends to $dbAlerts; here it EMITS the alerts and the C#
-    // accumulates them, because the accumulator must span the pipeline (which a per-record hop scope
+    // PS: the process block. The source assigns/appends to $dbProxies; here it EMITS the proxies and the
+    // C# accumulates them, because the accumulator must span the pipeline (which a per-record hop scope
     // cannot). The SqlInstance branch splats the caller's bound parameters (minus WhatIf/Confirm) to
-    // Get-DbaAgentAlert exactly as the source's $PSBoundParameters re-splat did.
+    // Get-DbaAgentProxy exactly as the source's $PSBoundParameters re-splat did.
     private const string ProcessScript = """
 param($SqlInstance, $InputObject, $__bound, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -173,13 +185,13 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [Microsoft.SqlServer.Management.Smo.Agent.Alert[]]$InputObject, [hashtable]$__bound)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [Microsoft.SqlServer.Management.Smo.Agent.ProxyAccount[]]$InputObject, [hashtable]$__bound)
 
     if ($SqlInstance) {
         $params = $__bound
         $null = $params.Remove('WhatIf')
         $null = $params.Remove('Confirm')
-        Get-DbaAgentAlert @params
+        Get-DbaAgentProxy @params
     } else {
         $InputObject
     }
@@ -187,10 +199,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     // PS: the end block VERBATIM apart from $PSCmdlet.ShouldProcess -> $__realCmdlet.ShouldProcess and
-    // -FunctionName Remove-DbaAgentAlert on the direct Stop-Function. $dbAlerts is the accumulated list
-    // the C# collected across all process records.
+    // -FunctionName Remove-DbaAgentProxy on the direct Stop-Function. $dbProxies is the accumulated list
+    // the C# collected. EnableException is bound so Stop-Function's scope-walking default inherits the
+    // caller's value (a Drop failure under -EnableException must throw).
     private const string EndScript = """
-param($dbAlerts, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($dbProxies, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -199,31 +212,31 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param($dbAlerts, $EnableException, $__realCmdlet)
+    param($dbProxies, $EnableException, $__realCmdlet)
 
-    # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaAgentAlert.
-    foreach ($dbAlert in $dbAlerts) {
-        if ($__realCmdlet.ShouldProcess($dbAlert.Parent.Parent.Name, "Removing the SQL Agent alert $($dbAlert.Name) on $($dbAlert.Parent.Parent.Name)")) {
+    # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaAgentProxy.
+    foreach ($dbProxy in $dbProxies) {
+        if ($__realCmdlet.ShouldProcess($dbProxy.Parent.Parent.Name, "Removing the SQL Agent proxy $($dbProxy.Name) on $($dbProxy.Parent.Parent.Name)")) {
             $output = [PSCustomObject]@{
-                ComputerName = $dbAlert.Parent.Parent.ComputerName
-                InstanceName = $dbAlert.Parent.Parent.ServiceName
-                SqlInstance  = $dbAlert.Parent.Parent.DomainInstanceName
-                Name         = $dbAlert.Name
+                ComputerName = $dbProxy.Parent.Parent.ComputerName
+                InstanceName = $dbProxy.Parent.Parent.ServiceName
+                SqlInstance  = $dbProxy.Parent.Parent.DomainInstanceName
+                Name         = $dbProxy.Name
                 Status       = $null
                 IsRemoved    = $false
             }
             try {
-                $dbAlert.Drop()
+                $dbProxy.Drop()
                 $output.Status = "Dropped"
                 $output.IsRemoved = $true
             } catch {
-                Stop-Function -Message "Failed removing the SQL Agent alert $($dbAlert.Name) on $($dbAlert.Parent.Parent.Name)" -ErrorRecord $_ -FunctionName Remove-DbaAgentAlert
+                Stop-Function -Message "Failed removing the SQL Agent proxy $($dbProxy.Name) on $($dbProxy.Parent.Parent.Name)" -ErrorRecord $_ -FunctionName Remove-DbaAgentProxy
                 $output.Status = (Get-ErrorMessage -Record $_)
                 $output.IsRemoved = $false
             }
             $output
         }
     }
-} $dbAlerts $EnableException $__realCmdlet @__commonParameters 3>&1 2>&1
+} $dbProxies $EnableException $__realCmdlet @__commonParameters 3>&1 2>&1
 """;
 }
