@@ -95,6 +95,9 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
     private DateTime _resolvedStartDate;
     private DateTime _resolvedExpirationDate;
 
+    /// <summary>$smocert as the script holds it: assigned in one record and readable by the next.</summary>
+    private object? _smocertState;
+
     /// <summary>Resolves the computed date defaults before any pipeline record is processed.</summary>
     protected override void BeginProcessing()
     {
@@ -102,8 +105,29 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
         // pipeline enumeration - and ExpirationDate is derived from the resolved StartDate, so resolving
         // either per record would let a slow pipeline drift them apart.
         _resolvedStartDate = TestBound(nameof(StartDate)) ? StartDate : DateTime.Now;
-        _resolvedExpirationDate = TestBound(nameof(ExpirationDate)) ? ExpirationDate : _resolvedStartDate.AddYears(5);
+
+        if (TestBound(nameof(ExpirationDate)))
+        {
+            _resolvedExpirationDate = ExpirationDate;
+            return;
+        }
+
+        // The default is the PowerShell expression $StartDate.AddYears(5), and it must be evaluated BY
+        // PowerShell. Calling DateTime.AddYears from C# surfaces a raw ArgumentOutOfRangeException when
+        // the addition overflows, where the script's method binder surfaces MethodInvocationException
+        // carrying the bare "ArgumentOutOfRangeException" fully-qualified error id - a divergence in the
+        // exception contract that a typed catch can see. Measured with -StartDate ([datetime]::MaxValue).
+        foreach (PSObject item in NestedCommand.InvokeScoped(this, DefaultExpirationScript, _resolvedStartDate))
+        {
+            if (item?.BaseObject is DateTime computed)
+                _resolvedExpirationDate = computed;
+        }
     }
+
+    private const string DefaultExpirationScript = """
+param($StartDate)
+$StartDate.AddYears(5)
+""";
 
     /// <summary>Creates the certificates for the databases bound to the current record.</summary>
     protected override void ProcessRecord()
@@ -118,6 +142,11 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
+            else if (item is not null && LanguagePrimitives.IsTrue(
+                item.Properties["__NewDbaDbCertificateProcessComplete"]?.Value))
+            {
+                _smocertState = UnwrapHopValue(item.Properties["Smocert"]?.Value);
+            }
             else if (item is not null)
             {
                 WriteObject(item);
@@ -125,10 +154,33 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Name, Database, Subject, _resolvedStartDate,
             _resolvedExpirationDate, ActiveForServiceBrokerDialog.ToBool(), SecurePassword, InputObject,
-            EnableException.ToBool(), this,
+            EnableException.ToBool(), this, _smocertState,
             TestBound(nameof(Name)), TestBound(nameof(Subject)),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+    }
+
+    /// <summary>
+    /// Unwraps a value the hop carried out through its sentinel.
+    /// </summary>
+    /// <remarks>
+    /// A value the script left unset arrives as AutomationNull, which behaves as $null in PowerShell but
+    /// unwraps to a truthy, property-less object - so it comes back as null instead. Otherwise the value is
+    /// unwrapped ONLY when the wrapper adds nothing: note properties live on the PSObject wrapper rather
+    /// than the BaseObject, so unwrapping such a value silently discards them.
+    /// </remarks>
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        foreach (PSMemberInfo member in wrapper.Members)
+        {
+            if (member is PSNoteProperty)
+                return wrapper;
+        }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -161,10 +213,14 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
     // PS: the process body VERBATIM. Substitutions only: $Pscmdlet -> $__realCmdlet (the ShouldProcess
     // gate); the two Test-Bound -Not reads -> the carried by-name flags; -FunctionName on the 2 DIRECT
     // Stop-Function calls; -FunctionName + -ModuleName "dbatools" on the 4 DIRECT Write-Message calls.
-    // No trailing sentinel: the body's $Name/$Subject assignments are re-derived from $db on every record
-    // in the script too, so nothing needs to survive the hop.
+    // $Name and $Subject are NOT carried - see the class remarks; the script re-derives both every record.
+    // $smocert IS carried. The script assigns it inside the try, so if a LATER record's New-Object throws
+    // before that assignment, the catch's -Target $smocert receives the PREVIOUS record's certificate. A
+    // per-record hop starts with $smocert unset and would pass null, changing the error record's
+    // TargetObject and the dbatools log target. Measured: a process-block assignment does survive into the
+    // next record of the same invocation, so the hop seeds $smocert in and emits it back out.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Name, $Database, $Subject, $StartDate, $ExpirationDate, $ActiveForServiceBrokerDialog, $SecurePassword, $InputObject, $EnableException, $__realCmdlet, $__nameBound, $__subjectBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Name, $Database, $Subject, $StartDate, $ExpirationDate, $ActiveForServiceBrokerDialog, $SecurePassword, $InputObject, $EnableException, $__realCmdlet, $__smocertCarry, $__nameBound, $__subjectBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -173,8 +229,12 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Name, [string[]]$Database, [string[]]$Subject, [datetime]$StartDate, [datetime]$ExpirationDate, $ActiveForServiceBrokerDialog, [System.Security.SecureString]$SecurePassword, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__realCmdlet, $__nameBound, $__subjectBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Name, [string[]]$Database, [string[]]$Subject, [datetime]$StartDate, [datetime]$ExpirationDate, $ActiveForServiceBrokerDialog, [System.Security.SecureString]$SecurePassword, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__realCmdlet, $__smocertCarry, $__nameBound, $__subjectBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # $smocert as the previous record left it: in the script one process scope spans every record, so a
+    # record whose New-Object throws before assigning it reports the PREVIOUS record's certificate.
+    $smocert = $__smocertCarry
 
         if ($SqlInstance) {
             $InputObject += Get-DbaDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $Database
@@ -231,7 +291,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-} $SqlInstance $SqlCredential $Name $Database $Subject $StartDate $ExpirationDate $ActiveForServiceBrokerDialog $SecurePassword $InputObject $EnableException $__realCmdlet $__nameBound $__subjectBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+    [pscustomobject]@{ __NewDbaDbCertificateProcessComplete = $true; Smocert = $smocert }
+} $SqlInstance $SqlCredential $Name $Database $Subject $StartDate $ExpirationDate $ActiveForServiceBrokerDialog $SecurePassword $InputObject $EnableException $__realCmdlet $__smocertCarry $__nameBound $__subjectBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
 }
