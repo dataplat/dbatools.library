@@ -37,8 +37,10 @@ namespace Dataplat.Dbatools.Commands;
 /// "Yes to All" answer persists across the whole invocation rather than resetting per hop
 /// (SupportsShouldProcess, ConfirmImpact Medium mirrored). The single Stop-Function is -Continue and
 /// there is no Test-FunctionInterrupt in the source, so no interrupt flag is ever raised and none is
-/// carried. The three bare "continue" statements ride verbatim: they sit in the process block with
-/// no enclosing loop, exactly as in the source. In-hop Stop-Function/Write-Message carry
+/// carried. The three bare "continue" statements ride verbatim but are NOT alike: the two argument
+/// guards sit in the process block ahead of any loop, so they exit the record, while the third is
+/// inside the "foreach ($db in $InputObject)" loop and merely skips a database already at the right
+/// compatibility level. Dot-sourcing preserves both meanings unchanged. In-hop Stop-Function/Write-Message carry
 /// -FunctionName. Surface pinned by migration/baselines/Invoke-DbaDbUpgrade.json - SqlInstance
 /// declares an explicit Position 0, which suppresses the implicit auto-numbering, so every other
 /// parameter is correctly positionless.
@@ -146,8 +148,8 @@ public sealed class InvokeDbaDbUpgradeCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the process block VERBATIM per record, dot-sourced so its three bare "continue"
-    // statements and any early exit leave only the body. Edits: the two Test-Bound guards become
+    // PS: the process block VERBATIM per record, dot-sourced so the two record-exiting guards, the
+    // loop-local database-skip continue, and any early exit all keep their source meanings. Edits: the two Test-Bound guards become
     // boolean expressions over the carried boundness flags (Test-Bound scope-walks the caller and
     // can never ride a hop), the seven $Pscmdlet gates route to $__realCmdlet, and -FunctionName is
     // stamped on the 21 direct Stop-Function/Write-Message calls. The source's begin line
