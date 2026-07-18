@@ -28,40 +28,40 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class BackupDbaDbMasterKeyCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter]
+    [Parameter(Position = 0)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative credential for the target instances.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>A credential whose password is used to encrypt the exported master key.</summary>
-    [Parameter]
+    [Parameter(Position = 2)]
     public PSCredential? Credential { get; set; }
 
     /// <summary>The database or databases whose master keys are exported.</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     public string[]? Database { get; set; }
 
     /// <summary>Databases to exclude from the export.</summary>
-    [Parameter]
+    [Parameter(Position = 4)]
     public string[]? ExcludeDatabase { get; set; }
 
     /// <summary>The password that encrypts the exported master key.</summary>
-    [Parameter]
+    [Parameter(Position = 5)]
     [Alias("Password")]
     public System.Security.SecureString? SecurePassword { get; set; }
 
     /// <summary>The directory the exported files are written to; defaults to the instance backup directory.</summary>
-    [Parameter]
+    [Parameter(Position = 6)]
     public string? Path { get; set; }
 
     /// <summary>An explicit base file name for the exported key file.</summary>
-    [Parameter]
+    [Parameter(Position = 7)]
     public string? FileBaseName { get; set; }
 
     /// <summary>Database objects, typically piped from Get-DbaDatabase.</summary>
-    [Parameter(ValueFromPipeline = true)]
+    [Parameter(ValueFromPipeline = true, Position = 8)]
     public Microsoft.SqlServer.Management.Smo.Database[]? InputObject { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
@@ -231,3 +231,4 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $SqlInstance $SqlCredential $Credential $Database $ExcludeDatabase $SecurePassword $Path $FileBaseName $InputObject $EnableException $__realCmdlet $__boundPath $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
+

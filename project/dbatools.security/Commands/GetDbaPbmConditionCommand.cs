@@ -27,12 +27,14 @@ namespace Dataplat.Dbatools.Commands;
 /// <para>
 /// InputObject is the only ValueFromPipeline parameter and the body's `$InputObject +=` appends the
 /// instance-resolved stores WITHIN a record, so nothing accumulates across records - the parameter rebinds
-/// per record exactly as the script sees it, and a per-record hop is faithful. Add-PbmLibrary rides at the
-/// top of each record's hop rather than in a begin hop: it only Add-Types the DMF assemblies, which is
-/// idempotent, and it resolves its module-scoped library root inside the dbatools module scope exactly as
-/// the script's begin block does. Buffered InvokeScoped is correct - the only terminating path is the Core
-/// guard, which fires before any output. EnableException is carried as a plain (untyped) value, because a
-/// switch in the inner CmdletBinding scriptblock is excluded from positional binding.
+/// per record exactly as the script sees it, and a per-record hop is faithful. Add-PbmLibrary runs ONCE
+/// from BeginProcessing, matching the script's begin block: it warns and returns when the DMF assemblies
+/// cannot be loaded, so a per-record call would repeat that warning once per record, and an empty pipeline
+/// must still run it. The body streams through InvokeScopedStreaming rather than buffering, because
+/// Stop-Function -Continue THROWS under -EnableException instead of taking its continue branch: a record
+/// can emit conditions for an early store and then terminate on a later one, and a buffered call would
+/// discard what was already produced (DEF-001). EnableException is carried as a plain (untyped) value,
+/// because a switch in the inner CmdletBinding scriptblock is excluded from positional binding.
 /// </para>
 /// </remarks>
 // No [OutputType] is declared: the emitted DMF Condition type ships in assemblies that
@@ -66,15 +68,31 @@ public sealed class GetDbaPbmConditionCommand : DbaBaseCmdlet
     /// <summary>Set once the body has latched the dbatools interrupt, mirroring the script's function scope.</summary>
     private bool _bodyInterrupted;
 
+    /// <summary>Loads the DMF libraries once, as the script's begin block does.</summary>
+    protected override void BeginProcessing()
+    {
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, AddLibraryScript,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+            }
+            else if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }
+    }
+
     /// <summary>Returns the conditions for the stores bound to the current record.</summary>
     protected override void ProcessRecord()
     {
         if (_bodyInterrupted || Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Condition, InputObject, IncludeSystemObject.ToBool(),
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -90,7 +108,9 @@ public sealed class GetDbaPbmConditionCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Condition, InputObject, IncludeSystemObject.ToBool(),
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -120,11 +140,31 @@ public sealed class GetDbaPbmConditionCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin block's Add-PbmLibrary, then the process body VERBATIM inside a dot-sourced block so
-    // its early return stays local and the trailing sentinel still runs. The sentinel reports the dbatools
-    // interrupt latch so the next record can skip exactly as the script's function-scoped latch makes it.
-    // Substitutions only: -FunctionName on the single DIRECT Stop-Function call, and -FunctionName plus
-    // -ModuleName "dbatools" on the single DIRECT Write-Message call. EnableException received untyped.
+    // PS: the script's begin block, run ONCE from BeginProcessing. Add-PbmLibrary warns and returns when
+    // the DMF assemblies cannot be loaded, so calling it per record would repeat that warning and its
+    // $error entry once per record instead of once - and an empty pipeline must still run it, as the
+    // script's begin block does.
+    private const string AddLibraryScript = """
+param($__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param($__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    Add-PbmLibrary
+} $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+""";
+
+    // PS: the process body VERBATIM inside a dot-sourced block so its early return stays local and the
+    // trailing sentinel still runs. The sentinel reports the dbatools interrupt latch so the next record
+    // can skip exactly as the script's function-scoped latch makes it. Substitutions only: -FunctionName
+    // on the single DIRECT Stop-Function call, and -FunctionName plus -ModuleName "dbatools" on the
+    // single DIRECT Write-Message call. EnableException received untyped.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Condition, $InputObject, $IncludeSystemObject, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -135,8 +175,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Condition, [psobject[]]$InputObject, $IncludeSystemObject, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-
-    Add-PbmLibrary
 
     . {
         if (Test-FunctionInterrupt) { return }
@@ -173,3 +211,4 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
 """;
 }
+

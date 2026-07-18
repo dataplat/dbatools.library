@@ -117,12 +117,13 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
     /// <remarks>
     /// A command that produced NO output leaves the script variable holding AutomationNull, which
     /// behaves as $null in PowerShell but unwraps to a truthy, property-less object - so it comes
-    /// back as null instead. A [PSCustomObject] value is returned still WRAPPED, because its note
-    /// properties live on the PSObject wrapper and its BaseObject is only an empty marker:
-    /// unwrapping such a value would silently discard the payload. Anything else unwraps to its
-    /// base value. Cardinality is settled at the sentinel (the carried collection is normalized
-    /// with @()), never inferred here - a genuinely empty [pscustomobject]@{} and a no-output
-    /// result are indistinguishable by shape, and only the sentinel knows which it holds.
+    /// back as null instead. Otherwise the value is unwrapped ONLY when the wrapper adds nothing:
+    /// note properties (whether Add-Member decoration on an SMO object or the members of a
+    /// [PSCustomObject]) live on the PSObject wrapper, not the BaseObject, so unwrapping such a
+    /// value silently discards them. Cardinality is settled at the sentinel, where the carried
+    /// collection is normalized with @(), never inferred here - a genuinely empty
+    /// [pscustomobject]@{} and a no-output result are indistinguishable by shape, and only the
+    /// sentinel knows which it holds.
     /// </remarks>
     private static object? UnwrapHopValue(object? value)
     {
@@ -130,7 +131,12 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
             return null;
         if (value is not PSObject wrapper)
             return value;
-        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
+        foreach (PSMemberInfo member in wrapper.Members)
+        {
+            if (member is PSNoteProperty)
+                return wrapper;
+        }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
