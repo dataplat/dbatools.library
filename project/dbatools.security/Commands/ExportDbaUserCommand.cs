@@ -38,6 +38,9 @@ namespace Dataplat.Dbatools.Commands;
 /// behave exactly as the script's begin/process ordering. The -Path config default (Path.DbatoolsExport)
 /// is resolved in module scope as the script's parameter default does; Get-ExportFilePath still consumes
 /// the bound $PSBoundParameters.Path/.FilePath, carried as $__boundPathValue/$__boundFilePathValue.
+/// The process body runs inside a NAMED-WRAPPER SHIM (a function literally named Export-DbaUser, invoked
+/// dot-sourced per batch): Get-ExportFilePath derives the export filename from (Get-PSCallStack)[1].Command,
+/// and an anonymous scriptblock frame produced invalid filenames carrying a scriptblock marker.
 /// Switches are carried as plain (untyped) values, because a switch in the inner CmdletBinding scriptblock
 /// is excluded from positional binding. Only the three DIRECT process Stop-Function/Write-Message calls take
 /// -FunctionName; Test-ExportDirectory's own nested Stop-Function attributes to that helper in both worlds
@@ -264,10 +267,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         $eol = [System.Environment]::NewLine
         $InputObject = $null
-        foreach ($__batch in $__batches) {
-            $SqlInstance = $__batch[1]
-            if ($__batch[0]) { $InputObject = $__batch[2] }
-            . {
+        # Named-wrapper shim: the process body runs inside a function carrying the command's name,
+        # so call-stack-deriving helpers see Export-DbaUser exactly as in the function world -
+        # Get-ExportFilePath builds export filenames from (Get-PSCallStack)[1].Command, and the
+        # anonymous scriptblock frame put a literal scriptblock marker in every per-user filename.
+        # The dot-sourced invocation keeps the body in the hop scope, so the cross-record
+        # accumulation and the interrupt latch behave unchanged.
+        function Export-DbaUser {
         if (Test-FunctionInterrupt) { return }
 
         foreach ($instance in $SqlInstance) {
@@ -683,7 +689,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if (-Not $GenerateFilePerUser -and $FilePath) {
             Get-ChildItem -Path $FilePath
         }
-            }
+        }
+        foreach ($__batch in $__batches) {
+            $SqlInstance = $__batch[1]
+            if ($__batch[0]) { $InputObject = $__batch[2] }
+            . Export-DbaUser
         }
 } $__batches $SqlCredential $Database $ExcludeDatabase $User $DestinationVersion $Path $FilePath $Encoding $NoClobber $Append $Passthru $Template $EnableException $ScriptingOptionsObject $ExcludeGoBatchSeparator $__pathBound $__filePathBound $__scriptingBound $__boundPathValue $__boundFilePathValue $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
