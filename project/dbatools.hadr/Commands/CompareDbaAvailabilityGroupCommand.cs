@@ -67,7 +67,7 @@ public sealed class CompareDbaAvailabilityGroupCommand : DbaBaseCmdlet
             _typeCarrier = Type;
             _typeCarrierSeeded = true;
         }
-        if (_typeCarrier is not null && System.Array.IndexOf(_typeCarrier, "All") >= 0)
+        if (_typeCarrier is not null && HasAllType(_typeCarrier))
         {
             _typeCarrier = new[] { "AgentJob", "Login", "Credential", "Operator" };
         }
@@ -94,6 +94,21 @@ public sealed class CompareDbaAvailabilityGroupCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }
+    }
+
+    private static bool HasAllType(string[] types)
+    {
+        // Mirrors the source's `"All" -in $Type`: PowerShell -in compares
+        // case-insensitively (and ValidateSet admits any casing), so `-Type all`
+        // must latch the expansion exactly like `-Type All` (codex r2).
+        foreach (string type in types)
+        {
+            if (string.Equals(type, "All", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private object? BoundCommonParameter(string name)
