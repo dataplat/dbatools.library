@@ -16,11 +16,13 @@ namespace Dataplat.Dbatools.Commands;
 /// run the original dbatools PowerShell body VERBATIM inside the dbatools module scope rather than
 /// being reimplemented in C#, so the engine decides the observable details.
 ///
-/// The function has a begin block and a process block. The begin block is a PURE string-building
-/// computation (it has no side effects - no Stop-Function, Write-Message, connection, or output - and
-/// is a function only of the non-pipeline $Type parameter), so it is FOLDED into the top of the
-/// process hop: recomputing $sql per record is identical to computing it once in begin. (The source's
-/// $where.Replace(...) calls do not assign back, so they are no-ops; preserved verbatim.)
+/// The function has a begin block and a process block. The begin block builds $sql from $Type; it is
+/// kept as a SEPARATE once-only hop rather than folded, because it has an OBSERVABLE side effect: the
+/// source's two "$where.Replace(...)" statements do NOT assign back, so their return values are emitted
+/// to the SUCCESS stream. In the source those two strings are emitted exactly once (begin runs once);
+/// folding the begin into the process hop would re-emit them per pipeline record. So the begin hop runs
+/// once in BeginProcessing (its leaked strings are WriteObject'd once, before any process output,
+/// matching the source), and $sql is carried to the process hop via the begin sentinel.
 ///
 /// The process block's second Stop-Function (query failure) has NO -Continue, so it SETS the
 /// function-scope interrupt, but nothing in the function reads Test-FunctionInterrupt, so the interrupt
@@ -52,6 +54,38 @@ public sealed class GetDbaXEObjectCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - the source declares it bare (every set), which
     // the inherited [Parameter] (no ParameterSetName) already matches; no override needed.
 
+    // $sql is built once in the begin hop (a computation with a leaked-string side effect) and carried
+    // to every process record.
+    private object? _sql;
+
+    protected override void BeginProcessing()
+    {
+        if (Interrupted)
+        {
+            return;
+        }
+
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
+            Type, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__getDbaXEObjectBegin"))
+            {
+                if (sentinel["__getDbaXEObjectBegin"] is Hashtable state)
+                {
+                    _sql = state["Sql"];
+                }
+                continue;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
+            }
+            WriteObject(item);
+        }
+    }
+
     protected override void ProcessRecord()
     {
         NestedCommand.InvokeScopedStreaming(this, item =>
@@ -66,7 +100,7 @@ public sealed class GetDbaXEObjectCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }, ProcessScript,
-            SqlInstance, SqlCredential, Type, EnableException.ToBool(),
+            SqlInstance, SqlCredential, _sql, EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
@@ -103,17 +137,17 @@ public sealed class GetDbaXEObjectCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin block (pure $sql construction) folded to the top, then the process block VERBATIM
-    // apart from -FunctionName Get-DbaXEObject on the two direct Stop-Function sites.
-    private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Type, $EnableException, $__boundVerbose, $__boundDebug)
+    // PS: the begin block VERBATIM (including the two $where.Replace(...) statements whose results leak to
+    // output - preserved exactly), plus a trailing sentinel carrying $sql. Runs once in BeginProcessing.
+    private const string BeginScript = """
+param($Type, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Type, $EnableException)
+    param([string[]]$Type)
     if ($Type) {
         $join = $Type -join "','"
         $where = "AND o.object_type in ('$join')"
@@ -146,6 +180,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             AND (o.capabilities IS NULL OR o.capabilities & 1 = 0)
             ORDER BY o.object_type
             "
+    @{ __getDbaXEObjectBegin = @{ Sql = $sql } }
+} $Type @__commonParameters 3>&1 2>&1
+""";
+
+    // PS: the process block VERBATIM apart from -FunctionName Get-DbaXEObject on the two direct
+    // Stop-Function sites. $sql is received from the begin carry.
+    private const string ProcessScript = """
+param($SqlInstance, $SqlCredential, $sql, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, $sql, $EnableException)
     foreach ($instance in $SqlInstance) {
         try {
             $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential -MinimumVersion 9
@@ -159,6 +208,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Issue collecting trace data on $server." -Target $server -ErrorRecord $_ -FunctionName Get-DbaXEObject
         }
     }
-} $SqlInstance $SqlCredential $Type $EnableException @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $sql $EnableException @__commonParameters 3>&1 2>&1
 """;
 }
