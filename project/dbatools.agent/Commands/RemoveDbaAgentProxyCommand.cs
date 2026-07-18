@@ -85,6 +85,7 @@ public sealed class RemoveDbaAgentProxyCommand : DbaBaseCmdlet
         // Reproduce "$params = $PSBoundParameters" faithfully: this cmdlet's own bound parameters.
         Hashtable bound = new Hashtable(MyInvocation.BoundParameters);
 
+        List<PSObject> recordItems = new List<PSObject>();
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, InputObject, bound,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
@@ -97,8 +98,21 @@ public sealed class RemoveDbaAgentProxyCommand : DbaBaseCmdlet
             }
             if (item is not null)
             {
-                _dbProxies.Add(item);
+                recordItems.Add(item);
             }
+        }
+
+        // Match the source's assignment semantics: the SqlInstance branch does "$dbProxies = Get-..."
+        // (REPLACE), the InputObject branch does "$dbProxies += $InputObject" (APPEND). When -SqlInstance
+        // is combined with piped records the lookup runs per record and replaces each time, so appending
+        // would accumulate duplicate proxies and Drop() them repeatedly.
+        if (SqlInstance != null && SqlInstance.Length > 0)
+        {
+            _dbProxies = recordItems;
+        }
+        else
+        {
+            _dbProxies.AddRange(recordItems);
         }
     }
 
