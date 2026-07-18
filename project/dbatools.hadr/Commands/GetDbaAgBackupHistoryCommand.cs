@@ -50,10 +50,13 @@ public sealed class GetDbaAgBackupHistoryCommand : DbaBaseCmdlet
     public DateTime Since { get; set; } = new DateTime(1970, 1, 1);
 
     /// <summary>Recovery fork GUID filter. The source declares a ValidateScript (GUID
-    /// regex or empty string); expressed here as the equivalent ValidatePattern with an
-    /// empty-string alternative - same accept/reject set, binding-error text differs.</summary>
+    /// regex or empty string); expressed here as the equivalent ValidatePattern - same
+    /// accept/reject set, binding-error text differs. The empty branch anchors with \z
+    /// because the source's ('' -eq $_) rejects a lone newline that ^$ would tolerate;
+    /// the GUID branch keeps $, matching the source -match's own trailing-newline
+    /// tolerance (codex r1).</summary>
     [Parameter]
-    [ValidatePattern(@"^$|^(\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\}){0,1}$")]
+    [ValidatePattern(@"^\z|^(\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\}){0,1}$")]
     public string? RecoveryFork { get; set; }
 
     /// <summary>Returns the most recent backup chain per database.</summary>
