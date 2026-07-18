@@ -53,7 +53,11 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class TestDbaDbDataGeneratorConfigCommand : DbaBaseCmdlet
 {
     /// <summary>Path to the JSON configuration file to validate.</summary>
-    [Parameter(Mandatory = true)]
+    // Position = 0 is required for parity, not decoration: a PowerShell advanced function gets
+    // implicit positional binding, so the script function bound -FilePath positionally. A compiled
+    // cmdlet infers no position, so omitting this would reject the documented
+    // "Test-DbaDbDataGeneratorConfig C:\temp\db1.json" call the .EXAMPLE shows.
+    [Parameter(Mandatory = true, Position = 0)]
     public string? FilePath { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
