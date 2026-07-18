@@ -42,6 +42,13 @@ public sealed class TestDbaPathCommand : DbaBaseCmdlet
     [Parameter(Mandatory = true, Position = 2)]
     public object Path { get; set; } = null!;
 
+    // PS: $Path = [string[]]$Path runs at FUNCTION scope inside the instance loop, so the
+    // narrowing survives into every later instance AND pipeline record: from the second
+    // iteration onward $RawPath picks up the ARRAY and the scalar bare-bool mode is gone
+    // for good. Carried here so record 2+ diverges to object mode exactly like the source
+    // (DEF-008 re-open, B's "sql1","sql2" | Test-DbaPath -Path C:\temp probe).
+    private object? _narrowedPath;
+
     protected override void ProcessRecord()
     {
         foreach (DbaInstanceParameter instance in SqlInstance)
@@ -64,9 +71,12 @@ public sealed class TestDbaPathCommand : DbaBaseCmdlet
             }
 
             const int groupSize = 100;
-            // PS: $RawPath = $Path; $Path = [string[]]$Path
-            bool rawIsArray = PsAssignment.Unwrap(Path) is Array;
-            string[] paths = (string[])LanguagePrimitives.ConvertTo(Path, typeof(string[]), CultureInfo.InvariantCulture);
+            // PS: $RawPath = $Path; $Path = [string[]]$Path - $RawPath reads the CURRENT
+            // (possibly already-narrowed) $Path, then the narrowing sticks (see _narrowedPath).
+            object currentPath = _narrowedPath ?? Path;
+            bool rawIsArray = PsAssignment.Unwrap(currentPath) is Array;
+            string[] paths = (string[])LanguagePrimitives.ConvertTo(currentPath, typeof(string[]), CultureInfo.InvariantCulture);
+            _narrowedPath = paths;
             // PS: single path + single instance + non-array raw input = bare-bool mode.
             bool scalarMode = paths.Length == 1 && SqlInstance.Length == 1 && !rawIsArray;
 

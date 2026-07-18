@@ -422,8 +422,15 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
     /// color, PS switch case-insensitivity preserved, default "#FF00CC". The helper's MANDATORY
     /// [string]$Status rejects a null/empty binding — the calculated property errors (statement
     /// class) and the Style field renders EMPTY, not magenta.
+    /// Internal (not private) so the TB-013 offline tests can pin the switch directly;
+    /// SCALAR inputs (and the array early-return) never touch SessionState, so a bare
+    /// instance suffices for those pins ONLY. Non-array collections route through PsText →
+    /// GetOfsSeparator, which reads the session $OFS and silently defaults to a space when
+    /// SessionState is unavailable — so a bare instance cannot validate the join; the
+    /// collection pins drive the REAL cmdlet end-to-end in a runspace instead (codex
+    /// TB-013 r3/r4).
     /// </summary>
-    private string ConvertTimelineStatusColor(object? status)
+    internal string ConvertTimelineStatusColor(object? status)
     {
         if (status is null)
         {
@@ -453,66 +460,43 @@ public sealed class ConvertToDbaTimelineCommand : DbaBaseCmdlet
 
     /// <summary>
     /// Private helper ConvertTo-JsDate absorbed: "new Date(yyyy, MM-1, dd, HH, mm, ss)" — the
-    /// month is 0-based int arithmetic on the Get-Date -Format "MM" string (unpadded), the
-    /// other parts keep their leading zeros. Get-Date -Format renders with the CURRENT culture
-    /// (calendar included), so the formatting culture is preserved; the "MM"-1 arithmetic is
-    /// PS string-to-int conversion (invariant numeric parse). A null/unconvertible input fails
-    /// the [datetime] cast in PS (statement-terminating in the calculated property, empty
-    /// value) — rendered empty here; a non-numeric month string leaves that component empty
-    /// exactly like the failing subexpression would.
+    /// month is 0-based int arithmetic on the Get-Date -Format "MM" string (the subtraction
+    /// renders it unpadded), the other parts keep their leading zeros. Get-Date -Format
+    /// renders with the CURRENT culture (calendar included: th-TH emits Buddhist years,
+    /// ar-SA emits UmAlQura dates), so the formatting culture is preserved; the "MM"-1
+    /// arithmetic is PS string-to-int conversion (invariant numeric parse).
+    /// FAILURE SHAPE (probed 5.1 + 7.6, TB-017 — this CORRECTS the earlier note here that
+    /// claimed per-component fallbacks like a "-1" month): a Get-Date formatting failure
+    /// (e.g. a pre-1900 date under ar-SA/UmAlQura — reachable, SQL sentinel dates reach back
+    /// to 1753) is a statement-terminating throw that -ErrorAction does not govern; it kills
+    /// the WHOLE template statement, the helper returns nothing, and the calculated-property
+    /// field renders EMPTY — same as the null/unconvertible [datetime]-cast failure. PS has
+    /// exactly two output classes: the complete string, or empty.
+    /// Internal (not private) so the TB-017 offline pins can drive it directly, including
+    /// the culture swaps; the date logic touches no SessionState.
+    /// NO array guard on purpose (opus TB-017, probe-settled): unlike the [string] sibling
+    /// above - where LanguagePrimitives $OFS-joins what the binder rejects, forcing the
+    /// explicit Array early-return - LanguagePrimitives.ConvertTo REFUSES array-to-DateTime
+    /// (probed both editions, single-element and empty), so the catch below already renders
+    /// the same EMPTY the PS binder rejection produces. The string conversion is likewise
+    /// INVARIANT in the PS binder (probed: en-GB "16/07/2026" fails and renders empty),
+    /// matching the InvariantCulture argument here.
     /// </summary>
-    private static string ConvertToJsDate(object? inputDate)
-    {
-        DateTime date;
-        try
-        {
-            date = (DateTime)LanguagePrimitives.ConvertTo(inputDate, typeof(DateTime), CultureInfo.InvariantCulture);
-        }
-        catch
-        {
-            return string.Empty;
-        }
-        CultureInfo culture = CultureInfo.CurrentCulture;
-        // PS month semantics (lab-proven under ar-SA/UmAlQura with an out-of-calendar date):
-        // if Get-Date -Format "MM" FAILS, the inner subexpression yields nothing and the
-        // arithmetic still runs — $null - 1 renders "-1"; if the FORMAT succeeds but the
-        // "MM"-1 string-int conversion fails (non-parsable digits), the whole $(x-1)
-        // subexpression dies and the component renders EMPTY.
-        string monthComponent;
-        try
-        {
-            string monthText = date.ToString("MM", culture);
-            try
-            {
-                monthComponent = (int.Parse(monthText, NumberStyles.Integer, CultureInfo.InvariantCulture) - 1).ToString(CultureInfo.InvariantCulture);
-            }
-            catch
-            {
-                monthComponent = string.Empty;
-            }
-        }
-        catch
-        {
-            monthComponent = "-1";
-        }
-        // EVERY component is its own $(Get-Date ...) subexpression in the PS template: a
-        // formatting failure (e.g. a pre-calendar-minimum date under ar-SA/UmAlQura) empties
-        // just that component and the row continues.
-        return string.Format(CultureInfo.InvariantCulture,
-            "new Date({0}, {1}, {2}, {3}, {4}, {5})",
-            FormatComponent(date, "yyyy", culture),
-            monthComponent,
-            FormatComponent(date, "dd", culture),
-            FormatComponent(date, "HH", culture),
-            FormatComponent(date, "mm", culture),
-            FormatComponent(date, "ss", culture));
-    }
-
-    private static string FormatComponent(DateTime date, string format, CultureInfo culture)
+    internal static string ConvertToJsDate(object? inputDate)
     {
         try
         {
-            return date.ToString(format, culture);
+            DateTime date = (DateTime)LanguagePrimitives.ConvertTo(inputDate, typeof(DateTime), CultureInfo.InvariantCulture);
+            CultureInfo culture = CultureInfo.CurrentCulture;
+            int month = int.Parse(date.ToString("MM", culture), NumberStyles.Integer, CultureInfo.InvariantCulture) - 1;
+            return string.Format(CultureInfo.InvariantCulture,
+                "new Date({0}, {1}, {2}, {3}, {4}, {5})",
+                date.ToString("yyyy", culture),
+                month.ToString(CultureInfo.InvariantCulture),
+                date.ToString("dd", culture),
+                date.ToString("HH", culture),
+                date.ToString("mm", culture),
+                date.ToString("ss", culture));
         }
         catch
         {

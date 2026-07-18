@@ -1,0 +1,158 @@
+#nullable enable
+
+using System;
+using System.Collections;
+using System.Management.Automation;
+using Dataplat.Dbatools.Parameter;
+
+namespace Dataplat.Dbatools.Commands;
+
+/// <summary>
+/// Finds orphaned database users (users whose login no longer exists on the instance). Port of
+/// public/Get-DbaDbOrphanUser.ps1; the workflow remains a module-scoped PowerShell compatibility hop.
+///
+/// A process-only port (SqlInstance is ValueFromPipeline, so process fires per record); the simplest kind -
+/// no begin/end, no accumulator, no interrupt (both Stop-Function calls are -Continue and there is no
+/// Test-FunctionInterrupt or early return), no Test-Bound. Database/ExcludeDatabase are truthiness checks. The
+/// only edits are -FunctionName Get-DbaDbOrphanUser on the two Stop-Function and five Write-Message calls.
+/// Surface pinned by migration/baselines/Get-DbaDbOrphanUser.json (positions 0-3, no sets, no ShouldProcess).
+/// </summary>
+[Cmdlet(VerbsCommon.Get, "DbaDbOrphanUser")]
+public sealed class GetDbaDbOrphanUserCommand : DbaBaseCmdlet
+{
+    /// <summary>The target SQL Server instance or instances.</summary>
+    [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
+    public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
+
+    /// <summary>Login to the target instance using alternative credentials.</summary>
+    [Parameter(Position = 1)]
+    public PSCredential? SqlCredential { get; set; }
+
+    /// <summary>The database(s) to check.</summary>
+    [Parameter(Position = 2)]
+    public object[]? Database { get; set; }
+
+    /// <summary>The database(s) to exclude.</summary>
+    [Parameter(Position = 3)]
+    public object[]? ExcludeDatabase { get; set; }
+
+    // EnableException is inherited from DbaBaseCmdlet - never redeclared.
+
+    protected override void ProcessRecord()
+    {
+        if (Interrupted)
+            return;
+
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
+            }
+            WriteObject(item);
+        }
+    }
+
+    private object? BoundCommonParameter(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    private void RemoveHopErrorBookkeeping(ErrorRecord record)
+    {
+        try
+        {
+            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+                return;
+            if (errorList[0] is not ErrorRecord first)
+                return;
+            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
+                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
+            {
+                errorList.RemoveAt(0);
+            }
+        }
+        catch
+        {
+            // Best-effort bookkeeping only.
+        }
+    }
+    // PS: the process block VERBATIM. Edit: -FunctionName Get-DbaDbOrphanUser on the two Stop-Function and
+    // five Write-Message calls. Database/ExcludeDatabase are truthiness checks (no Test-Bound).
+    private const string ProcessScript = """
+param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, $EnableException, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+        foreach ($instance in $SqlInstance) {
+            try {
+                $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
+            } catch {
+                Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaDbOrphanUser
+            }
+            $DatabaseCollection = @($server.Databases | Where-Object IsAccessible)
+
+            if ($Database) {
+                $DatabaseCollection = @($DatabaseCollection | Where-Object Name -In $Database)
+            }
+            if ($ExcludeDatabase) {
+                $DatabaseCollection = @($DatabaseCollection | Where-Object Name -NotIn $ExcludeDatabase)
+            }
+
+            if ($DatabaseCollection.Count -gt 0) {
+                foreach ($db in $DatabaseCollection) {
+                    try {
+                        Write-Message -Level Verbose -Message "Validating users on database '$db'." -FunctionName Get-DbaDbOrphanUser
+                        $UsersToWork = @()
+                        # ContainmentType is SQL Server 2012+ only, so keep the legacy path for older versions.
+                        $isContainedDatabase = (
+                            $server.versionMajor -gt 10 -and
+                            $null -ne $db.ContainmentType -and
+                            $db.ContainmentType -ne [Microsoft.SqlServer.Management.Smo.ContainmentType]::None
+                        )
+                        if (-not $isContainedDatabase) {
+                            $UsersToWork += $db.Users | Where-Object { ($_.Login -eq "") -and ($_.ID -gt 4) -and ($_.Sid.Length -eq 16) -and ($_.LoginType -in "SqlLogin", "Certificate") }
+                        } else {
+                            Write-Message -Level Verbose -Message "Skipping SQL login orphan check on contained database '$db' (ContainmentType: $($db.ContainmentType))." -FunctionName Get-DbaDbOrphanUser
+                        }
+                        $UsersToWork += $db.Users | Where-Object { ($_.Login -notin $server.Logins.Name) -and ($_.ID -gt 4) -and ($_.Sid.Length -gt 16 -and $_.LoginType -in "WindowsUser", "WindowsGroup") }
+                        if ($UsersToWork.Count -gt 0) {
+                            Write-Message -Level Verbose -Message "Orphan users found" -FunctionName Get-DbaDbOrphanUser
+                            foreach ($user in $UsersToWork) {
+                                [PSCustomObject]@{
+                                    ComputerName = $server.ComputerName
+                                    InstanceName = $server.ServiceName
+                                    SqlInstance  = $server.DomainInstanceName
+                                    DatabaseName = $db.Name
+                                    User         = $user.Name
+                                    SmoUser      = $user
+                                } | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, DatabaseName, User
+                            }
+                        } else {
+                            Write-Message -Level Verbose -Message "No orphan users found on database '$db'." -FunctionName Get-DbaDbOrphanUser
+                        }
+                        #reset collection
+                        $UsersToWork = $null
+                    } catch {
+                        Stop-Function -Message $_ -Continue -FunctionName Get-DbaDbOrphanUser
+                    }
+                }
+            } else {
+                Write-Message -Level VeryVerbose -Message "There are no databases to analyse." -FunctionName Get-DbaDbOrphanUser
+            }
+        }
+} $SqlInstance $SqlCredential $Database $ExcludeDatabase $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+}
