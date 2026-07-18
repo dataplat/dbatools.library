@@ -24,18 +24,21 @@ namespace Dataplat.Dbatools.Commands;
 ///    $objectCollection)" loop reprocesses the whole accumulated set on every record (a source
 ///    quirk - later records re-decrypt earlier records' objects against the current record's
 ///    server). It rides a state sentinel across records so that behavior is preserved bug-for-bug.
-///  - Only the export-directory creation stays in a genuine BEGIN hop, because it is the one begin
-///    SIDE EFFECT that can interrupt process (its Stop-Function halts every record), and because
-///    its "Stop-Function -Target $instance" binds $instance while $instance is UNBOUND in begin -
-///    a source quirk that would change if the block ran inside the process foreach.
+///  - Only the export-directory creation stays in a genuine BEGIN hop, so it runs ONCE (its
+///    Test-Path guard makes re-running idempotent, but a failure would warn per-record if it ran
+///    in process), and because its "Stop-Function -Target $instance" binds $instance while
+///    $instance is UNBOUND in begin - a source quirk that would change if the block ran inside the
+///    process foreach where $instance is the loop variable.
 ///
-/// INTERRUPT CARRY. The begin export-dir Stop-Function and any process Stop-Function set the module
-/// interrupt flag in the caller's scope; across separate hop invocations it does not survive, so
-/// each hop reads it at Get-Variable -Scope 0 after its dot-sourced body and carries it. C# skips
-/// process (and end) when a prior hop carried true, reproducing the source's Test-FunctionInterrupt
-/// short-circuit. Every process Stop-Function is -Continue (skip the current object/db/instance and
-/// keep looping), so within a record a failure does not halt later work; the begin failure is the
-/// only cross-record interrupt.
+/// INTERRUPT CARRY (vestigial here, preserved verbatim). Stop-Function sets the module interrupt
+/// flag ONLY on its non-Continue path; a "Stop-Function -Continue" warns and calls continue without
+/// ever setting it. EVERY Stop-Function in this command - the begin export-dir failure and all ten
+/// process failures - is -Continue, so the interrupt flag is never raised and the source's
+/// process-top "if (Test-FunctionInterrupt) { return }" never fires. The port keeps that check
+/// verbatim and threads the flag through each hop's Get-Variable -Scope 0 sentinel anyway, so the
+/// machinery stays byte-faithful to the source; it simply never triggers for this command. A begin
+/// export-dir failure therefore does NOT suppress process (matching the source), and EndProcessing
+/// is intentionally not gated on the carried flag.
 ///
 /// The source reads $Force (undeclared) at the export New-Item -Force:$Force - it rides verbatim as
 /// an unset read ($false). No ShouldProcess (the source declares none), no Test-Bound, no
@@ -76,7 +79,8 @@ public sealed class InvokeDbaDbDecryptObjectCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    // A begin export-dir failure, or a process Stop-Function on an earlier record, halts the rest.
+    // Carries the source's function-scope interrupt flag between hops. Vestigial for this command
+    // (every Stop-Function is -Continue, which never sets it) but preserved verbatim; see the class doc.
     private bool _interrupted;
     // Carries the $objectCollection accumulator (an ArrayList held opaquely - never cast in C#).
     private Hashtable? _state;
@@ -183,8 +187,8 @@ public sealed class InvokeDbaDbDecryptObjectCommand : DbaBaseCmdlet
     // PS: the begin block's export-directory side effect VERBATIM, dot-sourced. $instance is
     // unbound here exactly as in the source begin (its Stop-Function -Target binds $null). The
     // helper/encoding/ArrayList setup is NOT here - those are process-hop preamble (see the class
-    // doc). Edit: -FunctionName on the one Stop-Function. The sentinel reports whether this hop's
-    // Stop-Function set the interrupt.
+    // doc). Edit: -FunctionName on the one Stop-Function (which is -Continue, so it never sets the
+    // interrupt). The sentinel reports the interrupt flag verbatim - always false for this command.
     private const string BeginScript = """
 param($ExportDestination, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -216,7 +220,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // $encoding are recreated here (pure setup); the $objectCollection accumulator is restored from
     // the carried state (or created on the first record) so the source's grow-and-reprocess-whole
     // behavior survives across records. Edits: -FunctionName on the ten direct Stop-Function/
-    // Write-Message calls. The sentinel carries the accumulator and this record's interrupt.
+    // Write-Message calls (all -Continue, so none sets the interrupt). The sentinel carries the
+    // accumulator and the interrupt flag verbatim (the flag stays false for this command).
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $ObjectName, $EncodingType, $ExportDestination, $EnableException, $__state, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
