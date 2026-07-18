@@ -32,14 +32,44 @@ namespace Dataplat.Dbatools.Commands;
 /// executes inside the dbatools module scope via `& $__dbatoolsModule` - it would be CommandNotFound
 /// from a plain scriptblock, which is precisely what the module-scoped hop exists to provide.
 ///
-/// PRESERVED SOURCE BUG - do not "fix" this in the port. At source line 195 the online-rebuild
-/// capability scan iterates `$tables`, but `$tables` is not assigned until line 265, inside the
-/// OTHER (explicit -CompressionType) branch. So on the "Recommended" path `$tables` is $null on the
-/// first database and the scan body never executes, leaving $isOnlineRebuildSupported $false and
-/// forcing offline rebuilds; across a multi-database run it is worse than $null, because it can hold
-/// the PREVIOUS database's table collection and decide this database's online-rebuild capability
-/// from another database's indexes. Reproduced verbatim per the verbatim-source-bugs law and logged
-/// upstream; the hop reproduces it for free precisely because the body is unmodified.
+/// PRESERVED SOURCE BUG - do not "fix" this in the port, and note it does NOT reproduce for free.
+/// At source line 195 the online-rebuild capability scan iterates `$tables`, but `$tables` is not
+/// assigned until line 265, inside the OTHER (explicit -CompressionType) branch. On the EXPLICIT
+/// path that means the scan for each database reads the PREVIOUS iteration's table collection,
+/// deciding this database's online-rebuild capability from another database's indexes; on the
+/// "Recommended" path `$tables` is never assigned at all and the scan body simply never runs.
+///
+/// WITHIN one record the unmodified body reproduces that by itself. ACROSS records it does not, and
+/// that is DEF-012: an advanced function's process-block locals persist across piped records, so the
+/// source's record 2 still sees record 1's `$tables`, while a hop resets every body local per
+/// record. Measured with a DBATOOLS_LEGACY_FUNCTIONS A/B (one disposable database, instance piped
+/// twice, -CompressionType Row): the legacy function reported online rebuilds SUPPORTED on record 2
+/// and the unfixed port reported NOT supported - the source issuing ONLINE index rebuilds where the
+/// port issued OFFLINE ones, a real difference in locking behaviour on a destructive operation.
+///
+/// Fixed per the DEF-012 ruling with the established per-row sentinel carry: the affected locals ride
+/// __setDbaDbCompressionProcess from each record's end-of-body back into the next record's seed, so
+/// the bug is reproduced across records exactly as the source has it. Reproducing a bug faithfully
+/// is the requirement; the underlying defect is logged upstream, not repaired here.
+///
+/// TWO locals are carried, and the second one is the subtler shape:
+///   $tables                - read at line 195 before ANY assignment in the record.
+///   $compressionSuggestion - assigned ONLY inside conditional branches (the passed-in-InputObject
+///                            branch, or the first ShouldProcess gate), but READ at line 231 under a
+///                            DIFFERENT gate. Decline the testing gate on record 2 while accepting
+///                            the applying gate and the source reads record 1's suggestions, where an
+///                            uncarried port would see nothing and silently apply nothing.
+/// The second was found by review, not by my detector: a source-order walk sees an assignment textually
+/// before the read and calls it safe. That gap is now closed in the detector as the CROSS-BRANCH rule
+/// (an assignment dominates a read only if it is unconditional at some enclosing block level).
+///
+/// RESIDUAL, stated rather than hidden: the sentinel is emitted at the end of the body, so if the
+/// body throws out of the hop entirely (an -EnableException path - every Stop-Function site here
+/// uses -Continue, so this is narrow) that record's state is not carried, whereas the function's
+/// scope would still have held it. Reproducing that too would need the carry to survive an
+/// exception unwind, which the current InvokeScoped contract does not offer. Reviewed and accepted:
+/// a terminating error that escapes the hop ends the command pipeline, so no subsequent record
+/// survives to observe the lost state.
 ///
 /// -InputObject is deliberately `object` and NOT an array: the source declares it untyped
 /// (`$InputObject`, no type constraint) and the baseline records System.Object at position 8.
@@ -111,6 +141,14 @@ public sealed class SetDbaDbCompressionCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // DEF-012 cross-record carry. $tables is READ by the online-rebuild scan before anything assigns
+    // it in this record, so in the source it holds whatever the PREVIOUS record left behind. A hop
+    // resets body locals per record, which loses that. This field is the per-row sentinel carry
+    // mandated by the DEF-012 ruling: seeded null for the first record, then refreshed from each
+    // record's end-of-body sentinel so the next record sees exactly what the function would have.
+    private object? _carriedTables;
+    private object? _carriedCompressionSuggestion;
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -121,9 +159,18 @@ public sealed class SetDbaDbCompressionCommand : DbaBaseCmdlet
             CompressionType, MaxRunTime, PercentCompression,
             ForceOfflineRebuilds.ToBool(), SortInTempDB.ToBool(),
             InputObject, EnableException.ToBool(),
-            TestBound(nameof(InputObject)),
+            TestBound(nameof(InputObject)), _carriedTables, _carriedCompressionSuggestion,
             this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__setDbaDbCompressionProcess"))
+            {
+                if (sentinel["__setDbaDbCompressionProcess"] is Hashtable state)
+                {
+                    _carriedTables = state["Tables"];
+                    _carriedCompressionSuggestion = state["CompressionSuggestion"];
+                }
+                continue;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -166,15 +213,20 @@ public sealed class SetDbaDbCompressionCommand : DbaBaseCmdlet
     // Stop-Function and Write-Message sites. The $tables-before-assignment bug at the online-rebuild
     // scan is PRESERVED deliberately (see the class remarks).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $Table, $CompressionType, $MaxRunTime, $PercentCompression, $ForceOfflineRebuilds, $SortInTempDB, $InputObject, $EnableException, $__boundInputObject, $__realCmdlet, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $Table, $CompressionType, $MaxRunTime, $PercentCompression, $ForceOfflineRebuilds, $SortInTempDB, $InputObject, $EnableException, $__boundInputObject, $__carriedTables, $__carriedCompressionSuggestion, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$ExcludeDatabase, [string[]]$Table, [string]$CompressionType, [int]$MaxRunTime, [int]$PercentCompression, $ForceOfflineRebuilds, $SortInTempDB, $InputObject, $EnableException, $__boundInputObject, $__realCmdlet, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$ExcludeDatabase, [string[]]$Table, [string]$CompressionType, [int]$MaxRunTime, [int]$PercentCompression, $ForceOfflineRebuilds, $SortInTempDB, $InputObject, $EnableException, $__boundInputObject, $__carriedTables, $__carriedCompressionSuggestion, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # DEF-012 carry (hop mechanism, not source): re-seed the cross-record local the source would
+    # still be holding from the previous record. Must precede the body so the line-195 scan reads it.
+    $tables = $__carriedTables
+    $compressionSuggestion = $__carriedCompressionSuggestion
 
     $starttime = Get-Date
     foreach ($instance in $SqlInstance) {
@@ -434,6 +486,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $SqlInstance $SqlCredential $Database $ExcludeDatabase $Table $CompressionType $MaxRunTime $PercentCompression $ForceOfflineRebuilds $SortInTempDB $InputObject $EnableException $__boundInputObject $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+    # DEF-012 carry (hop mechanism, not source): hand this record's final $tables to the next one.
+    @{ __setDbaDbCompressionProcess = @{ Tables = $tables; CompressionSuggestion = $compressionSuggestion } }
+} $SqlInstance $SqlCredential $Database $ExcludeDatabase $Table $CompressionType $MaxRunTime $PercentCompression $ForceOfflineRebuilds $SortInTempDB $InputObject $EnableException $__boundInputObject $__carriedTables $__carriedCompressionSuggestion $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
+
