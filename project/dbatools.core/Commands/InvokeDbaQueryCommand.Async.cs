@@ -37,15 +37,7 @@ public sealed partial class InvokeDbaQueryCommand
         SqlConnection conn = (SqlConnection)sqlConnection.SqlConnectionObject;
 
         WriteMessage(MessageLevel.Debug, "Stripping GOs from source");
-        string[] rawPieces = GoSplitterRegex.Split(query);
-
-        // Only execute non-empty statements
-        List<string> pieces = new();
-        foreach (string rawPiece in rawPieces)
-        {
-            if (rawPiece.Trim().Length > 0)
-                pieces.Add(rawPiece);
-        }
+        List<string> pieces = SplitGoBatches(query);
 
         foreach (string piece in pieces)
         {
@@ -273,8 +265,23 @@ public sealed partial class InvokeDbaQueryCommand
         return preference?.ToString() ?? "Continue";
     }
 
+    /// <summary>PS: splits the query on GO separators (GoSplitterRegex) and keeps only the
+    /// statements that are non-empty after Trim. Extracted from the process loop verbatim so
+    /// the split-and-filter can be pinned without a live connection.</summary>
+    internal static List<string> SplitGoBatches(string query)
+    {
+        string[] rawPieces = GoSplitterRegex.Split(query);
+        List<string> pieces = new();
+        foreach (string rawPiece in rawPieces)
+        {
+            if (rawPiece.Trim().Length > 0)
+                pieces.Add(rawPiece);
+        }
+        return pieces;
+    }
+
     /// <summary>The embedded DBNullScrubber (props to Dave Wyatt), native.</summary>
-    internal static PSObject DataRowToPSObject(DataRow row)
+    internal static PSObject DataRowToPSObject(DataRow? row)
     {
         PSObject psObject = new();
 
@@ -393,7 +400,7 @@ public sealed partial class InvokeDbaQueryCommand
     }
 
     /// <summary>PS pipeline-assignment shaping of a nested result (null/single/array).</summary>
-    private static object? ShapePipelineValue(Collection<PSObject> raw)
+    internal static object? ShapePipelineValue(Collection<PSObject> raw)
     {
         if (raw.Count == 0)
             return null;
