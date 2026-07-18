@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
 
@@ -18,20 +17,22 @@ namespace Dataplat.Dbatools.Commands;
 /// PowerShell body VERBATIM inside the dbatools module scope rather than being reimplemented in C#, so the
 /// engine decides the observable details.
 ///
-/// The script has begin and process blocks, and its per-record process locals persist on the function
-/// scope across pipeline records (the source retains stale $server / $xml / $basename / $tempfile /
-/// $TargetFilePath / $TargetFileMetadataPath / $Name when an assignment is skipped by a Stop-Function
-/// -Continue). To reproduce that faithfully the port collects each record's (SqlInstance, Path) pair into
-/// _batches across ProcessRecord and, in EndProcessing, runs ONE hop that executes the begin body (the
-/// $metadata Import-Clixml) and then the process body once per collected batch in a SINGLE persistent scope
-/// - so every one of those locals carries record to record exactly as the function scope does. An empty
-/// pipeline collects no batches, so the process body never runs (begin still does), matching the script.
+/// The command processes and emits PER RECORD (unlike a purely end-block command), so the process body runs
+/// in a per-record hop during ProcessRecord - preserving pipeline streaming (records received before an
+/// upstream terminating failure are processed) and evaluating each Test-Bound at the record it belongs to.
+/// The begin block's $metadata (Import-Clixml of the bundled metadata under $script:PSModuleRoot) is a
+/// once-only value carried from BeginProcessing.
 ///
-/// Substitutions only: -FunctionName on every direct Stop-Function/Write-Message, and every Test-Bound ->
-/// the carried immutable flag ($__pathBound, $__templateBound, $__nameBound, $__targetFilePathBound,
-/// $__targetFileMetadataPathBound; Test-Bound never rides the hop). $script:PSModuleRoot resolves in the
-/// module scope. No process block reads Test-FunctionInterrupt, so no interrupt guard is needed. Each
-/// created session emits before a later file or instance may fail under -EnableException, so the hop uses
+/// The source keeps its process locals on the FUNCTION scope, so a value assigned in one record is still
+/// visible in the next when a Stop-Function -Continue skips the reassignment (stale $server, $xml,
+/// $basename, $tempfile) or a parameter is mutated ($Name, $TargetFilePath, $TargetFileMetadataPath - the
+/// last two via a non-idempotent "TrimEnd both separators then append one"). A fresh per-record hop scope
+/// would lose that, so those locals are seeded from a carried state at the top of each record's hop and
+/// re-emitted through a sentinel (rode out on a finally so an early return still carries them). Every
+/// Test-Bound becomes a carried immutable flag ($__pathBound, $__templateBound, $__nameBound,
+/// $__targetFilePathBound, $__targetFileMetadataPathBound), sampled per record (Test-Bound never rides the
+/// hop). No process block reads Test-FunctionInterrupt, so no interrupt is carried. Each created session
+/// emits before a later file or instance may fail under -EnableException, so the hop uses
 /// InvokeScopedStreaming. Surface pinned by migration/baselines/Import-DbaXESessionTemplate.json.
 /// </remarks>
 [Cmdlet(VerbsData.Import, "DbaXESessionTemplate")]
@@ -74,30 +75,66 @@ public sealed class ImportDbaXESessionTemplateCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    // One batch per ProcessRecord: the (SqlInstance, Path) pipeline bindings that record saw. The begin body
-    // and every process record then run in a single EndProcessing hop so the source's function-scope process
-    // locals persist across records.
-    private readonly List<object?[]> _batches = new List<object?[]>();
+    // The bundled metadata, read once in the begin hop.
+    private object? _metadata;
+
+    // The source's function-scope process locals, carried record to record (see the class remarks). The
+    // three mutated parameters seed from their bound values; the loop locals seed from null.
+    private object? _name;
+    private object? _targetFilePath;
+    private object? _targetFileMetadataPath;
+    private object? _server;
+    private object? _store;
+    private object? _xml;
+    private object? _basename;
+    private object? _tempfile;
+
+    protected override void BeginProcessing()
+    {
+        _name = Name;
+        _targetFilePath = TargetFilePath;
+        _targetFileMetadataPath = TargetFileMetadataPath;
+
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__importDbaXESessionTemplateBegin"))
+            {
+                if (sentinel["__importDbaXESessionTemplateBegin"] is Hashtable state)
+                {
+                    _metadata = state["Metadata"];
+                }
+                continue;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
+            }
+            WriteObject(item);
+        }
+    }
 
     protected override void ProcessRecord()
     {
-        if (Interrupted)
-        {
-            return;
-        }
-
-        _batches.Add(new object?[] { SqlInstance, Path });
-    }
-
-    protected override void EndProcessing()
-    {
-        if (Interrupted)
-        {
-            return;
-        }
-
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__importDbaXESessionTemplateProcess"))
+            {
+                if (sentinel["__importDbaXESessionTemplateProcess"] is Hashtable state)
+                {
+                    _name = state["Name"];
+                    _targetFilePath = state["TargetFilePath"];
+                    _targetFileMetadataPath = state["TargetFileMetadataPath"];
+                    _server = state["Server"];
+                    _store = state["Store"];
+                    _xml = state["Xml"];
+                    _basename = state["Basename"];
+                    _tempfile = state["Tempfile"];
+                }
+                return;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -108,8 +145,8 @@ public sealed class ImportDbaXESessionTemplateCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }, ProcessScript,
-            _batches.ToArray(), SqlCredential, Name, Template, TargetFilePath, TargetFileMetadataPath,
-            StartUpState, EnableException.ToBool(),
+            SqlInstance, SqlCredential, Path, Template, StartUpState, _metadata, EnableException.ToBool(),
+            _name, _targetFilePath, _targetFileMetadataPath, _server, _store, _xml, _basename, _tempfile,
             TestBound(nameof(Path)), TestBound(nameof(Template)), TestBound(nameof(Name)),
             TestBound(nameof(TargetFilePath)), TestBound(nameof(TargetFileMetadataPath)),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
@@ -148,204 +185,224 @@ public sealed class ImportDbaXESessionTemplateCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin body then the process body (dot-sourced, once per collected batch) VERBATIM in ONE scope,
-    // so the process locals persist record to record like the function scope. Substitutions: -FunctionName on
-    // every direct Stop-Function/Write-Message, and every Test-Bound -> the carried immutable flag.
+    // PS: the begin block VERBATIM ($script:PSModuleRoot resolves in the module scope), returning $metadata
+    // via a sentinel. Runs once in BeginProcessing.
+    private const string BeginScript = """
+param($__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    $xmlpath = Join-DbaPath $script:PSModuleRoot "bin" "xetemplates-metadata.xml"
+    $metadata = Import-Clixml $xmlpath
+    @{ __importDbaXESessionTemplateBegin = @{ Metadata = $metadata } }
+} @__commonParameters 3>&1 2>&1
+""";
+
+    // PS: the process block VERBATIM apart from -FunctionName Import-DbaXESessionTemplate on the direct
+    // Stop-Function/Write-Message sites, every Test-Bound -> the carried immutable flag, $metadata supplied
+    // from the begin carry, and the function-scope process locals seeded from carried state and re-emitted
+    // in a sentinel (on a finally). EnableException is bound so Stop-Function's scope-walking default inherits it.
     private const string ProcessScript = """
-param($__batches, $SqlCredential, $Name, $Template, $TargetFilePath, $TargetFileMetadataPath, $StartUpState, $EnableException, $__pathBound, $__templateBound, $__nameBound, $__targetFilePathBound, $__targetFileMetadataPathBound, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Path, $Template, $StartUpState, $metadata, $EnableException, $__carriedName, $__carriedTargetFilePath, $__carriedTargetFileMetadataPath, $__carriedServer, $__carriedStore, $__carriedXml, $__carriedBasename, $__carriedTempfile, $__pathBound, $__templateBound, $__nameBound, $__targetFilePathBound, $__targetFileMetadataPathBound, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param($__batches, $SqlCredential, [string]$Name, [string[]]$Template, [string]$TargetFilePath, [string]$TargetFileMetadataPath, [string]$StartUpState, $EnableException, $__pathBound, $__templateBound, $__nameBound, $__targetFilePathBound, $__targetFileMetadataPathBound)
-    $xmlpath = Join-DbaPath $script:PSModuleRoot "bin" "xetemplates-metadata.xml"
-    $metadata = Import-Clixml $xmlpath
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Path, [string[]]$Template, [string]$StartUpState, $metadata, $EnableException, $__carriedName, $__carriedTargetFilePath, $__carriedTargetFileMetadataPath, $__carriedServer, $__carriedStore, $__carriedXml, $__carriedBasename, $__carriedTempfile, $__pathBound, $__templateBound, $__nameBound, $__targetFilePathBound, $__targetFileMetadataPathBound)
+    # Seed the carried cross-record function-scope locals (the source keeps them on the persistent scope).
+    $Name = $__carriedName
+    $TargetFilePath = $__carriedTargetFilePath
+    $TargetFileMetadataPath = $__carriedTargetFileMetadataPath
+    $server = $__carriedServer
+    $store = $__carriedStore
+    $xml = $__carriedXml
+    $basename = $__carriedBasename
+    $tempfile = $__carriedTempfile
+    try {
+    if ((-not $__pathBound) -and (-not $__templateBound)) {
+        Stop-Function -Message "You must specify Path or Template." -FunctionName Import-DbaXESessionTemplate
+    }
 
-    foreach ($__batch in $__batches) {
-        $SqlInstance = $__batch[0]
-        $Path = $__batch[1]
-        . {
-        if ((-not $__pathBound) -and (-not $__templateBound)) {
-            Stop-Function -Message "You must specify Path or Template." -FunctionName Import-DbaXESessionTemplate
+    if (($Path.Count -gt 1 -or $Template.Count -gt 1) -and ($__nameBound)) {
+        Stop-Function -Message "Name cannot be specified with multiple files or templates because the Session will already exist." -FunctionName Import-DbaXESessionTemplate
+        return
+    }
+
+    foreach ($instance in $SqlInstance) {
+        try {
+            $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential -MinimumVersion 11
+        } catch {
+            Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Import-DbaXESessionTemplate
         }
 
-        if (($Path.Count -gt 1 -or $Template.Count -gt 1) -and ($__nameBound)) {
-            Stop-Function -Message "Name cannot be specified with multiple files or templates because the Session will already exist." -FunctionName Import-DbaXESessionTemplate
-            return
-        }
+        $SqlConn = $server.ConnectionContext.SqlConnectionObject
+        $SqlStoreConnection = New-Object Microsoft.SqlServer.Management.Sdk.Sfc.SqlStoreConnection $SqlConn
+        $store = New-Object Microsoft.SqlServer.Management.XEvent.XEStore $SqlStoreConnection
 
-        foreach ($instance in $SqlInstance) {
-            try {
-                $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential -MinimumVersion 11
-            } catch {
-                Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Import-DbaXESessionTemplate
+        foreach ($file in $template) {
+            $templatepath = Join-DbaPath $script:PSModuleRoot "bin" "XEtemplates" "$file.xml"
+            if ((Test-Path $templatepath)) {
+                $Path += $templatepath
+            } else {
+                Stop-Function -Message "Invalid template ($templatepath does not exist)." -Continue -FunctionName Import-DbaXESessionTemplate
             }
+        }
 
-            $SqlConn = $server.ConnectionContext.SqlConnectionObject
-            $SqlStoreConnection = New-Object Microsoft.SqlServer.Management.Sdk.Sfc.SqlStoreConnection $SqlConn
-            $store = New-Object Microsoft.SqlServer.Management.XEvent.XEStore $SqlStoreConnection
+        foreach ($file in $Path) {
 
-            foreach ($file in $template) {
-                $templatepath = Join-DbaPath $script:PSModuleRoot "bin" "XEtemplates" "$file.xml"
-                if ((Test-Path $templatepath)) {
-                    $Path += $templatepath
-                } else {
-                    Stop-Function -Message "Invalid template ($templatepath does not exist)." -Continue -FunctionName Import-DbaXESessionTemplate
+            if (-not $__targetFilePathBound) {
+                Write-Message -Level Verbose -Message "Importing $file to $instance" -FunctionName Import-DbaXESessionTemplate
+                try {
+                    $xml = [xml](Get-Content $file -ErrorAction Stop)
+                } catch {
+                    Stop-Function -Message "Failure" -ErrorRecord $_ -Target $file -Continue -FunctionName Import-DbaXESessionTemplate
                 }
-            }
+            } else {
+                Write-Message -Level Verbose -Message "TargetFilePath specified, changing all file locations in $file for $instance." -FunctionName Import-DbaXESessionTemplate
 
-            foreach ($file in $Path) {
-
-                if (-not $__targetFilePathBound) {
-                    Write-Message -Level Verbose -Message "Importing $file to $instance" -FunctionName Import-DbaXESessionTemplate
-                    try {
-                        $xml = [xml](Get-Content $file -ErrorAction Stop)
-                    } catch {
-                        Stop-Function -Message "Failure" -ErrorRecord $_ -Target $file -Continue -FunctionName Import-DbaXESessionTemplate
-                    }
-                } else {
-                    Write-Message -Level Verbose -Message "TargetFilePath specified, changing all file locations in $file for $instance." -FunctionName Import-DbaXESessionTemplate
-
-                    # Handle whatever people specify
-                    $TargetFilePath = $TargetFilePath.TrimEnd("\").TrimEnd("/")
+                # Handle whatever people specify
+                $TargetFilePath = $TargetFilePath.TrimEnd("\").TrimEnd("/")
+                if ($__targetFileMetadataPathBound) {
+                    Write-Message -Level Verbose -Message "TargetFileMetadataPath specified, changing all metadata file locations in $file for $instance." -FunctionName Import-DbaXESessionTemplate
+                    $TargetFileMetadataPath = $TargetFileMetadataPath.TrimEnd("\").TrimEnd("/")
+                }
+                if ((Test-HostOSLinux -SqlInstance $server)) {
+                    $TargetFilePath = "$TargetFilePath/"
                     if ($__targetFileMetadataPathBound) {
-                        Write-Message -Level Verbose -Message "TargetFileMetadataPath specified, changing all metadata file locations in $file for $instance." -FunctionName Import-DbaXESessionTemplate
-                        $TargetFileMetadataPath = $TargetFileMetadataPath.TrimEnd("\").TrimEnd("/")
+                        $TargetFileMetadataPath = "$TargetFileMetadataPath/"
                     }
-                    if ((Test-HostOSLinux -SqlInstance $server)) {
-                        $TargetFilePath = "$TargetFilePath/"
-                        if ($__targetFileMetadataPathBound) {
-                            $TargetFileMetadataPath = "$TargetFileMetadataPath/"
-                        }
-                    } else {
-                        $TargetFilePath = "$TargetFilePath\"
-                        if ($__targetFileMetadataPathBound) {
-                            $TargetFileMetadataPath = "$TargetFileMetadataPath\"
-                        }
+                } else {
+                    $TargetFilePath = "$TargetFilePath\"
+                    if ($__targetFileMetadataPathBound) {
+                        $TargetFileMetadataPath = "$TargetFileMetadataPath\"
                     }
-
-                    try {
-                        $basename = (Get-ChildItem $file).Basename
-                        $templateXml = [xml](Get-Content $file -Raw -ErrorAction Stop)
-                        $namespaceUri = $templateXml.DocumentElement.NamespaceURI
-                        $eventSessionNode = $templateXml.SelectSingleNode("/*[local-name()='event_sessions']/*[local-name()='event_session']")
-                        if (-not $eventSessionNode) {
-                            throw "No event_session element found in template $file."
-                        }
-
-                        $eventFileTargetNode = $eventSessionNode.SelectSingleNode("*[local-name()='target' and @name='event_file']")
-                        $eventFileTargetExists = $null -ne $eventFileTargetNode
-
-                        if (-not $eventFileTargetExists) {
-                            # No event_file target found in template - add one so TargetFilePath is honored
-                            Write-Message -Level Verbose -Message "No event_file target found in template, adding one with TargetFilePath." -FunctionName Import-DbaXESessionTemplate
-                            $eventFileTargetNode = $templateXml.CreateElement("target", $namespaceUri)
-                            $null = $eventFileTargetNode.SetAttribute("package", "package0")
-                            $null = $eventFileTargetNode.SetAttribute("name", "event_file")
-                        }
-
-                        $filenameParameterNode = $eventFileTargetNode.SelectSingleNode("*[local-name()='parameter' and @name='filename']")
-                        if (-not $filenameParameterNode) {
-                            $filenameParameterNode = $templateXml.CreateElement("parameter", $namespaceUri)
-                            $null = $filenameParameterNode.SetAttribute("name", "filename")
-                            $null = $eventFileTargetNode.AppendChild($filenameParameterNode)
-                        }
-
-                        $filenameValue = $filenameParameterNode.GetAttribute("value")
-                        if ([string]::IsNullOrWhiteSpace($filenameValue)) {
-                            $filenameValue = $basename
-                        }
-                        $null = $filenameParameterNode.SetAttribute("value", "$TargetFilePath$filenameValue")
-
-                        if ($__targetFileMetadataPathBound) {
-                            $metadataParameterNode = $eventFileTargetNode.SelectSingleNode("*[local-name()='parameter' and @name='metadatafile']")
-                            if ($metadataParameterNode) {
-                                $metadataValue = $metadataParameterNode.GetAttribute("value")
-                                if ([string]::IsNullOrWhiteSpace($metadataValue)) {
-                                    $metadataValue = $basename
-                                }
-                                $null = $metadataParameterNode.SetAttribute("value", "$TargetFileMetadataPath$metadataValue")
-                            } elseif (-not $eventFileTargetExists) {
-                                $metadataParameterNode = $templateXml.CreateElement("parameter", $namespaceUri)
-                                $null = $metadataParameterNode.SetAttribute("name", "metadatafile")
-                                $null = $metadataParameterNode.SetAttribute("value", "$TargetFileMetadataPath$basename")
-                                $null = $eventFileTargetNode.AppendChild($metadataParameterNode)
-                            }
-                        }
-
-                        if (-not $eventFileTargetExists) {
-                            $null = $eventSessionNode.AppendChild($eventFileTargetNode)
-                        }
-
-                        $temp = ([System.IO.Path]::GetTempPath()).TrimEnd("").TrimEnd("\").TrimEnd("/")
-                        $tempfile = Join-DbaPath $temp $basename
-                        $null = Set-Content -Path $tempfile -Value $templateXml.OuterXml -Encoding UTF8
-                        $xml = $templateXml
-                        $file = $tempfile
-                    } catch {
-                        Stop-Function -Message "Failure" -ErrorRecord $_ -Target $file -Continue -FunctionName Import-DbaXESessionTemplate
-                    }
-
-                    Write-Message -Level Verbose -Message "$TargetFilePath does not exist on $server, creating now." -FunctionName Import-DbaXESessionTemplate
-                    try {
-                        if (-not (Test-DbaPath -SqlInstance $server -Path $TargetFilePath)) {
-                            $null = New-DbaDirectory -SqlInstance $server -Path $TargetFilePath
-                        }
-                    } catch {
-                        Stop-Function -Message "Failure" -ErrorRecord $_ -Target $file -Continue -FunctionName Import-DbaXESessionTemplate
-                    }
-                }
-
-                if (-not $xml.event_sessions) {
-                    Stop-Function -Message "$file is not a valid XESession template document." -Continue -FunctionName Import-DbaXESessionTemplate
-                }
-
-                if ((-not $__nameBound)) {
-                    $Name = (Get-ChildItem $file).BaseName
-                }
-
-                # This could be done better but not today
-                $no2012 = ($metadata | Where-Object Compatibility -gt 2012).Name
-                $no2014 = ($metadata | Where-Object Compatibility -gt 2014).Name
-
-                if ($Name -in $no2012 -and $server.VersionMajor -eq 11) {
-                    Stop-Function -Message "$Name is not supported in SQL Server 2012 ($server)" -Continue -FunctionName Import-DbaXESessionTemplate
-                }
-
-                if ($Name -in $no2014 -and $server.VersionMajor -eq 12) {
-                    Stop-Function -Message "$Name is not supported in SQL Server 2014 ($server)" -Continue -FunctionName Import-DbaXESessionTemplate
-                }
-
-                if ((Get-DbaXESession -SqlInstance $server -Session $Name)) {
-                    Stop-Function -Message "$Name already exists on $instance" -Continue -FunctionName Import-DbaXESessionTemplate
                 }
 
                 try {
-                    Write-Message -Level Verbose -Message "Importing $file as $Name" -FunctionName Import-DbaXESessionTemplate
-                    $session = $store.CreateSessionFromTemplate($Name, $file)
-                    $session.Create()
-                    if ($file -eq $tempfile) {
-                        Remove-Item $tempfile -ErrorAction SilentlyContinue
+                    $basename = (Get-ChildItem $file).Basename
+                    $templateXml = [xml](Get-Content $file -Raw -ErrorAction Stop)
+                    $namespaceUri = $templateXml.DocumentElement.NamespaceURI
+                    $eventSessionNode = $templateXml.SelectSingleNode("/*[local-name()='event_sessions']/*[local-name()='event_session']")
+                    if (-not $eventSessionNode) {
+                        throw "No event_session element found in template $file."
                     }
-                    if ($StartUpState -eq "On") {
-                        $newsession = Get-DbaXESession -SqlInstance $server -Session $session.Name
-                        if (-not $newsession.AutoStart) {
-                            $newsession.AutoStart = $true
-                            $newsession.Alter()
+
+                    $eventFileTargetNode = $eventSessionNode.SelectSingleNode("*[local-name()='target' and @name='event_file']")
+                    $eventFileTargetExists = $null -ne $eventFileTargetNode
+
+                    if (-not $eventFileTargetExists) {
+                        # No event_file target found in template - add one so TargetFilePath is honored
+                        Write-Message -Level Verbose -Message "No event_file target found in template, adding one with TargetFilePath." -FunctionName Import-DbaXESessionTemplate
+                        $eventFileTargetNode = $templateXml.CreateElement("target", $namespaceUri)
+                        $null = $eventFileTargetNode.SetAttribute("package", "package0")
+                        $null = $eventFileTargetNode.SetAttribute("name", "event_file")
+                    }
+
+                    $filenameParameterNode = $eventFileTargetNode.SelectSingleNode("*[local-name()='parameter' and @name='filename']")
+                    if (-not $filenameParameterNode) {
+                        $filenameParameterNode = $templateXml.CreateElement("parameter", $namespaceUri)
+                        $null = $filenameParameterNode.SetAttribute("name", "filename")
+                        $null = $eventFileTargetNode.AppendChild($filenameParameterNode)
+                    }
+
+                    $filenameValue = $filenameParameterNode.GetAttribute("value")
+                    if ([string]::IsNullOrWhiteSpace($filenameValue)) {
+                        $filenameValue = $basename
+                    }
+                    $null = $filenameParameterNode.SetAttribute("value", "$TargetFilePath$filenameValue")
+
+                    if ($__targetFileMetadataPathBound) {
+                        $metadataParameterNode = $eventFileTargetNode.SelectSingleNode("*[local-name()='parameter' and @name='metadatafile']")
+                        if ($metadataParameterNode) {
+                            $metadataValue = $metadataParameterNode.GetAttribute("value")
+                            if ([string]::IsNullOrWhiteSpace($metadataValue)) {
+                                $metadataValue = $basename
+                            }
+                            $null = $metadataParameterNode.SetAttribute("value", "$TargetFileMetadataPath$metadataValue")
+                        } elseif (-not $eventFileTargetExists) {
+                            $metadataParameterNode = $templateXml.CreateElement("parameter", $namespaceUri)
+                            $null = $metadataParameterNode.SetAttribute("name", "metadatafile")
+                            $null = $metadataParameterNode.SetAttribute("value", "$TargetFileMetadataPath$basename")
+                            $null = $eventFileTargetNode.AppendChild($metadataParameterNode)
                         }
-                        $newsession | Start-DbaXESession
-                    } else {
-                        Get-DbaXESession -SqlInstance $server -Session $session.Name
+                    }
+
+                    if (-not $eventFileTargetExists) {
+                        $null = $eventSessionNode.AppendChild($eventFileTargetNode)
+                    }
+
+                    $temp = ([System.IO.Path]::GetTempPath()).TrimEnd("").TrimEnd("\").TrimEnd("/")
+                    $tempfile = Join-DbaPath $temp $basename
+                    $null = Set-Content -Path $tempfile -Value $templateXml.OuterXml -Encoding UTF8
+                    $xml = $templateXml
+                    $file = $tempfile
+                } catch {
+                    Stop-Function -Message "Failure" -ErrorRecord $_ -Target $file -Continue -FunctionName Import-DbaXESessionTemplate
+                }
+
+                Write-Message -Level Verbose -Message "$TargetFilePath does not exist on $server, creating now." -FunctionName Import-DbaXESessionTemplate
+                try {
+                    if (-not (Test-DbaPath -SqlInstance $server -Path $TargetFilePath)) {
+                        $null = New-DbaDirectory -SqlInstance $server -Path $TargetFilePath
                     }
                 } catch {
-                    Stop-Function -Message "Failure" -ErrorRecord $_ -Target $store -Continue -FunctionName Import-DbaXESessionTemplate
+                    Stop-Function -Message "Failure" -ErrorRecord $_ -Target $file -Continue -FunctionName Import-DbaXESessionTemplate
                 }
             }
-        }
+
+            if (-not $xml.event_sessions) {
+                Stop-Function -Message "$file is not a valid XESession template document." -Continue -FunctionName Import-DbaXESessionTemplate
+            }
+
+            if ((-not $__nameBound)) {
+                $Name = (Get-ChildItem $file).BaseName
+            }
+
+            # This could be done better but not today
+            $no2012 = ($metadata | Where-Object Compatibility -gt 2012).Name
+            $no2014 = ($metadata | Where-Object Compatibility -gt 2014).Name
+
+            if ($Name -in $no2012 -and $server.VersionMajor -eq 11) {
+                Stop-Function -Message "$Name is not supported in SQL Server 2012 ($server)" -Continue -FunctionName Import-DbaXESessionTemplate
+            }
+
+            if ($Name -in $no2014 -and $server.VersionMajor -eq 12) {
+                Stop-Function -Message "$Name is not supported in SQL Server 2014 ($server)" -Continue -FunctionName Import-DbaXESessionTemplate
+            }
+
+            if ((Get-DbaXESession -SqlInstance $server -Session $Name)) {
+                Stop-Function -Message "$Name already exists on $instance" -Continue -FunctionName Import-DbaXESessionTemplate
+            }
+
+            try {
+                Write-Message -Level Verbose -Message "Importing $file as $Name" -FunctionName Import-DbaXESessionTemplate
+                $session = $store.CreateSessionFromTemplate($Name, $file)
+                $session.Create()
+                if ($file -eq $tempfile) {
+                    Remove-Item $tempfile -ErrorAction SilentlyContinue
+                }
+                if ($StartUpState -eq "On") {
+                    $newsession = Get-DbaXESession -SqlInstance $server -Session $session.Name
+                    if (-not $newsession.AutoStart) {
+                        $newsession.AutoStart = $true
+                        $newsession.Alter()
+                    }
+                    $newsession | Start-DbaXESession
+                } else {
+                    Get-DbaXESession -SqlInstance $server -Session $session.Name
+                }
+            } catch {
+                Stop-Function -Message "Failure" -ErrorRecord $_ -Target $store -Continue -FunctionName Import-DbaXESessionTemplate
+            }
         }
     }
-} $__batches $SqlCredential $Name $Template $TargetFilePath $TargetFileMetadataPath $StartUpState $EnableException $__pathBound $__templateBound $__nameBound $__targetFilePathBound $__targetFileMetadataPathBound @__commonParameters 3>&1 2>&1
+    } finally {
+        @{ __importDbaXESessionTemplateProcess = @{ Name = $Name; TargetFilePath = $TargetFilePath; TargetFileMetadataPath = $TargetFileMetadataPath; Server = $server; Store = $store; Xml = $xml; Basename = $basename; Tempfile = $tempfile } }
+    }
+} $SqlInstance $SqlCredential $Path $Template $StartUpState $metadata $EnableException $__carriedName $__carriedTargetFilePath $__carriedTargetFileMetadataPath $__carriedServer $__carriedStore $__carriedXml $__carriedBasename $__carriedTempfile $__pathBound $__templateBound $__nameBound $__targetFilePathBound $__targetFileMetadataPathBound @__commonParameters 3>&1 2>&1
 """;
 }
