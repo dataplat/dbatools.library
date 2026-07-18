@@ -1,0 +1,144 @@
+#nullable enable
+
+using System.Collections;
+using System.Management.Automation;
+using Dataplat.Dbatools.Parameter;
+
+namespace Dataplat.Dbatools.Commands;
+
+/// <summary>
+/// Fails over database mirroring configurations to the mirror server.
+/// Port of public/Invoke-DbaDbMirrorFailover.ps1; surface pinned by
+/// migration/baselines/Invoke-DbaDbMirrorFailover.json.
+/// </summary>
+[Cmdlet(VerbsLifecycle.Invoke, "DbaDbMirrorFailover", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
+public sealed class InvokeDbaDbMirrorFailoverCommand : DbaBaseCmdlet
+{
+    /// <summary>The primary SQL Server instance.</summary>
+    [Parameter(Position = 0)]
+    public DbaInstanceParameter? SqlInstance { get; set; }
+
+    /// <summary>Login to the target instance using alternative credentials.</summary>
+    [Parameter(Position = 1)]
+    public PSCredential? SqlCredential { get; set; }
+
+    /// <summary>The mirrored databases to fail over to their mirror partners.</summary>
+    [Parameter(Position = 2)]
+    public string[]? Database { get; set; }
+
+    /// <summary>Database objects piped from Get-DbaDatabase.</summary>
+    [Parameter(ValueFromPipeline = true, Position = 3)]
+    public Microsoft.SqlServer.Management.Smo.Database[]? InputObject { get; set; }
+
+    /// <summary>Forces an immediate failover allowing data loss, and suppresses prompts.</summary>
+    [Parameter]
+    public SwitchParameter Force { get; set; }
+
+    // EnableException is inherited from DbaBaseCmdlet - never redeclared.
+
+    protected override void ProcessRecord()
+    {
+        if (Interrupted)
+        {
+            return;
+        }
+
+        // WHOLE-RECORD hop per the W3-005/W4-011 convention: the begin block's
+        // Force -> ConfirmPreference suppression rides at the hop top and both
+        // High-impact ShouldProcess gates run on the INNER scriptblock's own
+        // $Pscmdlet. The loop-less validation Stop-Function+return exits the
+        // record via the dot-block frame. The two Test-Bound checks become
+        // carried bound flags (they scope-walk the caller and cannot ride the hop).
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+            SqlInstance, SqlCredential, Database, InputObject,
+            Force.ToBool(), EnableException.ToBool(),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(Database)),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                continue;
+            }
+            WriteObject(item);
+        }
+    }
+
+    private object? BoundCommonParameter(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+        {
+            return LanguagePrimitives.IsTrue(value);
+        }
+        return null;
+    }
+
+    private void RemoveHopErrorBookkeeping(ErrorRecord record)
+    {
+        try
+        {
+            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+                return;
+            if (errorList[0] is not ErrorRecord first)
+                return;
+            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
+                string.Equals(first.Exception?.Message, record.Exception?.Message, System.StringComparison.Ordinal))
+            {
+                errorList.RemoveAt(0);
+            }
+        }
+        catch
+        {
+            // Best-effort bookkeeping only.
+        }
+    }
+
+    // PS: the begin block's Force -> ConfirmPreference suppression rides verbatim at
+    // the hop top, then the source process block VERBATIM, CRLF-preserved and
+    // cmp-proven byte-exact after stripping one -FunctionName append (Stop-Function)
+    // and reversing the Test-Bound guard substitution (SOURCE comment). ShouldProcess
+    // gates use the inner block's own $Pscmdlet; the dot-block preserves the return.
+    private const string ProcessScript = """
+param($SqlInstance, $SqlCredential, $Database, $InputObject, $Force, $EnableException, $__boundSqlInstance, $__boundDatabase, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $Force, $EnableException, $__boundSqlInstance, $__boundDatabase, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    if ($Force) { $ConfirmPreference = 'none' }
+
+    . {
+        if ($__boundSqlInstance -and -not $__boundDatabase) { # SOURCE: if ((Test-Bound -ParameterName SqlInstance) -and (Test-Bound -Not -ParameterName Database)) {
+            Stop-Function -Message "Database is required when SqlInstance is specified" -FunctionName Invoke-DbaDbMirrorFailover
+            return
+        }
+
+        $InputObject += Get-DbaDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $Database
+
+        foreach ($db in $InputObject) {
+            # if it's async, you have to break the mirroring and allow data loss
+            # alter database set partner force_service_allow_data_loss
+            # if it's sync mirroring you know it's all in sync, so you can just do alter database [dbname] set partner failover
+            if ($Force) {
+                if ($Pscmdlet.ShouldProcess($db.Parent.Name, "Forcing failover of $db and allowing data loss")) {
+                    $db | Set-DbaDbMirror -State ForceFailoverAndAllowDataLoss
+                }
+            } else {
+                if ($Pscmdlet.ShouldProcess($db.Parent.Name, "Setting safety level to full and failing over $db to partner server")) {
+                    $db | Set-DbaDbMirror -SafetyLevel Full
+                    $db | Set-DbaDbMirror -State Failover
+                }
+            }
+        }
+    }
+} $SqlInstance $SqlCredential $Database $InputObject $Force $EnableException $__boundSqlInstance $__boundDatabase $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+}
