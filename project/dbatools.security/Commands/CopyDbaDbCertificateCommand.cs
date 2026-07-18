@@ -24,7 +24,11 @@ namespace Dataplat.Dbatools.Commands;
 /// names, the source server, and the backup encryption password are carried between the hops as
 /// fields. The backup password in particular MUST be carried: it is a once-generated random password
 /// (when none is supplied), and re-deriving it per record would restore with a different password
-/// than the backup used.
+/// than the backup used. The ProcessRecord hop copies to each destination database in turn, emitting a
+/// result object per copy, and can raise a terminating -EnableException failure on a later copy after an
+/// earlier one has already emitted, so its output is streamed through InvokeScopedStreaming - each result
+/// reaches the pipeline as produced and survives a later throw; a buffered collection would be discarded
+/// on that throw and lose the earlier copies' results.
 /// </para>
 /// <para>
 /// The encryption and decryption passwords ride into the hop as live SecureStrings and are handed to
@@ -134,21 +138,23 @@ public sealed class CopyDbaDbCertificateCommand : DbaBaseCmdlet
         if (_beginInterrupted || Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            Destination, DestinationSqlCredential, SharedPath, MasterKeyPassword, DecryptionPassword,
-            _sourceCertificates, _dbsNames, _sourceServer, _backupEncryptionPassword,
-            EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
             }
-            WriteObject(item);
-        }
+            else
+            {
+                WriteObject(item);
+            }
+        }, ProcessScript,
+            Destination, DestinationSqlCredential, SharedPath, MasterKeyPassword, DecryptionPassword,
+            _sourceCertificates, _dbsNames, _sourceServer, _backupEncryptionPassword,
+            EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private static object? Unwrap(object? value)
