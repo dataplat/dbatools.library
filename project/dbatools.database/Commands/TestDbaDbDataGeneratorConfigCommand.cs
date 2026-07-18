@@ -49,7 +49,6 @@ namespace Dataplat.Dbatools.Commands;
 /// resolves from inside the module scope hop, which is where the source called it.
 /// </summary>
 [Cmdlet(VerbsDiagnostic.Test, "DbaDbDataGeneratorConfig")]
-[OutputType(typeof(PSObject))]
 public sealed class TestDbaDbDataGeneratorConfigCommand : DbaBaseCmdlet
 {
     /// <summary>Path to the JSON configuration file to validate.</summary>
