@@ -141,6 +141,36 @@ internal static class NestedCommand
     }
 
     /// <summary>
+    /// Order-preserving variant of <see cref="InvokeScoped"/> for hops whose SOURCE
+    /// interleaves warnings with output within ONE invocation (DEF-001-ORDER). Plain
+    /// InvokeScoped writes 3&gt;&amp;1-merged warnings IMMEDIATELY during the drain but returns
+    /// output for the caller to WriteObject AFTER, so every warning of an invocation precedes
+    /// its output rows - the function world interleaves them at each emission point. This
+    /// method dispatches the merged buffer in ONE loop in emission order, mirroring
+    /// InvokeScoped's exact classification (WarningRecord -&gt; WriteWarning, everything else
+    /// -&gt; onOutput at the moment it is drained), so the cross-stream timeline matches the
+    /// function. Additive: existing InvokeScoped callers are untouched; a row adopts this only
+    /// when its parity provably depends on the warning/output interleave (go-forward per the
+    /// DEF-001-ORDER pricing decision).
+    /// </summary>
+    internal static void InvokeScopedOrdered(PSCmdlet host, Action<PSObject> onOutput, string scriptText, params object?[] scriptArgs)
+    {
+        using (ShieldDefaultParameterValues(host))
+        {
+            ScriptBlock script = ScriptBlock.Create(
+                "param($__nestedCommandArguments)\n& {\n" + scriptText + "\n} @__nestedCommandArguments");
+            Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, script, null, new object?[] { scriptArgs });
+            foreach (PSObject item in raw)
+            {
+                if (item?.BaseObject is WarningRecord warning)
+                    host.WriteWarning(warning.Message);
+                else
+                    onOutput(item!);
+            }
+        }
+    }
+
+    /// <summary>
     /// Streaming invocation over a steppable pipeline — for PS call sites that piped input to
     /// the command at top level, where output must reach the user's pipeline as it is
     /// produced (restore progress objects), not after the command completes.
