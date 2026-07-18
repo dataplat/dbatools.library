@@ -34,10 +34,22 @@ namespace Dataplat.Dbatools.Commands;
 /// Get-Variable -Scope 0 after its dot-sourced body and carries it, and C# skips process when a
 /// prior hop carried true. The body keeps its own verbatim Test-FunctionInterrupt line as well.
 ///
-/// NO cross-record state carry is needed: no parameter is reassigned anywhere in the body (checked
-/// per name), so nothing the source keeps in function scope is lost by a per-record hop. This is
-/// the cheap branch of the carry question - the mutated-variable case is what forced a documented
-/// divergence on Invoke-DbaDbShrink.
+/// CROSS-RECORD STATE. No PARAMETER is reassigned in the body, but three non-parameter locals are
+/// branch-assigned and read on paths that can run before any assignment in a later record, so the
+/// source's function scope carries them and a per-record hop would not:
+///  - $failed is set true on a copy failure and NEVER reset, and the metadata-update and
+///    source-file-deletion block is gated on "if (-not $failed)". In the source one failure
+///    therefore suppresses those DESTRUCTIVE steps for every later piped instance; without the
+///    carry the port would resume deleting source files after a failure the source treated as
+///    disqualifying. This is the safety-relevant one.
+///  - $ComputerName is assigned only on the localhost branch, the successful-remoting branches, or
+///    the "$null -eq $ComputerName" fallback. When BOTH remoting probes fail on a later record, no
+///    branch assigns it and the fallback does not fire because it still holds the PREVIOUS record's
+///    value - so the source reuses the earlier host and the port would substitute the current one.
+///  - $returnObject is assigned once per file in the main path but READ in the "already exists"
+///    branch, which can run before any assignment in a record; the source reuses the prior record's
+///    object there, where a fresh hop scope would raise a null-property error.
+/// All three ride the state sentinel with per-name Assigned flags, so unset-vs-assigned survives.
 ///
 /// Test-Bound never rides a hop, so the two begin probes become carried caller-boundness flags. All
 /// seven $PSCmdlet.ShouldProcess gates route to the real cmdlet via $__realCmdlet so a "Yes to All"
@@ -94,6 +106,8 @@ public sealed class MoveDbaDbFileCommand : DbaBaseCmdlet
 
     // A begin validation failure, or a failure on an earlier piped instance, silences the rest.
     private bool _interrupted;
+    // The three branch-assigned locals the source keeps in function scope (opaque to C#).
+    private Hashtable? _state;
 
     protected override void BeginProcessing()
     {
@@ -133,8 +147,11 @@ public sealed class MoveDbaDbFileCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__moveDbaDbFileProcess"))
             {
-                if (sentinel["__moveDbaDbFileProcess"] is Hashtable state)
-                    _interrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
+                if (sentinel["__moveDbaDbFileProcess"] is Hashtable result)
+                {
+                    _state = result["State"] as Hashtable;
+                    _interrupted = LanguagePrimitives.IsTrue(result["Interrupted"]);
+                }
                 return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
@@ -147,7 +164,7 @@ public sealed class MoveDbaDbFileCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, FileType, FileDestination, FileToMove,
             DeleteAfterMove.ToBool(), FileStructureOnly.ToBool(), Force.ToBool(),
-            EnableException.ToBool(), this,
+            EnableException.ToBool(), _state, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -209,7 +226,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // the 24 direct Stop-Function/Write-Message calls. The sentinel carries this record's interrupt
     // so a failure silences later piped instances, as the single function scope did.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $FileType, $FileDestination, $FileToMove, $DeleteAfterMove, $FileStructureOnly, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $FileType, $FileDestination, $FileToMove, $DeleteAfterMove, $FileStructureOnly, $Force, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -218,8 +235,18 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [string]$Database, [string]$FileType, [string]$FileDestination, [hashtable]$FileToMove, $DeleteAfterMove, $FileStructureOnly, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [string]$Database, [string]$FileType, [string]$FileDestination, [hashtable]$FileToMove, $DeleteAfterMove, $FileStructureOnly, $Force, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # Restore the three branch-assigned locals the source keeps in function scope. $failed gates the
+    # DESTRUCTIVE metadata-update and source-delete block, so losing it would resume deletions the
+    # source suppressed; $ComputerName is reused when both remoting probes fail on a later record;
+    # $returnObject is read in the already-exists branch without being assigned there.
+    if ($null -ne $__state) {
+        foreach ($__name in "failed", "ComputerName", "returnObject") {
+            if ($__state[$__name + "Assigned"]) { Set-Variable -Name $__name -Value $__state[$__name] }
+        }
+    }
 
     . {
         if (Test-FunctionInterrupt) { return }
@@ -513,7 +540,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
-    @{ __moveDbaDbFileProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
-} $SqlInstance $SqlCredential $Database $FileType $FileDestination $FileToMove $DeleteAfterMove $FileStructureOnly $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    $__snap = @{}
+    foreach ($__name in "failed", "ComputerName", "returnObject") {
+        $__v = Get-Variable -Name $__name -Scope 0 -ErrorAction Ignore
+        if ($__v) { $__snap[$__name + "Assigned"] = $true; $__snap[$__name] = $__v.Value } else { $__snap[$__name + "Assigned"] = $false }
+    }
+    @{ __moveDbaDbFileProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value); State = $__snap } }
+} $SqlInstance $SqlCredential $Database $FileType $FileDestination $FileToMove $DeleteAfterMove $FileStructureOnly $Force $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
