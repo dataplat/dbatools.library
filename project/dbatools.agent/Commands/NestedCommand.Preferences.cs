@@ -27,8 +27,8 @@ internal static partial class NestedCommand
         // Stop-Function connect warnings on New-DbaDbUser yet SUPPRESSES them on
         // Remove-DbaDbRoleMember - no uniform in-scope preference matches both, and blanket
         // propagation regressed a sealed suite; suppression/display already round-trips through
-        // the merge + host re-emission). The CONVERTING values (Stop/Inquire) have no such
-        // ambiguity: a function-local Warning-to-terminating conversion must fire inside the
+        // the merge + host re-emission). The Stop value has no such
+        // ambiguity: the function-local Warning-to-terminating conversion must fire inside the
         // body for its own try/catch to see it (lane G's control-flow measurement), so those
         // propagate.
         ("WarningAction", "WarningPreference"),
@@ -43,9 +43,14 @@ internal static partial class NestedCommand
         {
             if (!host.MyInvocation.BoundParameters.TryGetValue(parameterName, out object? bound) || bound is null)
                 continue;
+            // Stop is the only propagated WarningAction value: in-body conversion terminates
+            // before anything can merge, so it cannot double-fire. Inquire is excluded - an
+            // in-body prompt whose Continue answer lets the warning merge out would prompt a
+            // SECOND time at the host boundary, unlike the function path; Inquire keeps the
+            // pre-existing single host-side prompt instead.
             if (parameterName == "WarningAction" &&
                 bound is ActionPreference warningValue &&
-                warningValue != ActionPreference.Stop && warningValue != ActionPreference.Inquire)
+                warningValue != ActionPreference.Stop)
                 continue;
             saved ??= new List<(string, object?)>();
             saved.Add((preferenceVariable, host.SessionState.PSVariable.GetValue(preferenceVariable)));
