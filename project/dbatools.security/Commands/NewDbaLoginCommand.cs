@@ -196,27 +196,34 @@ public sealed class NewDbaLoginCommand : DbaBaseCmdlet
         _hashedPasswordState = HashedPassword;
         _securePasswordState = SecurePassword;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Force.ToBool(), Sid, HashedPassword, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] streamed via InvokeScopedStreaming (B FINAL-CERT ruling): the begin body can emit
+        // before a reachable terminating throw (Stop-Function -EnableException on an invalid Sid char),
+        // so a buffered InvokeScoped could lose an earlier emit. Streaming yields each record as
+        // produced. Const body byte-unchanged; the __NewDbaLoginBeginComplete sentinel still rides the
+        // callback and is harvested into _sidState/_hashedPasswordState/_beginInterrupted as before.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
+                return;
             }
-            else if (item is not null && LanguagePrimitives.IsTrue(
+            if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__NewDbaLoginBeginComplete"]?.Value))
             {
                 _sidState = UnwrapHopValue(item.Properties["Sid"]?.Value);
                 _hashedPasswordState = UnwrapHopValue(item.Properties["HashedPassword"]?.Value);
                 _beginInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+                return;
             }
-            else if (item is not null)
+            if (item is not null)
             {
                 WriteObject(item);
             }
-        }
+        }, BeginScript,
+            Force.ToBool(), Sid, HashedPassword, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>Creates the logins for the current record.</summary>
