@@ -299,7 +299,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         } catch {
-            Stop-Function -Message "Could not get Agent Job History from $instance" -Target $instance -Continue -FunctionName Get-JobHistory
+            Stop-Function -Message "Could not get Agent Job History from $instance" -Target $instance -Continue
         }
     }
 

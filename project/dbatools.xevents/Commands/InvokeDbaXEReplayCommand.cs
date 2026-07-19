@@ -25,7 +25,14 @@ namespace Dataplat.Dbatools.Commands;
 /// $filename and every other local persist exactly as the function scope does. An empty pipeline collects
 /// no batches so the process body never runs (begin still creates the temp file), matching the script.
 ///
-/// DEF-010 (documented, ruling requested): the process body's event filter is a BARE "continue"
+/// DEF-010 SANCTIONED KEEP-DIVERGENCE (ruled 2026-07-19, operator quality-review directive §3d): the
+/// divergence below is DELIBERATE and APPROVED - do not "fix" it back to faithful reproduction. Same
+/// class as W2-046: a bare continue that drops all subsequent events is a catastrophic SILENT bug, so
+/// diverging toward the filter's evident intent (process all matching events) is the TB-092-spirit
+/// call and is consistent with the DEF-010 canonical ruling. The underlying SOURCE bug is tracked
+/// upstream as U-5; when it is fixed there, this divergence should disappear rather than be preserved.
+///
+/// The measurement, retained: the process body's event filter is a BARE "continue"
 /// ("if (`$InputObject.Name -notin `$Event) { continue }"). In the script world that bare continue in a
 /// process block has NO enclosing loop, so it propagates up the call stack and ABORTS the entire piped
 /// invocation on the FIRST non-matching event (a latent source bug, the bare-continue sibling of W2-046's
