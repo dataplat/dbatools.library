@@ -24,23 +24,23 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class FindDbaCommandCommand : DbaBaseCmdlet
 {
     /// <summary>Text pattern to match against command help.</summary>
-    [Parameter]
+    [Parameter(Position = 0)]
     public string? Pattern { get; set; }
 
     /// <summary>Tag(s) to filter by.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public string[]? Tag { get; set; }
 
     /// <summary>Author to filter by.</summary>
-    [Parameter]
+    [Parameter(Position = 2)]
     public string? Author { get; set; }
 
     /// <summary>Minimum version to filter by.</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     public string? MinimumVersion { get; set; }
 
     /// <summary>Maximum version to filter by.</summary>
-    [Parameter]
+    [Parameter(Position = 4)]
     public string? MaximumVersion { get; set; }
 
     /// <summary>Rebuilds the help index before searching.</summary>

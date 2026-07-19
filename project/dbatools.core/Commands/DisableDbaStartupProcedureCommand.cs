@@ -123,7 +123,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         foreach ($instance in $SqlInstance) {
-            Write-Message -Level Verbose -Message "Getting startup procedures for $instance"
+            Write-Message -Level Verbose -Message "Getting startup procedures for $instance" -FunctionName Disable-DbaStartupProcedure -ModuleName "dbatools"
             try {
                 $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
             } catch {
@@ -138,7 +138,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($null -eq $sp) {
                         Stop-Function -Message "Requested procedure $proc does not exist." -Continue -Target $server -Category InvalidData -FunctionName Disable-DbaStartupProcedure
                     } else {
-                        Write-Message -Level Verbose -Message "Adding $($procParts.Name) $($procParts.Schema) for $instance"
+                        Write-Message -Level Verbose -Message "Adding $($procParts.Name) $($procParts.Schema) for $instance" -FunctionName Disable-DbaStartupProcedure -ModuleName "dbatools"
                         $InputObject += $sp
                     }
                 } else {
@@ -154,11 +154,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         try {
             if ($sp.Startup -eq $startup) {
-                Write-Message -Level Verbose -Message "No work being performed. Startup property already $startup"
+                Write-Message -Level Verbose -Message "No work being performed. Startup property already $startup" -FunctionName Disable-DbaStartupProcedure -ModuleName "dbatools"
                 $status = $false
                 $note = "Action $action already performed"
             } else {
-                if ($Pscmdlet.ShouldProcess("$instance", "Setting Startup status of $proc to $startup")) {
+                if ($__realCmdlet.ShouldProcess("$instance", "Setting Startup status of $proc to $startup")) {
                     $sp.Startup = $startup
                     $sp.Alter()
                     $status = $true

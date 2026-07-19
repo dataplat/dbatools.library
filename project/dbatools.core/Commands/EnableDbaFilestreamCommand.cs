@@ -66,12 +66,24 @@ public sealed class EnableDbaFilestreamCommand : DbaBaseCmdlet
                 WriteError(nestedError);
                 return;
             }
+            if (item?.Properties["__dbatoolsEfLevelCarrier"] is not null &&
+                LanguagePrimitives.IsTrue(item.Properties["__dbatoolsEfLevelCarrier"].Value))
+            {
+                // DEF-011/012: the source's begin-initialized $level (with the 3->2 downgrade)
+                // persists across pipeline records; the hop emits it via this carrier and the
+                // next record's hop seeds from it.
+                _carriedLevel = item.Properties["Level"]?.Value;
+                return;
+            }
             WriteObject(item);
         }, ProcessScript,
             SqlInstance, SqlCredential, Credential, FileStreamLevel, ShareName, Force.ToBool(), EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            _carriedLevel);
     }
+
+    private object? _carriedLevel;
 
     private object? BoundCommonParameter(string name)
     {
@@ -105,7 +117,7 @@ public sealed class EnableDbaFilestreamCommand : DbaBaseCmdlet
     // which is VERBATIM per record. Substitutions only: $PSCmdlet -> $__realCmdlet, explicit
     // -FunctionName Enable-DbaFilestream on Stop-Function (W1-090).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Credential, $FileStreamLevel, $ShareName, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Credential, $FileStreamLevel, $ShareName, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedLevel)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -114,7 +126,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [PSCredential]$Credential, [string]$FileStreamLevel, [string]$ShareName, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [PSCredential]$Credential, [string]$FileStreamLevel, [string]$ShareName, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedLevel)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if ($FileStreamLevel -notin (1, 2, 3)) {
@@ -132,6 +144,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     # = $finallevel removed as it was identified as a unused variable
     $level = [int]$FileStreamLevel
+    # DEF-011/012 (codex): the source initializes $level ONCE in begin and the 3->2 downgrade
+    # at :170 persists into later pipeline records; each hop re-inlines begin, so the
+    # prior-record value is seeded from the sentinel carrier when present.
+    if ($null -ne $__carriedLevel) { $level = [int]$__carriedLevel }
     $OutputLookup = @{
         0 = 'Disabled'
         1 = 'FileStream enabled for T-Sql access'
@@ -188,6 +204,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $SqlInstance $SqlCredential $Credential $FileStreamLevel $ShareName $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    [pscustomobject]@{ __dbatoolsEfLevelCarrier = $true; Level = $level }
+} $SqlInstance $SqlCredential $Credential $FileStreamLevel $ShareName $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedLevel @__commonParameters 3>&1 2>&1
 """;
 }
