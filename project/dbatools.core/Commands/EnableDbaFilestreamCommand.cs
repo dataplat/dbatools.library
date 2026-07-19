@@ -27,24 +27,24 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class EnableDbaFilestreamCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true)]
+    [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true, Position = 0)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative credential for the target instance.</summary>
-    [Parameter(ValueFromPipelineByPropertyName = true)]
+    [Parameter(ValueFromPipelineByPropertyName = true, Position = 1)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>Alternative Windows credential for the target server.</summary>
-    [Parameter(ValueFromPipelineByPropertyName = true)]
+    [Parameter(ValueFromPipelineByPropertyName = true, Position = 2)]
     public PSCredential? Credential { get; set; }
 
     /// <summary>The FileStream access level to enable (name or numeric 1/2/3).</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     [ValidateSet("TSql", "TSqlIoStreaming", "TSqlIoStreamingRemoteClient", "1", "2", "3")]
     public string FileStreamLevel { get; set; } = "1";
 
     /// <summary>The Windows file share name for FileStream data (requires level >= 2).</summary>
-    [Parameter]
+    [Parameter(Position = 4)]
     public string? ShareName { get; set; }
 
     /// <summary>Bypasses confirmation and restarts the SQL Server service to apply changes immediately.</summary>

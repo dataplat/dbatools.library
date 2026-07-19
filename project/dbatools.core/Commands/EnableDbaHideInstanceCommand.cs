@@ -28,11 +28,11 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class EnableDbaHideInstanceCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances. Defaults to the local computer.</summary>
-    [Parameter(ValueFromPipeline = true)]
+    [Parameter(ValueFromPipeline = true, Position = 0)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative Windows credential for the target server.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? Credential { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
@@ -42,10 +42,12 @@ public sealed class EnableDbaHideInstanceCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // PS: [DbaInstanceParameter[]]$SqlInstance = $env:COMPUTERNAME - apply the default when
-        // the parameter is unbound (a compiled parameter cannot default to a runtime expression).
+        // PS: [DbaInstanceParameter[]]$SqlInstance = $env:COMPUTERNAME - apply the default ONLY
+        // when the parameter is genuinely ABSENT: an explicitly bound $null/@() no-ops in the
+        // function world and must not fall back to the local registry (same guard as the
+        // Disable sibling, codex-caught there).
         DbaInstanceParameter[]? instances = SqlInstance;
-        if (instances is null || instances.Length == 0)
+        if (!MyInvocation.BoundParameters.ContainsKey("SqlInstance") && (instances is null || instances.Length == 0))
         {
             string? machine = Environment.GetEnvironmentVariable("COMPUTERNAME");
             if (!string.IsNullOrEmpty(machine))

@@ -27,19 +27,19 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class DisableDbaStartupProcedureCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter]
+    [Parameter(Position = 0)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative credential for the target instances.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>The startup procedure(s) to disable (schema.name).</summary>
-    [Parameter]
+    [Parameter(Position = 2)]
     public string[]? StartupProcedure { get; set; }
 
     /// <summary>Startup procedure object(s) piped in.</summary>
-    [Parameter(ValueFromPipeline = true)]
+    [Parameter(ValueFromPipeline = true, Position = 3)]
     public object[]? InputObject { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
