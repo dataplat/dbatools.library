@@ -31,6 +31,7 @@ public sealed partial class AddDbaAgDatabaseCommand : DbaBaseCmdlet
     /// <summary>The availability group the databases are added to.</summary>
     [Parameter(ParameterSetName = "NonPipeline", Mandatory = true)]
     [Parameter(ParameterSetName = "Pipeline", Mandatory = true, Position = 0)]
+    [PsStringCast]
     public string? AvailabilityGroup { get; set; }
 
     /// <summary>The databases to add to the availability group.</summary>
@@ -55,6 +56,7 @@ public sealed partial class AddDbaAgDatabaseCommand : DbaBaseCmdlet
     [Parameter(ParameterSetName = "NonPipeline")]
     [Parameter(ParameterSetName = "Pipeline")]
     [ValidateSet("Automatic", "Manual")]
+    [PsStringCast]
     public string? SeedingMode { get; set; }
 
     /// <summary>Network path readable by every replica, used for backup/restore staging.</summary>

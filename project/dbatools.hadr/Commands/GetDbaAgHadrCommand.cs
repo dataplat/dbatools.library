@@ -38,19 +38,22 @@ public sealed class GetDbaAgHadrCommand : DbaBaseCmdlet
 
         foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new DbaInstanceParameter[] { instance }, SqlCredential,
-                EnableException.ToBool(),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+            // capture (documented observability change, not behaviour); the parity runner strips the
+            // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+                new DbaInstanceParameter[] { instance }, SqlCredential,
+                EnableException.ToBool(),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 

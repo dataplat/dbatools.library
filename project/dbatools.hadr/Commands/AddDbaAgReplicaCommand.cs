@@ -31,16 +31,19 @@ public sealed partial class AddDbaAgReplicaCommand : DbaBaseCmdlet
     /// <summary>The cluster type backing the availability group.</summary>
     [Parameter(Position = 3)]
     [ValidateSet("Wsfc", "External", "None")]
+    [PsStringCast]
     public string ClusterType { get; set; } = ConfigValueOrFallback("AvailabilityGroups.Default.ClusterType", "Wsfc");
 
     /// <summary>The availability mode of the replica.</summary>
     [Parameter(Position = 4)]
     [ValidateSet("AsynchronousCommit", "SynchronousCommit")]
+    [PsStringCast]
     public string AvailabilityMode { get; set; } = "SynchronousCommit";
 
     /// <summary>The failover mode of the replica.</summary>
     [Parameter(Position = 5)]
     [ValidateSet("Automatic", "Manual", "External")]
+    [PsStringCast]
     public string FailoverMode { get; set; } = "Automatic";
 
     /// <summary>The backup priority of the replica.</summary>
@@ -50,16 +53,19 @@ public sealed partial class AddDbaAgReplicaCommand : DbaBaseCmdlet
     /// <summary>Connection mode when the replica is primary.</summary>
     [Parameter(Position = 7)]
     [ValidateSet("AllowAllConnections", "AllowReadWriteConnections")]
+    [PsStringCast]
     public string ConnectionModeInPrimaryRole { get; set; } = "AllowAllConnections";
 
     /// <summary>Connection mode when the replica is secondary; friendly aliases are normalized in the body.</summary>
     [Parameter(Position = 8)]
     [ValidateSet("AllowNoConnections", "AllowReadIntentConnectionsOnly", "AllowAllConnections", "No", "Read-intent only", "Yes")]
+    [PsStringCast]
     public string ConnectionModeInSecondaryRole { get; set; } = ConfigValueOrFallback("AvailabilityGroups.Default.ConnectionModeInSecondaryRole", "AllowNoConnections");
 
     /// <summary>The seeding mode of the replica.</summary>
     [Parameter(Position = 9)]
     [ValidateSet("Automatic", "Manual")]
+    [PsStringCast]
     public string? SeedingMode { get; set; }
 
     /// <summary>The mirroring endpoint name to use or create.</summary>
