@@ -54,13 +54,13 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     private object? _effectiveInputObject;
-    // The invocation-bound InputObject as it stood BEFORE any pipeline record: the engine only
-    // rebinds the property for records that PIPE workload groups, so a reference transition
-    // from this snapshot is the per-record rebind signal (codex r2: BoundParameters.ContainsKey
-    // stays true for invocation-bound -InputObject across piped SqlInstance records, which must
-    // ACCUMULATE like the function world's process scope, not reset).
-    private object? _invocationInputObject;
-    private bool _invocationInputCaptured;
+    // The most recently OBSERVED InputObject reference: the engine only rebinds the property
+    // for records that PIPE workload groups, so a reference CHANGE from the last observation is
+    // the per-record rebind signal (codex r2/r3: a fixed first-record snapshot misclassifies
+    // later non-rebinding records after one genuine rebind - the property retains the last
+    // piped value - and BoundParameters.ContainsKey stays true for invocation-bound
+    // -InputObject, which must ACCUMULATE like the function world's process scope).
+    private object? _lastObservedInputObject;
 
     protected override void ProcessRecord()
     {
@@ -98,14 +98,17 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             EnableException.ToBool(), BoundVerbose());
     }
 
+    protected override void BeginProcessing()
+    {
+        base.BeginProcessing();
+        // Baseline = the invocation-bound value (or null) before any pipeline record.
+        _lastObservedInputObject = InputObject;
+    }
+
     private object? SelectProcessInputObject()
     {
-        if (!_invocationInputCaptured)
-        {
-            _invocationInputCaptured = true;
-            _invocationInputObject = InputObject;
-        }
-        bool pipelineRebound = !ReferenceEquals(InputObject, _invocationInputObject);
+        bool pipelineRebound = !ReferenceEquals(InputObject, _lastObservedInputObject);
+        _lastObservedInputObject = InputObject;
         if (pipelineRebound)
             return InputObject;
         return _effectiveInputObject ?? InputObject;
