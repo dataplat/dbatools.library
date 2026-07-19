@@ -61,8 +61,21 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// NO INTERRUPT BRIDGE: the guards at :467 and :476 and :483 are non-Continue and do set the latch,
 /// but this source has NO Test-FunctionInterrupt to read it back, so they re-warn per record.
-/// NO CROSS-RECORD CARRY: :490 "$InputObject +=" targets the pipeline-bound parameter, and
-/// Find-AccumulatorCarry.ps1 reports only $commonParams (:507), which is reset in-block.
+/// FOUR CROSS-RECORD CARRIES - all load-bearing, DO NOT REMOVE. An earlier version of this comment
+/// asserted "no cross-record carry", which was wrong twice over and is exactly how compatibility
+/// state gets deleted by a later reader who trusts the doc over the code:
+///   $Name and $Schema (:481, :483) - rewritten by the two-part-name parsing. NEITHER is the
+///     pipeline-bound parameter (only $InputObject is), so the binder never rewrites them and the
+///     SOURCE keeps the parsed values for every later record. Reachable divergence: with
+///     -Name "[my.table]", record 1 parses to the bracket-quoted "my.table"; the source's record 2
+///     re-parses that UNQUOTED value as schema "my" + table "table" and creates the table in the
+///     WRONG SCHEMA, while a fresh hop scope would re-parse the original and get it right. The port
+///     must reproduce the source, so both carry.
+///   $object (:503) and $schemaObject (:586) - read by the catch cleanup at :617-626 which calls
+///     .Drop() on them; a throw before assignment leaves the SOURCE holding the previous record's
+///     objects and dropping those.
+/// What genuinely does NOT carry: ":490 $InputObject +=" targets the pipeline-bound parameter, which
+/// IS rebound per record, and $commonParams (:507) is reset in-block.
 /// NO preference assignment (checked with the unanchored pattern) and NO .IsPresent sites.
 ///
 /// The 18 switches cross as SwitchParameter OBJECTS received untyped per B's combined rule; only
@@ -439,6 +452,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # Carried with Assigned flags so a first record leaves them genuinely undefined, as the source does.
     if ($null -ne $__state -and $__state.ObjectAssigned) { $object = $__state.Object }
     if ($null -ne $__state -and $__state.SchemaObjectAssigned) { $schemaObject = $__state.SchemaObject }
+    # PARAMETER-MUTATION CARRY (codex r2). $Name (:483) and $Schema (:481) are rewritten by the
+    # two-part-name parsing, and NEITHER is the pipeline-bound parameter - only $InputObject is - so
+    # the binder never rewrites them and the SOURCE keeps the parsed values for every later record.
+    # Measured: a non-pipeline parameter mutated in process yields a, ax, axx over three records.
+    # Reachable divergence: with -Name "[my.table]", record 1 parses to the bracket-quoted name
+    # "my.table"; the source's record 2 then re-parses that UNQUOTED value as schema "my" + table
+    # "table" and creates the table in the wrong schema, while a fresh hop scope re-parses the
+    # original and gets it right. The port must reproduce the source, so both carry.
+    if ($null -ne $__state -and $__state.NameAssigned) { $Name = $__state.Name }
+    if ($null -ne $__state -and $__state.SchemaAssigned) { $Schema = $__state.Schema }
 
     . {
         if (($__boundSqlInstance)) {
@@ -611,11 +634,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $__ob = Get-Variable -Name object -Scope 0 -ErrorAction Ignore
     $__so = Get-Variable -Name schemaObject -Scope 0 -ErrorAction Ignore
+    $__nm = Get-Variable -Name Name -Scope 0 -ErrorAction Ignore
+    $__sc = Get-Variable -Name Schema -Scope 0 -ErrorAction Ignore
     @{ __newDbaDbTableProcess = @{
         ObjectAssigned       = [bool]$__ob
         Object               = $(if ($__ob) { $__ob.Value } else { $null })
         SchemaObjectAssigned = [bool]$__so
         SchemaObject         = $(if ($__so) { $__so.Value } else { $null })
+        NameAssigned         = [bool]$__nm
+        Name                 = $(if ($__nm) { $__nm.Value } else { $null })
+        SchemaAssigned       = [bool]$__sc
+        Schema               = $(if ($__sc) { $__sc.Value } else { $null })
     } }
 } $SqlInstance $SqlCredential $Database $Name $Schema $ColumnMap $ColumnObject $Passthru $InputObject $EnableException $__boundParameters $__state $__boundSqlInstance $__boundDatabase $__boundName $__boundSchema $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
