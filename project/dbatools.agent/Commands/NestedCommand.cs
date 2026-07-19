@@ -56,11 +56,12 @@ internal static partial class NestedCommand
             using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
             string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
+            string __seedToken = Guid.NewGuid().ToString("N");
             ScriptBlock script = ScriptBlock.Create(
-                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\ntry { & {\n" + scriptText +
+                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\n" + ModuleRootSeedProlog(__seedToken) + "try { & {\n" + scriptText +
                 "\n} @__nestedCommandArguments } catch { " +
                 "$__nestedTermination.ErrorRecord = $PSItem; " +
-                "Write-Output $__nestedTerminationMarker }");
+                "Write-Output $__nestedTerminationMarker }" + ModuleRootSeedEpilog(__seedToken));
             Collection<PSObject> raw = host.InvokeCommand.InvokeScript(
                 false,
                 script,
@@ -107,11 +108,12 @@ internal static partial class NestedCommand
             using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
             string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
+            string __seedToken = Guid.NewGuid().ToString("N");
             string wrapper =
-                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\ntry { & {\n" + scriptText +
+                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\n" + ModuleRootSeedProlog(__seedToken) + "try { & {\n" + scriptText +
                 "\n} @__nestedCommandArguments 6>&1 5>&1 4>&1 3>&1 2>&1 } catch { " +
                 "$__nestedTermination.ErrorRecord = $PSItem; " +
-                "Write-Output $__nestedTerminationMarker }";
+                "Write-Output $__nestedTerminationMarker }" + ModuleRootSeedEpilog(__seedToken);
 
             ErrorRecord? terminatingError = null;
             // Pipeline-stop parity (DEF-001 tail, W2-030): a downstream early stop -

@@ -134,8 +134,9 @@ internal static partial class NestedCommand
             // The carrier param is the ONLY name bound in the caller's scope; the args
             // array travels as a single element so null elements survive the InvokeScript
             // object[]-unpacking (W5-016), then splats positionally into the real scope.
+            string __seedToken = Guid.NewGuid().ToString("N");
             ScriptBlock script = ScriptBlock.Create(
-                "param($__nestedCommandArguments)\n& {\n" + scriptText + "\n} @__nestedCommandArguments");
+                "param($__nestedCommandArguments)\n" + ModuleRootSeedProlog(__seedToken) + "& {\n" + scriptText + "\n} @__nestedCommandArguments" + ModuleRootSeedEpilog(__seedToken));
             Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, script, null, new object?[] { scriptArgs });
             Collection<PSObject> output = new Collection<PSObject>();
             foreach (PSObject item in raw)
