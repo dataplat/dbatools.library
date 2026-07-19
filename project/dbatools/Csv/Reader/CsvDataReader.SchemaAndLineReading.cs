@@ -98,12 +98,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             {
                 if (_bufferPosition >= _bufferLength)
                 {
-                    lock (_bufferLifecycleLock)
-                    {
-                        if (_buffer == null)
-                            throw new ObjectDisposedException(GetType().Name);
-                        _bufferLength = _reader.Read(buffer, 0, buffer.Length);
-                    }
+                    _bufferLength = _reader.Read(buffer, 0, buffer.Length);
                     _bufferPosition = 0;
 
                     if (_bufferLength == 0)
@@ -147,12 +142,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                         else if (_bufferPosition >= _bufferLength)
                         {
                             // Peek next buffer
-                            lock (_bufferLifecycleLock)
-                    {
-                        if (_buffer == null)
-                            throw new ObjectDisposedException(GetType().Name);
-                        _bufferLength = _reader.Read(buffer, 0, buffer.Length);
-                    }
+                            _bufferLength = _reader.Read(buffer, 0, buffer.Length);
                             _bufferPosition = 0;
                             if (_bufferLength > 0 && buffer[0] == '\n')
                             {

@@ -50,15 +50,20 @@ namespace Dataplat.Dbatools.Csv.Reader
                     _reader.Dispose();
                 }
 
-                // Return pooled buffer - under the lifecycle lock so a concurrent refill
-                // cannot write into an array that has already gone back to the pool.
+                // Return pooled buffer ONLY when no read is in flight; a concurrent reader
+                // keeps the array (deferred to GC) so it can neither observe a null field nor
+                // write through a pool-returned array. The disposed inner reader ends the
+                // in-flight read with its own ObjectDisposedException at the next refill.
                 lock (_bufferLifecycleLock)
                 {
-                    if (_bufferFromPool && _buffer != null)
+                    if (System.Threading.Interlocked.CompareExchange(ref _activeReads, 0, 0) == 0)
                     {
-                        ArrayPool<char>.Shared.Return(_buffer);
+                        if (_bufferFromPool && _buffer != null)
+                        {
+                            ArrayPool<char>.Shared.Return(_buffer);
+                        }
+                        _buffer = null;
                     }
-                    _buffer = null;
                 }
             }
         }
