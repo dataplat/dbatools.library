@@ -119,11 +119,13 @@ public sealed class TestDbaAvailabilityGroupCommand : DbaBaseCmdlet
     }
 
     // PS: the source process block VERBATIM, CRLF-preserved and byte-proven against source
-    // lines 116-334 (extracted programmatically) after stripping the 22 -FunctionName appends. The
-    // source has NO Test-Bound (asserted at generation), so there is no rewrite to reverse - only
-    // the -FunctionName strips. All of the source's development notes/comments ride untouched. No
-    // gate, no sentinel; there is no early-return guard, but the source's own `return`s after each
-    // Stop-Function are preserved by the dot-block.
+    // lines 116-334 (extracted programmatically) after stripping the 22 Stop-Function -FunctionName
+    // appends and reversing the 10 direct-Write-Message DEF-006 rewrites (each carries its own
+    // # SOURCE: marker; -FunctionName + -ModuleName "dbatools" so the anonymous hop stamps the
+    // command name and module the same way the function world does - measured, not assumed). The
+    // source has NO Test-Bound (asserted at generation). All of the source's development notes ride
+    // untouched. No gate, no sentinel; the source's own `return`s after each Stop-Function are
+    // preserved by the dot-block.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $AvailabilityGroup, $Secondary, $SecondarySqlCredential, $AddDatabase, $SeedingMode, $SharedPath, $UseLastBackup, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -281,7 +283,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($replicaDb) {
                     # Database already present on replica, so test if already joined or if we can use it.
                     if ($replicaDb.AvailabilityGroupName -eq $AvailabilityGroup) {
-                        Write-Message -Level Verbose -Message "Database $db is already part of the Availability Group on replica $replicaName."
+                        Write-Message -Level Verbose -Message "Database $db is already part of the Availability Group on replica $replicaName." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db is already part of the Availability Group on replica $replicaName."
                     } else {
                         if ($replicaDb.Status -ne 'Restoring') {
                             $failure = $true
@@ -291,7 +293,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $failure = $true
                             Stop-Function -Message "Database $db is already present on $replicaName, so -UseLastBackup must not be used. Please remove database from replica to use -UseLastBackup." -Continue -FunctionName Test-DbaAvailabilityGroup
                         }
-                        Write-Message -Level Verbose -Message "Database $db is already present in restoring status on replica $replicaName."
+                        Write-Message -Level Verbose -Message "Database $db is already present in restoring status on replica $replicaName." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db is already present in restoring status on replica $replicaName."
                     }
                 } else {
                     # No database on replica, so test if we need a backup.
@@ -299,32 +301,32 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # To have a detailed verbose message, we test in small steps.
                     if ($SeedingMode -eq 'Automatic') {
                         if ($ag.AvailabilityReplicas[$replicaName].SeedingMode -eq 'Automatic') {
-                            Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName. The replica is already configured accordingly."
+                            Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName. The replica is already configured accordingly." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName. The replica is already configured accordingly."
                         } else {
-                            Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName. The replica will be configured accordingly."
+                            Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName. The replica will be configured accordingly." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName. The replica will be configured accordingly."
                         }
                         if ($db.LastBackupDate.Year -eq 1) {
                             # Automatic seeding only works with databases that are really in RecoveryModel Full, so a full backup has been taken.
-                            Write-Message -Level Verbose -Message "Database $db will need a backup first. This is ok if one of the other replicas uses manual seeding."
+                            Write-Message -Level Verbose -Message "Database $db will need a backup first. This is ok if one of the other replicas uses manual seeding." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db will need a backup first. This is ok if one of the other replicas uses manual seeding."
                             $backupNeeded = $true
                         }
                     } elseif ($SeedingMode -eq 'Manual') {
                         if ($ag.AvailabilityReplicas[$replicaName].SeedingMode -eq 'Manual') {
-                            Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName. The replica is already configured accordingly."
+                            Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName. The replica is already configured accordingly." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName. The replica is already configured accordingly."
                         } else {
-                            Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName. The replica will be configured accordingly."
+                            Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName. The replica will be configured accordingly." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName. The replica will be configured accordingly."
                         }
                         $restoreNeeded[$replicaName] = $true
                     } else {
                         if ($ag.AvailabilityReplicas[$replicaName].SeedingMode -eq 'Automatic') {
-                            Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName."
+                            Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db will use automatic seeding on replica $replicaName."
                             if ($db.LastBackupDate.Year -eq 1) {
                                 # Automatic seeding only works with databases that are really in RecoveryModel Full, so a full backup has been taken.
-                                Write-Message -Level Verbose -Message "Database $db will need a backup first. This is ok if one of the other replicas uses manual seeding."
+                                Write-Message -Level Verbose -Message "Database $db will need a backup first. This is ok if one of the other replicas uses manual seeding." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db will need a backup first. This is ok if one of the other replicas uses manual seeding."
                                 $backupNeeded = $true
                             }
                         } else {
-                            Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName."
+                            Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName." -FunctionName Test-DbaAvailabilityGroup -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Database $db will need a restore on replica $replicaName."
                             $restoreNeeded[$replicaName] = $true
                         }
                     }
