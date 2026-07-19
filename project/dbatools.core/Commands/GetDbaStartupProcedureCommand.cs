@@ -16,9 +16,10 @@ namespace Dataplat.Dbatools.Commands;
 /// Test-Bound -ParameterName StartupProcedure guard is carried as a bound flag - the scriptblock runs
 /// in module scope and cannot see the real cmdlet's $PSBoundParameters. No ShouldProcess. Positions
 /// match the retired function (SqlInstance=0, SqlCredential=1, StartupProcedure=2;
-/// EnableException=switch/null) and DefaultParameterSetName "Default" is preserved. Substitutions
-/// only: Test-Bound -> the carried $__boundStartupProcedure flag, explicit -FunctionName
-/// Get-DbaStartupProcedure on Stop-Function (W1-090); the body is otherwise verbatim (including the
+/// EnableException=switch/null) and DefaultParameterSetName "Default" is preserved. Intentional
+/// rewrites: Test-Bound -> the carried $__boundStartupProcedure flag, explicit -FunctionName
+/// Get-DbaStartupProcedure on Stop-Function (W1-090), and -FunctionName/-ModuleName on the two
+/// direct Write-Message calls (DEF-006); the body is otherwise verbatim (including the
 /// source's undefined $servername in the verbose message). Surface pinned by
 /// migration/baselines/Get-DbaStartupProcedure.json.
 /// </summary>
@@ -85,9 +86,9 @@ public sealed class GetDbaStartupProcedureCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the process body VERBATIM per record (no begin/end blocks). Substitutions only:
-    // Test-Bound -ParameterName StartupProcedure -> the carried $__boundStartupProcedure flag,
-    // explicit -FunctionName Get-DbaStartupProcedure on Stop-Function (W1-090).
+    // PS: the process body per record (no begin/end blocks). Intentional rewrites: Test-Bound
+    // -ParameterName StartupProcedure -> the carried $__boundStartupProcedure flag, -FunctionName
+    // on Stop-Function (W1-090), and DEF-006 attribution on the two Write-Message calls.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $StartupProcedure, $EnableException, $__boundStartupProcedure, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
