@@ -223,7 +223,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
     param($__carriedPartschs, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-    $partschs = @( $__carriedPartschs )
+    $partschs = @( )
+    if ($null -ne $__carriedPartschs) { $partschs = @( $__carriedPartschs ) }
 
         # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaDbPartitionScheme.
         foreach ($partschItem in $partschs) {

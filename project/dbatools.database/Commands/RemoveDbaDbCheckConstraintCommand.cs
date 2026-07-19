@@ -8,25 +8,25 @@ using Dataplat.Dbatools.Parameter;
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Drops user defined functions. Port of public/Remove-DbaDbUdf.ps1; the workflow remains a module-scoped PowerShell
+/// Drops check constraints. Port of public/Remove-DbaDbCheckConstraint.ps1; the workflow remains a module-scoped PowerShell
 /// compatibility hop.
 ///
 /// This is a genuine begin/process/END command and is ported as one. The source accumulates into
-/// $udfs during process and does all the dropping in end, and that deferral is deliberate - the
+/// $chkcs during process and does all the dropping in end, and that deferral is deliberate - the
 /// source comment explains it: dropping while enumerating a collection piped straight from
-/// Get-DbaDbUdf raises "Collection was modified; enumeration operation may not execute." So the
+/// Get-DbaDbCheckConstraint raises "Collection was modified; enumeration operation may not execute." So the
 /// port keeps the work in EndProcessing rather than emitting per record. Emitting per record would
 /// change both the output timing and the enumeration safety that comment exists to protect.
 ///
-/// $udfs therefore accumulates ACROSS RECORDS, which a hop cannot do on its own: the process hop
+/// $chkcs therefore accumulates ACROSS RECORDS, which a hop cannot do on its own: the process hop
 /// reports the accumulated collection back through a sentinel, the cmdlet holds it between records,
-/// and the end hop receives it once. The begin block is the single line "$udfs = @( )", so the
+/// and the end hop receives it once. The begin block is the single line "$chkcs = @( )", so the
 /// cmdlet's own empty starting state is that initialiser - it is not re-run per record, which would
 /// discard everything an earlier record collected.
 ///
 /// $PSBoundParameters cannot ride the hop. Inside one it is the HOP SCRIPTBLOCK's dictionary, not
 /// the cmdlet's - probed directly, a hop reading it saw the internal carrier parameter alongside the
-/// real ones. The source splats that dictionary straight into Get-DbaDbUdf, so shipping it verbatim
+/// real ones. The source splats that dictionary straight into Get-DbaDbCheckConstraint, so shipping it verbatim
 /// would pass hop plumbing as if it were user parameters. The real bound parameters are marshalled
 /// in from here instead; the source's own Remove('WhatIf') / Remove('Confirm') lines then run
 /// against it verbatim. This is the same family as Test-Bound and fails the same way: no error, just
@@ -34,7 +34,7 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// The ShouldProcess gate is routed to the OUTER cmdlet. ConfirmImpact is High, so this prompts by
 /// default, and -Confirm's "Yes to All" answer lives on the invoking runtime - an inner-owned gate
-/// would forget it and re-prompt for every function.
+/// would forget it and re-prompt for every view.
 ///
 /// The two parameter sets are preserved exactly as the source declares them, including
 /// -SqlInstance mandatory at position 0 in NonPipeline and -InputObject mandatory and pipeline-bound
@@ -44,55 +44,50 @@ namespace Dataplat.Dbatools.Commands;
 /// catch has NO -Continue and no return, so it falls through to assign $output.Status and emit the
 /// failed record - that fall-through is the source's behaviour and ships unchanged.
 /// </summary>
-[Cmdlet(VerbsCommon.Remove, "DbaDbUdf", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
+[Cmdlet(VerbsCommon.Remove, "DbaDbCheckConstraint", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High, DefaultParameterSetName = "Default")]
 [OutputType(typeof(PSObject))]
-public sealed class RemoveDbaDbUdfCommand : DbaBaseCmdlet
+public sealed class RemoveDbaDbCheckConstraintCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(ParameterSetName = "NonPipeline", Mandatory = true, Position = 0)]
+    [Parameter(ParameterSetName = "Default")]
+    [Parameter(ParameterSetName = "Pipeline")]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative credential for the target instances.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
+    [Parameter(ParameterSetName = "Default")]
+    [Parameter(ParameterSetName = "Pipeline")]
     public PSCredential? SqlCredential { get; set; }
 
-    /// <summary>The database or databases holding the functions.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? Database { get; set; }
+    /// <summary>The database or databases holding the check constraints.</summary>
+    [Parameter(ParameterSetName = "Default")]
+    [Parameter(ParameterSetName = "Pipeline")]
+    public object[]? Database { get; set; }
 
     /// <summary>Databases to skip.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
+    [Parameter(ParameterSetName = "Default")]
+    [Parameter(ParameterSetName = "Pipeline")]
     public object[]? ExcludeDatabase { get; set; }
 
-    /// <summary>Skip system user defined functions.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
-    public SwitchParameter ExcludeSystemUdf { get; set; }
+    /// <summary>Skip constraints on system tables.</summary>
+    [Parameter(ParameterSetName = "Default")]
+    [Parameter(ParameterSetName = "Pipeline")]
+    public SwitchParameter ExcludeSystemTable { get; set; }
 
-    /// <summary>Only these schemas.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? Schema { get; set; }
-
-    /// <summary>Skip these schemas.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? ExcludeSchema { get; set; }
-
-    /// <summary>Only these user defined functions.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? Name { get; set; }
-
-    /// <summary>Skip these user defined functions.</summary>
-    [Parameter(ParameterSetName = "NonPipeline")]
-    public string[]? ExcludeName { get; set; }
-
-    /// <summary>SMO function object(s), typically from Get-DbaDbUdf.</summary>
+    /// <summary>SMO check constraint object(s), typically from Get-DbaDbCheckConstraint.</summary>
     [Parameter(ParameterSetName = "Pipeline", Mandatory = true, ValueFromPipeline = true)]
-    public object[]? InputObject { get; set; }
+    public Microsoft.SqlServer.Management.Smo.Check[]? InputObject { get; set; }
 
-    // EnableException is inherited from DbaBaseCmdlet - never redeclared.
+    // EnableException is OVERRIDDEN, not redeclared. This source scopes it to the Pipeline set only,
+    // and DbaBaseCmdlet declares the property virtual precisely so a port can re-scope it - the
+    // inherited bare declaration reflects as __AllParameterSets and diverges, which the compiled
+    // surface diff catches as a breaking ParameterSetMembership change. Overriding is the sanctioned
+    // mechanism; the never-redeclare rule forbids a NEW property, not this.
+    [Parameter(ParameterSetName = "Pipeline")]
+    public override SwitchParameter EnableException { get; set; }
 
-    // The source's begin block is "$udfs = @( )", so this empty state IS that initialiser. It is
+    // The source's begin block is "$chkcs = @( )", so this empty state IS that initialiser. It is
     // deliberately NOT reset per record: process accumulates across records and end consumes once.
-    private object? _udfs;
+    private object? _chkcs;
 
     protected override void ProcessRecord()
     {
@@ -102,9 +97,9 @@ public sealed class RemoveDbaDbUdfCommand : DbaBaseCmdlet
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item is not null && LanguagePrimitives.IsTrue(
-                item.Properties["__removeDbaDbUdfState"]?.Value))
+                item.Properties["__removeDbaDbCheckConstraintState"]?.Value))
             {
-                _udfs = item.Properties["Udfs"]?.Value;
+                _chkcs = item.Properties["Chkcs"]?.Value;
                 return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
@@ -115,9 +110,8 @@ public sealed class RemoveDbaDbUdfCommand : DbaBaseCmdlet
             }
             WriteObject(item);
         }, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, ExcludeSystemUdf, Schema,
-            ExcludeSchema, Name, ExcludeName, InputObject, EnableException.ToBool(),
-            _udfs, BoundParametersForSplat(),
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, ExcludeSystemTable, InputObject, EnableException.ToBool(),
+            _chkcs, BoundParametersForSplat(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
@@ -136,12 +130,12 @@ public sealed class RemoveDbaDbUdfCommand : DbaBaseCmdlet
             }
             WriteObject(item);
         }, EndScript,
-            _udfs, EnableException.ToBool(), this,
+            _chkcs, EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
-    // The cmdlet's REAL bound parameters, for the source's "Get-DbaDbUdf @params" splat. A hop's own
+    // The cmdlet's REAL bound parameters, for the source's "Get-DbaDbCheckConstraint @params" splat. A hop's own
     // $PSBoundParameters would include the hop carrier parameters, so it cannot be used.
     private Hashtable BoundParametersForSplat()
     {
@@ -178,52 +172,52 @@ public sealed class RemoveDbaDbUdfCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the source's PROCESS body VERBATIM, with $udfs seeded from the carry and reported back.
+    // PS: the source's PROCESS body VERBATIM, with $chkcs seeded from the carry and reported back.
     // Substitution: $PSBoundParameters -> $__boundParams (see the class remarks).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $ExcludeSystemUdf, $Schema, $ExcludeSchema, $Name, $ExcludeName, $InputObject, $EnableException, $__carriedUdfs, $__boundParams, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $ExcludeSystemTable, $InputObject, $EnableException, $__carriedChkcs, $__boundParams, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [object[]]$ExcludeDatabase, $ExcludeSystemUdf, [string[]]$Schema, [string[]]$ExcludeSchema, [string[]]$Name, [string[]]$ExcludeName, [object[]]$InputObject, $EnableException, $__carriedUdfs, $__boundParams, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, $ExcludeSystemTable, [Microsoft.SqlServer.Management.Smo.Check[]]$InputObject, $EnableException, $__carriedChkcs, $__boundParams, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     try {
-        # The begin block's "$udfs = @( )" runs ONCE for the whole invocation, so on every record
+        # The begin block's "$chkcs = @( )" runs ONCE for the whole invocation, so on every record
         # after the first the accumulated collection is restored instead of re-initialised.
-        $udfs = @( )
-        if ($null -ne $__carriedUdfs) { $udfs = @( $__carriedUdfs ) }
+        $chkcs = @( )
+        if ($null -ne $__carriedChkcs) { $chkcs = @( $__carriedChkcs ) }
 
-            if ($SqlInstance) {
-                $params = $__boundParams
-                $null = $params.Remove('WhatIf')
-                $null = $params.Remove('Confirm')
-                $udfs = Get-DbaDbUdf @params
-            } else {
-                $udfs += $InputObject
-            }
+        if ($SqlInstance) {
+            $params = $__boundParams
+            $null = $params.Remove('WhatIf')
+            $null = $params.Remove('Confirm')
+            $chkcs = Get-DbaDbCheckConstraint @params
+        } else {
+            $chkcs += $InputObject
+        }
 
     } finally {
-        # Emitted PLAIN, not as ", @( $udfs )". The unary-comma wrapping looks like the safe way to
+        # Emitted PLAIN, not as ", @( $chkcs )". The unary-comma wrapping looks like the safe way to
         # preserve a collection, but measured over three records it collapses the carry to a single
-        # element (the next hop's "@( $__carriedUdfs )" unwraps the outer array and keeps only the
-        # nested one), which silently loses every function but the last. Plain assignment round-trips the
+        # element (the next hop's "@( $__carriedChkcs )" unwraps the outer array and keeps only the
+        # nested one), which silently loses every check constraint but the last. Plain assignment round-trips the
         # whole collection.
         [pscustomobject]@{
-            __removeDbaDbUdfState = $true
-            Udfs                   = $udfs
+            __removeDbaDbCheckConstraintState = $true
+            Chkcs                    = $chkcs
         }
     }
-} $SqlInstance $SqlCredential $Database $ExcludeDatabase $ExcludeSystemUdf $Schema $ExcludeSchema $Name $ExcludeName $InputObject $EnableException $__carriedUdfs $__boundParams $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $ExcludeDatabase $ExcludeSystemTable $InputObject $EnableException $__carriedChkcs $__boundParams $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the source's END body VERBATIM. Substitution: $PSCmdlet -> $__realCmdlet so the gate is
     // owned by the outer cmdlet and -Confirm's Yes-to-All survives.
     private const string EndScript = """
-param($__carriedUdfs, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($__carriedChkcs, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -232,31 +226,29 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param($__carriedUdfs, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param($__carriedChkcs, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-    $udfs = @( )
-    if ($null -ne $__carriedUdfs) { $udfs = @( $__carriedUdfs ) }
+    $chkcs = @( )
+    if ($null -ne $__carriedChkcs) { $chkcs = @( $__carriedChkcs ) }
 
         # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaDbUdf.
-        foreach ($udfItem in $udfs) {
-            if ($__realCmdlet.ShouldProcess($udfItem.Parent.Parent.Name, "Removing the user defined function $($udfItem.Schema).$($udfItem.Name) in the database $($udfItem.Parent.Name) on $($udfItem.Parent.Parent.Name)")) {
+        foreach ($chkcItem in $chkcs) {
+            if ($__realCmdlet.ShouldProcess($chkcItem.Parent.Parent.Parent.Name, "Removing the check constraint [$($chkcItem.Name)] on the table $($chkcItem.Parent) on the database [$($chkcItem.Parent.Parent.Name)]")) {
                 $output = [PSCustomObject]@{
-                    ComputerName = $udfItem.Parent.Parent.ComputerName
-                    InstanceName = $udfItem.Parent.Parent.ServiceName
-                    SqlInstance  = $udfItem.Parent.Parent.DomainInstanceName
-                    Database     = $udfItem.Parent.Name
-                    Udf          = "$($udfItem.Schema).$($udfItem.Name)"
-                    UdfName      = $udfItem.Name
-                    UdfSchema    = $udfItem.Schema
+                    ComputerName = $chkcItem.ComputerName
+                    InstanceName = $chkcItem.Parent.Parent.Parent.ServiceName
+                    SqlInstance  = $chkcItem.Parent.Parent.Parent.DomainInstanceName
+                    Database     = $chkcItem.Parent.Name
+                    Name         = $chkcItem.Name
                     Status       = $null
                     IsRemoved    = $false
                 }
                 try {
-                    $udfItem.Drop()
+                    $chkcItem.Drop()
                     $output.Status = "Dropped"
                     $output.IsRemoved = $true
                 } catch {
-                    Stop-Function -Message "Failed removing the user defined function $($udfItem.Schema).$($udfItem.Name) in the database $($udfItem.Parent.Name) on $($udfItem.Parent.Parent.Name)" -ErrorRecord $_ -FunctionName Remove-DbaDbUdf
+                    Stop-Function -Message "Failed removing the check constraint $($chkcItem.Schema).$($chkcItem.Name) in the database $($chkcItem.Parent.Name) on $($chkcItem.Parent.Parent.Name)" -ErrorRecord $_ -FunctionName Remove-DbaDbCheckConstraint
                     $output.Status = (Get-ErrorMessage -Record $_)
                     $output.IsRemoved = $false
                 }
@@ -264,6 +256,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-} $__carriedUdfs $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $__carriedChkcs $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

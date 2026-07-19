@@ -170,7 +170,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         [int]$jobStepsCount = $currentjob.JobSteps.Count
         [int]$currentStepRetryAttempts = $currentjob.CurrentRunRetryAttempt
         [int]$currentStepRetries = $currentjob.JobSteps[$currentStepName].RetryAttempts
-        Write-Message -Level Verbose -Message "Server: $server - $currentjob is $currentRunStatus, currently on Job Step '$currentStepName' ($currentStepId of $jobStepsCount), and has tried $currentStepRetryAttempts of $currentStepRetries retry attempts" -FunctionName Start-DbaAgentJob
+        Write-Message -Level Verbose -Message "Server: $server - $currentjob is $currentRunStatus, currently on Job Step '$currentStepName' ($currentStepId of $jobStepsCount), and has tried $currentStepRetryAttempts of $currentStepRetries retry attempts"
         if (($Wait) -and ($WaitPeriod) ) { Start-Sleep -Seconds $WaitPeriod }
         $currentjob.Refresh()
     }

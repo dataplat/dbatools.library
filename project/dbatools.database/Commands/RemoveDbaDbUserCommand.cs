@@ -472,7 +472,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-    $pipedUsers = @( $__carriedPipedUsers )
+    $pipedUsers = @( )
+    if ($null -ne $__carriedPipedUsers) { $pipedUsers = @( $__carriedPipedUsers ) }
 
         # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaDbUser.
         Remove-DbUser $pipedUsers
