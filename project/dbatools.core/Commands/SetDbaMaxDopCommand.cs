@@ -76,23 +76,23 @@ public sealed class SetDbaMaxDopCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, Database, ExcludeDatabase, MaxDop, InputObject,
             AllDatabases.ToBool(), EnableException.ToBool(),
             TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
             TestBound(nameof(Database)), TestBound(nameof(ExcludeDatabase)),
             TestBound(nameof(AllDatabases)), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

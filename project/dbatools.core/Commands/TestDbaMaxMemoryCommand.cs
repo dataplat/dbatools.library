@@ -38,18 +38,18 @@ public sealed class TestDbaMaxMemoryCommand : DbaBaseCmdlet
 
         foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new DbaInstanceParameter[] { instance }, SqlCredential, Credential, EnableException.ToBool(),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+            new DbaInstanceParameter[] { instance }, SqlCredential, Credential, EnableException.ToBool(),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 

@@ -77,21 +77,21 @@ public sealed class NewDbaCustomErrorCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { instance }, SqlCredential, MessageID, Severity, MessageText ?? "", Language,
-                WithLog.ToBool(), EnableException.ToBool(),
-                TestBound(nameof(Language)), TestBound(nameof(WithLog)), this,
-                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+            new[] { instance }, SqlCredential, MessageID, Severity, MessageText ?? "", Language,
+                WithLog.ToBool(), EnableException.ToBool(),
+                TestBound(nameof(Language)), TestBound(nameof(WithLog)), this,
+                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 

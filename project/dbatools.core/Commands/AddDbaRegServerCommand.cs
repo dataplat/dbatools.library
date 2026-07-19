@@ -123,13 +123,7 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
             _bindInitialized = true;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, _serverNameState, _nameState, Description ?? "", Group,
-            ActiveDirectoryTenant ?? "", ActiveDirectoryUserId ?? "", ConnectionString ?? "",
-            OtherParams ?? "", _inputObjectState, ServerObject, EnableException.ToBool(), _state,
-            BoundRaw("ServerName"), BoundRaw("ServerObject"), BoundRaw("Name"), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3002State"))
@@ -141,16 +135,22 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
                     _nameState = _state["Name"];
                     _serverNameState = _state["ServerName"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, _serverNameState, _nameState, Description ?? "", Group,
+            ActiveDirectoryTenant ?? "", ActiveDirectoryUserId ?? "", ConnectionString ?? "",
+            OtherParams ?? "", _inputObjectState, ServerObject, EnableException.ToBool(), _state,
+            BoundRaw("ServerName"), BoundRaw("ServerObject"), BoundRaw("Name"), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>The raw bound value (or null when unbound) so the hop's
