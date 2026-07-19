@@ -114,7 +114,7 @@ public sealed class FindDbaUserObjectCommand : DbaBaseCmdlet
         }
     }
     // PS: the begin block VERBATIM (the one-time $Pattern mutation) plus a sentinel carrying the
-    // resulting $Pattern to the process hop. Edit: -FunctionName on the one Write-Message. -ModuleName "dbatools"
+    // resulting $Pattern to the process hop. Edit: -FunctionName on the one Write-Message.
     private const string BeginScript = """
 param($Pattern, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}

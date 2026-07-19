@@ -184,7 +184,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $View $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
-    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbView on the five Write-Message; Test-Bound -ModuleName "dbatools"
+    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbView on the five Write-Message; Test-Bound
     // SqlInstance -> $__boundSqlInstance and Test-Bound -ParameterName ExcludeSystemView -> $__boundExcludeSystemView.
     // $fqtns arrives carried from begin. The opening if (Test-FunctionInterrupt) { return } is inert here (fresh
     // scope) - the real begin-interrupt gate is the C# _beginInterrupted check. The three continues are loop-bound.

@@ -506,7 +506,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     @{ __findDbaOrphanedFileProcess = @{ State = $__state } }
 } $SqlInstance $SqlCredential $Path $Recurse $LocalOnly $RemoteOnly $EnableException $__state $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
-    // PS: the end block. Edit: -FunctionName on the Write-Message. $result is restored from the carried -ModuleName "dbatools"
+    // PS: the end block. Edit: -FunctionName on the Write-Message. $result is restored from the carried
     // state so its cross-record value drives the "no orphaned files" message exactly as the source scope.
     private const string EndScript = """
 param($__state, $EnableException, $__boundVerbose, $__boundDebug)

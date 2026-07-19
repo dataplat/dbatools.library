@@ -182,7 +182,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $Table $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
-    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbTable on the four Write-Message. $fqTns arrives -ModuleName "dbatools"
+    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbTable on the four Write-Message. $fqTns arrives
     // carried from begin. The opening if (Test-FunctionInterrupt) { return } is inert here (fresh scope) - the real
     // begin-interrupt gate is the C# _beginInterrupted check above. The two continues are loop-bound.
     private const string ProcessScript = """

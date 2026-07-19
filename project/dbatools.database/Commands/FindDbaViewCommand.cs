@@ -308,7 +308,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     @{ __findDbaViewProcess = @{ State = $__state } }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $Pattern $IncludeSystemDatabases $EnableException $__state $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
-    // PS: the end block VERBATIM. Edit: -FunctionName on the Write-Message. $everyservervwcount is -ModuleName "dbatools"
+    // PS: the end block VERBATIM. Edit: -FunctionName on the Write-Message. $everyservervwcount is
     // restored from the carried state so the grand total reflects all records.
     private const string EndScript = """
 param($__state, $EnableException, $__boundVerbose, $__boundDebug)

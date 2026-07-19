@@ -256,7 +256,7 @@ public sealed class InvokeDbaDbDataMaskingCommand : DbaBaseCmdlet
     }
 
     // PS: the begin block VERBATIM, dot-sourced so its assignments land in the hop scope for
-    // the sentinel. Edits: -FunctionName on the four Write-Message defaults. $Force rides as -ModuleName "dbatools"
+    // the sentinel. Edits: -FunctionName on the four Write-Message defaults. $Force rides as
     // the source's undeclared read. The sentinel carries the computed type lists and the
     // defaulted ints as one opaque state hashtable.
     private const string BeginScript = """
