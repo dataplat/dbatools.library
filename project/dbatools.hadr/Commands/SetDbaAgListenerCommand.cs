@@ -86,29 +86,32 @@ public sealed class SetDbaAgListenerCommand : DbaBaseCmdlet
         //
         // W3-082 PROMPT-STATE TRANSPLANT: VFP + per-record + inner-$Pscmdlet gate + ConfirmImpact
         // High over a listener port change.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w4056State"))
+            {
+                _state = sentinel["__w4056State"] as Hashtable;
+                return;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, AvailabilityGroup, Listener, Port, InputObject,
             EnableException.ToBool(),
             TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
             TestBound(nameof(AvailabilityGroup)), TestBound(nameof(Listener)),
             _state,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            Hashtable? sentinel = item?.BaseObject as Hashtable;
-            if (sentinel is not null && sentinel.ContainsKey("__w4056State"))
-            {
-                _state = sentinel["__w4056State"] as Hashtable;
-                continue;
-            }
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

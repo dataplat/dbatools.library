@@ -66,27 +66,30 @@ public sealed class InvokeDbaAgFailoverCommand : DbaBaseCmdlet
         // __w4037State sentinel. The two loop-less validation Stop-Function+return
         // sites exit the record via the dot-block frame; the catch site is
         // -Continue (loop-local).
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, AvailabilityGroup, InputObject,
-            Force.ToBool(), EnableException.ToBool(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)), _state,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w4037State"))
             {
                 _state = sentinel["__w4037State"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, AvailabilityGroup, InputObject,
+            Force.ToBool(), EnableException.ToBool(),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)), _state,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
