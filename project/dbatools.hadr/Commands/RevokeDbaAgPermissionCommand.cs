@@ -66,7 +66,7 @@ public sealed class RevokeDbaAgPermissionCommand : DbaBaseCmdlet
         }
 
         // WHOLE-RECORD hop. This row carries the DEF-012 NON-PARAMETER cross-record sub-class
-        // (coordinator ruling 2026-07-19 02:35), and both leaks were MEASURED before the port was
+        // (coordinator ruling 2026-07-19 02:35), and the first two leaks were MEASURED before the port was
         // written - not inferred from reading the source.
         //
         // CARRY 1 - $perm, and it is the severe one (escalated upstream as U-10, a privilege-
@@ -150,9 +150,9 @@ public sealed class RevokeDbaAgPermissionCommand : DbaBaseCmdlet
     // PS: the source process block VERBATIM, CRLF-preserved and byte-proven against source
     // lines 112-219 after appending nine -FunctionName arguments and reversing the single
     // Test-Bound rewrite (SOURCE comment). The source's own "Seting"/"Revokeing" typos ride
-    // untouched. Bracketing the body: the two DEF-012 non-parameter leaks ($perm, $server) are
+    // untouched. Bracketing the body: the THREE DEF-012 non-parameter leaks ($perm, $server, $ag) are
     // seeded BEFORE the body so it observes the source's cross-record state, and the W3-082
-    // prompt-state transplant is injected before any gate; the tail harvests all three.
+    // prompt-state transplant is injected before any gate; the tail harvests all FOUR values.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Login, $AvailabilityGroup, $Type, $Permission, $InputObject, $EnableException, $__boundSqlInstance, $__boundInputObject, $__state, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -166,7 +166,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Login, [string[]]$AvailabilityGroup, [string[]]$Type, [string[]]$Permission, [Microsoft.SqlServer.Management.Smo.Login[]]$InputObject, $EnableException, $__boundSqlInstance, $__boundInputObject, $__state, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    # DEF-012 NON-PARAMETER cross-record state. Neither of these is a parameter: $perm is the loop
+    # DEF-012 NON-PARAMETER cross-record state. None of these is a parameter: $perm is the loop
     # variable of the :168/:195 loops, read at :128 before any record assigns it, and $server is
     # assigned only on the other branch (:130) and in the later loop (:159). Both survive in
     # function scope in the source, so both are seeded here BEFORE the body. Seeded on ContainsKey
@@ -174,6 +174,20 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # must observe.
     if ($null -ne $__state -and $__state.ContainsKey('perm')) { $perm = $__state.perm }
     if ($null -ne $__state -and $__state.ContainsKey('server')) { $server = $__state.server }
+    # THIRD LEAK, carried under the SAME coordinator ruling by extension rather than by name.
+    # The 2026-07-19 W4-055 dual ruling names $perm and $server; it does not mention $ag, which I
+    # reported separately. Its stated PRINCIPLE - port bug-for-bug, never let a per-record hop's
+    # safer divergence hide the bug - applies to $ag identically, so it is carried here rather
+    # than left to differ. $ag is assigned at :135 (CreateAnyDatabase branch) and :194 (AG branch)
+    # but READ at :186 in the ENDPOINT branch as `-Target $ag`, a path on which nothing assigns it.
+    # Source order says assigned, control flow says never assigned on the reading path - which is
+    # exactly the per-BRANCH blind spot my own detector documents. WITHOUT this carry the compiled
+    # world would pass -Target $null where the source passes the previous record's group: a
+    # divergence in the SAFE direction, which is still a divergence and the one thing the ruling
+    # forbids. FLAGGED TO THE COORDINATOR as an applied extension, not a silent decision - strike
+    # it and this line comes out. Severity assessed (not measured) as benign like W4-039's
+    # Stop-Function -Target case: it colours an error record's Target, it does not issue a grant.
+    if ($null -ne $__state -and $__state.ContainsKey('ag')) { $ag = $__state.ag }
 
     # cross-record engine-state restore: the ShouldProcess Yes/No-to-All answer spans the
     # pipeline in the source (one CommandRuntime); the transplant field name is identical
@@ -297,7 +311,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
 
-    @{ __w4055State = @{ perm = $perm; server = $server; shouldProcessContinueStatus = $(if ($null -ne $__spField) { "$($__spField.GetValue($Pscmdlet.CommandRuntime))" } else { $null }) } }
+    @{ __w4055State = @{ perm = $perm; server = $server; ag = $ag; shouldProcessContinueStatus = $(if ($null -ne $__spField) { "$($__spField.GetValue($Pscmdlet.CommandRuntime))" } else { $null }) } }
 } $SqlInstance $SqlCredential $Login $AvailabilityGroup $Type $Permission $InputObject $EnableException $__boundSqlInstance $__boundInputObject $__state $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
