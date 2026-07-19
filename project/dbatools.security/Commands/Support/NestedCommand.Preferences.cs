@@ -21,12 +21,17 @@ internal static partial class NestedCommand
     private static readonly (string ParameterName, string PreferenceVariable)[] ActionPreferenceMap =
     {
         ("ErrorAction", "ErrorActionPreference"),
-        // WarningAction is deliberately ABSENT: the function world is PATH-DEPENDENT for it
-        // (measured 2026-07-19: with -WarningAction SilentlyContinue the function world CAPTURES
+        // WarningAction is CONVERTING-VALUES-ONLY (see the filter in PropagateActionPreferences):
+        // the function world is PATH-DEPENDENT for its non-converting values (measured
+        // 2026-07-19: with -WarningAction SilentlyContinue the function world CAPTURES
         // Stop-Function connect warnings on New-DbaDbUser yet SUPPRESSES them on
-        // Remove-DbaDbRoleMember), so no uniform in-scope preference can match both paths.
-        // Propagating it regressed a sealed suite; the WarningAction divergence class stays with
-        // the owner-level Write-Message analysis instead.
+        // Remove-DbaDbRoleMember - no uniform in-scope preference matches both, and blanket
+        // propagation regressed a sealed suite; suppression/display already round-trips through
+        // the merge + host re-emission). The CONVERTING values (Stop/Inquire) have no such
+        // ambiguity: a function-local Warning-to-terminating conversion must fire inside the
+        // body for its own try/catch to see it (lane G's control-flow measurement), so those
+        // propagate.
+        ("WarningAction", "WarningPreference"),
         ("InformationAction", "InformationPreference"),
         ("ProgressAction", "ProgressPreference"),
     };
@@ -37,6 +42,10 @@ internal static partial class NestedCommand
         foreach ((string parameterName, string preferenceVariable) in ActionPreferenceMap)
         {
             if (!host.MyInvocation.BoundParameters.TryGetValue(parameterName, out object? bound) || bound is null)
+                continue;
+            if (parameterName == "WarningAction" &&
+                bound is ActionPreference warningValue &&
+                warningValue != ActionPreference.Stop && warningValue != ActionPreference.Inquire)
                 continue;
             saved ??= new List<(string, object?)>();
             saved.Add((preferenceVariable, host.SessionState.PSVariable.GetValue(preferenceVariable)));
