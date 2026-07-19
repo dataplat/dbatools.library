@@ -76,20 +76,21 @@ public sealed class TestDbaAvailabilityGroupCommand : DbaBaseCmdlet
         // T8/DEF-002 EXPOSURE (shared-runtime, blocked on A, escalated): AvailabilityGroup [string]
         // and AddDatabase [string[]] flow to called cmdlets. DEF-001 is weaker (read-only) though
         // it emits per replica/database.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, AvailabilityGroup, Secondary, SecondarySqlCredential,
-            AddDatabase, SeedingMode, SharedPath, UseLastBackup.ToBool(),
-            EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // DEF-001 closed via InvokeScopedStreaming (ab7492c); read-only so no WhatIf interaction.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, AvailabilityGroup, Secondary, SecondarySqlCredential,
+            AddDatabase, SeedingMode, SharedPath, UseLastBackup.ToBool(),
+            EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

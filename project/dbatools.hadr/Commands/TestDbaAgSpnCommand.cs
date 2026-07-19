@@ -83,27 +83,29 @@ public sealed class TestDbaAgSpnCommand : DbaBaseCmdlet
         // T8/DEF-002 EXPOSURE (shared-runtime, blocked on A, escalated): AvailabilityGroup and
         // Listener are [string[]] flowing to called cmdlets; DEF-001 buffered-output is weaker here
         // (read-only; the AD lookup's own try/catch swallows the -EnableException throw at :199).
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Credential, AvailabilityGroup, Listener, InputObject,
-            EnableException.ToBool(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
-            _state,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // DEF-001 closed via InvokeScopedStreaming (ab7492c); read-only so no WhatIf interaction.
+        // The three-var carry sentinel rides the callback as the last emitted item, unchanged.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w4065State"))
             {
                 _state = sentinel["__w4065State"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Credential, AvailabilityGroup, Listener, InputObject,
+            EnableException.ToBool(),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
+            _state,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

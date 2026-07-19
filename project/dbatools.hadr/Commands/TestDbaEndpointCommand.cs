@@ -51,21 +51,22 @@ public sealed class TestDbaEndpointCommand : DbaBaseCmdlet
         // the catch (codex precision) - so no cross-record leak to carry. $EnableException is passed
         // for consistency though the body has no Stop-Function that reads it.
         //
-        // T8/DEF-002 exposure on Endpoint [string[]] -> Get-DbaEndpoint (shared-runtime, blocked on
-        // A). DEF-001 is weak here (read-only; the TcpClient connect failures are caught locally).
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Endpoint, InputObject,
-            EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // T8/DEF-002 on Endpoint [string[]] CLOSED via [PsStringArrayCast]. DEF-001 (weak here -
+        // read-only, TcpClient failures caught locally) closed via InvokeScopedStreaming (ab7492c);
+        // read-only so no WhatIf interaction.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Endpoint, InputObject,
+            EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

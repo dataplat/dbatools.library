@@ -96,31 +96,33 @@ public sealed class TestDbaDbLogShipStatusCommand : DbaBaseCmdlet
         // EnableException are passed UNTYPED/.ToBool() (switch-shift rule). $instance/$server/
         // $result/$results/$statusDetails/$object are process-locals reset before use each record.
         //
-        // [DEF-001] buffered InvokeScoped: this row emits per-result and per-instance and can lose
-        // an earlier emit if a later instance throws terminating under -EnableException, and a
-        // downstream `| Select -First 1` stops the source but not the buffered port. Same shared-
-        // runtime class W4-063/W4-052 await A on (InvokeScopedStreaming, 0/80 hadr commands use it).
-        // [T8/DEF-002] on Database/ExcludeDatabase [string[]]. Both blocked on A.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Simple.ToBool(), Primary.ToBool(), Secondary.ToBool(),
-            _state,
-            EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] CLOSED by adopting A's shipped NestedCommand.InvokeScopedStreaming (ab7492c):
+        // this row emits per-result/per-instance and could lose an earlier emit if a later instance
+        // threw terminating under -EnableException, and a downstream `| Select -First 1` stopped the
+        // source but not the buffered port. Streaming writes each record as produced. Safe on this
+        // READ-ONLY row (no ShouldProcess gate, so none of the -WhatIf-transcript interaction I
+        // measured on the gate rows). The state sentinel rides the callback as the last emitted item.
+        // [T8/DEF-002] on Database/ExcludeDatabase [string[]] CLOSED via [PsStringArrayCast].
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w4067State"))
             {
                 _state = sentinel["__w4067State"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Simple.ToBool(), Primary.ToBool(), Secondary.ToBool(),
+            _state,
+            EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
