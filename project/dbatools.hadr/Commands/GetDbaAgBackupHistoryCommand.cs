@@ -229,8 +229,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__parameterSetName, [string[]]$__boundParameterKeys, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        Write-Message -Level System -Message "Active Parameter set: $($__parameterSetName)." -FunctionName Get-DbaAgBackupHistory # SOURCE: $($PSCmdlet.ParameterSetName)
-        Write-Message -Level System -Message "Bound parameters: $($__boundParameterKeys -join ", ")" -FunctionName Get-DbaAgBackupHistory # SOURCE: $($PSBoundParameters.Keys -join ", ")
+        Write-Message -Level System -Message "Active Parameter set: $($__parameterSetName)." -FunctionName Get-DbaAgBackupHistory # SOURCE: $($PSCmdlet.ParameterSetName) -ModuleName "dbatools"
+        Write-Message -Level System -Message "Bound parameters: $($__boundParameterKeys -join ", ")" -FunctionName Get-DbaAgBackupHistory # SOURCE: $($PSBoundParameters.Keys -join ", ") -ModuleName "dbatools"
         $serverList = @()
     @{ __w4013State = @{ serverList = $serverList } }
 } $__parameterSetName $__boundParameterKeys $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
@@ -268,7 +268,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Instance $instance has no availability group named '$AvailabilityGroup', so skipping." -Target $instance -Continue -FunctionName Get-DbaAgBackupHistory
             }
 
-            Write-Message -Level Verbose -Message "Added $server to serverList" -FunctionName Get-DbaAgBackupHistory
+            Write-Message -Level Verbose -Message "Added $server to serverList" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
             $serverList += $server
         }
     @{ __w4013State = @{ serverList = $serverList } }
@@ -300,16 +300,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($serverList.Count -eq 1) {
-            Write-Message -Level Verbose -Message "We have one server, so it should be a listener" -FunctionName Get-DbaAgBackupHistory
+            Write-Message -Level Verbose -Message "We have one server, so it should be a listener" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
             $server = $serverList[0]
 
             $replicaNames = ($server.AvailabilityGroups | Where-Object { $_.Name -in $AvailabilityGroup } ).AvailabilityReplicas.Name
-            Write-Message -Level Verbose -Message "We have found these replicas: $replicaNames" -FunctionName Get-DbaAgBackupHistory
+            Write-Message -Level Verbose -Message "We have found these replicas: $replicaNames" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
 
             $serverList = $replicaNames
         }
 
-        Write-Message -Level Verbose -Message "We have more than one server, so query them all and aggregate" -FunctionName Get-DbaAgBackupHistory
+        Write-Message -Level Verbose -Message "We have more than one server, so query them all and aggregate" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
         # If -Database is not set, we want to filter on all databases of the availability group
         if (-not $__boundDatabase) { # SOURCE: if (Test-Bound -Not -ParameterName Database) {
             $agDatabase = (Get-DbaAgDatabase -SqlInstance $serverList[0] -AvailabilityGroup $AvailabilityGroup).Name
@@ -324,25 +324,25 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($Last) {
-            Write-Message -Level Verbose -Message "Filtering Ag backups for Last" -FunctionName Get-DbaAgBackupHistory
+            Write-Message -Level Verbose -Message "Filtering Ag backups for Last" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
             $AgResults | Select-DbaBackupInformation -ServerName $AvailabilityGroup
         } elseif ($LastFull) {
-            Write-Message -Level Verbose -Message "Filtering Ag backups for LastFull" -FunctionName Get-DbaAgBackupHistory
+            Write-Message -Level Verbose -Message "Filtering Ag backups for LastFull" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
             Foreach ($AgDb in ( $AgResults.Database | Select-Object -Unique)) {
                 $AgResults | Where-Object { $_.Database -eq $AgDb } | Sort-Object -Property $LsnSort | Select-Object -Last 1
             }
         } elseif ($LastDiff) {
-            Write-Message -Level Verbose -Message "Filtering Ag backups for LastDiff" -FunctionName Get-DbaAgBackupHistory
+            Write-Message -Level Verbose -Message "Filtering Ag backups for LastDiff" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
             Foreach ($AgDb in ( $AgResults.Database | Select-Object -Unique)) {
                 $AgResults | Where-Object { $_.Database -eq $AgDb } | Sort-Object -Property $LsnSort | Select-Object -Last 1
             }
         } elseif ($LastLog) {
-            Write-Message -Level Verbose -Message "Filtering Ag backups for LastLog" -FunctionName Get-DbaAgBackupHistory
+            Write-Message -Level Verbose -Message "Filtering Ag backups for LastLog" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
             Foreach ($AgDb in ( $AgResults.Database | Select-Object -Unique)) {
                 $AgResults | Where-Object { $_.Database -eq $AgDb } | Sort-Object -Property $LsnSort | Select-Object -Last 1
             }
         } else {
-            Write-Message -Level Verbose -Message "Output Ag backups without filtering" -FunctionName Get-DbaAgBackupHistory
+            Write-Message -Level Verbose -Message "Output Ag backups without filtering" -FunctionName Get-DbaAgBackupHistory -ModuleName "dbatools"
             $AgResults
         }
     }

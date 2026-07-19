@@ -142,7 +142,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.EngineEdition -match "Express") {
-                Write-Message -Level Warning -Message "$instance is Express Edition which does not support Log Shipping" -FunctionName Get-DbaDbLogShipError
+                Write-Message -Level Warning -Message "$instance is Express Edition which does not support Log Shipping" -FunctionName Get-DbaDbLogShipError -ModuleName "dbatools"
                 continue
             }
 
@@ -251,7 +251,7 @@ DROP TABLE #DatabaseID;"
 
                 }
             } else {
-                Write-Message -Message "No log shipping errors found" -Level Verbose -FunctionName Get-DbaDbLogShipError
+                Write-Message -Message "No log shipping errors found" -Level Verbose -FunctionName Get-DbaDbLogShipError -ModuleName "dbatools"
             }
         }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $Action $DateTimeFrom $DateTimeTo $Primary $Secondary $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

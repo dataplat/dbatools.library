@@ -128,7 +128,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($end in $endpoints) {
-                Write-Message -Level Verbose -Message "Getting endpoint $($end.Name) on $($server.Name)" -FunctionName Get-DbaEndpoint
+                Write-Message -Level Verbose -Message "Getting endpoint $($end.Name) on $($server.Name)" -FunctionName Get-DbaEndpoint -ModuleName "dbatools"
                 if ($end.Protocol.Tcp.ListenerPort) {
                     if ($end.Protocol.Tcp.ListenerIPAddress -ne [System.Net.IPAddress]'0.0.0.0') {
                         $dns = $end.Protocol.Tcp.ListenerIPAddress

@@ -120,7 +120,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             try {
                 [long]$currentTimestamp = ($server.Query("SELECT cpu_ticks / CONVERT(FLOAT, (cpu_ticks / ms_ticks)) AS TimeStamp FROM sys.dm_os_sys_info")).TimeStamp
-                Write-Message -Level Verbose -Message "Using current timestamp of $currentTimestamp" -FunctionName Get-DbaAgRingBuffer
+                Write-Message -Level Verbose -Message "Using current timestamp of $currentTimestamp" -FunctionName Get-DbaAgRingBuffer -ModuleName "dbatools"
 
                 if ($RingBufferType) {
                     $typeList = ($RingBufferType | ForEach-Object { "N'$_'" }) -join ", "
@@ -147,7 +147,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     WHERE DATEADD(ms, -1 * ($currentTimestamp - [timestamp]), GETDATE()) > DATEADD(MINUTE, -$CollectionMinutes, GETDATE())
                     ORDER BY EventTime DESC;"
 
-                Write-Message -Level Verbose -Message "Executing SQL Statement: $sql" -FunctionName Get-DbaAgRingBuffer
+                Write-Message -Level Verbose -Message "Executing SQL Statement: $sql" -FunctionName Get-DbaAgRingBuffer -ModuleName "dbatools"
                 foreach ($row in $server.Query($sql)) {
                     [PSCustomObject]@{
                         ComputerName   = $server.ComputerName
