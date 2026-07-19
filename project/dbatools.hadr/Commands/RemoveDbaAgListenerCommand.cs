@@ -73,28 +73,31 @@ public sealed class RemoveDbaAgListenerCommand : DbaBaseCmdlet
         // carried bound flags; :87 is the MULTI-NAME -Not form, meaning NEITHER bound. The
         // loop-less validation returns exit the record via the dot-block frame; the in-loop
         // failure site is -Continue.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Listener, AvailabilityGroup, InputObject,
-            EnableException.ToBool(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)), TestBound(nameof(Listener)),
-            _state,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w4046State"))
             {
                 _state = sentinel["__w4046State"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Listener, AvailabilityGroup, InputObject,
+            EnableException.ToBool(),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)), TestBound(nameof(Listener)),
+            _state,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
