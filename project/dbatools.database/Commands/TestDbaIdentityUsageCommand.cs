@@ -241,7 +241,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Processing $db on $instance" -FunctionName Test-DbaIdentityUsage
+                Write-Message -Level Verbose -Message "Processing $db on $instance" -FunctionName Test-DbaIdentityUsage -ModuleName "dbatools"
 
                 if ($db.IsAccessible -eq $false) {
                     Stop-Function -Message "The database $db is not accessible. Skipping." -Continue -FunctionName Test-DbaIdentityUsage

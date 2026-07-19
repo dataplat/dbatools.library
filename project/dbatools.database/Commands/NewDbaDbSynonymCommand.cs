@@ -214,7 +214,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             $server = $db.Parent
-            Write-Message -Level 'Verbose' -Message "Getting Database Synonyms for $db on $server" -FunctionName New-DbaDbSynonym
+            Write-Message -Level 'Verbose' -Message "Getting Database Synonyms for $db on $server" -FunctionName New-DbaDbSynonym -ModuleName "dbatools"
 
             $dbSynonyms = $db.Synonyms
 
@@ -223,7 +223,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Stop-Function -Message "The $syn synonym already exist within database $db on instance $server." -Target $db -Continue -FunctionName New-DbaDbSynonym
                 }
 
-                Write-Message -Level Verbose -Message "Add synonyms to Database $db on target $server" -FunctionName New-DbaDbSynonym
+                Write-Message -Level Verbose -Message "Add synonyms to Database $db on target $server" -FunctionName New-DbaDbSynonym -ModuleName "dbatools"
 
                 if ($__realCmdlet.ShouldProcess("Creating new Synonym $synonym on database $db", $server)) {
                     try {

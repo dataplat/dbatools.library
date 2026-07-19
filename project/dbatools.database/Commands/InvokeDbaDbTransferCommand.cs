@@ -264,7 +264,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $paramSet[$key] = $__boundParameters[$key]
                 }
             }
-            Write-Message -Message "Generating a transfer object based on current parameters" -Level Verbose -FunctionName Invoke-DbaDbTransfer
+            Write-Message -Message "Generating a transfer object based on current parameters" -Level Verbose -FunctionName Invoke-DbaDbTransfer -ModuleName "dbatools"
             $transfer = New-DbaDbTransfer @paramSet
         }
         # add event handling

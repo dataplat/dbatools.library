@@ -179,7 +179,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($instance in $SqlInstance) {
-                Write-Message -Message "Attempting Connection to $instance" -Level Verbose -FunctionName Set-DbaDbIdentity
+                Write-Message -Message "Attempting Connection to $instance" -Level Verbose -FunctionName Set-DbaDbIdentity -ModuleName "dbatools"
                 try {
                     $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
                 } catch {
@@ -193,7 +193,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 foreach ($db in $dbs) {
-                    Write-Message -Level Verbose -Message "Processing $db on $instance" -FunctionName Set-DbaDbIdentity
+                    Write-Message -Level Verbose -Message "Processing $db on $instance" -FunctionName Set-DbaDbIdentity -ModuleName "dbatools"
 
                     if ($db.IsAccessible -eq $false) {
                         Stop-Function -Message "The database $db is not accessible. Skipping." -Continue -FunctionName Set-DbaDbIdentity
@@ -221,7 +221,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
 
                             if ($__realCmdlet.ShouldProcess($server.Name, "Execute the command $query against $instance")) {
-                                Write-Message -Message "Query to run: $query" -Level Verbose -FunctionName Set-DbaDbIdentity
+                                Write-Message -Message "Query to run: $query" -Level Verbose -FunctionName Set-DbaDbIdentity -ModuleName "dbatools"
                                 $results = $server | Invoke-DbaQuery  -Query $query -Database $db.Name -MessagesToOutput
                                 if ($null -ne $results) {
                                     $words = $results.Split(" ")

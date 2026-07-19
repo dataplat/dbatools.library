@@ -320,7 +320,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     foreach ($db in $databases) {
-                        Write-Message -Level Verbose -Message "Get users in Database $db on target $server" -FunctionName Remove-DbaDbUser
+                        Write-Message -Level Verbose -Message "Get users in Database $db on target $server" -FunctionName Remove-DbaDbUser -ModuleName "dbatools"
                         $users = Get-DbaDbUser -SqlInstance $server -Database $db.Name
                         $users = $users | Where-Object Name -In $User
                         Remove-DbUser $users

@@ -153,19 +153,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $inputType = $input.GetType().FullName
             switch ($inputType) {
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbSynonym
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbSynonym -ModuleName "dbatools"
                     $dbSynonyms = Get-DbaDbSynonym -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -Schema $Schema -ExcludeSchema $ExcludeSchema -Synonym $Synonym -ExcludeSynonym $ExcludeSynonym
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbSynonym
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbSynonym -ModuleName "dbatools"
                     $dbSynonyms = Get-DbaDbSynonym -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -Schema $Schema -ExcludeSchema $ExcludeSchema -Synonym $Synonym -ExcludeSynonym $ExcludeSynonym
                 }
                 'Microsoft.SqlServer.Management.Smo.Database' {
-                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbSynonym
+                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbSynonym -ModuleName "dbatools"
                     $dbSynonyms = Get-DbaDbSynonym -InputObject $input
                 }
                 'Microsoft.SqlServer.Management.Smo.Synonym' {
-                    Write-Message -Level Verbose -Message "Processing DatabaseSynonym through InputObject" -FunctionName Remove-DbaDbSynonym
+                    Write-Message -Level Verbose -Message "Processing DatabaseSynonym through InputObject" -FunctionName Remove-DbaDbSynonym -ModuleName "dbatools"
                     $dbSynonyms = $input
                 }
                 default {

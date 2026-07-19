@@ -179,7 +179,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # The DacFx types are loaded by dbatools.library - verify they are available
         try {
             $null = [Microsoft.SqlServer.Dac.Model.TSqlModel]
-            Write-Message -Level Verbose -Message "DacFx Model types are available from dbatools.library" -FunctionName New-DbaDacPackage
+            Write-Message -Level Verbose -Message "DacFx Model types are available from dbatools.library" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
         } catch {
             Stop-Function -Message "DacFx Model types are not available. Ensure dbatools.library is properly loaded." -FunctionName New-DbaDacPackage
             return
@@ -246,7 +246,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 return
             }
 
-            Write-Message -Level Verbose -Message "Found $($sqlFiles.Count) SQL files in $resolvedPath" -FunctionName New-DbaDacPackage
+            Write-Message -Level Verbose -Message "Found $($sqlFiles.Count) SQL files in $resolvedPath" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
 
             # Default database name from directory name
             if (-not $DatabaseName) {
@@ -282,7 +282,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Map version string to SqlServerVersion enum
         $sqlVersionEnum = [Microsoft.SqlServer.Dac.Model.SqlServerVersion]::$SqlServerVersion
 
-        Write-Message -Level Verbose -Message "Creating TSqlModel with target version: $SqlServerVersion" -FunctionName New-DbaDacPackage
+        Write-Message -Level Verbose -Message "Creating TSqlModel with target version: $SqlServerVersion" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
 
         # Create TSqlModel - handle different DacFx versions
         try {
@@ -292,7 +292,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $model = New-Object Microsoft.SqlServer.Dac.Model.TSqlModel -ArgumentList @($sqlVersionEnum, $modelOptions)
             } catch {
                 # Fallback: try with $null for options (some DacFx versions require this)
-                Write-Message -Level Verbose -Message "Retrying TSqlModel creation with null options" -FunctionName New-DbaDacPackage
+                Write-Message -Level Verbose -Message "Retrying TSqlModel creation with null options" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
                 $model = New-Object Microsoft.SqlServer.Dac.Model.TSqlModel -ArgumentList @($sqlVersionEnum, $null)
             }
         } catch {
@@ -309,13 +309,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Add SQL files to model
         foreach ($sqlFile in $sqlFiles) {
             $fileCount++
-            Write-Message -Level Verbose -Message "Processing file $fileCount of $($sqlFiles.Count): $($sqlFile.Name)" -FunctionName New-DbaDacPackage
+            Write-Message -Level Verbose -Message "Processing file $fileCount of $($sqlFiles.Count): $($sqlFile.Name)" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
 
             try {
                 $sqlContent = Get-Content -Path $sqlFile.FullName -Raw -ErrorAction Stop
 
                 if ([string]::IsNullOrWhiteSpace($sqlContent)) {
-                    Write-Message -Level Warning -Message "Skipping empty file: $($sqlFile.FullName)" -FunctionName New-DbaDacPackage
+                    Write-Message -Level Warning -Message "Skipping empty file: $($sqlFile.FullName)" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
                     continue
                 }
 
@@ -325,12 +325,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             } catch {
                 $errorMessage = "Error processing file $($sqlFile.FullName): $($_.Exception.Message)"
                 $null = $buildErrors.Add($errorMessage)
-                Write-Message -Level Warning -Message $errorMessage -FunctionName New-DbaDacPackage
+                Write-Message -Level Warning -Message $errorMessage -FunctionName New-DbaDacPackage -ModuleName "dbatools"
             }
         }
 
         # Validate the model
-        Write-Message -Level Verbose -Message "Validating model..." -FunctionName New-DbaDacPackage
+        Write-Message -Level Verbose -Message "Validating model..." -FunctionName New-DbaDacPackage -ModuleName "dbatools"
 
         try {
             $validationMessages = $model.Validate()
@@ -341,25 +341,25 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 # DacMessageType is in Microsoft.SqlServer.Dac namespace, not Microsoft.SqlServer.Dac.Model
                 if ($msg.MessageType -eq [Microsoft.SqlServer.Dac.DacMessageType]::Error) {
                     $null = $buildErrors.Add($msgText)
-                    Write-Message -Level Warning -Message $msgText -FunctionName New-DbaDacPackage
+                    Write-Message -Level Warning -Message $msgText -FunctionName New-DbaDacPackage -ModuleName "dbatools"
                 } else {
                     $null = $buildWarnings.Add($msgText)
-                    Write-Message -Level Verbose -Message $msgText -FunctionName New-DbaDacPackage
+                    Write-Message -Level Verbose -Message $msgText -FunctionName New-DbaDacPackage -ModuleName "dbatools"
                 }
             }
         } catch {
             $errorMessage = "Model validation failed: $($_.Exception.Message)"
             $null = $buildErrors.Add($errorMessage)
-            Write-Message -Level Warning -Message $errorMessage -FunctionName New-DbaDacPackage
+            Write-Message -Level Warning -Message $errorMessage -FunctionName New-DbaDacPackage -ModuleName "dbatools"
         }
 
         # Count objects in model
         try {
             $allObjects = $model.GetObjects([Microsoft.SqlServer.Dac.Model.DacQueryScopes]::UserDefined)
             $objectCount = ($allObjects | Measure-Object).Count
-            Write-Message -Level Verbose -Message "Model contains $objectCount user-defined objects" -FunctionName New-DbaDacPackage
+            Write-Message -Level Verbose -Message "Model contains $objectCount user-defined objects" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
         } catch {
-            Write-Message -Level Warning -Message "Could not count model objects: $($_.Exception.Message)" -FunctionName New-DbaDacPackage
+            Write-Message -Level Warning -Message "Could not count model objects: $($_.Exception.Message)" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
         }
 
         # Build the DACPAC
@@ -398,11 +398,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $packageOptions = New-Object Microsoft.SqlServer.Dac.PackageOptions
 
                 # Build the DACPAC
-                Write-Message -Level Verbose -Message "Creating DACPAC at $OutputPath" -FunctionName New-DbaDacPackage
+                Write-Message -Level Verbose -Message "Creating DACPAC at $OutputPath" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
 
                 [Microsoft.SqlServer.Dac.DacPackageExtensions]::BuildPackage($OutputPath, $model, $packageMetadata, $packageOptions)
 
-                Write-Message -Level Output -Message "Successfully created DACPAC: $OutputPath" -FunctionName New-DbaDacPackage
+                Write-Message -Level Output -Message "Successfully created DACPAC: $OutputPath" -FunctionName New-DbaDacPackage -ModuleName "dbatools"
 
             } catch {
                 $errorMessage = "Failed to create DACPAC: $($_.Exception.Message)"

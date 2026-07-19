@@ -231,7 +231,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if (-not ($__boundLogBackupTimeStampFormat)) {
-            Write-Message -Message 'Setting Default LogBackupTimeStampFormat' -Level Verbose -FunctionName Remove-DbaDbTableData
+            Write-Message -Message 'Setting Default LogBackupTimeStampFormat' -Level Verbose -FunctionName Remove-DbaDbTableData -ModuleName "dbatools"
             $LogBackupTimeStampFormat = "yyyyMMddHHmm"
         }
 
@@ -351,15 +351,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             switch ($inputType) {
                 # get the db(s) based on the caller's parameters
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbTableData
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbTableData -ModuleName "dbatools"
                     $dbDatabases = Get-DbaDatabase -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeSystem
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbTableData
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbTableData -ModuleName "dbatools"
                     $dbDatabases = Get-DbaDatabase -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeSystem
                 }
                 'Microsoft.SqlServer.Management.Smo.Database' {
-                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbTableData
+                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbTableData -ModuleName "dbatools"
                     $dbDatabases = $input | Where-Object { -not $_.IsSystemObject }
                 }
                 default {
@@ -386,15 +386,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $isDbLogShipping = $db.Query("SELECT COUNT(1) FROM msdb.dbo.log_shipping_monitor_primary WHERE primary_database = '$($db.Name)'")
 
                     if ($isDbLogShipping -eq 1) {
-                        Write-Message -Level Warning -Message "$($db.Name) is the primary db in a log shipping configuration. Be sure to re-sync after this command completes." -FunctionName Remove-DbaDbTableData
+                        Write-Message -Level Warning -Message "$($db.Name) is the primary db in a log shipping configuration. Be sure to re-sync after this command completes." -FunctionName Remove-DbaDbTableData -ModuleName "dbatools"
                     }
 
                     if ($db.IsMirroringEnabled) {
-                        Write-Message -Level Warning -Message "$($db.Name) is configured for mirroring. Be sure to validate the mirror is synchronized after this command completes." -FunctionName Remove-DbaDbTableData
+                        Write-Message -Level Warning -Message "$($db.Name) is configured for mirroring. Be sure to validate the mirror is synchronized after this command completes." -FunctionName Remove-DbaDbTableData -ModuleName "dbatools"
                     }
 
                     if (-not [string]::IsNullOrEmpty($db.AvailabilityGroupName)) {
-                        Write-Message -Level Warning -Message "$($db.Name) is part of an availability group. Be sure to validate the secondary database(s) is synchronized after this command completes." -FunctionName Remove-DbaDbTableData
+                        Write-Message -Level Warning -Message "$($db.Name) is part of an availability group. Be sure to validate the secondary database(s) is synchronized after this command completes." -FunctionName Remove-DbaDbTableData -ModuleName "dbatools"
                     }
                 }
 
@@ -428,7 +428,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $timingsArray += $commandTiming
                                 $totalTimeMillis += $commandTiming.TotalMilliseconds
 
-                                Write-Message -Level Verbose -Message "Iteration $iterationCount took $($commandTiming.TotalMilliseconds) milliseconds to remove $rowCount rows" -FunctionName Remove-DbaDbTableData
+                                Write-Message -Level Verbose -Message "Iteration $iterationCount took $($commandTiming.TotalMilliseconds) milliseconds to remove $rowCount rows" -FunctionName Remove-DbaDbTableData -ModuleName "dbatools"
                             }
                         } catch {
                             Stop-Function -Message "Error removing data from $Table $DeleteSql using $sql on $($db.Parent.Name)" -ErrorRecord $_ -FunctionName Remove-DbaDbTableData

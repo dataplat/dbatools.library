@@ -310,7 +310,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     try {
                         $server = [DbaInstance]($instanceName.ToString().Replace('--', '\'))
                         $publishProfile = Join-Path $Path "$($instanceName.Replace('--','-'))-$db-publish.xml" -ErrorAction Stop
-                        Write-Message -Level Verbose -Message "Writing to $publishProfile" -FunctionName New-DbaDacProfile
+                        Write-Message -Level Verbose -Message "Writing to $publishProfile" -FunctionName New-DbaDacProfile -ModuleName "dbatools"
                         $profileTemplate | Out-File $publishProfile -ErrorAction Stop
                         [PSCustomObject]@{
                             ComputerName     = $server.ComputerName

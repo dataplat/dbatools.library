@@ -110,7 +110,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         foreach ($object in $InputObject) {
             if ($__realCmdlet.ShouldProcess($object.Name, "Updating value from '$($object.Value)' to '$Value'")) {
                 try {
-                    Write-Message -Level System -Message "Updating value from '$($object.Value)' to '$Value'" -FunctionName Set-DbaExtendedProperty
+                    Write-Message -Level System -Message "Updating value from '$($object.Value)' to '$Value'" -FunctionName Set-DbaExtendedProperty -ModuleName "dbatools"
                     $object.Value = $Value
                     $object.Alter()
                     $object.Refresh()

@@ -248,7 +248,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if (($CustomCapturePolicyExecutionCount -or $CustomCapturePolicyTotalCompileCPUTimeMS -or $CustomCapturePolicyTotalExecutionCPUTimeMS -or $CustomCapturePolicyStaleThresholdHours) -and $server.VersionMajor -lt 15) {
-                    Write-Message -Level Warning -Message "Custom Capture Policies can only be set in SQL Server 2019 and above. These options will be skipped for $instance" -FunctionName Set-DbaDbQueryStoreOption
+                    Write-Message -Level Warning -Message "Custom Capture Policies can only be set in SQL Server 2019 and above. These options will be skipped for $instance" -FunctionName Set-DbaDbQueryStoreOption -ModuleName "dbatools"
                 }
 
                 # We have to exclude all the system databases since they cannot have the Query Store feature enabled
@@ -256,10 +256,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 foreach ($db in $dbs) {
                     $dbName = $db.Name
-                    Write-Message -Level Verbose -Message "Processing $dbName on $instance" -FunctionName Set-DbaDbQueryStoreOption
+                    Write-Message -Level Verbose -Message "Processing $dbName on $instance" -FunctionName Set-DbaDbQueryStoreOption -ModuleName "dbatools"
 
                     if ($db.IsAccessible -eq $false) {
-                        Write-Message -Level Warning -Message "The database $db on server $instance is not accessible. Skipping database." -FunctionName Set-DbaDbQueryStoreOption
+                        Write-Message -Level Warning -Message "The database $db on server $instance is not accessible. Skipping database." -FunctionName Set-DbaDbQueryStoreOption -ModuleName "dbatools"
                         continue
                     }
 
@@ -272,7 +272,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if ($db.QueryStoreOptions.DesiredState -eq "Off" -and (-not $__boundState)) {
-                        Write-Message -Level Warning -Message "State is set to Off; cannot change values. Please update State to ReadOnly or ReadWrite." -FunctionName Set-DbaDbQueryStoreOption
+                        Write-Message -Level Warning -Message "State is set to Off; cannot change values. Please update State to ReadOnly or ReadWrite." -FunctionName Set-DbaDbQueryStoreOption -ModuleName "dbatools"
                         continue
                     }
 
