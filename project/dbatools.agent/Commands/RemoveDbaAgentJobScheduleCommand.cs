@@ -231,7 +231,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 if ($__realCmdlet.ShouldProcess($server, "Detaching schedule '$scheduleName' from job '$($jobObject.Name)'")) {
                     try {
-                        Write-Message -Level Verbose -Message "Detaching schedule '$scheduleName' from job '$($jobObject.Name)' on $($server.Name)" -FunctionName Remove-DbaAgentJobSchedule
+                        Write-Message -Level Verbose -Message "Detaching schedule '$scheduleName' from job '$($jobObject.Name)' on $($server.Name)" -FunctionName Remove-DbaAgentJobSchedule -ModuleName "dbatools"
                         $jobSchedule.Drop($true)
                         $output.Status = "Detached"
                         $output.IsDetached = $true

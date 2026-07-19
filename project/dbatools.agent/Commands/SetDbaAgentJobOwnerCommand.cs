@@ -167,7 +167,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         #Get job list. If value for -Job is passed, massage to make it a string array.
         #Otherwise, use all jobs on the instance where owner not equal to -TargetLogin
-        Write-Message -Level Verbose -Message "Gathering jobs to update." -FunctionName Set-DbaAgentJobOwner
+        Write-Message -Level Verbose -Message "Gathering jobs to update." -FunctionName Set-DbaAgentJobOwner -ModuleName "dbatools"
 
         if ($Job) {
             $jobcollection = $server.JobServer.Jobs | Where-Object { $Job -contains $_.Name }
@@ -182,7 +182,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $InputObject += $jobcollection
     }
 
-    Write-Message -Level Verbose -Message "Updating $($InputObject.Count) job(s)." -FunctionName Set-DbaAgentJobOwner
+    Write-Message -Level Verbose -Message "Updating $($InputObject.Count) job(s)." -FunctionName Set-DbaAgentJobOwner -ModuleName "dbatools"
     foreach ($agentJob in $InputObject) {
         $jobname = $agentJob.Name
         $server = $agentJob.Parent.Parent
@@ -209,7 +209,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } else {
                     if ($__realCmdlet.ShouldProcess($instance, "Setting job owner for $jobname to $newLogin")) {
                         try {
-                            Write-Message -Level Verbose -Message "Setting job owner for $jobname to $newLogin on $instance." -FunctionName Set-DbaAgentJobOwner
+                            Write-Message -Level Verbose -Message "Setting job owner for $jobname to $newLogin on $instance." -FunctionName Set-DbaAgentJobOwner -ModuleName "dbatools"
                             #Set job owner to $TargetLogin (default 'sa')
                             $agentJob.OwnerLoginName = $newLogin
                             $agentJob.Alter()

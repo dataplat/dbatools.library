@@ -126,7 +126,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     foreach ($xesession in $InputObject) {
         $server = $xesession.Parent
         $sessionname = $xesession.Name
-        Write-Message -Level Verbose -Message "Watching $sessionname on $($server.Name)." -FunctionName Watch-DbaXESession
+        Write-Message -Level Verbose -Message "Watching $sessionname on $($server.Name)." -FunctionName Watch-DbaXESession -ModuleName "dbatools"
 
         if (-not $xesession.IsRunning) {
             Stop-Function -Message "$($xesession.Name) is not running on $($server.Name)" -Continue -FunctionName Watch-DbaXESession

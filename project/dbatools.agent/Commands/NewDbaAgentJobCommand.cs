@@ -380,7 +380,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if (-not $Force -and ($server.JobServer.Jobs.Name -contains $Job)) {
                 Stop-Function -Message "Job $Job already exists on $instance" -Target $instance -Continue -FunctionName New-DbaAgentJob
             } elseif ($Force -and ($server.JobServer.Jobs.Name -contains $Job)) {
-                Write-Message -Message "Job $Job already exists on $instance. Removing.." -Level Verbose -FunctionName New-DbaAgentJob
+                Write-Message -Message "Job $Job already exists on $instance. Removing.." -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
 
                 if ($__gate.ShouldProcess($instance, "Removing the job $Job on $instance")) {
                     try {
@@ -408,20 +408,20 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 #region job options
                 # Settings the options for the job
                 if ($Disabled) {
-                    Write-Message -Message "Setting job to disabled" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Setting job to disabled" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     $currentjob.IsEnabled = $false
                 } else {
-                    Write-Message -Message "Setting job to enabled" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Setting job to enabled" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     $currentjob.IsEnabled = $true
                 }
 
                 if ($Description.Length -ge 1) {
-                    Write-Message -Message "Setting job description" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Setting job description" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     $currentjob.Description = $Description
                 }
 
                 if ($StartStepId -ge 1) {
-                    Write-Message -Message "Setting job start step id" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Setting job start step id" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     $currentjob.StartStepID = $StartStepId
                 }
 
@@ -443,7 +443,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             return
                         }
                     } else {
-                        Write-Message -Message "Setting job category" -Level Verbose -FunctionName New-DbaAgentJob
+                        Write-Message -Message "Setting job category" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                         $currentjob.Category = $Category
                     }
                 }
@@ -451,7 +451,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($OwnerLogin.Length -ge 1) {
                     # Check if the login name is present on the instance
                     if ($server.Logins.Name -contains $OwnerLogin) {
-                        Write-Message -Message "Setting job owner login name to $OwnerLogin" -Level Verbose -FunctionName New-DbaAgentJob
+                        Write-Message -Message "Setting job owner login name to $OwnerLogin" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                         $currentjob.OwnerLoginName = $OwnerLogin
                     } else {
                         Stop-Function -Message "The owner $OwnerLogin does not exist on instance $instance" -Target $Job -Continue -FunctionName New-DbaAgentJob
@@ -459,7 +459,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ($EventLogLevel -ge 0) {
-                    Write-Message -Message "Setting job event log level" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Setting job event log level" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     $currentjob.EventLogLevel = $EventLogLevel
                 }
 
@@ -467,10 +467,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($EmailLevel -ge 1) {
                         # Check if the operator name is present
                         if ($server.JobServer.Operators.Name -contains $EmailOperator) {
-                            Write-Message -Message "Setting job e-mail level" -Level Verbose -FunctionName New-DbaAgentJob
+                            Write-Message -Message "Setting job e-mail level" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                             $currentjob.EmailLevel = $EmailLevel
 
-                            Write-Message -Message "Setting job e-mail operator" -Level Verbose -FunctionName New-DbaAgentJob
+                            Write-Message -Message "Setting job e-mail operator" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                             $currentjob.OperatorToEmail = $EmailOperator
                         } else {
                             Stop-Function -Message "The e-mail operator name $EmailOperator does not exist on instance $instance. Exiting.." -Target $Job -Continue -FunctionName New-DbaAgentJob
@@ -484,16 +484,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($NetsendLevel -ge 1) {
                         # Check if the operator name is present
                         if ($server.JobServer.Operators.Name -contains $NetsendOperator) {
-                            Write-Message -Message "Setting job netsend level" -Level Verbose -FunctionName New-DbaAgentJob
+                            Write-Message -Message "Setting job netsend level" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                             $currentjob.NetSendLevel = $NetsendLevel
 
-                            Write-Message -Message "Setting job netsend operator" -Level Verbose -FunctionName New-DbaAgentJob
+                            Write-Message -Message "Setting job netsend operator" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                             $currentjob.OperatorToNetSend = $NetsendOperator
                         } else {
                             Stop-Function -Message "The netsend operator name $NetsendOperator does not exist on instance $instance. Exiting.." -Target $Job -Continue -FunctionName New-DbaAgentJob
                         }
                     } else {
-                        Write-Message -Message "Invalid combination of netsend operator name $NetsendOperator and netsend level $NetsendLevel. Not setting the notification." -FunctionName New-DbaAgentJob
+                        Write-Message -Message "Invalid combination of netsend operator name $NetsendOperator and netsend level $NetsendLevel. Not setting the notification." -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     }
                 }
 
@@ -501,35 +501,35 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($PageLevel -ge 1) {
                         # Check if the operator name is present
                         if ($server.JobServer.Operators.Name -contains $PageOperator) {
-                            Write-Message -Message "Setting job pager level" -Level Verbose -FunctionName New-DbaAgentJob
+                            Write-Message -Message "Setting job pager level" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                             $currentjob.PageLevel = $PageLevel
 
-                            Write-Message -Message "Setting job pager operator" -Level Verbose -FunctionName New-DbaAgentJob
+                            Write-Message -Message "Setting job pager operator" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                             $currentjob.OperatorToPage = $PageOperator
                         } else {
                             Stop-Function -Message "The page operator name $PageOperator does not exist on instance $instance. Exiting.." -Target $Job -Continue -FunctionName New-DbaAgentJob
                         }
                     } else {
-                        Write-Message -Message "Invalid combination of page operator name $PageOperator and page level $PageLevel. Not setting the notification." -Level Warning -FunctionName New-DbaAgentJob
+                        Write-Message -Message "Invalid combination of page operator name $PageOperator and page level $PageLevel. Not setting the notification." -Level Warning -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     }
                 }
 
                 if ($DeleteLevel -ge 0) {
-                    Write-Message -Message "Setting job delete level" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Setting job delete level" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     $currentjob.DeleteLevel = $DeleteLevel
                 }
                 #endregion job options
 
                 try {
-                    Write-Message -Message "Creating the job" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Creating the job" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
 
                     # Create the job
                     $currentjob.Create()
 
-                    Write-Message -Message "Job created with UID $($currentjob.JobID)" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Job created with UID $($currentjob.JobID)" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
 
                     # Make sure the target is set for the job
-                    Write-Message -Message "Applying the target (local) to job $Job" -Level Verbose -FunctionName New-DbaAgentJob
+                    Write-Message -Message "Applying the target (local) to job $Job" -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
                     $currentjob.ApplyToTargetServer("(local)")
 
                     # Refresh the SMO - another bug in SMO? As this should not be needed...
@@ -574,7 +574,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding()]
     param($EnableException)
     if (Test-FunctionInterrupt) { return }
-    Write-Message -Message "Finished creating job(s)." -Level Verbose -FunctionName New-DbaAgentJob
+    Write-Message -Message "Finished creating job(s)." -Level Verbose -FunctionName New-DbaAgentJob -ModuleName "dbatools"
 } $EnableException @__commonParameters 3>&1 2>&1
 """;
 }

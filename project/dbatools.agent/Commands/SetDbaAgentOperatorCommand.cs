@@ -262,7 +262,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the start time
             if (-not $SaturdayStartTime) {
                 $SaturdayStartTime = '000000'
-                Write-Message -Message "Saturday Start time was not set. Setting it to $SaturdayStartTime" -Level Verbose -FunctionName Set-DbaAgentOperator
+                Write-Message -Message "Saturday Start time was not set. Setting it to $SaturdayStartTime" -Level Verbose -FunctionName Set-DbaAgentOperator -ModuleName "dbatools"
             } elseif ($SaturdayStartTime -notmatch $RegexTime) {
                 Stop-Function -Message "Start time $SaturdayStartTime needs to match between '000000' and '235959'" -FunctionName Set-DbaAgentOperator
                 return
@@ -271,7 +271,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the end time
             if (-not $SaturdayEndTime) {
                 $SaturdayEndTime = '235959'
-                Write-Message -Message "Saturday End time was not set. Setting it to $SaturdayEndTime" -Level Verbose -FunctionName Set-DbaAgentOperator
+                Write-Message -Message "Saturday End time was not set. Setting it to $SaturdayEndTime" -Level Verbose -FunctionName Set-DbaAgentOperator -ModuleName "dbatools"
             } elseif ($SaturdayEndTime -notmatch $RegexTime) {
                 Stop-Function -Message "End time $SaturdayEndTime needs to match between '000000' and '235959'" -FunctionName Set-DbaAgentOperator
                 return
@@ -282,7 +282,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the start time
             if (-not $SundayStartTime) {
                 $SundayStartTime = '000000'
-                Write-Message -Message "Sunday Start time was not set. Setting it to $SundayStartTime" -Level Verbose -FunctionName Set-DbaAgentOperator
+                Write-Message -Message "Sunday Start time was not set. Setting it to $SundayStartTime" -Level Verbose -FunctionName Set-DbaAgentOperator -ModuleName "dbatools"
             } elseif ($SundayStartTime -notmatch $RegexTime) {
                 Stop-Function -Message "Start time $SundayStartTime needs to match between '000000' and '235959'" -FunctionName Set-DbaAgentOperator
                 return
@@ -291,7 +291,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the end time
             if (-not $SundayEndTime) {
                 $SundayEndTime = '235959'
-                Write-Message -Message "Sunday End time was not set. Setting it to $SundayEndTime" -Level Verbose -FunctionName Set-DbaAgentOperator
+                Write-Message -Message "Sunday End time was not set. Setting it to $SundayEndTime" -Level Verbose -FunctionName Set-DbaAgentOperator -ModuleName "dbatools"
             } elseif ($SundayEndTime -notmatch $RegexTime) {
                 Stop-Function -Message "Sunday End time $SundayEndTime needs to match between '000000' and '235959'" -FunctionName Set-DbaAgentOperator
                 return
@@ -302,7 +302,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the start time
             if (-not $WeekdayStartTime) {
                 $WeekdayStartTime = '000000'
-                Write-Message -Message "Weekday Start time was not set. Setting it to $WeekdayStartTime" -Level Verbose -FunctionName Set-DbaAgentOperator
+                Write-Message -Message "Weekday Start time was not set. Setting it to $WeekdayStartTime" -Level Verbose -FunctionName Set-DbaAgentOperator -ModuleName "dbatools"
             } elseif ($WeekdayStartTime -notmatch $RegexTime) {
                 Stop-Function -Message "Weekday Start time $WeekdayStartTime needs to match between '000000' and '235959'" -FunctionName Set-DbaAgentOperator
                 return
@@ -311,7 +311,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the end time
             if (-not $WeekdayEndTime) {
                 $WeekdayEndTime = '235959'
-                Write-Message -Message "Weekday End time was not set. Setting it to $WeekdayEndTime" -Level Verbose -FunctionName Set-DbaAgentOperator
+                Write-Message -Message "Weekday End time was not set. Setting it to $WeekdayEndTime" -Level Verbose -FunctionName Set-DbaAgentOperator -ModuleName "dbatools"
             } elseif ($WeekdayEndTime -notmatch $RegexTime) {
                 Stop-Function -Message "Weekday End time $WeekdayEndTime needs to match between '000000' and '235959'" -FunctionName Set-DbaAgentOperator
                 return

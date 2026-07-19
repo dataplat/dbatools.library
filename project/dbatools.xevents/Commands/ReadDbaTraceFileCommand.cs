@@ -271,12 +271,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         foreach ($file in $currentPath) {
-            Write-Message -Level Verbose -Message "Parsing $file" -FunctionName Read-DbaTraceFile
+            Write-Message -Level Verbose -Message "Parsing $file" -FunctionName Read-DbaTraceFile -ModuleName "dbatools"
 
             $exists = Test-DbaPath -SqlInstance $server -Path $file
 
             if (!$exists) {
-                Write-Message -Level Warning -Message "Path does not exist" -Target $file -FunctionName Read-DbaTraceFile
+                Write-Message -Level Warning -Message "Path does not exist" -Target $file -FunctionName Read-DbaTraceFile -ModuleName "dbatools"
                 Continue
             }
 
@@ -284,7 +284,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 FROM fn_trace_gettable('$file', DEFAULT)
                 $Where"
 
-            Write-Message -Message "SQL: $sql" -Level Debug -FunctionName Read-DbaTraceFile
+            Write-Message -Message "SQL: $sql" -Level Debug -FunctionName Read-DbaTraceFile -ModuleName "dbatools"
             try {
                 $server.Query($sql)
             } catch {

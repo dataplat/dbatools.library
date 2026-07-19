@@ -249,16 +249,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($__boundJob -and $jobName -notin $Job) {
-                Write-Message -Level Verbose -Message "Job [$jobName] filtered. Skipping." -FunctionName Copy-DbaAgentJob
+                Write-Message -Level Verbose -Message "Job [$jobName] filtered. Skipping." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                 continue
             }
             if ($__boundExcludeJob -and $jobName -in $ExcludeJob) {
-                Write-Message -Level Verbose -Message "Job [$jobName] excluded. Skipping." -FunctionName Copy-DbaAgentJob
+                Write-Message -Level Verbose -Message "Job [$jobName] excluded. Skipping." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                 continue
             }
-            Write-Message -Message "Working on job: $jobName" -Level Verbose -FunctionName Copy-DbaAgentJob
+            Write-Message -Message "Working on job: $jobName" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
             $sql = "`r`n                SELECT sp.[name] AS MaintenancePlanName`r`n                FROM msdb.dbo.sysmaintplan_plans AS sp`r`n                INNER JOIN msdb.dbo.sysmaintplan_subplans AS sps`r`n                    ON sps.plan_id = sp.id`r`n                WHERE job_id = '$($jobId)'"
-            Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentJob
+            Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
 
             $MaintenancePlanName = $sourceServer.Query($sql).MaintenancePlanName
 
@@ -267,7 +267,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyJobStatus.Status = "Skipped"
                     $copyJobStatus.Notes = "Job is associated with maintenance plan"
                     $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Job [$jobName] is associated with Maintenance Plan: $MaintenancePlanName" -FunctionName Copy-DbaAgentJob
+                    Write-Message -Level Verbose -Message "Job [$jobName] is associated with Maintenance Plan: $MaintenancePlanName" -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                 }
                 continue
             }
@@ -281,7 +281,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyJobStatus.Status = "Skipped"
                     $copyJobStatus.Notes = "Job is dependent on database: $missingDb"
                     $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Database(s) $missingDb doesn't exist on destination. Skipping job [$jobName]." -FunctionName Copy-DbaAgentJob
+                    Write-Message -Level Verbose -Message "Database(s) $missingDb doesn't exist on destination. Skipping job [$jobName]." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                 }
                 continue
             }
@@ -295,13 +295,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     try {
                         $adInfo = $destServer.EnumWindowsUserInfo($ownerName)
                         if ($adInfo.Rows.Count -gt 0) {
-                            Write-Message -Level Verbose -Message "Login $ownerName not found as a direct login but has access via AD group membership on destination. Proceeding." -FunctionName Copy-DbaAgentJob
+                            Write-Message -Level Verbose -Message "Login $ownerName not found as a direct login but has access via AD group membership on destination. Proceeding." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             $false
                         } else {
                             $true
                         }
                     } catch {
-                        Write-Message -Level Verbose -Message "Could not verify AD group membership for $ownerName on destination: $PSItem" -FunctionName Copy-DbaAgentJob
+                        Write-Message -Level Verbose -Message "Could not verify AD group membership for $ownerName on destination: $PSItem" -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                         $true
                     }
                 }
@@ -314,7 +314,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copyJobStatus.Status = "Skipped"
                         $copyJobStatus.Notes = "Job is dependent on login $missingLogin"
                         $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Login(s) $missingLogin doesn't exist on destination. Use -Force to set owner to [sa]. Skipping job [$jobName]." -FunctionName Copy-DbaAgentJob
+                        Write-Message -Level Verbose -Message "Login(s) $missingLogin doesn't exist on destination. Use -Force to set owner to [sa]. Skipping job [$jobName]." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                     }
                     continue
                 }
@@ -329,7 +329,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyJobStatus.Status = "Skipped"
                     $copyJobStatus.Notes = "Job is dependent on proxy $missingProxy"
                     $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Proxy Account(s) $missingProxy doesn't exist on destination. Skipping job [$jobName]." -FunctionName Copy-DbaAgentJob
+                    Write-Message -Level Verbose -Message "Proxy Account(s) $missingProxy doesn't exist on destination. Skipping job [$jobName]." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                 }
                 continue
             }
@@ -343,7 +343,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyJobStatus.Status = "Skipped"
                     $copyJobStatus.Notes = "Job is dependent on operator $missingOperator"
                     $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Operator(s) $($missingOperator) doesn't exist on destination. Skipping job [$jobName]" -FunctionName Copy-DbaAgentJob
+                    Write-Message -Level Verbose -Message "Operator(s) $($missingOperator) doesn't exist on destination. Skipping job [$jobName]" -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                 }
                 continue
             }
@@ -369,13 +369,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $destDate = (Invoke-DbaQuery @splatDestDate).date_modified
 
                         if ($null -eq $sourceDate -or $null -eq $destDate) {
-                            Write-Message -Level Warning -Message "Could not retrieve date_modified for job $jobName. Skipping date comparison." -FunctionName Copy-DbaAgentJob
+                            Write-Message -Level Warning -Message "Could not retrieve date_modified for job $jobName. Skipping date comparison." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             if ($force -eq $false) {
                                 if ($__realCmdlet.ShouldProcess($destinstance, "Job $jobName exists at destination. Use -Force to drop and migrate.")) {
                                     $copyJobStatus.Status = "Skipped"
                                     $copyJobStatus.Notes = "Already exists on destination"
                                     $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                    Write-Message -Level Verbose -Message "Job $jobName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJob
+                                    Write-Message -Level Verbose -Message "Job $jobName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                                 }
                                 continue
                             }
@@ -383,7 +383,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             # Source is newer, proceed with drop and recreate
                             if ($__realCmdlet.ShouldProcess($destinstance, "Source job is newer (modified $sourceDate). Dropping and recreating job $destJobName")) {
                                 try {
-                                    Write-Message -Message "Source job $jobName is newer. Dropping and recreating $destJobName." -Level Verbose -FunctionName Copy-DbaAgentJob
+                                    Write-Message -Message "Source job $jobName is newer. Dropping and recreating $destJobName." -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                                     # Before dropping, save which alerts reference this job
                                     $splatAlertsForJob = @{
                                         SqlInstance  = $destServer
@@ -392,13 +392,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                         SqlParameter = @{ jobName = $destJobName }
                                     }
                                     $alertsReferencingJob = (Invoke-DbaQuery @splatAlertsForJob).name
-                                    Write-Message -Message "Found $($alertsReferencingJob.Count) alert(s) referencing job $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob
+                                    Write-Message -Message "Found $($alertsReferencingJob.Count) alert(s) referencing job $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                                     $destServer.JobServer.Jobs[$destJobName].Drop()
                                 } catch {
                                     $copyJobStatus.Status = "Failed"
                                     $copyJobStatus.Notes = (Get-ErrorMessage -Record $_).Message
                                     $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                    Write-Message -Level Verbose -Message "Issue dropping job $jobName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJob
+                                    Write-Message -Level Verbose -Message "Issue dropping job $jobName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                                     continue
                                 }
                             }
@@ -408,7 +408,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $copyJobStatus.Status = "Skipped"
                                 $copyJobStatus.Notes = "Job has same modification date on source and destination"
                                 $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                Write-Message -Level Verbose -Message "Job $jobName has same modification date ($sourceDate). Skipping." -FunctionName Copy-DbaAgentJob
+                                Write-Message -Level Verbose -Message "Job $jobName has same modification date ($sourceDate). Skipping." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             }
                             continue
                         } else {
@@ -417,18 +417,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $copyJobStatus.Status = "Skipped"
                                 $copyJobStatus.Notes = "Destination job is newer than source (dest: $destDate, source: $sourceDate)"
                                 $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                Write-Message -Level Warning -Message "Job $jobName is newer on destination ($destDate) than source ($sourceDate). Skipping." -FunctionName Copy-DbaAgentJob
+                                Write-Message -Level Warning -Message "Job $jobName is newer on destination ($destDate) than source ($sourceDate). Skipping." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             }
                             continue
                         }
                     } catch {
-                        Write-Message -Level Warning -Message "Error comparing dates for job $jobName | $PSItem" -FunctionName Copy-DbaAgentJob
+                        Write-Message -Level Warning -Message "Error comparing dates for job $jobName | $PSItem" -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                         if ($force -eq $false) {
                             if ($__realCmdlet.ShouldProcess($destinstance, "Job $jobName exists at destination. Use -Force to drop and migrate.")) {
                                 $copyJobStatus.Status = "Skipped"
                                 $copyJobStatus.Notes = "Already exists on destination"
                                 $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                Write-Message -Level Verbose -Message "Job $jobName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJob
+                                Write-Message -Level Verbose -Message "Job $jobName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             }
                             continue
                         }
@@ -438,13 +438,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copyJobStatus.Status = "Skipped"
                         $copyJobStatus.Notes = "Already exists on destination"
                         $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Job $jobName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJob
+                        Write-Message -Level Verbose -Message "Job $jobName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                     }
                     continue
                 } else {
                     if ($__realCmdlet.ShouldProcess($destinstance, "Dropping job $destJobName and recreating")) {
                         try {
-                            Write-Message -Message "Dropping Job $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob
+                            Write-Message -Message "Dropping Job $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             # Before dropping, save which alerts reference this job
                             $splatAlertsForJob = @{
                                 SqlInstance  = $destServer
@@ -453,13 +453,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 SqlParameter = @{ jobName = $destJobName }
                             }
                             $alertsReferencingJob = (Invoke-DbaQuery @splatAlertsForJob).name
-                            Write-Message -Message "Found $($alertsReferencingJob.Count) alert(s) referencing job $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob
+                            Write-Message -Message "Found $($alertsReferencingJob.Count) alert(s) referencing job $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             $destServer.JobServer.Jobs[$destJobName].Drop()
                         } catch {
                             $copyJobStatus.Status = "Failed"
                             $copyJobStatus.Notes = (Get-ErrorMessage -Record $_).Message
                             $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Issue dropping job $jobName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJob
+                            Write-Message -Level Verbose -Message "Issue dropping job $jobName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             continue
                         }
                     }
@@ -468,7 +468,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($__realCmdlet.ShouldProcess($destinstance, "Creating Job $destJobName")) {
                 try {
-                    Write-Message -Message "Copying Job $jobName as $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob
+                    Write-Message -Message "Copying Job $jobName as $destJobName" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                     $sql = $serverJob.Script() | Out-String
 
                     if ($missingLogin.Count -gt 0 -and $force) {
@@ -482,7 +482,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $sql = $sql -replace [Regex]::Escape("@job_name=N'$jobName'"), "@job_name=N'$NewName'"
                     }
 
-                    Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentJob
+                    Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                     $destServer.Query($sql)
 
                     $destServer.JobServer.Jobs.Refresh()
@@ -491,7 +491,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     # Restore alert-to-job links if job was dropped and recreated
                     if ($alertsReferencingJob -and $alertsReferencingJob.Count -gt 0) {
-                        Write-Message -Message "Restoring alert-to-job links for $jobName" -Level Verbose -FunctionName Copy-DbaAgentJob
+                        Write-Message -Message "Restoring alert-to-job links for $jobName" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                         foreach ($alertName in $alertsReferencingJob) {
                             try {
                                 $splatUpdateAlert = @{
@@ -504,9 +504,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     }
                                 }
                                 $null = Invoke-DbaQuery @splatUpdateAlert
-                                Write-Message -Message "Restored link between alert [$alertName] and job [$jobName]" -Level Verbose -FunctionName Copy-DbaAgentJob
+                                Write-Message -Message "Restored link between alert [$alertName] and job [$jobName]" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             } catch {
-                                Write-Message -Level Warning -Message "Failed to restore alert link for [$alertName] to job [$jobName] | $PSItem" -FunctionName Copy-DbaAgentJob
+                                Write-Message -Level Warning -Message "Failed to restore alert link for [$alertName] to job [$jobName] | $PSItem" -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                             }
                         }
                     }
@@ -517,14 +517,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyJobStatus.Status = "Failed"
                     $copyJobStatus.Notes = (Get-ErrorMessage -Record $_)
                     $copyJobStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Issue copying job $jobName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJob
+                    Write-Message -Level Verbose -Message "Issue copying job $jobName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                     continue
                 }
             }
 
             if ($DisableOnDestination) {
                 if ($__realCmdlet.ShouldProcess($destinstance, "Disabling $destJobName")) {
-                    Write-Message -Message "Disabling $destJobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJob
+                    Write-Message -Message "Disabling $destJobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                     $destServer.JobServer.Jobs[$destJobName].IsEnabled = $False
                     $destServer.JobServer.Jobs[$destJobName].Alter()
                 }
@@ -532,7 +532,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($DisableOnSource) {
                 if ($__realCmdlet.ShouldProcess($source, "Disabling $jobName")) {
-                    Write-Message -Message "Disabling $jobName on $source" -Level Verbose -FunctionName Copy-DbaAgentJob
+                    Write-Message -Message "Disabling $jobName on $source" -Level Verbose -FunctionName Copy-DbaAgentJob -ModuleName "dbatools"
                     $serverJob.IsEnabled = $false
                     $serverJob.Alter()
                 }

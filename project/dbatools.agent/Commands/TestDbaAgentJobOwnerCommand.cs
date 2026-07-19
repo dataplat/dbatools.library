@@ -189,7 +189,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Stop-Function -Message "Invalid login: $Login." -FunctionName Test-DbaAgentJobOwner
                     return
                 } else {
-                    Write-Message -Level Warning -Message "$Login is not a valid login on $instance. Moving on." -FunctionName Test-DbaAgentJobOwner
+                    Write-Message -Level Warning -Message "$Login is not a valid login on $instance. Moving on." -FunctionName Test-DbaAgentJobOwner -ModuleName "dbatools"
                     continue
                 }
             }
@@ -213,7 +213,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             #Get database list. If value for -Job is passed, massage to make it a string array.
             #Otherwise, use all jobs on the instance where owner not equal to -TargetLogin
-            Write-Message -Level Verbose -Message "Gathering jobs to check." -FunctionName Test-DbaAgentJobOwner
+            Write-Message -Level Verbose -Message "Gathering jobs to check." -FunctionName Test-DbaAgentJobOwner -ModuleName "dbatools"
             if ($Job) {
                 $jobCollection = $server.JobServer.Jobs | Where-Object { $Job -contains $_.Name }
             } elseif ($ExcludeJob) {
@@ -224,7 +224,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             #for each database, create custom object for return set.
             foreach ($j in $jobCollection) {
-                Write-Message -Level Verbose -Message "Checking $j" -FunctionName Test-DbaAgentJobOwner
+                Write-Message -Level Verbose -Message "Checking $j" -FunctionName Test-DbaAgentJobOwner -ModuleName "dbatools"
                 $row = [ordered]@{
                     Server       = $server.Name
                     Job          = $j.Name

@@ -141,7 +141,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # Check if Job parameter is bound with null, empty, or whitespace-only values
     if ($__boundJob) {
         if ($null -eq $Job -or $Job.Count -eq 0 -or ($Job | Where-Object { [string]::IsNullOrWhiteSpace($_) })) {
-            Write-Message -Level Verbose -Message "The -Job parameter was explicitly provided but contains null, empty, or whitespace-only values. This may indicate an uninitialized variable. Skipping operation." -FunctionName Remove-DbaAgentJob
+            Write-Message -Level Verbose -Message "The -Job parameter was explicitly provided but contains null, empty, or whitespace-only values. This may indicate an uninitialized variable. Skipping operation." -FunctionName Remove-DbaAgentJob -ModuleName "dbatools"
             return
         }
     }
@@ -169,14 +169,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $dropHistory = $dropSchedule = 1
 
                 if ($__boundKeepHistory) {
-                    Write-Message -Level SomewhatVerbose -Message "Job history will be kept" -FunctionName Remove-DbaAgentJob
+                    Write-Message -Level SomewhatVerbose -Message "Job history will be kept" -FunctionName Remove-DbaAgentJob -ModuleName "dbatools"
                     $dropHistory = 0
                 }
                 if ($__boundKeepUnusedSchedule) {
-                    Write-Message -Level SomewhatVerbose -Message "Unused job schedules will be kept" -FunctionName Remove-DbaAgentJob
+                    Write-Message -Level SomewhatVerbose -Message "Unused job schedules will be kept" -FunctionName Remove-DbaAgentJob -ModuleName "dbatools"
                     $dropSchedule = 0
                 }
-                Write-Message -Level SomewhatVerbose -Message "Removing job" -FunctionName Remove-DbaAgentJob
+                Write-Message -Level SomewhatVerbose -Message "Removing job" -FunctionName Remove-DbaAgentJob -ModuleName "dbatools"
                 $dropJobQuery = ("EXEC dbo.sp_delete_job @job_name = '{0}', @delete_history = {1}, @delete_unused_schedule = {2}" -f $currentJob.Name.Replace("'", "''"), $dropHistory, $dropSchedule)
                 $server.Databases['msdb'].ExecuteNonQuery($dropJobQuery)
                 $server.JobServer.Jobs.Refresh()
@@ -189,7 +189,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Status       = 'Dropped'
                 }
             } catch {
-                Write-Message -Level Verbose -Message "Could not drop job $job on $server" -FunctionName Remove-DbaAgentJob
+                Write-Message -Level Verbose -Message "Could not drop job $job on $server" -FunctionName Remove-DbaAgentJob -ModuleName "dbatools"
 
                 [PSCustomObject]@{
                     ComputerName = $server.ComputerName

@@ -409,7 +409,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if (($FrequencyType -in (16, 8)) -and $FrequencyRecurrenceFactor -lt 1) {
             if ($Force) {
                 $FrequencyRecurrenceFactor = 1
-                Write-Message -Message "Recurrence factor not set for weekly or monthly interval. Setting it to $FrequencyRecurrenceFactor." -Level Verbose -FunctionName New-DbaAgentSchedule
+                Write-Message -Message "Recurrence factor not set for weekly or monthly interval. Setting it to $FrequencyRecurrenceFactor." -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
             } else {
                 Stop-Function -Message "The recurrence factor $FrequencyRecurrenceFactor (parameter FrequencyRecurrenceFactor) needs to be at least one when using a weekly or monthly interval." -Target $SqlInstance -FunctionName New-DbaAgentSchedule
                 return
@@ -527,7 +527,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Check if the interval is valid for the frequency
         if ($FrequencyType -eq 0) {
             if ($Force) {
-                Write-Message -Message "Parameter FrequencyType must be set to at least [Once]. Setting it to 'Once'." -Level Warning -FunctionName New-DbaAgentSchedule
+                Write-Message -Message "Parameter FrequencyType must be set to at least [Once]. Setting it to 'Once'." -Level Warning -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                 $FrequencyType = 1
             } else {
                 Stop-Function -Message "Parameter FrequencyType must be set to at least [Once]" -Target $SqlInstance -FunctionName New-DbaAgentSchedule
@@ -538,7 +538,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Check if the interval is valid for the frequency
         if (($FrequencyType -in 4, 8, 32) -and ($interval -lt 1)) {
             if ($Force) {
-                Write-Message -Message "Parameter FrequencyInterval must be provided for a recurring schedule. Setting it to first day of the week." -Level Warning -FunctionName New-DbaAgentSchedule
+                Write-Message -Message "Parameter FrequencyInterval must be provided for a recurring schedule. Setting it to first day of the week." -Level Warning -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                 $interval = 1
             } else {
                 Stop-Function -Message "Parameter FrequencyInterval must be provided for a recurring schedule." -Target $SqlInstance -FunctionName New-DbaAgentSchedule
@@ -549,7 +549,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Check the start date
         if (-not $StartDate -and $Force) {
             $StartDate = Get-Date -Format 'yyyyMMdd'
-            Write-Message -Message "Start date was not set. Force is being used. Setting it to $StartDate" -Level Verbose -FunctionName New-DbaAgentSchedule
+            Write-Message -Message "Start date was not set. Force is being used. Setting it to $StartDate" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
         } elseif (-not $StartDate) {
             Stop-Function -Message "Please enter a start date or use -Force to use defaults." -Target $SqlInstance -FunctionName New-DbaAgentSchedule
             return
@@ -564,7 +564,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Check the end date
         if (-not $EndDate -and $Force) {
             $EndDate = '99991231'
-            Write-Message -Message "End date was not set. Force is being used. Setting it to $EndDate" -Level Verbose -FunctionName New-DbaAgentSchedule
+            Write-Message -Message "End date was not set. Force is being used. Setting it to $EndDate" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
         } elseif (-not $EndDate) {
             Stop-Function -Message "Please enter an end date or use -Force to use defaults." -Target $SqlInstance -FunctionName New-DbaAgentSchedule
             return
@@ -583,7 +583,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Check the start time
         if (-not $StartTime -and $Force) {
             $StartTime = '000000'
-            Write-Message -Message "Start time was not set. Force is being used. Setting it to $StartTime" -Level Verbose -FunctionName New-DbaAgentSchedule
+            Write-Message -Message "Start time was not set. Force is being used. Setting it to $StartTime" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
         } elseif (-not $StartTime) {
             Stop-Function -Message "Please enter a start time or use -Force to use defaults." -Target $SqlInstance -FunctionName New-DbaAgentSchedule
             return
@@ -598,7 +598,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Check the end time
         if (-not $EndTime -and $Force) {
             $EndTime = '235959'
-            Write-Message -Message "End time was not set. Force is being used. Setting it to $EndTime" -Level Verbose -FunctionName New-DbaAgentSchedule
+            Write-Message -Message "End time was not set. Force is being used. Setting it to $EndTime" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
         } elseif (-not $EndTime) {
             Stop-Function -Message "Please enter an end time or use -Force to use defaults." -Target $SqlInstance -FunctionName New-DbaAgentSchedule
             return
@@ -645,7 +645,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Create the schedule
             if ($__gate.ShouldProcess($instance, "Adding the schedule $schedule")) {
                 try {
-                    Write-Message -Message "Adding the schedule $jobschedule on instance $instance" -Level Verbose -FunctionName New-DbaAgentSchedule
+                    Write-Message -Message "Adding the schedule $jobschedule on instance $instance" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
 
                     # Create the schedule
                     try {
@@ -661,53 +661,53 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     #region job schedule options
                     if ($Disabled) {
-                        Write-Message -Message "Setting job schedule to disabled" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Setting job schedule to disabled" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $jobschedule.IsEnabled = $false
                     } else {
-                        Write-Message -Message "Setting job schedule to enabled" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Setting job schedule to enabled" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $jobschedule.IsEnabled = $true
                     }
 
                     if ($interval -ge 1) {
-                        Write-Message -Message "Setting job schedule frequency interval to $interval" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Setting job schedule frequency interval to $interval" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $jobschedule.FrequencyInterval = $interval
                     }
 
                     if ($FrequencyType -ge 1) {
-                        Write-Message -Message "Setting job schedule frequency to $FrequencyType" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Setting job schedule frequency to $FrequencyType" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $jobschedule.FrequencyTypes = $FrequencyType
                     }
 
                     if ($FrequencySubdayType -ge 1) {
-                        Write-Message -Message "Setting job schedule frequency subday type to $FrequencySubdayType" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Setting job schedule frequency subday type to $FrequencySubdayType" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $jobschedule.FrequencySubDayTypes = $FrequencySubdayType
                     }
 
                     if ($FrequencySubdayInterval -ge 1) {
-                        Write-Message -Message "Setting job schedule frequency subday interval to $FrequencySubdayInterval" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Setting job schedule frequency subday interval to $FrequencySubdayInterval" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $jobschedule.FrequencySubDayInterval = $FrequencySubdayInterval
                     }
 
                     if (($FrequencyRelativeInterval -ge 1) -and ($FrequencyType -eq 32)) {
-                        Write-Message -Message "Setting job schedule frequency relative interval to $FrequencyRelativeInterval" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Setting job schedule frequency relative interval to $FrequencyRelativeInterval" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $jobschedule.FrequencyRelativeIntervals = $FrequencyRelativeInterval
                     }
 
                     if (($FrequencyRecurrenceFactor -ge 1) -and ($FrequencyType -in 8, 16, 32)) {
-                        Write-Message -Message "Setting job schedule frequency recurrence factor to $FrequencyRecurrenceFactor" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Setting job schedule frequency recurrence factor to $FrequencyRecurrenceFactor" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $jobschedule.FrequencyRecurrenceFactor = $FrequencyRecurrenceFactor
                     }
 
-                    Write-Message -Message "Setting job schedule start date to $StartDate / $activeStartDate" -Level Verbose -FunctionName New-DbaAgentSchedule
+                    Write-Message -Message "Setting job schedule start date to $StartDate / $activeStartDate" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                     $jobschedule.ActiveStartDate = $activeStartDate
 
-                    Write-Message -Message "Setting job schedule end date to $EndDate / $activeEndDate" -Level Verbose -FunctionName New-DbaAgentSchedule
+                    Write-Message -Message "Setting job schedule end date to $EndDate / $activeEndDate" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                     $jobschedule.ActiveEndDate = $activeEndDate
 
-                    Write-Message -Message "Setting job schedule start time to $StartTime / $activeStartTimeOfDay" -Level Verbose -FunctionName New-DbaAgentSchedule
+                    Write-Message -Message "Setting job schedule start time to $StartTime / $activeStartTimeOfDay" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                     $jobschedule.ActiveStartTimeOfDay = $activeStartTimeOfDay
 
-                    Write-Message -Message "Setting job schedule end time to $EndTime / $activeEndTimeOfDay" -Level Verbose -FunctionName New-DbaAgentSchedule
+                    Write-Message -Message "Setting job schedule end time to $EndTime / $activeEndTimeOfDay" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                     $jobschedule.ActiveEndTimeOfDay = $activeEndTimeOfDay
 
                     if ($Owner) {
@@ -716,7 +716,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     $jobschedule.Create()
 
-                    Write-Message -Message "Job schedule created with UID $($jobschedule.ScheduleUid)" -Level Verbose -FunctionName New-DbaAgentSchedule
+                    Write-Message -Message "Job schedule created with UID $($jobschedule.ScheduleUid)" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                 } catch {
                     Stop-Function -Message "Something went wrong adding the schedule." -Target $instance -ErrorRecord $_ -Continue -FunctionName New-DbaAgentSchedule
                 }
@@ -729,7 +729,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $jobs = Get-DbaAgentJob -SqlInstance $server -Job $Job
                 foreach ($j in $jobs) {
                     if ($__gate.ShouldProcess($instance, "Adding the schedule $schedule to job $($j.Name)")) {
-                        Write-Message -Message "Adding schedule $Schedule to job $($j.Name)" -Level Verbose -FunctionName New-DbaAgentSchedule
+                        Write-Message -Message "Adding schedule $Schedule to job $($j.Name)" -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
                         $j.AddSharedSchedule($jobschedule.Id)
                         $jobschedule.Refresh()
                     }
@@ -758,7 +758,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding()]
     param($EnableException)
     if (Test-FunctionInterrupt) { return }
-    Write-Message -Message "Finished creating job schedule(s)." -Level Verbose -FunctionName New-DbaAgentSchedule
+    Write-Message -Message "Finished creating job schedule(s)." -Level Verbose -FunctionName New-DbaAgentSchedule -ModuleName "dbatools"
 } $EnableException @__commonParameters 3>&1 2>&1
 """;
 }

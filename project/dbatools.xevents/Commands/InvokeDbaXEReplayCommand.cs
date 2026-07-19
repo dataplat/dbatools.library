@@ -206,7 +206,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
 
         if ($Raw) {
-            Write-Message -Message "Invoking XEReplay against $instance running on $($server.name) with raw output" -Level Verbose -FunctionName Invoke-DbaXEReplay
+            Write-Message -Message "Invoking XEReplay against $instance running on $($server.name) with raw output" -Level Verbose -FunctionName Invoke-DbaXEReplay -ModuleName "dbatools"
             if ($__sqlCredentialBound) {
                 . sqlcmd -S $instance -i $filename -U $SqlCredential.Username -P $SqlCredential.GetNetworkCredential().Password
                 continue
@@ -216,7 +216,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-        Write-Message -Message "Invoking XEReplay against $instance running on $($server.name)" -Level Verbose -FunctionName Invoke-DbaXEReplay
+        Write-Message -Message "Invoking XEReplay against $instance running on $($server.name)" -Level Verbose -FunctionName Invoke-DbaXEReplay -ModuleName "dbatools"
         if ($__sqlCredentialBound) {
             $output = . sqlcmd -S $instance -i $filename -U $SqlCredential.Username -P $SqlCredential.GetNetworkCredential().Password
         } else {

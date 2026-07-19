@@ -201,13 +201,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $jobServer.ProxyAccounts.Refresh()
                     }
                 } else {
-                    Write-Message -Level Warning -Message "Proxy account $proxy already exists on $instance. Use -Force to drop and recreate." -FunctionName New-DbaAgentProxy
+                    Write-Message -Level Warning -Message "Proxy account $proxy already exists on $instance. Use -Force to drop and recreate." -FunctionName New-DbaAgentProxy -ModuleName "dbatools"
                     continue
                 }
             }
 
             if (-not $server.Credentials[$ProxyCredential]) {
-                Write-Message -Level Warning -Message "Credential '$ProxyCredential' does not exist on $instance" -FunctionName New-DbaAgentProxy
+                Write-Message -Level Warning -Message "Credential '$ProxyCredential' does not exist on $instance" -FunctionName New-DbaAgentProxy -ModuleName "dbatools"
                 continue
             }
 
@@ -243,7 +243,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $proxy.AddLogin($loginname)
                     }
                 } else {
-                    Write-Message -Level Warning -Message "Login '$loginname' does not exist on $instance" -FunctionName New-DbaAgentProxy
+                    Write-Message -Level Warning -Message "Login '$loginname' does not exist on $instance" -FunctionName New-DbaAgentProxy -ModuleName "dbatools"
                 }
             }
 
@@ -253,7 +253,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $proxy.AddServerRole($role)
                     }
                 } else {
-                    Write-Message -Level Warning -Message "Server Role '$role' does not exist on $instance" -FunctionName New-DbaAgentProxy
+                    Write-Message -Level Warning -Message "Server Role '$role' does not exist on $instance" -FunctionName New-DbaAgentProxy -ModuleName "dbatools"
                 }
             }
 
@@ -263,7 +263,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $proxy.AddMsdbRole($role)
                     }
                 } else {
-                    Write-Message -Level Warning -Message "msdb role '$role' does not exist on $instance" -FunctionName New-DbaAgentProxy
+                    Write-Message -Level Warning -Message "msdb role '$role' does not exist on $instance" -FunctionName New-DbaAgentProxy -ModuleName "dbatools"
                 }
             }
 

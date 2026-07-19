@@ -190,7 +190,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $sql = "$sql $where"
         }
 
-        Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbMailLog
+        Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbMailLog -ModuleName "dbatools"
 
         try {
             $server.Query($sql) | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, LogDate, EventType, Description, Login

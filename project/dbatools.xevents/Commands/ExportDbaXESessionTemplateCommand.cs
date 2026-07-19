@@ -221,7 +221,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if (-not $__boundFilePath) {
             $FilePath = Join-DbaPath $Path "$xesname.xml"
         }
-        Write-Message -Level Verbose -Message "Wrote $xesname to $FilePath" -FunctionName Export-DbaXESessionTemplate
+        Write-Message -Level Verbose -Message "Wrote $xesname to $FilePath" -FunctionName Export-DbaXESessionTemplate -ModuleName "dbatools"
         [Microsoft.SqlServer.Management.XEvent.XEStore]::SaveSessionToTemplate($xes, $FilePath, $true)
         Get-ChildItem -Path $FilePath
     }

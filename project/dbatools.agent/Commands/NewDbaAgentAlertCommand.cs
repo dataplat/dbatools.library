@@ -229,7 +229,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         if ($Operator -and $NotifyMethod) {
                             foreach ($op in $Operator) {
                                 try {
-                                    Write-Message -Level Verbose -Message "Adding notification of type $NotifyMethod for $op to $instance" -FunctionName New-DbaAgentAlert
+                                    Write-Message -Level Verbose -Message "Adding notification of type $NotifyMethod for $op to $instance" -FunctionName New-DbaAgentAlert -ModuleName "dbatools"
                                     $newalert.AddNotification($op, [Microsoft.SqlServer.Management.Smo.Agent.NotifyMethods]::$NotifyMethod)
                                     $newalert.Alter()
                                 } catch {

@@ -250,11 +250,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($sched.JobCount -ge 1) {
                     foreach ($jobId in $sched.EnumJobReferences()) {
                         $jobSchedule = $sched.Parent.GetJobByID($jobId).JobSchedules | Where-Object { $_.ScheduleUid -eq $sched.ScheduleUid }
-                        Write-Message -Level Verbose -Message "Removing the schedule $($sched.Name) with id $($sched.Id) and uid $($sched.ScheduleUid) from job $($jobSchedule.Parent)" -FunctionName Remove-DbaAgentSchedule
+                        Write-Message -Level Verbose -Message "Removing the schedule $($sched.Name) with id $($sched.Id) and uid $($sched.ScheduleUid) from job $($jobSchedule.Parent)" -FunctionName Remove-DbaAgentSchedule -ModuleName "dbatools"
                         $jobSchedule.Drop($true)   # $true = we keep the schedule and drop it later
                     }
                 }
-                Write-Message -Level Verbose -Message "Removing the schedule $($sched.Name) with id $($sched.Id) and uid $($sched.ScheduleUid) on $($sched.Parent.Parent.Name)" -FunctionName Remove-DbaAgentSchedule
+                Write-Message -Level Verbose -Message "Removing the schedule $($sched.Name) with id $($sched.Id) and uid $($sched.ScheduleUid) on $($sched.Parent.Parent.Name)" -FunctionName Remove-DbaAgentSchedule -ModuleName "dbatools"
                 Remove-TeppCacheItem -SqlInstance $sched.Parent.Parent -Type schedule -Name $sched.Name
                 $sched.Drop()
                 $output.Status = "Dropped"

@@ -224,7 +224,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copySharedScheduleStatus.Status = "Skipped"
                         $copySharedScheduleStatus.Notes = "Already exists on destination"
                         $copySharedScheduleStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Shared job schedule $scheduleName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentSchedule
+                        Write-Message -Level Verbose -Message "Shared job schedule $scheduleName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentSchedule -ModuleName "dbatools"
                     }
                     continue
                 } else {
@@ -233,18 +233,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copySharedScheduleStatus.Status = "Skipped"
                             $copySharedScheduleStatus.Notes = "Schedule has associated jobs"
                             $copySharedScheduleStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Schedule [$scheduleName] has associated jobs. Skipping." -FunctionName Copy-DbaAgentSchedule
+                            Write-Message -Level Verbose -Message "Schedule [$scheduleName] has associated jobs. Skipping." -FunctionName Copy-DbaAgentSchedule -ModuleName "dbatools"
                         }
                         continue
                     } else {
                         if ($__realCmdlet.ShouldProcess($destinstance, "Dropping schedule $scheduleName and recreating")) {
                             try {
-                                Write-Message -Level Verbose -Message "Dropping schedule $scheduleName" -FunctionName Copy-DbaAgentSchedule
+                                Write-Message -Level Verbose -Message "Dropping schedule $scheduleName" -FunctionName Copy-DbaAgentSchedule -ModuleName "dbatools"
                                 $destServer.JobServer.SharedSchedules[$scheduleName].Drop()
                             } catch {
                                 $copySharedScheduleStatus.Status = "Failed"
                                 $copySharedScheduleStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                Write-Message -Level Verbose -Message "Issue dropping schedule $scheduleName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentSchedule
+                                Write-Message -Level Verbose -Message "Issue dropping schedule $scheduleName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentSchedule -ModuleName "dbatools"
                                 continue
                             }
                         }
@@ -254,10 +254,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($__realCmdlet.ShouldProcess($destinstance, "Creating schedule $scheduleName")) {
                 try {
-                    Write-Message -Level Verbose -Message "Copying schedule $scheduleName" -FunctionName Copy-DbaAgentSchedule
+                    Write-Message -Level Verbose -Message "Copying schedule $scheduleName" -FunctionName Copy-DbaAgentSchedule -ModuleName "dbatools"
                     $sql = $currentschedule.Script() | Out-String
 
-                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentSchedule
+                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentSchedule -ModuleName "dbatools"
                     $destServer.Query($sql)
 
                     $copySharedScheduleStatus.Status = "Successful"
@@ -265,7 +265,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } catch {
                     $copySharedScheduleStatus.Status = "Failed"
                     $copySharedScheduleStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Issue creating schedule $scheduleName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentSchedule
+                    Write-Message -Level Verbose -Message "Issue creating schedule $scheduleName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentSchedule -ModuleName "dbatools"
                     continue
                 }
             }

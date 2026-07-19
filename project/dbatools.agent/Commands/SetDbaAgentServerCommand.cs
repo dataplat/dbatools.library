@@ -352,106 +352,106 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             #region job server options
             # Settings the options for the job server
             if ($AgentLogLevel) {
-                Write-Message -Message "Setting Agent log level to $AgentLogLevel" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting Agent log level to $AgentLogLevel" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.AgentLogLevel = $AgentLogLevel
             }
 
             if ($AgentMailType) {
-                Write-Message -Message "Setting Agent Mail Type to $AgentMailType" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting Agent Mail Type to $AgentMailType" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.AgentMailType = $AgentMailType
             }
 
             if ($AgentShutdownWaitTime) {
-                Write-Message -Message "Setting Agent Shutdown Wait Time to $AgentShutdownWaitTime" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting Agent Shutdown Wait Time to $AgentShutdownWaitTime" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.AgentShutdownWaitTime = $AgentShutdownWaitTime
             }
 
             if ($DatabaseMailProfile) {
                 if ($DatabaseMailProfile -in (Get-DbaDbMail -SqlInstance $server).Profiles.Name) {
-                    Write-Message -Message "Setting Database Mail Profile to $DatabaseMailProfile" -Level Verbose -FunctionName Set-DbaAgentServer
+                    Write-Message -Message "Setting Database Mail Profile to $DatabaseMailProfile" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                     $jobServer.DatabaseMailProfile = $DatabaseMailProfile
                 } else {
-                    Write-Message -Message "Database mail profile not found on $server" -Level Warning -FunctionName Set-DbaAgentServer
+                    Write-Message -Message "Database mail profile not found on $server" -Level Warning -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 }
             }
 
             if ($ErrorLogFile) {
-                Write-Message -Message "Setting agent server ErrorLogFile to $ErrorLogFile" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server ErrorLogFile to $ErrorLogFile" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.ErrorLogFile = $ErrorLogFile
             }
 
             if ($IdleCpuDuration) {
-                Write-Message -Message "Setting agent server IdleCpuDuration to $IdleCpuDuration" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server IdleCpuDuration to $IdleCpuDuration" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.IdleCpuDuration = $IdleCpuDuration
             }
 
             if ($IdleCpuPercentage) {
-                Write-Message -Message "Setting agent server IdleCpuPercentage to $IdleCpuPercentage" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server IdleCpuPercentage to $IdleCpuPercentage" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.IdleCpuPercentage = $IdleCpuPercentage
             }
 
             if ($CpuPolling) {
-                Write-Message -Message "Setting agent server IsCpuPollingEnabled to $IsCpuPollingEnabled" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server IsCpuPollingEnabled to $IsCpuPollingEnabled" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.IsCpuPollingEnabled = if ($CpuPolling -eq "Enabled") { $true } else { $false }
             }
 
             if ($LocalHostAlias) {
-                Write-Message -Message "Setting agent server LocalHostAlias to $LocalHostAlias" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server LocalHostAlias to $LocalHostAlias" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.LocalHostAlias = $LocalHostAlias
             }
 
             if ($LoginTimeout) {
-                Write-Message -Message "Setting agent server LoginTimeout to $LoginTimeout" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server LoginTimeout to $LoginTimeout" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.LoginTimeout = $LoginTimeout
             }
 
             if ($MaximumHistoryRows) {
-                Write-Message -Message "Setting agent server MaximumHistoryRows to $MaximumHistoryRows" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server MaximumHistoryRows to $MaximumHistoryRows" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.MaximumHistoryRows = $MaximumHistoryRows
             }
 
             if ($__bound.ContainsKey("MaximumJobHistoryRows")) {
-                Write-Message -Message "Setting agent server MaximumJobHistoryRows to $MaximumJobHistoryRows" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server MaximumJobHistoryRows to $MaximumJobHistoryRows" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.MaximumJobHistoryRows = $MaximumJobHistoryRows
             }
 
             if ($NetSendRecipient) {
-                Write-Message -Message "Setting agent server NetSendRecipient to $NetSendRecipient" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server NetSendRecipient to $NetSendRecipient" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.NetSendRecipient = $NetSendRecipient
             }
 
             if ($ReplaceAlertTokens) {
-                Write-Message -Message "Setting agent server ReplaceAlertTokensEnabled to $ReplaceAlertTokens" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server ReplaceAlertTokensEnabled to $ReplaceAlertTokens" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.ReplaceAlertTokensEnabled = if ($ReplaceAlertTokens -eq "Enabled") { $true } else { $false }
             }
 
             if ($SaveInSentFolder) {
-                Write-Message -Message "Setting agent server SaveInSentFolder to $SaveInSentFolder" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server SaveInSentFolder to $SaveInSentFolder" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.SaveInSentFolder = if ($SaveInSentFolder -eq "Enabled") { $true } else { $false }
             }
 
             if ($SqlAgentAutoStart) {
-                Write-Message -Message "Setting agent server SqlAgentAutoStart to $SqlAgentAutoStart" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server SqlAgentAutoStart to $SqlAgentAutoStart" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.SqlAgentAutoStart = if ($SqlAgentAutoStart -eq "Enabled") { $true } else { $false }
             }
 
             if ($SqlAgentMailProfile) {
-                Write-Message -Message "Setting agent server SqlAgentMailProfile to $SqlAgentMailProfile" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server SqlAgentMailProfile to $SqlAgentMailProfile" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.SqlAgentMailProfile = $SqlAgentMailProfile
             }
 
             if ($SqlAgentRestart) {
-                Write-Message -Message "Setting agent server SqlAgentRestart to $SqlAgentRestart" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server SqlAgentRestart to $SqlAgentRestart" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.SqlAgentRestart = if ($SqlAgentRestart -eq "Enabled") { $true } else { $false }
             }
 
             if ($SqlServerRestart) {
-                Write-Message -Message "Setting agent server SqlServerRestart to $SqlServerRestart" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server SqlServerRestart to $SqlServerRestart" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.SqlServerRestart = if ($SqlServerRestart -eq "Enabled") { $true } else { $false }
             }
 
             if ($WriteOemErrorLog) {
-                Write-Message -Message "Setting agent server WriteOemErrorLog to $WriteOemErrorLog" -Level Verbose -FunctionName Set-DbaAgentServer
+                Write-Message -Message "Setting agent server WriteOemErrorLog to $WriteOemErrorLog" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
                 $jobServer.WriteOemErrorLog = if ($WriteOemErrorLog -eq "Enabled") { $true } else { $false }
             }
 
@@ -460,7 +460,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Execute
             if ($__realCmdlet.ShouldProcess($SqlInstance, "Changing the agent server")) {
                 try {
-                    Write-Message -Message "Changing the agent server" -Level Verbose -FunctionName Set-DbaAgentServer
+                    Write-Message -Message "Changing the agent server" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
 
                     # Change the agent server
                     $jobServer.Alter()
@@ -489,7 +489,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 & $__dbatoolsModule {
     [CmdletBinding()]
     param($EnableException)
-    Write-Message -Message "Finished changing agent server(s)" -Level Verbose -FunctionName Set-DbaAgentServer
+    Write-Message -Message "Finished changing agent server(s)" -Level Verbose -FunctionName Set-DbaAgentServer -ModuleName "dbatools"
 } $EnableException @__commonParameters 3>&1 2>&1
 """;
 }

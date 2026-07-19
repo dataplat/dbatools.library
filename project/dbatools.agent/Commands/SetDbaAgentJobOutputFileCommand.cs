@@ -144,7 +144,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if (!$Job) {
             # This is because jobname isn't yet required
-            Write-Message -Level Warning -Message "You must specify a job using the -Job parameter." -FunctionName Set-DbaAgentJobOutputFile
+            Write-Message -Level Warning -Message "You must specify a job using the -Job parameter." -FunctionName Set-DbaAgentJobOutputFile -ModuleName "dbatools"
             return
         }
 
@@ -155,12 +155,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $steps = $currentJob.JobSteps | Where-Object Name -in $Step
 
                 if (!$steps) {
-                    Write-Message -Level Warning -Message "$Step didn't return any steps" -FunctionName Set-DbaAgentJobOutputFile
+                    Write-Message -Level Warning -Message "$Step didn't return any steps" -FunctionName Set-DbaAgentJobOutputFile -ModuleName "dbatools"
                     return
                 }
             } else {
                 if (($currentJob.JobSteps).Count -gt 1) {
-                    Write-Message -Level Output -Message "Which Job Step do you wish to add output file to?" -FunctionName Set-DbaAgentJobOutputFile
+                    Write-Message -Level Output -Message "Which Job Step do you wish to add output file to?" -FunctionName Set-DbaAgentJobOutputFile -ModuleName "dbatools"
                     $steps = $currentJob.JobSteps | Out-GridView -Title "Choose the Job Steps to add an output file to" -PassThru -Verbose
                 } else {
                     $steps = $currentJob.JobSteps
@@ -174,8 +174,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             foreach ($jobStep in $steps) {
                 $currentOutputFile = $jobStep.OutputFileName
 
-                Write-Message -Level Verbose -Message "Current Output File for $currentJob is $currentOutputFile" -FunctionName Set-DbaAgentJobOutputFile
-                Write-Message -Level Verbose -Message "Adding $OutputFile to $jobStep for $currentJob" -FunctionName Set-DbaAgentJobOutputFile
+                Write-Message -Level Verbose -Message "Current Output File for $currentJob is $currentOutputFile" -FunctionName Set-DbaAgentJobOutputFile -ModuleName "dbatools"
+                Write-Message -Level Verbose -Message "Adding $OutputFile to $jobStep for $currentJob" -FunctionName Set-DbaAgentJobOutputFile -ModuleName "dbatools"
 
                 try {
                     if ($__realCmdlet.ShouldProcess($jobStep, "Changing Output File from $currentOutputFile to $OutputFile")) {

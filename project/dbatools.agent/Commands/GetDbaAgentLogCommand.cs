@@ -102,7 +102,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             foreach ($number in $LogNumber) {
                 try {
                     foreach ($object in $server.JobServer.ReadErrorLog($number)) {
-                        Write-Message -Level Verbose -Message "Processing $object" -FunctionName Get-DbaAgentLog
+                        Write-Message -Level Verbose -Message "Processing $object" -FunctionName Get-DbaAgentLog -ModuleName "dbatools"
                         Add-Member -Force -InputObject $object -MemberType NoteProperty ComputerName -value $server.ComputerName
                         Add-Member -Force -InputObject $object -MemberType NoteProperty InstanceName -value $server.ServiceName
                         Add-Member -Force -InputObject $object -MemberType NoteProperty SqlInstance -value $server.DomainInstanceName
@@ -115,7 +115,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } else {
             try {
                 foreach ($object in $server.JobServer.ReadErrorLog()) {
-                    Write-Message -Level Verbose -Message "Processing $object" -FunctionName Get-DbaAgentLog
+                    Write-Message -Level Verbose -Message "Processing $object" -FunctionName Get-DbaAgentLog -ModuleName "dbatools"
                     Add-Member -Force -InputObject $object -MemberType NoteProperty ComputerName -value $server.ComputerName
                     Add-Member -Force -InputObject $object -MemberType NoteProperty InstanceName -value $server.ServiceName
                     Add-Member -Force -InputObject $object -MemberType NoteProperty SqlInstance -value $server.DomainInstanceName

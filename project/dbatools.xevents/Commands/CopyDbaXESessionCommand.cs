@@ -167,7 +167,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $destinstance -Continue -FunctionName Copy-DbaXESession
         }
 
-        Write-Message -Level Verbose -Message "Migrating sessions." -FunctionName Copy-DbaXESession
+        Write-Message -Level Verbose -Message "Migrating sessions." -FunctionName Copy-DbaXESession -ModuleName "dbatools"
         foreach ($session in $storeSessions) {
             $sessionName = $session.Name
 
@@ -188,14 +188,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copyXeSessionStatus.Notes = "Already exists on destination"
                         $copyXeSessionStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
 
-                        Write-Message -Level Verbose -Message "Extended Event Session '$sessionName' was skipped because it already exists on $destinstance." -FunctionName Copy-DbaXESession
-                        Write-Message -Level Verbose -Message "Use -Force to drop and recreate." -FunctionName Copy-DbaXESession
+                        Write-Message -Level Verbose -Message "Extended Event Session '$sessionName' was skipped because it already exists on $destinstance." -FunctionName Copy-DbaXESession -ModuleName "dbatools"
+                        Write-Message -Level Verbose -Message "Use -Force to drop and recreate." -FunctionName Copy-DbaXESession -ModuleName "dbatools"
                     }
                     continue
                 } else {
                     if ($Pscmdlet.ShouldProcess($destinstance, "Attempting to drop $sessionName")) {
-                        Write-Message -Level Verbose -Message "Extended Event Session '$sessionName' exists on $destinstance." -FunctionName Copy-DbaXESession
-                        Write-Message -Level Verbose -Message "Force specified. Dropping $sessionName." -FunctionName Copy-DbaXESession
+                        Write-Message -Level Verbose -Message "Extended Event Session '$sessionName' exists on $destinstance." -FunctionName Copy-DbaXESession -ModuleName "dbatools"
+                        Write-Message -Level Verbose -Message "Force specified. Dropping $sessionName." -FunctionName Copy-DbaXESession -ModuleName "dbatools"
 
                         try {
                             $destStore.Sessions[$sessionName].Drop()
@@ -203,7 +203,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyXeSessionStatus.Status = "Failed"
                             $copyXeSessionStatus.Notes = (Get-ErrorMessage -Record $_)
                             $copyXeSessionStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Issue dropping Extended Event session $sessionName on $destinstance | $PSItem" -FunctionName Copy-DbaXESession
+                            Write-Message -Level Verbose -Message "Issue dropping Extended Event session $sessionName on $destinstance | $PSItem" -FunctionName Copy-DbaXESession -ModuleName "dbatools"
                             continue
                         }
                     }
@@ -214,8 +214,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     $sql = $session.ScriptCreate().GetScript() | Out-String
 
-                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaXESession
-                    Write-Message -Level Verbose -Message "Migrating session $sessionName." -FunctionName Copy-DbaXESession
+                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaXESession -ModuleName "dbatools"
+                    Write-Message -Level Verbose -Message "Migrating session $sessionName." -FunctionName Copy-DbaXESession -ModuleName "dbatools"
                     $null = $destServer.Query($sql)
 
                     if ($session.IsRunning -eq $true) {
@@ -229,7 +229,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyXeSessionStatus.Status = "Failed"
                     $copyXeSessionStatus.Notes = (Get-ErrorMessage -Record $_)
                     $copyXeSessionStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Issue creating Extended Event session $sessionName on $destinstance | $PSItem" -FunctionName Copy-DbaXESession
+                    Write-Message -Level Verbose -Message "Issue creating Extended Event session $sessionName on $destinstance | $PSItem" -FunctionName Copy-DbaXESession -ModuleName "dbatools"
                     continue
                 }
             }

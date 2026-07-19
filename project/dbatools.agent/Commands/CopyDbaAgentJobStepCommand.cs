@@ -212,21 +212,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($__boundJob -and $jobName -notin $Job) {
-                Write-Message -Level Verbose -Message "Job [$jobName] filtered. Skipping." -FunctionName Copy-DbaAgentJobStep
+                Write-Message -Level Verbose -Message "Job [$jobName] filtered. Skipping." -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                 continue
             }
             if ($__boundExcludeJob -and $jobName -in $ExcludeJob) {
-                Write-Message -Level Verbose -Message "Job [$jobName] excluded. Skipping." -FunctionName Copy-DbaAgentJobStep
+                Write-Message -Level Verbose -Message "Job [$jobName] excluded. Skipping." -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                 continue
             }
-            Write-Message -Message "Working on job: $jobName" -Level Verbose -FunctionName Copy-DbaAgentJobStep
+            Write-Message -Message "Working on job: $jobName" -Level Verbose -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
 
             if ($destJobs.name -notcontains $sourceJob.name) {
                 if ($__realCmdlet.ShouldProcess($destinstance, "Job $jobName does not exist on destination. Skipping step synchronization.")) {
                     $copyJobStepStatus.Status = "Skipped"
                     $copyJobStepStatus.Notes = "Job does not exist on destination. Use Copy-DbaAgentJob to create it first."
                     $copyJobStepStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Warning -Message "Job $jobName does not exist on destination $destinstance. Use Copy-DbaAgentJob to create it first." -FunctionName Copy-DbaAgentJobStep
+                    Write-Message -Level Warning -Message "Job $jobName does not exist on destination $destinstance. Use Copy-DbaAgentJob to create it first." -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                 }
                 continue
             }
@@ -235,7 +235,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($__boundStep) {
                 $sourceSteps = $sourceSteps | Where-Object Name -in $Step
                 if (-not $sourceSteps) {
-                    Write-Message -Level Warning -Message "No matching steps found in job $jobName for specified step names: $($Step -join ', ')" -FunctionName Copy-DbaAgentJobStep
+                    Write-Message -Level Warning -Message "No matching steps found in job $jobName for specified step names: $($Step -join ', ')" -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                     continue
                 }
             }
@@ -248,19 +248,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $stepsToRemove = $stepsToRemove | Where-Object Name -in $Step
                     }
 
-                    Write-Message -Message "Removing $($stepsToRemove.Count) existing step(s) from $jobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep
+                    Write-Message -Message "Removing $($stepsToRemove.Count) existing step(s) from $jobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                     foreach ($stepToRemove in $stepsToRemove) {
-                        Write-Message -Message "Removing step $($stepToRemove.Name) from $jobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep
+                        Write-Message -Message "Removing step $($stepToRemove.Name) from $jobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                         $stepToRemove.Drop()
                     }
                     $destJob.JobSteps.Refresh()
 
-                    Write-Message -Message "Copying $($sourceSteps.Count) step(s) from $jobName to $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep
+                    Write-Message -Message "Copying $($sourceSteps.Count) step(s) from $jobName to $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                     foreach ($sourceStep in $sourceSteps) {
-                        Write-Message -Message "Creating step $($sourceStep.Name) in $jobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep
+                        Write-Message -Message "Creating step $($sourceStep.Name) in $jobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                         $sql = $sourceStep.Script() | Out-String
                         $sql = $sql -replace "@job_id=N'[0-9a-fA-F-]+'", "@job_name=N'$($jobName -replace "'", "''")'"
-                        Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentJobStep
+                        Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                         $destServer.Query($sql)
                     }
 

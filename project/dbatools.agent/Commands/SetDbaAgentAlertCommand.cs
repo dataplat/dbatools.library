@@ -207,12 +207,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($Enabled) {
-                Write-Message -Message "Setting alert to enabled" -Level Verbose -FunctionName Set-DbaAgentAlert
+                Write-Message -Message "Setting alert to enabled" -Level Verbose -FunctionName Set-DbaAgentAlert -ModuleName "dbatools"
                 $currentAlert.IsEnabled = $true
             }
 
             if ($Disabled) {
-                Write-Message -Message "Setting alert to disabled" -Level Verbose -FunctionName Set-DbaAgentAlert
+                Write-Message -Message "Setting alert to disabled" -Level Verbose -FunctionName Set-DbaAgentAlert -ModuleName "dbatools"
                 $currentAlert.IsEnabled = $false
             }
 
@@ -221,7 +221,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Execute
             if ($__gate.ShouldProcess($SqlInstance, "Committing changes for alert $a")) {
                 try {
-                    Write-Message -Message "Committing changes for alert $a" -Level Verbose -FunctionName Set-DbaAgentAlert
+                    Write-Message -Message "Committing changes for alert $a" -Level Verbose -FunctionName Set-DbaAgentAlert -ModuleName "dbatools"
 
                     # Change the alert
                     $currentAlert.Alter()
