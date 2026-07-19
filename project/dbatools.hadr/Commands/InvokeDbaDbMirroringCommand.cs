@@ -50,11 +50,13 @@ public sealed partial class InvokeDbaDbMirroringCommand : DbaBaseCmdlet
     /// <summary>Endpoint encryption requirement.</summary>
     [Parameter(Position = 7)]
     [ValidateSet("Disabled", "Required", "Supported")]
+    [PsStringCast]
     public string EndpointEncryption { get; set; } = "Required";
 
     /// <summary>Endpoint encryption algorithm.</summary>
     [Parameter(Position = 8)]
     [ValidateSet("Aes", "AesRC4", "None", "RC4", "RC4Aes")]
+    [PsStringCast]
     public string EncryptionAlgorithm { get; set; } = "Aes";
 
     /// <summary>Network share both instances can read, used to stage the seeding backups.</summary>

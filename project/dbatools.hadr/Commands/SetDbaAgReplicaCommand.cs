@@ -33,11 +33,13 @@ public sealed class SetDbaAgReplicaCommand : DbaBaseCmdlet
     /// <summary>The availability mode.</summary>
     [Parameter(Position = 4)]
     [ValidateSet("AsynchronousCommit", "SynchronousCommit")]
+    [PsStringCast]
     public string? AvailabilityMode { get; set; }
 
     /// <summary>The failover mode.</summary>
     [Parameter(Position = 5)]
     [ValidateSet("Automatic", "Manual", "External")]
+    [PsStringCast]
     public string? FailoverMode { get; set; }
 
     /// <summary>The backup priority.</summary>
@@ -47,6 +49,7 @@ public sealed class SetDbaAgReplicaCommand : DbaBaseCmdlet
     /// <summary>The connection mode in the primary role.</summary>
     [Parameter(Position = 7)]
     [ValidateSet("AllowAllConnections", "AllowReadWriteConnections")]
+    [PsStringCast]
     public string? ConnectionModeInPrimaryRole { get; set; }
 
     /// <summary>The connection mode in the secondary role. Accepts both the SMO names and the
@@ -54,11 +57,13 @@ public sealed class SetDbaAgReplicaCommand : DbaBaseCmdlet
     [Parameter(Position = 8)]
     [ValidateSet("AllowAllConnections", "AllowNoConnections", "AllowReadIntentConnectionsOnly",
         "No", "Read-intent only", "Yes")]
+    [PsStringCast]
     public string? ConnectionModeInSecondaryRole { get; set; }
 
     /// <summary>The seeding mode.</summary>
     [Parameter(Position = 9)]
     [ValidateSet("Automatic", "Manual")]
+    [PsStringCast]
     public string? SeedingMode { get; set; }
 
     /// <summary>The session timeout in seconds.</summary>
