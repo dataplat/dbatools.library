@@ -96,40 +96,41 @@ public sealed class SuspendDbaAgDbDataMovementCommand : DbaBaseCmdlet
         // "" at bind time to match the function world (measured: compiled now passes <''> not
         // <null> to the lookup). See the Database property comment.
         //
-        // [DEF-001] buffered output loss: STILL on buffered InvokeScoped here. I adopted
-        // InvokeScopedStreaming and it correctly fixes the DEF-001 emit-and-throw AND keeps the
-        // real behaviour identical (WhatIf still prevents the mutation, message still prints to
-        // console), BUT it changes ShouldProcess -WhatIf TRANSCRIPT capture: measured that
-        // Start-Transcript in a child process captures the function/buffered WhatIf message but NOT
-        // the streaming one. That is a real (narrow) logging divergence on ShouldProcess-gate rows,
-        // and A owns the streaming machinery - flagged to A before propagating streaming across the
-        // gate rows. Reverted to buffered here pending A's guidance; this row stays HELD on DEF-001.
+        // [DEF-001] CLOSED via InvokeScopedStreaming (ab7492c). It fixes the emit-and-throw AND keeps
+        // the real behaviour identical (WhatIf still prevents the mutation, message still prints to
+        // console). It DOES change ShouldProcess -WhatIf TRANSCRIPT capture (Start-Transcript in a
+        // child process captures the function/buffered WhatIf message but not the streaming one - a
+        // narrow logging observability change, documented, repro at tools/diag-w4063-streaming-whatif
+        // -transcript.ps1). Confirmed a non-blocker: the fleet streamed ShouldProcess rows through it
+        // (C's 62-port wave) and MSTest passed 487/487, which tests behaviour not WhatIf-transcript.
+        // The parity runner now compares gate BEHAVIOUR (mutation prevented) not the transcript
+        // gate-message. The state sentinel rides the streaming callback as the last emitted item.
         //
         // W3-082 PROMPT-STATE TRANSPLANT: VFP + per-record + an inner $Pscmdlet gate at :119
         // under ConfirmImpact High.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w4050State"))
+            {
+                _state = sentinel["__w4050State"] as Hashtable;
+                return;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, AvailabilityGroup, Database, InputObject,
             EnableException.ToBool(),
             TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
             TestBound(nameof(Database)), TestBound(nameof(AvailabilityGroup)),
             _state,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            Hashtable? sentinel = item?.BaseObject as Hashtable;
-            if (sentinel is not null && sentinel.ContainsKey("__w4050State"))
-            {
-                _state = sentinel["__w4050State"] as Hashtable;
-                continue;
-            }
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
