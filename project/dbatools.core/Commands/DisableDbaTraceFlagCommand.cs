@@ -24,15 +24,15 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class DisableDbaTraceFlagCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative credential for the target instances.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>The trace flag number(s) to disable.</summary>
-    [Parameter(Mandatory = true)]
+    [Parameter(Mandatory = true, Position = 2)]
     public int[]? TraceFlag { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
