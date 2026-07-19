@@ -27,17 +27,15 @@ public sealed class SuspendDbaAgDbDataMovementCommand : DbaBaseCmdlet
     public string? AvailabilityGroup { get; set; }
 
     /// <summary>The database or databases to suspend data movement for.</summary>
-    // T8/DEF-002 EXPOSURE, BLOCKED ON SHARED RUNTIME (see the block comment in ProcessRecord and
-    // the → A escalation). The source's [string[]]$Database casts AT BIND TIME, so `-Database
-    // @($null)` coerces the null element to "" before Get-DbaAgDatabase sees it; the compiled
-    // binder keeps the raw null and the hop's inner [string[]] param does NOT re-cast a null
-    // ELEMENT, so the two worlds pass <''> vs <null> to the lookup - measured directly against the
-    // real cmdlet. The documented fix is [PsStringArrayCast], BUT that attribute is `internal` to
-    // dbatools.core and is NOT visible to the hadr satellite (its exemplars all live in core), so
-    // it cannot be applied here until A exposes the PsCompat casts to satellites. This is the ONLY
-    // value-flowing string parameter: $AvailabilityGroup's value is never used (only its
-    // Test-Bound binding is), so it needs no cast even once the attribute is available.
+    // T8/DEF-002 FIXED by [PsStringArrayCast] (PsCompat now present in hadr, ab7492c). The source's
+    // [string[]]$Database casts AT BIND TIME, so `-Database @($null)` coerces the null element to ""
+    // before Get-DbaAgDatabase sees it; the compiled binder keeps the raw null and the hop's inner
+    // [string[]] param does NOT re-cast a null ELEMENT, so without this the two worlds passed <''>
+    // vs <null> to the lookup (measured directly against the real cmdlet). The cast happens before
+    // validators, matching the function world. This is the ONLY value-flowing string parameter:
+    // $AvailabilityGroup's value is never used (only its Test-Bound binding is), so it needs no cast.
     [Parameter(Position = 3)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>Availability database objects piped from Get-DbaAgDatabase.</summary>
@@ -93,19 +91,19 @@ public sealed class SuspendDbaAgDbDataMovementCommand : DbaBaseCmdlet
         // identically), NOT the W4-055 leak (assigned in one branch, read in another). Carrying
         // them would be wrong: there is nothing to carry.
         //
-        // TWO SHARED-RUNTIME EXPOSURES codex surfaced on this row, BOTH blocked on lane A and BOTH
-        // uniform across the hadr satellite (0 of 80 hadr commands use streaming; hadr carries no
-        // PsCompat at all), so NEITHER is a defect unique to this port and NEITHER can be fixed
-        // from this seat:
-        //   [DEF-001] buffered InvokeScoped: this command emits $agdb per record and can throw
-        //     terminating under -EnableException (Stop-Function -Continue still throws when
-        //     EnableException is set), so an earlier record's already-emitted object can be lost;
-        //     a downstream `| Select -First 1` likewise stops the source early but not the buffered
-        //     port. The canonical fix is NestedCommand.InvokeScopedStreaming (W2-030 @3acfd56),
-        //     which no hadr command has adopted. Same class W4-052 is parked on awaiting A's
-        //     consolidated shared-runtime answer.
-        //   [T8/DEF-002] the -Database @($null) bind-time cast (see the Database property comment):
-        //     needs [PsStringArrayCast], which is internal to dbatools.core and absent from hadr.
+        // [T8/DEF-002] the -Database @($null) bind-time cast: FIXED by [PsStringArrayCast] on the
+        // Database property (PsCompat now present in hadr via ab7492c), casting the null element to
+        // "" at bind time to match the function world (measured: compiled now passes <''> not
+        // <null> to the lookup). See the Database property comment.
+        //
+        // [DEF-001] buffered output loss: STILL on buffered InvokeScoped here. I adopted
+        // InvokeScopedStreaming and it correctly fixes the DEF-001 emit-and-throw AND keeps the
+        // real behaviour identical (WhatIf still prevents the mutation, message still prints to
+        // console), BUT it changes ShouldProcess -WhatIf TRANSCRIPT capture: measured that
+        // Start-Transcript in a child process captures the function/buffered WhatIf message but NOT
+        // the streaming one. That is a real (narrow) logging divergence on ShouldProcess-gate rows,
+        // and A owns the streaming machinery - flagged to A before propagating streaming across the
+        // gate rows. Reverted to buffered here pending A's guidance; this row stays HELD on DEF-001.
         //
         // W3-082 PROMPT-STATE TRANSPLANT: VFP + per-record + an inner $Pscmdlet gate at :119
         // under ConfirmImpact High.
