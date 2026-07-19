@@ -98,28 +98,31 @@ public sealed class RevokeDbaAgPermissionCommand : DbaBaseCmdlet
         // Neither leak is a PARAMETER, which is why Get-ParamMutationInventory reports zero for
         // this row and is correct to. They ride the __w4055State sentinel alongside the W3-082
         // prompt state.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Login, AvailabilityGroup, Type, Permission, InputObject,
-            EnableException.ToBool(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
-            _state,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w4055State"))
             {
                 _state = sentinel["__w4055State"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Login, AvailabilityGroup, Type, Permission, InputObject,
+            EnableException.ToBool(),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
+            _state,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
