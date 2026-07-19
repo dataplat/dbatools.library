@@ -34,8 +34,15 @@ namespace Dataplat.Dbatools.Commands;
 /// TWO $PSBoundParameters reads, and BOTH must be substituted - this is the row's real hazard,
 /// because inside a hop `$PSBoundParameters` is the SCRIPTBLOCK's, not the cmdlet's:
 ///     1. The guard `if (-not $PSBoundParameters.SqlInstance -and -not $PSBoundParameters.InputObject)`
-///        is a was-it-SUPPLIED test written as a property read rather than via Test-Bound. It becomes
-///        the carried bound flags $__boundSqlInstance / $__boundInputObject.
+///        tests the TRUTHINESS OF THE BOUND VALUE - it is NOT a was-it-supplied test, despite looking
+///        like one. CORRECTED after the carrier-semantics sweep: I first carried it as
+///        $__boundSqlInstance / $__boundInputObject, i.e. BOUNDNESS, and that diverges exactly where
+///        it matters - a bound-but-falsy `-SqlInstance @( )` or `-InputObject @( )` makes the SOURCE
+///        take the guard path while a boundness carrier lets the port sail past it into the drop loop.
+///        The correct substitution needs NO carrier at all: the hop already receives the values, so
+///        the guard tests `-not $SqlInstance -and -not $InputObject` directly, which is precisely what
+///        the source does. Contrast case 2 below and the Test-Bound rows elsewhere in this satellite -
+///        there is no universally right carrier form, only reproducing the source's own test.
 ///     2. `$params = $PSBoundParameters` is splatted into Get-DbaDbTable. It rides as a per-record
 ///        Hashtable clone of THIS cmdlet's bound parameters, and the verbatim Remove('WhatIf') /
 ///        Remove('Confirm') lines then run against that clone. Note the source mutates the LIVE
@@ -115,7 +122,6 @@ public sealed class RemoveDbaDbTableCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, Table, InputObject, EnableException.ToBool(),
             _tables, BoundParametersForSplat(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
@@ -182,14 +188,14 @@ public sealed class RemoveDbaDbTableCommand : DbaBaseCmdlet
     // against it). The accumulator restores from the carry and is emitted from a finally so it
     // survives an exception in the body.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $Table, $InputObject, $EnableException, $__carriedTables, $__boundParams, $__boundSqlInstance, $__boundInputObject, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $Table, $InputObject, $EnableException, $__carriedTables, $__boundParams, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$Table, [Microsoft.SqlServer.Management.Smo.Table[]]$InputObject, $EnableException, $__carriedTables, $__boundParams, $__boundSqlInstance, $__boundInputObject, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$Table, [Microsoft.SqlServer.Management.Smo.Table[]]$InputObject, $EnableException, $__carriedTables, $__boundParams, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     try {
@@ -204,7 +210,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $tables = @( )
         if ($null -ne $__carriedTables) { $tables = @( $__carriedTables ) }
 
-        if (-not $__boundSqlInstance -and -not $__boundInputObject) {
+        if (-not $SqlInstance -and -not $InputObject) {
             Stop-Function -Message "You must specify either SqlInstance or InputObject" -FunctionName Remove-DbaDbTable
             return
         }
@@ -224,7 +230,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Tables                  = $tables
         }
     }
-} $SqlInstance $SqlCredential $Database $Table $InputObject $EnableException $__carriedTables $__boundParams $__boundSqlInstance $__boundInputObject $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $Table $InputObject $EnableException $__carriedTables $__boundParams $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the end block VERBATIM. Substitutions: $PSCmdlet -> $__realCmdlet and -FunctionName
@@ -279,3 +285,4 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $__carriedTables $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
+
