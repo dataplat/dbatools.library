@@ -125,6 +125,7 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     private bool _processInterrupted;
     private object? _inputObjectState;
     private bool _inputObjectByName;
+    private bool _inputObjectEverPipelineBound;
 
     /// <summary>
     /// Parameters the BODY mutates and the script keeps across records: -Append flips true when a user
@@ -196,12 +197,25 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
         if (_beginInterrupted || _processInterrupted || Interrupted)
             return;
 
-        // Reset to the current InputObject ONLY when it was pipeline-bound this record (databases piped):
-        // a non-null value is then a genuine new record, identical instance or not. If InputObject was
-        // bound BY NAME it is a fixed value the body accumulates on top of (with SqlInstance piped), so it
-        // must NOT reset; and a null InputObject (instances piped to SqlInstance) keeps the accumulation.
-        if (!_inputObjectByName && InputObject != null)
-            _inputObjectState = InputObject;
+        // The complete bimodal model, matching PowerShell's ValueFromPipeline rebind rule (measured):
+        //  - by-name InputObject: a fixed value the body accumulates on top of; never reset here.
+        //  - pipeline-bound InputObject THIS record (non-null): a genuine new record (identical instance
+        //    or not) - reset to it, and remember it has been pipeline-bound.
+        //  - null InputObject AFTER it was ever pipeline-bound: the binder reset it because this record
+        //    bound SqlInstance instead - reset to null too (source emits A,B not A,A,B for @(db; instance)).
+        //  - null InputObject that was NEVER pipeline-bound: pure SqlInstance mode - keep the += accumulation.
+        if (!_inputObjectByName)
+        {
+            if (InputObject != null)
+            {
+                _inputObjectState = InputObject;
+                _inputObjectEverPipelineBound = true;
+            }
+            else if (_inputObjectEverPipelineBound)
+            {
+                _inputObjectState = null;
+            }
+        }
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
