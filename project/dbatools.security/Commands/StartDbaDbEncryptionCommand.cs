@@ -242,9 +242,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject = $__byNameInputObject
 
-        foreach ($__batch in $__batches) {
-            if ($__batch[0]) { $InputObject = $__batch[1] }
-            . {
+        # Named-wrapper shim: the process body runs inside a function carrying the command's name,
+        # so call-stack-deriving helpers see Start-DbaDbEncryption exactly as in the function world.
+        # Write-ProgressHelper reads (Get-PSCallStack)[1].Command to build BOTH its Activity string
+        # and its TotalSteps lookup; from an anonymous scriptblock frame it saw a literal scriptblock
+        # marker, which produced 'Executing <ScriptBlock>' and a FLAT 0% where the script ramps.
+        # The dot-sourced invocation keeps the body in the hop scope, so cross-record state is unchanged.
+        function Start-DbaDbEncryption {
         if (-not $SqlInstance -and -not $InputObject) {
             Stop-Function -Message "You must specify either SqlInstance or pipe in an InputObject from Get-DbaDatabase" -FunctionName Start-DbaDbEncryption
             return
@@ -678,7 +682,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $runspacePool.Dispose()
             }
         }
-            }
+        }
+        foreach ($__batch in $__batches) {
+            if ($__batch[0]) { $InputObject = $__batch[1] }
+            . Start-DbaDbEncryption
         }
 } $__batches $__byNameInputObject $SqlInstance $SqlCredential $EncryptorName $EncryptorType $Database $ExcludeDatabase $BackupPath $MasterKeySecurePassword $CertificateSubject $CertificateStartDate $CertificateExpirationDate $CertificateActiveForServiceBrokerDialog $BackupSecurePassword $AllUserDatabases $Force $Parallel $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
