@@ -67,21 +67,24 @@ public sealed class GetDbaDbLogShipErrorCommand : DbaBaseCmdlet
         // TRUTHY in PowerShell - passing the raw property would fire the source's
         // `if ($DateTimeFrom)` gates on every call (probe-verified both editions).
         // The inner hop params stay untyped for the same reason.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Action,
-            TestBound(nameof(DateTimeFrom)) ? (object?)DateTimeFrom : null,
-            TestBound(nameof(DateTimeTo)) ? (object?)DateTimeTo : null,
-            Primary.ToBool(), Secondary.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, Action,
+            TestBound(nameof(DateTimeFrom)) ? (object?)DateTimeFrom : null,
+            TestBound(nameof(DateTimeTo)) ? (object?)DateTimeTo : null,
+            Primary.ToBool(), Secondary.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

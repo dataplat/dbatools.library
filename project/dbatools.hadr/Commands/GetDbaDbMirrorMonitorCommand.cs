@@ -24,6 +24,7 @@ public sealed class GetDbaDbMirrorMonitorCommand : DbaBaseCmdlet
 
     /// <summary>Restricts results to these databases.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>Database objects piped from Get-DbaDatabase.</summary>
@@ -37,6 +38,7 @@ public sealed class GetDbaDbMirrorMonitorCommand : DbaBaseCmdlet
     /// <summary>How much monitor history to return.</summary>
     [Parameter(Position = 4)]
     [ValidateSet("LastRow", "LastTwoHours", "LastFourHours", "LastEightHours", "LastDay", "LastTwoDays", "Last100Rows", "Last500Rows", "Last1000Rows", "Last1000000Rows")]
+    [PsStringCast]
     public string LimitResults { get; set; } = "LastTwoHours";
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
@@ -54,19 +56,22 @@ public sealed class GetDbaDbMirrorMonitorCommand : DbaBaseCmdlet
         // switch never maps it ($rows stays null, verbatim in both worlds). The plain
         // catch Stop-Function's interrupt flag is WRITE-ONLY in this source (no
         // Test-FunctionInterrupt) - inert in both worlds, no carry.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, InputObject,
-            Update.ToBool(), LimitResults, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, InputObject,
+            Update.ToBool(), LimitResults, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
