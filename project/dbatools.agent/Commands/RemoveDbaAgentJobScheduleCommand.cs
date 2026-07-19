@@ -77,22 +77,22 @@ public sealed class RemoveDbaAgentJobScheduleCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Job, InputObject, EnableException.ToBool(),
-            MyInvocation.BoundParameters.ContainsKey("Job"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             if (item is not null)
             {
                 _jobs.Add(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Job, InputObject, EnableException.ToBool(),
+            MyInvocation.BoundParameters.ContainsKey("Job"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
