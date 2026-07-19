@@ -12,29 +12,34 @@ namespace Dataplat.Dbatools.Commands;
 /// public/Remove-DbaDbOrphanUser.ps1; the workflow remains a module-scoped PowerShell compatibility
 /// hop.
 ///
-/// The hop runs once PER INSTANCE. The source foreaches $SqlInstance, keeps no cross-instance state
-/// in that loop, and emits verbose output per database, so batching every instance into a single hop
-/// would emit all of that verbose ahead of all results instead of interleaving per instance. Unlike
-/// Set-DbaDbQueryStoreOption there is no pre-loop guard here, so the split needs no run-once
-/// machinery: the process body IS the instance loop.
+/// The hop runs once PER INSTANCE. The source foreaches $SqlInstance and keeps no cross-instance
+/// state in that loop, so the split is safe; Unlike Set-DbaDbQueryStoreOption there is no pre-loop
+/// guard here, so it needs no run-once machinery either - the process body IS the instance loop.
+/// An earlier revision of this comment justified the split by claiming a single whole-array hop would
+/// "emit all verbose ahead of all results". That was WRONG and is retracted: InvokeScopedStreaming
+/// streams, so records surface in production order either way. The split is retained because it
+/// bounds each instance's failure to its own invocation, not for any ordering reason.
 ///
-/// The source's begin block does one thing - "if ($Force) { $ConfirmPreference = 'none' }" - and it
-/// folds into the top of the hop, since -Force is not a pipeline parameter and setting the
-/// preference per invocation is identical to setting it once. That fold is sound because a
+/// The source's begin block does TWO things - "if ($Force) { $ConfirmPreference = 'none' }" and an
+/// $eol constant - and both fold into the top of the hop, since -Force is not a pipeline parameter
+/// and setting the preference per invocation is identical to setting it once. That fold is sound because a
 /// $ConfirmPreference set inside the hop still reaches a gate routed to the outer cmdlet -
 /// ShouldProcess resolves the preference from the scope chain at call time, measured separately with
 /// a failing control.
 ///
-/// All three ShouldProcess gates are routed to the OUTER cmdlet ($Pscmdlet becomes $__realCmdlet),
+/// All FIVE ShouldProcess gates are routed to the OUTER cmdlet ($Pscmdlet becomes $__realCmdlet),
 /// which keeps -Confirm's "Yes to All" answer alive across pipeline records rather than letting a
-/// per-record inner runtime forget it.
+/// per-record inner runtime forget it. (Counted mechanically, not by eye: an earlier revision of this
+/// comment said three.)
 ///
-/// No local needs a cross-record carry, and the source is unusually explicit about it: $UsersToWork
-/// is reset to $null at the end of every database iteration and $UsersToRemove is re-initialised to
-/// @() before each user loop, so neither can leak forward. $DatabaseCollection, $db, $User,
-/// $ExistLogin and $query are each assigned and read within one iteration, and $server is assigned
-/// at the top of the instance loop whose failure path is Stop-Function -Continue, which skips every
-/// remaining statement of that iteration including the reads.
+/// No local needs a cross-record carry, and the accumulators are the part worth checking rather than
+/// assuming: $AlterSchemaOwner and $DropSchema are built with += and read together to compose the
+/// DROP USER batch, which is exactly the shape that forced guarded carries on other rows. Both are
+/// reset to "" INSIDE the per-user loop that consumes them, immediately before the appends, so
+/// nothing leaks between users or databases. $db, $DatabaseCollection, $dbuser, $ExistLogin and
+/// $query are each assigned and read within one iteration, and $server is assigned at the top of the
+/// instance loop whose failure path is Stop-Function -Continue, which skips every remaining statement
+/// of that iteration including the reads.
 ///
 /// No graceful-stop latch: the source has no Test-FunctionInterrupt guard, so a later record simply
 /// re-enters the process body. Carrying a latch would suppress output the function repeats.
@@ -43,9 +48,47 @@ namespace Dataplat.Dbatools.Commands;
 /// design - each binds per record as usual - but it means a caller can pipe either, and the
 /// per-instance split is over whatever -SqlInstance holds for the current record.
 ///
-/// The hop streams rather than buffers. This command MUTATES server state (schema re-ownership and DROP USER), and each emitted
-/// object records a user that was actually remapped or reported, so a buffered invocation would
-/// discard the records of completed repairs if a later database threw under -EnableException.
+/// $StackSource IS HOP-SAFE, and this is worth recording because it looks like it should not be. The
+/// body calls Get-PSCallStack and branches on the CALLER's identity: a call from Repair-DbaDbOrphanUser
+/// trusts the -User collection it was handed, anything else goes and discovers users itself. A hop
+/// inserts extra scriptblock frames, so this is the same family as Test-Bound - a guard that inspects
+/// the very thing the hop changes - and it was reported as a defect on review.
+///
+/// It is not one, and the reason is the indexing: $CallStack[$CallStack.Count - 2] counts from the
+/// BOTTOM of the stack while the hop's frames are added at the TOP. Measured rather than argued -
+/// the function shape resolves "Repair-DbaDbOrphanUser" through frames
+/// <ScriptBlock> <- Remove-DbaDbOrphanUser <- Repair-DbaDbOrphanUser <- script, and the hop shape
+/// resolves the SAME value through three additional inner <ScriptBlock> frames. Had the source used
+/// (Get-PSCallStack)[1] - top-relative, as Get-DbaDbBackupHistory does - it WOULD have broken, and
+/// that command is not yet ported. Anyone porting it should treat this as a live hazard.
+///
+/// The hop streams rather than buffers. This command MUTATES server state (schema re-ownership and DROP USER).
+/// Note precisely what a streamed object does and does not mean here: the schema-action objects are
+/// emitted BEFORE the final ExecuteNonQuery that applies the batch, so an emitted record reports
+/// intent, not a completed repair - a later declined gate or a failed execution can leave an emitted
+/// object whose mutation never landed. Streaming is still correct, because buffering would discard
+/// the record of everything that DID complete when a later database throws under -EnableException;
+/// but an earlier revision of this comment claimed emitted objects "record completed repairs", and
+/// that overstated it.
+///
+/// TWO KNOWN SHARED-RUNTIME GAPS, held for the consolidated fix rather than worked around here.
+///
+/// First, warnings raised by NESTED calls are lost: the function emits a Connect-DbaInstance
+/// connection warning and its own Stop-Function warning, and this port emits only the second, in both
+/// warning modes. The mechanism I originally proposed - "compiled nested cmdlets bypass the 3>&1
+/// merge" - is NOT well supported and should not be repeated as fact. PSCmdlet.WriteWarning produces
+/// an ordinary stream-3 WarningRecord, which the redirection and the demultiplexer both handle, so
+/// "the child is compiled" cannot by itself be the cause; a real bypass would need direct host/UI
+/// writes, a separate pipeline or runspace, or a different code path in the child. The MEASUREMENT
+/// stands and the diagnosis does not.
+///
+/// Second - and this is the sharper form of the -WarningAction gap - preference values of Stop are
+/// not propagated INTO the hop at all. The source applies -WarningAction / -ErrorAction Stop inside
+/// its own try blocks, where a Stop is caught and handled. In the port the records are merged and
+/// re-emitted from the streaming callback, so a Stop fires OUTSIDE the original catch boundary. That
+/// is not merely a lost warning: it changes where termination happens and therefore which side
+/// effects have already been applied when it does. This command re-owns schemas and drops users, so
+/// the distinction is a real one for a caller.
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "DbaDbOrphanUser", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [OutputType(typeof(PSObject))]
