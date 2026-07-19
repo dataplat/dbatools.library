@@ -21,7 +21,12 @@ internal static partial class NestedCommand
     private static readonly (string ParameterName, string PreferenceVariable)[] ActionPreferenceMap =
     {
         ("ErrorAction", "ErrorActionPreference"),
-        ("WarningAction", "WarningPreference"),
+        // WarningAction is deliberately ABSENT: the function world is PATH-DEPENDENT for it
+        // (measured 2026-07-19: with -WarningAction SilentlyContinue the function world CAPTURES
+        // Stop-Function connect warnings on New-DbaDbUser yet SUPPRESSES them on
+        // Remove-DbaDbRoleMember), so no uniform in-scope preference can match both paths.
+        // Propagating it regressed a sealed suite; the WarningAction divergence class stays with
+        // the owner-level Write-Message analysis instead.
         ("InformationAction", "InformationPreference"),
         ("ProgressAction", "ProgressPreference"),
     };
