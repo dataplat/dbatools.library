@@ -24,6 +24,7 @@ public sealed class RemoveDbaEndpointCommand : DbaBaseCmdlet
 
     /// <summary>The endpoint or endpoints to remove.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Endpoint { get; set; }
 
     /// <summary>Remove every endpoint on the instance.</summary>

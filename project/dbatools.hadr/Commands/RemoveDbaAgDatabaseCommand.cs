@@ -24,6 +24,7 @@ public sealed class RemoveDbaAgDatabaseCommand : DbaBaseCmdlet
 
     /// <summary>The database or databases to remove from the availability group.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>The availability group or groups to remove the databases from.</summary>

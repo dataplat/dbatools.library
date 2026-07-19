@@ -24,6 +24,7 @@ public sealed class InvokeDbaDbMirrorFailoverCommand : DbaBaseCmdlet
 
     /// <summary>The mirrored databases to fail over to their mirror partners.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>Database objects piped from Get-DbaDatabase.</summary>

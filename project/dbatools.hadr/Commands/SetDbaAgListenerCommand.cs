@@ -24,10 +24,12 @@ public sealed class SetDbaAgListenerCommand : DbaBaseCmdlet
 
     /// <summary>The availability group or groups whose listener is being changed.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? AvailabilityGroup { get; set; }
 
     /// <summary>The listener or listeners to act on.</summary>
     [Parameter(Position = 3)]
+    [PsStringArrayCast]
     public string[]? Listener { get; set; }
 
     /// <summary>The new port number.</summary>

@@ -36,21 +36,25 @@ public sealed partial class NewDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>The name of the availability group.</summary>
     [Parameter(Mandatory = true, Position = 4)]
+    [PsStringCast]
     public string? Name { get; set; }
 
     /// <summary>The cluster type backing the availability group.</summary>
     [Parameter(Position = 5)]
     [ValidateSet("Wsfc", "External", "None")]
+    [PsStringCast]
     public string ClusterType { get; set; } = ConfigValueOrFallback("AvailabilityGroups.Default.ClusterType", "Wsfc");
 
     /// <summary>Which replica backups are preferred to run on.</summary>
     [Parameter(Position = 6)]
     [ValidateSet("None", "Primary", "Secondary", "SecondaryOnly")]
+    [PsStringCast]
     public string AutomatedBackupPreference { get; set; } = "Secondary";
 
     /// <summary>The failure condition level that triggers automatic failover.</summary>
     [Parameter(Position = 7)]
     [ValidateSet("OnAnyQualifiedFailureCondition", "OnCriticalServerErrors", "OnModerateServerErrors", "OnServerDown", "OnServerUnresponsive")]
+    [PsStringCast]
     public string FailureConditionLevel { get; set; } = ConfigValueOrFallback("AvailabilityGroups.Default.FailureConditionLevel", "OnCriticalServerErrors");
 
     /// <summary>Health check timeout in milliseconds.</summary>
@@ -59,6 +63,7 @@ public sealed partial class NewDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>The databases to add to the availability group.</summary>
     [Parameter(Position = 9)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>Network share readable by every replica, used to stage seeding backups.</summary>
@@ -68,11 +73,13 @@ public sealed partial class NewDbaAvailabilityGroupCommand : DbaBaseCmdlet
     /// <summary>The replica availability mode.</summary>
     [Parameter(Position = 11)]
     [ValidateSet("AsynchronousCommit", "SynchronousCommit")]
+    [PsStringCast]
     public string AvailabilityMode { get; set; } = "SynchronousCommit";
 
     /// <summary>The replica failover mode.</summary>
     [Parameter(Position = 12)]
     [ValidateSet("Automatic", "Manual", "External")]
+    [PsStringCast]
     public string FailoverMode { get; set; } = "Automatic";
 
     /// <summary>The replica backup priority.</summary>
@@ -82,16 +89,19 @@ public sealed partial class NewDbaAvailabilityGroupCommand : DbaBaseCmdlet
     /// <summary>Connection access allowed while the replica is primary.</summary>
     [Parameter(Position = 14)]
     [ValidateSet("AllowAllConnections", "AllowReadWriteConnections")]
+    [PsStringCast]
     public string ConnectionModeInPrimaryRole { get; set; } = "AllowAllConnections";
 
     /// <summary>Connection access allowed while the replica is secondary.</summary>
     [Parameter(Position = 15)]
     [ValidateSet("AllowNoConnections", "AllowReadIntentConnectionsOnly", "AllowAllConnections", "No", "Read-intent only", "Yes")]
+    [PsStringCast]
     public string ConnectionModeInSecondaryRole { get; set; } = ConfigValueOrFallback("AvailabilityGroups.Default.ConnectionModeInSecondaryRole", "AllowNoConnections");
 
     /// <summary>How the secondary databases are seeded.</summary>
     [Parameter(Position = 16)]
     [ValidateSet("Automatic", "Manual")]
+    [PsStringCast]
     public string SeedingMode { get; set; } = "Manual";
 
     /// <summary>The mirroring endpoint name.</summary>
@@ -100,6 +110,7 @@ public sealed partial class NewDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>Explicit endpoint URLs, one per replica (primary first).</summary>
     [Parameter(Position = 18)]
+    [PsStringArrayCast]
     public string[]? EndpointUrl { get; set; }
 
     /// <summary>Certificate used to authenticate the mirroring endpoint.</summary>

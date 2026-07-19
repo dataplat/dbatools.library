@@ -24,11 +24,13 @@ public sealed class JoinDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>The availability groups to join.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? AvailabilityGroup { get; set; }
 
     /// <summary>The cluster type of the availability group.</summary>
     [Parameter(Position = 3)]
     [ValidateSet("External", "Wsfc", "None")]
+    [PsStringCast]
     public string? ClusterType { get; set; }
 
     /// <summary>Availability group objects piped from Get-DbaAvailabilityGroup.</summary>

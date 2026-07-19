@@ -24,6 +24,7 @@ public sealed class RemoveDbaAgListenerCommand : DbaBaseCmdlet
 
     /// <summary>The listener or listeners to remove.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Listener { get; set; }
 
     /// <summary>The availability group or groups to remove the listeners from.</summary>

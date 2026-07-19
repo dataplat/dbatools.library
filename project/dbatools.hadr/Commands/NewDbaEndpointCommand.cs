@@ -30,31 +30,37 @@ public sealed class NewDbaEndpointCommand : DbaBaseCmdlet
     /// <summary>The endpoint type.</summary>
     [Parameter(Position = 3)]
     [ValidateSet("DatabaseMirroring", "ServiceBroker", "Soap", "TSql")]
+    [PsStringCast]
     public string Type { get; set; } = "DatabaseMirroring";
 
     /// <summary>The endpoint protocol.</summary>
     [Parameter(Position = 4)]
     [ValidateSet("Tcp", "NamedPipes", "Http", "Via", "SharedMemory")]
+    [PsStringCast]
     public string Protocol { get; set; } = "Tcp";
 
     /// <summary>The mirroring role served by the endpoint.</summary>
     [Parameter(Position = 5)]
     [ValidateSet("All", "None", "Partner", "Witness")]
+    [PsStringCast]
     public string Role { get; set; } = "All";
 
     /// <summary>Endpoint encryption requirement.</summary>
     [Parameter(Position = 6)]
     [ValidateSet("Disabled", "Required", "Supported")]
+    [PsStringCast]
     public string EndpointEncryption { get; set; } = "Required";
 
     /// <summary>Endpoint encryption algorithm.</summary>
     [Parameter(Position = 7)]
     [ValidateSet("Aes", "AesRC4", "None", "RC4", "RC4Aes")]
+    [PsStringCast]
     public string EncryptionAlgorithm { get; set; } = "Aes";
 
     /// <summary>The endpoint authentication order.</summary>
     [Parameter(Position = 8)]
     [ValidateSet("Certificate", "CertificateKerberos", "CertificateNegotiate", "CertificateNtlm", "Kerberos", "KerberosCertificate", "Negotiate", "NegotiateCertificate", "Ntlm", "NtlmCertificate")]
+    [PsStringCast]
     public string? AuthenticationOrder { get; set; }
 
     /// <summary>Certificate used to authenticate the endpoint.</summary>
