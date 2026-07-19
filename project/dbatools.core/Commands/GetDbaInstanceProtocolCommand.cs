@@ -109,7 +109,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $Server = Resolve-DbaNetworkName -ComputerName $Computer -Credential $Credential
         if ($Server.FullComputerName) {
             $Computer = $server.FullComputerName
-            Write-Message -Level Verbose -Message "Getting SQL Server namespace on $computer"
+            Write-Message -Level Verbose -Message "Getting SQL Server namespace on $computer" -FunctionName Get-DbaInstanceProtocol -ModuleName "dbatools"
 
             $cmNamespace = 'root\Microsoft\SQLServer'
             try {
@@ -121,14 +121,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     ErrorAction  = 'Stop'
                 }
                 $namespaces = Get-DbaCmObject @cmGetInstanceParams
-                Write-Message -Level Verbose -Message "Successfully retrieved namespaces from $Computer. Total found: $($namespaces.Count)"
+                Write-Message -Level Verbose -Message "Successfully retrieved namespaces from $Computer. Total found: $($namespaces.Count)" -FunctionName Get-DbaInstanceProtocol -ModuleName "dbatools"
             } catch {
                 Stop-Function -Message "Failed to retrieve ComputerManagement namespace" -Category ConnectionError -ErrorRecord $_ -Target $Computer -Continue -FunctionName Get-DbaInstanceProtocol
             }
             if ($namespaces) {
                 try {
                     $instance = $namespaces | Where-Object { (Get-DbaCmObject -ComputerName $Computer -Credential $Credential -Namespace "$cmNamespace\$($_.Name)" -ClassName ServerNetworkProtocol -ErrorAction Stop).count -gt 0 } | Sort-Object Name -Descending | Select-Object -First 1
-                    Write-Message -Level Verbose -Message "Successfully retrieved ServerNetworkProtocol data from $Computer"
+                    Write-Message -Level Verbose -Message "Successfully retrieved ServerNetworkProtocol data from $Computer" -FunctionName Get-DbaInstanceProtocol -ModuleName "dbatools"
                 } catch {
                     Stop-Function -Message "Failed to retrieve Network Protcol data" -ErrorRecord $_ -Target $Computer -Continue -FunctionName Get-DbaInstanceProtocol
                 }
@@ -137,7 +137,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
             if ($instance.Name) {
                 $instanceName = $instance.Name
-                Write-Message -Level Verbose -Message "Getting Cim class ServerNetworkProtocol in Namespace $instanceName on $Computer"
+                Write-Message -Level Verbose -Message "Getting Cim class ServerNetworkProtocol in Namespace $instanceName on $Computer" -FunctionName Get-DbaInstanceProtocol -ModuleName "dbatools"
                 try {
                     $prot = Get-DbaCmObject -ComputerName $Computer -Credential $Credential -Namespace "$cmNamespace\$($instanceName)" -ClassName ServerNetworkProtocol -ErrorAction Stop
 
@@ -145,13 +145,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $prot | Add-Member -Force -MemberType ScriptMethod -Name Disable -Value { Invoke-CimMethod -MethodName SetDisable -InputObject $this }
                     foreach ($protocol in $prot) { Select-DefaultView -InputObject $protocol -Property 'PSComputerName as ComputerName', 'InstanceName', 'ProtocolDisplayName as DisplayName', 'ProtocolName as Name', 'MultiIpConfigurationSupport as MultiIP', 'Enabled as IsEnabled' }
                 } catch {
-                    Write-Message -Level Warning -Message "Issue gathering ServerNetworkProtocol data on $Computer"
+                    Write-Message -Level Warning -Message "Issue gathering ServerNetworkProtocol data on $Computer" -FunctionName Get-DbaInstanceProtocol -ModuleName "dbatools"
                 }
             } else {
-                Write-Message -Level Warning -Message "No ComputerManagement Namespace on $Computer. Please note that this function is available from SQL 2005 up."
+                Write-Message -Level Warning -Message "No ComputerManagement Namespace on $Computer. Please note that this function is available from SQL 2005 up." -FunctionName Get-DbaInstanceProtocol -ModuleName "dbatools"
             }
         } else {
-            Write-Message -Level Warning -Message "Failed to connect to $Computer"
+            Write-Message -Level Warning -Message "Failed to connect to $Computer" -FunctionName Get-DbaInstanceProtocol -ModuleName "dbatools"
         }
     }
 } $ComputerName $Credential $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

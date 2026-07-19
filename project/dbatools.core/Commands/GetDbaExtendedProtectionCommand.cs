@@ -108,11 +108,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+    # ATTRIBUTION SHIM (the W3-084 Get-PSCallStack class): Test-ElevationRequirement stamps
+    # its Stop-Function with (Get-PSCallStack)[1].Command - the CALLER frame. Called bare
+    # from this hop that frame is the scriptblock => [<ScriptBlock>] attribution. The named
+    # wrapper restores the source's own frame (same shim as the Set sibling); -Continue flow
+    # control unwinds through the wrapper to the foreach exactly as through the source frame.
+    function Get-DbaExtendedProtection {
+        param($__splat)
+        Test-ElevationRequirement @__splat
+    }
+
 
     foreach ($instance in $SqlInstance) {
-        Write-Message -Level VeryVerbose -Message "Processing $instance." -Target $instance
+        Write-Message -Level VeryVerbose -Message "Processing $instance." -FunctionName Get-DbaExtendedProtection -ModuleName "dbatools" -Target $instance
         if ($instance.IsLocalHost) {
-            $null = Test-ElevationRequirement -ComputerName $instance -Continue
+            $null = Get-DbaExtendedProtection @{ ComputerName = $instance; Continue = $true }
         }
 
         try {
@@ -154,10 +164,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if ([System.String]::IsNullOrEmpty($vsname)) { $vsname = $instance }
 
-        Write-Message -Level Verbose -Message "Regroot: $regRoot" -Target $instance
-        Write-Message -Level Verbose -Message "ServiceAcct: $serviceAccount" -Target $instance
-        Write-Message -Level Verbose -Message "InstanceName: $instanceName" -Target $instance
-        Write-Message -Level Verbose -Message "VSNAME: $vsname" -Target $instance
+        Write-Message -Level Verbose -Message "Regroot: $regRoot" -FunctionName Get-DbaExtendedProtection -ModuleName "dbatools" -Target $instance
+        Write-Message -Level Verbose -Message "ServiceAcct: $serviceAccount" -FunctionName Get-DbaExtendedProtection -ModuleName "dbatools" -Target $instance
+        Write-Message -Level Verbose -Message "InstanceName: $instanceName" -FunctionName Get-DbaExtendedProtection -ModuleName "dbatools" -Target $instance
+        Write-Message -Level Verbose -Message "VSNAME: $vsname" -FunctionName Get-DbaExtendedProtection -ModuleName "dbatools" -Target $instance
 
         $scriptblock = {
             $regPath = "Registry::HKEY_LOCAL_MACHINE\$($args[0])\MSSQLServer\SuperSocketNetLib"
