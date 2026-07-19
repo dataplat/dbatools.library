@@ -125,23 +125,27 @@ public sealed class ExportDbaServerRoleCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, _batches.ToArray(), ScriptingOptionsObject, ServerRole, ExcludeServerRole,
             Path, FilePath, BatchSeparator, Encoding,
             ExcludeFixedRole.ToBool(), IncludeRoleMember.ToBool(), Passthru.ToBool(), NoClobber.ToBool(),
             Append.ToBool(), NoPrefix.ToBool(), EnableException.ToBool(),
             TestBound(nameof(Path)), TestBound(nameof(BatchSeparator)), TestBound(nameof(ScriptingOptionsObject)),
             BoundValue("Path"), BoundValue("FilePath"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundValue(string name)

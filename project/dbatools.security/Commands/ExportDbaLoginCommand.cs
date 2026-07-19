@@ -147,7 +147,20 @@ public sealed class ExportDbaLoginCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, _batches.ToArray(), Login, ExcludeLogin, Database,
             DefaultDatabase, Path, FilePath, Encoding, BatchSeparator, DestinationVersion,
             ExcludeJobs.ToBool(), ExcludeDatabase.ToBool(), ExcludePassword.ToBool(), NoClobber.ToBool(),
@@ -155,16 +168,7 @@ public sealed class ExportDbaLoginCommand : DbaBaseCmdlet
             IncludeRolePermissions.ToBool(), EnableException.ToBool(), this,
             TestBound(nameof(Path)), TestBound(nameof(BatchSeparator)), BoundValue("Path"), BoundValue("FilePath"),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundValue(string name)
