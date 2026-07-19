@@ -68,7 +68,11 @@ public sealed class TestDbaAgPolicyStateCommand : DbaBaseCmdlet
         // [string[]] and its value flows to Get-DbaAvailabilityGroup at :104, so `-AvailabilityGroup
         // @($null)` would diverge (<null> compiled vs <''> function) until hadr gains PsCompat and
         // this parameter gets [PsStringArrayCast]. Read-only Test-* so the DEF-001 buffered-output
-        // class is far weaker here (no terminating throw between per-record emits in the body).
+        // class is far weaker here (codex precision: not "no terminating throw" categorically - a
+        // later $ag.Refresh()/SMO member CAN throw under -ErrorAction Stop after earlier emits - but
+        // there is no explicit post-emit throw or non-continue Stop-Function path, and a read-only
+        // command can only lose partial report output, never conceal a completed mutation, so the
+        // established read-only accept-and-link disposition applies).
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, AvailabilityGroup, InputObject,
             EnableException.ToBool(),
