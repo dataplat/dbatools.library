@@ -218,7 +218,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
     param($__carriedSequences, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-    $sequences = @( $__carriedSequences )
+    $sequences = @( )
+    if ($null -ne $__carriedSequences) { $sequences = @( $__carriedSequences ) }
 
         # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaDbSequence.
         foreach ($sequenceItem in $sequences) {

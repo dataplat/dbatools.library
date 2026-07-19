@@ -213,7 +213,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
     param($__carriedViews, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-    $views = @( $__carriedViews )
+    $views = @( )
+    if ($null -ne $__carriedViews) { $views = @( $__carriedViews ) }
 
         # We have to delete in the end block to prevent "Collection was modified; enumeration operation may not execute." if directly piped from Get-DbaDbView.
         foreach ($viewItem in $views) {
