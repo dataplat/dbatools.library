@@ -171,7 +171,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($wait) {
                 while ($currentjob.CurrentRunStatus -ne 'Idle') {
-                    Write-Message -Level Verbose -Message "$currentjob is $($currentjob.CurrentRunStatus)" -FunctionName Stop-DbaAgentJob
+                    Write-Message -Level Verbose -Message "$currentjob is $($currentjob.CurrentRunStatus)" -FunctionName Stop-DbaAgentJob -ModuleName "dbatools"
                     Start-Sleep -Seconds 3
                     $currentjob.Refresh()
                 }

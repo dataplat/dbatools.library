@@ -262,7 +262,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the start time
             if (-not $SaturdayStartTime -and $Force) {
                 $SaturdayStartTime = '000000'
-                Write-Message -Message "Saturday Start time was not set. Force is being used. Setting it to $SaturdayStartTime" -Level Verbose -FunctionName New-DbaAgentOperator
+                Write-Message -Message "Saturday Start time was not set. Force is being used. Setting it to $SaturdayStartTime" -Level Verbose -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
             } elseif (-not $SaturdayStartTime) {
                 Stop-Function -Message "Please enter Saturday start time or use -Force to use defaults." -FunctionName New-DbaAgentOperator
                 return
@@ -274,7 +274,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the end time
             if (-not $SaturdayEndTime -and $Force) {
                 $SaturdayEndTime = '235959'
-                Write-Message -Message "Saturday End time was not set. Force is being used. Setting it to $SaturdayEndTime" -Level Verbose -FunctionName New-DbaAgentOperator
+                Write-Message -Message "Saturday End time was not set. Force is being used. Setting it to $SaturdayEndTime" -Level Verbose -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
             } elseif (-not $SaturdayEndTime) {
                 Stop-Function -Message "Please enter a Saturday end time or use -Force to use defaults." -FunctionName New-DbaAgentOperator
                 return
@@ -288,7 +288,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the start time
             if (-not $SundayStartTime -and $Force) {
                 $SundayStartTime = '000000'
-                Write-Message -Message "Sunday Start time was not set. Force is being used. Setting it to $SundayStartTime" -Level Verbose -FunctionName New-DbaAgentOperator
+                Write-Message -Message "Sunday Start time was not set. Force is being used. Setting it to $SundayStartTime" -Level Verbose -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
             } elseif (-not $SundayStartTime) {
                 Stop-Function -Message "Please enter a Sunday start time or use -Force to use defaults." -FunctionName New-DbaAgentOperator
                 return
@@ -300,7 +300,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the end time
             if (-not $SundayEndTime -and $Force) {
                 $SundayEndTime = '235959'
-                Write-Message -Message "Sunday End time was not set. Force is being used. Setting it to $SundayEndTime" -Level Verbose -FunctionName New-DbaAgentOperator
+                Write-Message -Message "Sunday End time was not set. Force is being used. Setting it to $SundayEndTime" -Level Verbose -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
             } elseif (-not $SundayEndTime) {
                 Stop-Function -Message "Please enter a Sunday End Time or use -Force to use defaults." -FunctionName New-DbaAgentOperator
                 return
@@ -314,7 +314,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the start time
             if (-not $WeekdayStartTime -and $Force) {
                 $WeekdayStartTime = '000000'
-                Write-Message -Message "Weekday Start time was not set. Force is being used. Setting it to $WeekdayStartTime" -Level Verbose -FunctionName New-DbaAgentOperator
+                Write-Message -Message "Weekday Start time was not set. Force is being used. Setting it to $WeekdayStartTime" -Level Verbose -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
             } elseif (-not $WeekdayStartTime) {
                 Stop-Function -Message "Please enter Weekday Start Time or use -Force to use defaults." -FunctionName New-DbaAgentOperator
                 return
@@ -326,7 +326,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Check the end time
             if (-not $WeekdayEndTime -and $Force) {
                 $WeekdayEndTime = '235959'
-                Write-Message -Message "Weekday End time was not set. Force is being used. Setting it to $WeekdayEndTime" -Level Verbose -FunctionName New-DbaAgentOperator
+                Write-Message -Message "Weekday End time was not set. Force is being used. Setting it to $WeekdayEndTime" -Level Verbose -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
             } elseif (-not $WeekdayEndTime) {
                 Stop-Function -Message "Please enter a Weekday End Time or use -Force to use defaults." -FunctionName New-DbaAgentOperator
                 return
@@ -377,18 +377,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ((Get-DbaAgentOperator -SqlInstance $server -Operator $Operator).Count -ne 0) {
                 if ($force -eq $false) {
                     if ($__gate.ShouldProcess($server, "Operator $operator exists at $server. Use -Force to drop and and create it.")) {
-                        Write-Message -Level Verbose -Message "Operator $operator exists at $server. Use -Force to drop and create." -FunctionName New-DbaAgentOperator
+                        Write-Message -Level Verbose -Message "Operator $operator exists at $server. Use -Force to drop and create." -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
                     }
                     continue
                 } else {
                     if ($failsafe.FailsafeOperator -eq $operator -and $IsFailsafeOperator) {
-                        Write-Message -Level Verbose -Message "$operator is the failsafe operator. Skipping drop." -FunctionName New-DbaAgentOperator
+                        Write-Message -Level Verbose -Message "$operator is the failsafe operator. Skipping drop." -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
                         continue
                     }
 
                     if ($__gate.ShouldProcess($server, "Dropping operator $operator")) {
                         try {
-                            Write-Message -Level Verbose -Message "Dropping Operator $operator" -FunctionName New-DbaAgentOperator
+                            Write-Message -Level Verbose -Message "Dropping Operator $operator" -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
                             $server.JobServer.Operators[$operator].Drop()
                         } catch {
                             Stop-Function -Message "Issue dropping operator" -Category InvalidOperation -ErrorRecord $_ -Target $server -Continue -FunctionName New-DbaAgentOperator
@@ -460,7 +460,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $server.JobServer.AlertSystem.Alter()
                     }
 
-                    Write-Message -Level Verbose -Message "Creating Operator $operator" -FunctionName New-DbaAgentOperator
+                    Write-Message -Level Verbose -Message "Creating Operator $operator" -FunctionName New-DbaAgentOperator -ModuleName "dbatools"
                     Get-DbaAgentOperator -SqlInstance $server -Operator $Operator
                 } catch {
                     Stop-Function -Message "Issue creating operator." -Category InvalidOperation -ErrorRecord $_ -Target $server -FunctionName New-DbaAgentOperator

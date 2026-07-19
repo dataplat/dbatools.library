@@ -184,7 +184,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if (Test-FunctionInterrupt) { return }
 
     foreach ($instance in $SqlInstance) {
-        Write-Message -Level Verbose -Message "Running Scan on: $instance" -FunctionName Find-DbaAgentJob
+        Write-Message -Level Verbose -Message "Running Scan on: $instance" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
 
         try {
             $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
@@ -195,73 +195,73 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $output = @()
 
         if ($JobName) {
-            Write-Message -Level Verbose -Message "Retrieving jobs by their name." -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Retrieving jobs by their name." -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $jobs = Get-JobList -SqlInstance $server -JobFilter $JobName
             $output = $jobs
         }
 
         if ($StepName) {
-            Write-Message -Level Verbose -Message "Retrieving jobs by their step names." -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Retrieving jobs by their step names." -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $jobs = Get-JobList -SqlInstance $server -StepFilter $StepName
             $output = $jobs
         }
 
         if ( -not ($JobName -or $StepName)) {
-            Write-Message -Level Verbose -Message "Retrieving all jobs" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Retrieving all jobs" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $jobs = Get-JobList -SqlInstance $server
             $output = $jobs
         }
 
         if ($Category) {
-            Write-Message -Level Verbose -Message "Finding job/s that have the specified category defined" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Finding job/s that have the specified category defined" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $jobs | Where-Object { $Category -contains $_.Category }
         }
 
         if ($IsFailed) {
-            Write-Message -Level Verbose -Message "Checking for failed jobs." -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Checking for failed jobs." -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $jobs | Where-Object LastRunOutcome -eq "Failed"
         }
 
         if ($LastUsed) {
             $DaysBack = $LastUsed * -1
             $SinceDate = (Get-Date).AddDays($DaysBack)
-            Write-Message -Level Verbose -Message "Finding job/s not ran in last $LastUsed days" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Finding job/s not ran in last $LastUsed days" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $jobs | Where-Object { $_.LastRunDate -le $SinceDate }
         }
 
         if ($IsDisabled) {
-            Write-Message -Level Verbose -Message "Finding job/s that are disabled" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Finding job/s that are disabled" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $jobs | Where-Object IsEnabled -eq $false
         }
 
         if ($IsNotScheduled) {
-            Write-Message -Level Verbose -Message "Finding job/s that have no schedule defined" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Finding job/s that have no schedule defined" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $jobs | Where-Object HasSchedule -eq $false
         }
         if ($IsNoEmailNotification) {
-            Write-Message -Level Verbose -Message "Finding job/s that have no email operator defined" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Finding job/s that have no email operator defined" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $jobs | Where-Object { [string]::IsNullOrEmpty($_.OperatorToEmail) -eq $true }
         }
 
         if ($Owner) {
-            Write-Message -Level Verbose -Message "Finding job/s with owner critera" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Finding job/s with owner critera" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             if ($Owner -match "-") {
                 $OwnerMatch = $Owner -replace "-", ""
-                Write-Message -Level Verbose -Message "Checking for jobs that NOT owned by: $OwnerMatch" -FunctionName Find-DbaAgentJob
+                Write-Message -Level Verbose -Message "Checking for jobs that NOT owned by: $OwnerMatch" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
                 $output = $jobs | Where-Object { $OwnerMatch -notcontains $_.OwnerLoginName }
             } else {
-                Write-Message -Level Verbose -Message "Checking for jobs that are owned by: $owner" -FunctionName Find-DbaAgentJob
+                Write-Message -Level Verbose -Message "Checking for jobs that are owned by: $owner" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
                 $output = $jobs | Where-Object { $Owner -contains $_.OwnerLoginName }
             }
         }
 
         if ($ExcludeJobName) {
-            Write-Message -Level Verbose -Message "Excluding job/s based on Exclude" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Excluding job/s based on Exclude" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $output | Where-Object { $ExcludeJobName -notcontains $_.Name }
         }
 
         if ($Since) {
-            Write-Message -Level Verbose -Message "Getting only jobs whose LastRunDate is greater than or equal to $since" -FunctionName Find-DbaAgentJob
+            Write-Message -Level Verbose -Message "Getting only jobs whose LastRunDate is greater than or equal to $since" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $output | Where-Object { $_.LastRunDate -ge $since }
         }
 

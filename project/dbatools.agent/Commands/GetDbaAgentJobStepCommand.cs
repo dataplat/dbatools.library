@@ -155,7 +155,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } catch {
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaAgentJobStep
         }
-        Write-Message -Level Verbose -Message "Collecting jobs on $instance" -FunctionName Get-DbaAgentJobStep
+        Write-Message -Level Verbose -Message "Collecting jobs on $instance" -FunctionName Get-DbaAgentJobStep -ModuleName "dbatools"
         $InputObject += $server.JobServer.Jobs
     }
     [pscustomobject]@{
@@ -186,7 +186,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($ExcludeDisabledJobs) {
         $InputObject = $InputObject | Where-Object IsEnabled -eq $true
     }
-    Write-Message -Level Verbose -Message "Collecting job steps on ($server.Name)" -FunctionName Get-DbaAgentJobStep
+    Write-Message -Level Verbose -Message "Collecting job steps on ($server.Name)" -FunctionName Get-DbaAgentJobStep -ModuleName "dbatools"
     foreach ($agentJobStep in $InputObject.jobsteps) {
         Add-Member -Force -InputObject $agentJobStep -MemberType NoteProperty -Name ComputerName -value $agentJobStep.Parent.Parent.Parent.ComputerName
         Add-Member -Force -InputObject $agentJobStep -MemberType NoteProperty -Name InstanceName -value $agentJobStep.Parent.Parent.Parent.ServiceName

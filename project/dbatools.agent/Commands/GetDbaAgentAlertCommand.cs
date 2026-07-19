@@ -117,8 +117,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaAgentAlert
         }
 
-        Write-Message -Level Debug -Message "Getting Edition from $server" -FunctionName Get-DbaAgentAlert
-        Write-Message -Level Debug -Message "$server is a $($server.Edition)" -FunctionName Get-DbaAgentAlert
+        Write-Message -Level Debug -Message "Getting Edition from $server" -FunctionName Get-DbaAgentAlert -ModuleName "dbatools"
+        Write-Message -Level Debug -Message "$server is a $($server.Edition)" -FunctionName Get-DbaAgentAlert -ModuleName "dbatools"
 
         if ($server.Edition -like 'Express*') {
             Stop-Function -Message "There is no SQL Agent on $server, it's a $($server.Edition)" -Continue -FunctionName Get-DbaAgentAlert

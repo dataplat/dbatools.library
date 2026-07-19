@@ -334,7 +334,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if (-not $Force -and (-not $currentJobStep)) {
                     Stop-Function -Message "Step '$StepName' doesn't exist for job $j on $server. If you would like to add a new job step use -Force" -Target $server -Continue -FunctionName Set-DbaAgentJobStep
                 } elseif ($Force -and (-not $currentJobStep)) {
-                    Write-Message -Message "Adding job step $StepName to $($currentJob.Name) on $server" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Adding job step $StepName to $($currentJob.Name) on $server" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
 
                     try {
                         # create the job step as a placeholder here and then the other fields will be updated below depending on what the caller specified
@@ -347,7 +347,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $jobStep = $currentJobStep
                 }
 
-                Write-Message -Message "Modifying job '$j' on $server" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                Write-Message -Message "Modifying job '$j' on $server" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
 
                 #region job step options
                 # Setting the options for the job step
@@ -358,49 +358,49 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ($Subsystem) {
-                    Write-Message -Message "Setting job step subsystem to $Subsystem" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step subsystem to $Subsystem" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.Subsystem = $Subsystem
                 }
 
                 if ($SubsystemServer) {
-                    Write-Message -Message "Setting job step subsystem server to $SubsystemServer" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step subsystem server to $SubsystemServer" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.Server = $SubsystemServer
                 }
 
                 if ($Command) {
-                    Write-Message -Message "Setting job step command to $Command" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step command to $Command" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.Command = $Command
                 }
 
                 if ($CmdExecSuccessCode) {
-                    Write-Message -Message "Setting job step command exec success code to $CmdExecSuccessCode" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step command exec success code to $CmdExecSuccessCode" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.CommandExecutionSuccessCode = $CmdExecSuccessCode
                 }
 
                 if ($OnSuccessAction) {
-                    Write-Message -Message "Setting job step success action to $OnSuccessAction" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step success action to $OnSuccessAction" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.OnSuccessAction = $OnSuccessAction
                 }
 
                 if ($OnSuccessStepId) {
-                    Write-Message -Message "Setting job step success step id to $OnSuccessStepId" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step success step id to $OnSuccessStepId" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.OnSuccessStep = $OnSuccessStepId
                 }
 
                 if ($OnFailAction) {
-                    Write-Message -Message "Setting job step fail action to $OnFailAction" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step fail action to $OnFailAction" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.OnFailAction = $OnFailAction
                 }
 
                 if ($OnFailStepId) {
-                    Write-Message -Message "Setting job step fail step id to $OnFailStepId" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step fail step id to $OnFailStepId" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.OnFailStep = $OnFailStepId
                 }
 
                 if ($Database) {
                     # Check if the database is present on the server
                     if ($server.Databases.Name -contains $Database) {
-                        Write-Message -Message "Setting job step database name to $Database" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                        Write-Message -Message "Setting job step database name to $Database" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                         $jobStep.DatabaseName = $Database
                     } else {
                         Stop-Function -Message "The database $Database is not present on $server." -Target $server -Continue -FunctionName Set-DbaAgentJobStep
@@ -410,7 +410,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if (($DatabaseUser) -and ($Database)) {
                     # Check if the username is present in the database
                     if ($Server.Databases[$jobStep.DatabaseName].Users.Name -contains $DatabaseUser) {
-                        Write-Message -Message "Setting job step database username to $DatabaseUser" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                        Write-Message -Message "Setting job step database username to $DatabaseUser" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                         $jobStep.DatabaseUserName = $DatabaseUser
                     } else {
                         Stop-Function -Message "The database user '$DatabaseUser' is not present in the database $($jobStep.DatabaseName) on $server." -Target $server -Continue -FunctionName Set-DbaAgentJobStep
@@ -418,28 +418,28 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ($__bound.ContainsKey('RetryAttempts')) {
-                    Write-Message -Message "Setting job step retry attempts to $RetryAttempts" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step retry attempts to $RetryAttempts" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.RetryAttempts = $RetryAttempts
                 }
 
                 if ($__bound.ContainsKey('RetryInterval')) {
-                    Write-Message -Message "Setting job step retry interval to $RetryInterval" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step retry interval to $RetryInterval" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.RetryInterval = $RetryInterval
                 }
 
                 if ($OutputFileName) {
-                    Write-Message -Message "Setting job step output file name to $OutputFileName" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step output file name to $OutputFileName" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.OutputFileName = $OutputFileName
                 }
 
                 if ($__bound.ContainsKey('ProxyName')) {
                     if ([string]::IsNullOrEmpty($ProxyName)) {
                         # Remove proxy from job step
-                        Write-Message -Message "Removing proxy from job step" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                        Write-Message -Message "Removing proxy from job step" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                         $jobStep.ProxyName = ''
                     } elseif ($Server.JobServer.ProxyAccounts.Name -contains $ProxyName) {
                         # Set or update proxy name
-                        Write-Message -Message "Setting job step proxy name to $ProxyName" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                        Write-Message -Message "Setting job step proxy name to $ProxyName" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                         $jobStep.ProxyName = $ProxyName
                     } else {
                         Stop-Function -Message "The proxy name $ProxyName doesn't exist on instance $server." -Target $server -Continue -FunctionName Set-DbaAgentJobStep
@@ -447,7 +447,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ($Flag.Count -ge 1) {
-                    Write-Message -Message "Setting job step flag(s) to $($Flags -join ',')" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                    Write-Message -Message "Setting job step flag(s) to $($Flags -join ',')" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
                     $jobStep.JobStepFlags = $Flag
                 }
                 #region job step options
@@ -455,7 +455,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 # Execute
                 if ($__gate.ShouldProcess($server, "Committing changes for job step '$StepName' for job '$j'")) {
                     try {
-                        Write-Message -Message "Committing changes for '$StepName' for job '$j' on $server" -Level Verbose -FunctionName Set-DbaAgentJobStep
+                        Write-Message -Message "Committing changes for '$StepName' for job '$j' on $server" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
 
                         # Change the job step
                         $jobStep.Alter()
@@ -489,7 +489,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding()]
     param($EnableException)
     if (Test-FunctionInterrupt) { return }
-    Write-Message -Message "Finished changing job step(s)" -Level Verbose -FunctionName Set-DbaAgentJobStep
+    Write-Message -Message "Finished changing job step(s)" -Level Verbose -FunctionName Set-DbaAgentJobStep -ModuleName "dbatools"
 } $EnableException @__commonParameters 3>&1 2>&1
 """;
 }

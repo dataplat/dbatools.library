@@ -185,7 +185,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $sql = "$sql $where"
         }
 
-        Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbMailHistory
+        Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbMailHistory -ModuleName "dbatools"
 
         try {
             $server.Query($sql) | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, Profile, Recipients, CopyRecipients, BlindCopyRecipients, Subject, Importance, Sensitivity, FileAttachments, AttachmentEncoding, SendRequestDate, SendRequestUser, SentStatus, SentDate

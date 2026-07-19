@@ -248,7 +248,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # Get the job category object
                     $currentCategory = $server.JobServer.JobCategories[$cat]
 
-                    Write-Message -Message "Changing job category $cat" -Level Verbose -FunctionName Set-DbaAgentJobCategory
+                    Write-Message -Message "Changing job category $cat" -Level Verbose -FunctionName Set-DbaAgentJobCategory -ModuleName "dbatools"
 
                     # Get and set the original and new values
                     $newCategoryName = $null
@@ -281,7 +281,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 & $__dbatoolsModule {
     [CmdletBinding()]
     param($EnableException)
-    Write-Message -Message "Finished changing job category." -Level Verbose -FunctionName Set-DbaAgentJobCategory
+    Write-Message -Message "Finished changing job category." -Level Verbose -FunctionName Set-DbaAgentJobCategory -ModuleName "dbatools"
 } $EnableException @__commonParameters 3>&1 2>&1
 """;
 }

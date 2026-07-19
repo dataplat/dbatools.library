@@ -220,13 +220,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         If ($__realCmdlet.ShouldProcess($server, "Starting job $currentjob")) {
             # Start the job
             $lastrun = $currentjob.LastRunDate
-            Write-Message -Level Verbose -Message "Last run date was $lastrun" -FunctionName Start-DbaAgentJob
+            Write-Message -Level Verbose -Message "Last run date was $lastrun" -FunctionName Start-DbaAgentJob -ModuleName "dbatools"
             if ($StepName) {
                 if ($currentjob.JobSteps.Name -contains $StepName) {
-                    Write-Message -Level Verbose -Message "Starting job [$currentjob] at step [$StepName]" -FunctionName Start-DbaAgentJob
+                    Write-Message -Level Verbose -Message "Starting job [$currentjob] at step [$StepName]" -FunctionName Start-DbaAgentJob -ModuleName "dbatools"
                     $null = $currentjob.Start($StepName)
                 } else {
-                    Write-Message -Level Verbose -Message "Job [$currentjob] does not contain step [$StepName]" -FunctionName Start-DbaAgentJob
+                    Write-Message -Level Verbose -Message "Job [$currentjob] does not contain step [$StepName]" -FunctionName Start-DbaAgentJob -ModuleName "dbatools"
                     continue
                 }
             } else {
@@ -241,10 +241,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $i = 0
             # Check if the status is Idle
             while (($currentjob.CurrentRunStatus -eq 'Idle' -and $i++ -lt 60)) {
-                Write-Message -Level Verbose -Message "Job $($currentjob.Name) status is $($currentjob.CurrentRunStatus)" -FunctionName Start-DbaAgentJob
-                Write-Message -Level Verbose -Message "Job $($currentjob.Name) last run date is $($currentjob.LastRunDate)" -FunctionName Start-DbaAgentJob
+                Write-Message -Level Verbose -Message "Job $($currentjob.Name) status is $($currentjob.CurrentRunStatus)" -FunctionName Start-DbaAgentJob -ModuleName "dbatools"
+                Write-Message -Level Verbose -Message "Job $($currentjob.Name) last run date is $($currentjob.LastRunDate)" -FunctionName Start-DbaAgentJob -ModuleName "dbatools"
 
-                Write-Message -Level Verbose -Message "Sleeping for $SleepPeriod ms and refreshing" -FunctionName Start-DbaAgentJob
+                Write-Message -Level Verbose -Message "Sleeping for $SleepPeriod ms and refreshing" -FunctionName Start-DbaAgentJob -ModuleName "dbatools"
                 Start-Sleep -Milliseconds $SleepPeriod
                 $currentjob.Refresh()
 
