@@ -133,7 +133,25 @@ public sealed partial class AddDbaAgReplicaCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w4003State"))
+            {
+                _state = sentinel["__w4003State"] as Hashtable;
+                return;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, Name, ClusterType, AvailabilityMode, FailoverMode,
             BackupPriority, ConnectionModeInPrimaryRole, ConnectionModeInSecondaryRole,
             SeedingMode, Endpoint, EndpointUrl, Passthru.ToBool(), ReadOnlyRoutingList,
@@ -141,22 +159,7 @@ public sealed partial class AddDbaAgReplicaCommand : DbaBaseCmdlet
             SessionTimeout, InputObject, EnableException.ToBool(), _state, this,
             BoundFlag("Name"),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            Hashtable? sentinel = item?.BaseObject as Hashtable;
-            if (sentinel is not null && sentinel.ContainsKey("__w4003State"))
-            {
-                _state = sentinel["__w4003State"] as Hashtable;
-                continue;
-            }
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private bool BoundFlag(string name)

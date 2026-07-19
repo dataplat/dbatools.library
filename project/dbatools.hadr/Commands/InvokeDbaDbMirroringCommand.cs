@@ -120,7 +120,25 @@ public sealed partial class InvokeDbaDbMirroringCommand : DbaBaseCmdlet
         // the source removes the key spelled 'Whatif', which a default (case-sensitive)
         // Hashtable would leave behind for the validation splat to reject.
         // Probe: migration/tools/Probe-W4041HashtableCaseComparer.ps1.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w4041State"))
+            {
+                _state = sentinel["__w4041State"] as Hashtable;
+                return;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             Primary, PrimarySqlCredential, Mirror, MirrorSqlCredential, Witness,
             WitnessSqlCredential, Database, EndpointEncryption, EncryptionAlgorithm,
             SharedPath, InputObject, UseLastBackup.ToBool(), Force.ToBool(),
@@ -129,22 +147,7 @@ public sealed partial class InvokeDbaDbMirroringCommand : DbaBaseCmdlet
             TestBound(nameof(Primary)), TestBound(nameof(Database)),
             TestBound(nameof(SharedPath)), TestBound(nameof(UseLastBackup)), _state,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            Hashtable? sentinel = item?.BaseObject as Hashtable;
-            if (sentinel is not null && sentinel.ContainsKey("__w4041State"))
-            {
-                _state = sentinel["__w4041State"] as Hashtable;
-                continue;
-            }
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
