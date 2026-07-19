@@ -17,7 +17,7 @@ namespace Dataplat.Dbatools.Commands;
 /// the inputs (seven Stop-Function -Continue guards), and MUTATES the local $RandomizerType/$Min/$Max that process
 /// consumes. Because process fires once, the begin block is PREPENDED (verbatim) into the process hop so those local
 /// mutations are in scope for process. The whole body (begin+process) is wrapped in
-/// oreach ($__continueGuard in @(1)) { ... } because the many Stop-Function -Continue guards (begin 212/214/216/222/228/235/239
+/// foreach ($__continueGuard in @(1)) { ... } because the many Stop-Function -Continue guards (begin 212/214/216/222/228/235/239
 /// and process 428/432/436) sit at non-loop locations, so their internal continue would otherwise escape the module
 /// scriptblock (the bare-continue-in-hop hazard); continue still targets the nearest enclosing loop, so genuinely
 /// loop-bound continues are unaffected. The verbatim if (Test-FunctionInterrupt) { return } is inert (all
