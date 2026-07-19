@@ -44,9 +44,11 @@ public sealed class TestDbaEndpointCommand : DbaBaseCmdlet
         // mutation is `$InputObject +=` at :102, targeting the ValueFromPipeline parameter, which
         // the binder RE-BINDS every record. Both detectors clean; and per the W4-067 DEF-012
         // lesson I checked the conditionally-assigned locals: $connect/$sslconnect are assigned on
-        // EVERY try/catch path before their read at the output object, $tcp/$ssl are per-iteration
-        // locals - so no cross-record leak to carry. $EnableException is passed for consistency
-        // though the body has no Stop-Function that reads it.
+        // EVERY try/catch path before their read at the output object, and $tcp/$ssl are safe not
+        // by lexical scope (they are process-scoped like the rest) but because every reachable read
+        // is assignment-dominated - a New-Object/assignment precedes it or the failure transfers to
+        // the catch (codex precision) - so no cross-record leak to carry. $EnableException is passed
+        // for consistency though the body has no Stop-Function that reads it.
         //
         // T8/DEF-002 exposure on Endpoint [string[]] -> Get-DbaEndpoint (shared-runtime, blocked on
         // A). DEF-001 is weak here (read-only; the TcpClient connect failures are caught locally).
