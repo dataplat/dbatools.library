@@ -34,6 +34,7 @@ public sealed class SetDbaEndpointCommand : DbaBaseCmdlet
     /// <summary>The endpoint type.</summary>
     [Parameter(Position = 4)]
     [ValidateSet("DatabaseMirroring", "ServiceBroker", "Soap", "TSql")]
+    [PsStringCast]
     public string? Type { get; set; }
 
     /// <summary>Modify all endpoints on the instance.</summary>

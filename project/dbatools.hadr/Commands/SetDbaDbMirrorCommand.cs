@@ -38,11 +38,13 @@ public sealed class SetDbaDbMirrorCommand : DbaBaseCmdlet
     /// <summary>The transaction safety level.</summary>
     [Parameter(Position = 5)]
     [ValidateSet("Full", "Off", "None")]
+    [PsStringCast]
     public string? SafetyLevel { get; set; }
 
     /// <summary>The mirroring state to move the database to.</summary>
     [Parameter(Position = 6)]
     [ValidateSet("ForceFailoverAndAllowDataLoss", "Failover", "RemoveWitness", "Resume", "Suspend", "Off")]
+    [PsStringCast]
     public string? State { get; set; }
 
     /// <summary>Database objects piped from Get-DbaDatabase.</summary>
