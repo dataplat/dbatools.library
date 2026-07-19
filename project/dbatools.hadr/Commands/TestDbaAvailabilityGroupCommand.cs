@@ -43,6 +43,7 @@ public sealed class TestDbaAvailabilityGroupCommand : DbaBaseCmdlet
     /// <summary>The seeding mode to validate against.</summary>
     [Parameter]
     [ValidateSet("Automatic", "Manual")]
+    [PsStringCast]
     public string? SeedingMode { get; set; }
 
     /// <summary>The shared path used for the seeding/restore readiness checks.</summary>

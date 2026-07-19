@@ -39,17 +39,20 @@ public sealed class SetDbaAvailabilityGroupCommand : DbaBaseCmdlet
     /// <summary>The cluster type.</summary>
     [Parameter(Position = 3)]
     [ValidateSet("External", "Wsfc", "None")]
+    [PsStringCast]
     public string? ClusterType { get; set; }
 
     /// <summary>The automated backup preference.</summary>
     [Parameter(Position = 4)]
     [ValidateSet("None", "Primary", "Secondary", "SecondaryOnly")]
+    [PsStringCast]
     public string? AutomatedBackupPreference { get; set; }
 
     /// <summary>The failure condition level.</summary>
     [Parameter(Position = 5)]
     [ValidateSet("OnAnyQualifiedFailureCondition", "OnCriticalServerErrors", "OnModerateServerErrors",
         "OnServerDown", "OnServerUnresponsive")]
+    [PsStringCast]
     public string? FailureConditionLevel { get; set; }
 
     /// <summary>The health check timeout.</summary>
