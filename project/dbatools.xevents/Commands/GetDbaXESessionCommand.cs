@@ -116,7 +116,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaXESession
         }
 
-        Write-Message -Level Verbose -Message "Getting XEvents Sessions on $instance." -FunctionName Get-DbaXESession
+        Write-Message -Level Verbose -Message "Getting XEvents Sessions on $instance." -FunctionName Get-DbaXESession -ModuleName "dbatools"
         $xesessions = $XEStore.sessions
 
         if ($Session) {

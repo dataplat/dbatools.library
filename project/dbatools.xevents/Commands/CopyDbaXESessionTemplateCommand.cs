@@ -122,7 +122,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         try {
             $files = (Get-DbaXESessionTemplate -Path $Path | Where-Object Source -ne Microsoft).Path
             foreach ($file in $files) {
-                Write-Message -Level Output -Message "Copying $($file.Name) to $destinstance." -FunctionName Copy-DbaXESessionTemplate
+                Write-Message -Level Output -Message "Copying $($file.Name) to $destinstance." -FunctionName Copy-DbaXESessionTemplate -ModuleName "dbatools"
                 Copy-Item -Path $file -Destination $destinstance -ErrorAction Stop
             }
         } catch {

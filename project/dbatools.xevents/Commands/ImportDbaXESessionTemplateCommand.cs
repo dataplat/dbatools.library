@@ -257,19 +257,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         foreach ($file in $Path) {
 
             if (-not $__targetFilePathBound) {
-                Write-Message -Level Verbose -Message "Importing $file to $instance" -FunctionName Import-DbaXESessionTemplate
+                Write-Message -Level Verbose -Message "Importing $file to $instance" -FunctionName Import-DbaXESessionTemplate -ModuleName "dbatools"
                 try {
                     $xml = [xml](Get-Content $file -ErrorAction Stop)
                 } catch {
                     Stop-Function -Message "Failure" -ErrorRecord $_ -Target $file -Continue -FunctionName Import-DbaXESessionTemplate
                 }
             } else {
-                Write-Message -Level Verbose -Message "TargetFilePath specified, changing all file locations in $file for $instance." -FunctionName Import-DbaXESessionTemplate
+                Write-Message -Level Verbose -Message "TargetFilePath specified, changing all file locations in $file for $instance." -FunctionName Import-DbaXESessionTemplate -ModuleName "dbatools"
 
                 # Handle whatever people specify
                 $TargetFilePath = $TargetFilePath.TrimEnd("\").TrimEnd("/")
                 if ($__targetFileMetadataPathBound) {
-                    Write-Message -Level Verbose -Message "TargetFileMetadataPath specified, changing all metadata file locations in $file for $instance." -FunctionName Import-DbaXESessionTemplate
+                    Write-Message -Level Verbose -Message "TargetFileMetadataPath specified, changing all metadata file locations in $file for $instance." -FunctionName Import-DbaXESessionTemplate -ModuleName "dbatools"
                     $TargetFileMetadataPath = $TargetFileMetadataPath.TrimEnd("\").TrimEnd("/")
                 }
                 if ((Test-HostOSLinux -SqlInstance $server)) {
@@ -298,7 +298,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     if (-not $eventFileTargetExists) {
                         # No event_file target found in template - add one so TargetFilePath is honored
-                        Write-Message -Level Verbose -Message "No event_file target found in template, adding one with TargetFilePath." -FunctionName Import-DbaXESessionTemplate
+                        Write-Message -Level Verbose -Message "No event_file target found in template, adding one with TargetFilePath." -FunctionName Import-DbaXESessionTemplate -ModuleName "dbatools"
                         $eventFileTargetNode = $templateXml.CreateElement("target", $namespaceUri)
                         $null = $eventFileTargetNode.SetAttribute("package", "package0")
                         $null = $eventFileTargetNode.SetAttribute("name", "event_file")
@@ -346,7 +346,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Stop-Function -Message "Failure" -ErrorRecord $_ -Target $file -Continue -FunctionName Import-DbaXESessionTemplate
                 }
 
-                Write-Message -Level Verbose -Message "$TargetFilePath does not exist on $server, creating now." -FunctionName Import-DbaXESessionTemplate
+                Write-Message -Level Verbose -Message "$TargetFilePath does not exist on $server, creating now." -FunctionName Import-DbaXESessionTemplate -ModuleName "dbatools"
                 try {
                     if (-not (Test-DbaPath -SqlInstance $server -Path $TargetFilePath)) {
                         $null = New-DbaDirectory -SqlInstance $server -Path $TargetFilePath
@@ -381,7 +381,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             try {
-                Write-Message -Level Verbose -Message "Importing $file as $Name" -FunctionName Import-DbaXESessionTemplate
+                Write-Message -Level Verbose -Message "Importing $file as $Name" -FunctionName Import-DbaXESessionTemplate -ModuleName "dbatools"
                 $session = $store.CreateSessionFromTemplate($Name, $file)
                 $session.Create()
                 if ($file -eq $tempfile) {

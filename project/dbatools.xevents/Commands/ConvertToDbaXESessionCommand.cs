@@ -214,21 +214,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ((Get-DbaXESession @splatXESession)) {
             $oldname = $name
             $Name = "$name-$traceid"
-            Write-Message -Level Output -Message "XE Session $oldname already exists on $server, trying $name." -FunctionName ConvertTo-DbaXESession
+            Write-Message -Level Output -Message "XE Session $oldname already exists on $server, trying $name." -FunctionName ConvertTo-DbaXESession -ModuleName "dbatools"
         }
 
         $splatXESession["Session"] = $Name
         if ((Get-DbaXESession @splatXESession)) {
             $oldname = $name
             $Name = "$name-$(Get-Random)"
-            Write-Message -Level Output -Message "XE Session $oldname already exists on $server, trying $name." -FunctionName ConvertTo-DbaXESession
+            Write-Message -Level Output -Message "XE Session $oldname already exists on $server, trying $name." -FunctionName ConvertTo-DbaXESession -ModuleName "dbatools"
         }
 
         $sql = $rawsql.Replace("--TRACEID--", $traceid)
         $sql = $sql.Replace("--SESSIONNAME--", $name)
 
         try {
-            Write-Message -Level Verbose -Message "Executing SQL in tempdb." -FunctionName ConvertTo-DbaXESession
+            Write-Message -Level Verbose -Message "Executing SQL in tempdb." -FunctionName ConvertTo-DbaXESession -ModuleName "dbatools"
             $results = $tempdb.ExecuteWithResults($sql).Tables.Rows.SqlString
         } catch {
             Stop-Function -Message "Issue creating, dropping or executing sp_SQLskills_ConvertTraceToExtendedEvents in tempdb on $server." -Target $server -ErrorRecord $_ -FunctionName ConvertTo-DbaXESession
@@ -239,7 +239,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($OutputScriptOnly) {
             $results
         } else {
-            Write-Message -Level Verbose -Message "Creating XE Session $name." -FunctionName ConvertTo-DbaXESession
+            Write-Message -Level Verbose -Message "Creating XE Session $name." -FunctionName ConvertTo-DbaXESession -ModuleName "dbatools"
             try {
                 $tempdb.ExecuteNonQuery($results)
             } catch {

@@ -155,7 +155,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($pathObject.Status -eq 'Running') {
                 $files = $files | Select-Object -SkipLast 1
             }
-            Write-Message -Level Verbose -Message "Received $($files.Count) files based on [$targetFile]" -FunctionName Read-DbaXEFile
+            Write-Message -Level Verbose -Message "Received $($files.Count) files based on [$targetFile]" -FunctionName Read-DbaXEFile -ModuleName "dbatools"
         } else {
             Stop-Function -Message "The Path [$pathObject] has an unsupported file type of [$($pathObject.GetType().FullName)]." -FunctionName Read-DbaXEFile
         }
