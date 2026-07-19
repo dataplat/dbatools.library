@@ -282,7 +282,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         if ($ag.Parent.VersionMajor -ge 17) {
                             $ag.ClusterConnectionOptions = $ClusterConnectionOption
                         } else {
-                            Write-Message -Level Warning -Message "ClusterConnectionOption is only supported in SQL Server 2025 and above. Skipping this setting on $($ag.Parent.Name)." -FunctionName Set-DbaAvailabilityGroup
+                            Write-Message -Level Warning -Message "ClusterConnectionOption is only supported in SQL Server 2025 and above. Skipping this setting on $($ag.Parent.Name)." -FunctionName Set-DbaAvailabilityGroup -ModuleName "dbatools"
                         }
                     }
 

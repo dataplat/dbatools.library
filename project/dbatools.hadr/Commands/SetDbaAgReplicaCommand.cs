@@ -382,7 +382,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($SessionTimeout) {
                         if ($SessionTimeout -lt 10) {
                             $Message = "We recommend that you keep the time-out period at 10 seconds or greater. Setting the value to less than 10 seconds creates the possibility of a heavily loaded system missing pings and falsely declaring failure. Please see sqlps.io/agrec for more information."
-                            Write-Message -Message $Message -Level Warning -FunctionName Set-DbaAgReplica
+                            Write-Message -Message $Message -Level Warning -FunctionName Set-DbaAgReplica -ModuleName "dbatools"
                         }
                         $agreplica.SessionTimeout = $SessionTimeout
                     }

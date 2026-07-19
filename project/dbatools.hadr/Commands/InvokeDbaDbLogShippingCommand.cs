@@ -172,7 +172,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        Write-Message -Message "Finished setting up log shipping." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+        Write-Message -Message "Finished setting up log shipping." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 } $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 

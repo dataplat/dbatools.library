@@ -136,14 +136,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             #>
 
             try {
-                Write-Message -Level Verbose -Message "Checking current Hadr setting for $computer" -FunctionName Disable-DbaAgHadr
+                Write-Message -Level Verbose -Message "Checking current Hadr setting for $computer" -FunctionName Disable-DbaAgHadr -ModuleName "dbatools"
                 $currentState = Get-WmiHadr -SqlInstance $instance -Credential $Credential
             } catch {
                 Stop-Function -Message "Failure to pull current state of Hadr setting on $computer" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Disable-DbaAgHadr
             }
 
             $isHadrEnabled = $currentState.IsHadrEnabled
-            Write-Message -Level InternalComment -Message "$instance Hadr current value: $isHadrEnabled" -FunctionName Disable-DbaAgHadr
+            Write-Message -Level InternalComment -Message "$instance Hadr current value: $isHadrEnabled" -FunctionName Disable-DbaAgHadr -ModuleName "dbatools"
 
             # hadr results from sql wmi can be iffy, skip the check
             <#
@@ -181,7 +181,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $newState = Get-WmiHadr -SqlInstance $instance -Credential $Credential
 
                 if (-not $__boundForce) { # SOURCE: if (Test-Bound -Not -ParameterName Force) {
-                    Write-Message -Level Warning -Message "You must restart the SQL Server for it to take effect." -FunctionName Disable-DbaAgHadr
+                    Write-Message -Level Warning -Message "You must restart the SQL Server for it to take effect." -FunctionName Disable-DbaAgHadr -ModuleName "dbatools"
                 }
 
                 [PSCustomObject]@{

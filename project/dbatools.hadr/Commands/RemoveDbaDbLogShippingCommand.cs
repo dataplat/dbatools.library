@@ -318,14 +318,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         @secondary_database = N'$($logshippingInfo.SecondaryDatabase)'"
 
                     try {
-                        Write-Message -Level verbose -Message "Removing the primary and secondaries from log shipping" -FunctionName Remove-DbaDbLogShipping
+                        Write-Message -Level verbose -Message "Removing the primary and secondaries from log shipping" -FunctionName Remove-DbaDbLogShipping -ModuleName "dbatools"
                         Invoke-DbaQuery -SqlInstance $primaryServer -SqlCredential $PrimarySqlCredential -Database master -Query $query
                     } catch {
                         Stop-Function -Message "Something went wrong removing the primaries and secondaries" -Target $primaryServer -ErrorRecord $_ -FunctionName Remove-DbaDbLogShipping
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "No secondary configuration found for [$db]. Removing primary configuration only." -FunctionName Remove-DbaDbLogShipping
+                Write-Message -Level Verbose -Message "No secondary configuration found for [$db]. Removing primary configuration only." -FunctionName Remove-DbaDbLogShipping -ModuleName "dbatools"
             }
 
             # Remove the primary database log shipping info
@@ -333,7 +333,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $query = "EXEC dbo.sp_delete_log_shipping_primary_database @database = N'$($logshippingInfo.PrimaryDatabase)'"
 
                 try {
-                    Write-Message -Level verbose -Message "Removing the primary database from log shipping" -FunctionName Remove-DbaDbLogShipping
+                    Write-Message -Level verbose -Message "Removing the primary database from log shipping" -FunctionName Remove-DbaDbLogShipping -ModuleName "dbatools"
                     Invoke-DbaQuery -SqlInstance $primaryServer -SqlCredential $PrimarySqlCredential -Database master -Query $query
                 } catch {
                     Stop-Function -Message "Something went wrong removing the primary database from log shipping" -Target $primaryServer -ErrorRecord $_ -FunctionName Remove-DbaDbLogShipping
@@ -347,7 +347,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $query = "EXEC dbo.sp_delete_log_shipping_secondary_database @secondary_database = N'$($logshippingInfo.SecondaryDatabase)'"
 
                     try {
-                        Write-Message -Level verbose -Message "Removing the secondary database from log shipping" -FunctionName Remove-DbaDbLogShipping
+                        Write-Message -Level verbose -Message "Removing the secondary database from log shipping" -FunctionName Remove-DbaDbLogShipping -ModuleName "dbatools"
                         Invoke-DbaQuery -SqlInstance $secondaryServer -SqlCredential $SecondarySqlCredential -Database master -Query $query
                     } catch {
                         Stop-Function -Message "Something went wrong removing the secondary database from log shipping" -Target $secondaryServer -ErrorRecord $_ -FunctionName Remove-DbaDbLogShipping
@@ -357,7 +357,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 # Remove the secondary database if needed
                 if ($RemoveSecondaryDatabase) {
                     if ($PSCmdlet.ShouldProcess("Removing the secondary database from [$($logshippingInfo.SecondaryDatabase)]")) {
-                        Write-Message -Level verbose -Message "Removing the secondary database [$($logshippingInfo.SecondaryDatabase)]" -FunctionName Remove-DbaDbLogShipping
+                        Write-Message -Level verbose -Message "Removing the secondary database [$($logshippingInfo.SecondaryDatabase)]" -FunctionName Remove-DbaDbLogShipping -ModuleName "dbatools"
                         try {
                             $null = Remove-DbaDatabase -SqlInstance $secondaryServer -SqlCredential $SecondarySqlCredential -Database $logshippingInfo.SecondaryDatabase -Confirm:$false
                         } catch {

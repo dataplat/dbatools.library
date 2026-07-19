@@ -203,7 +203,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # Retrieve the log shipping information from the secondary instance
             try {
-                Write-Message -Message "Retrieving log shipping information from the secondary instance" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                Write-Message -Message "Retrieving log shipping information from the secondary instance" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
                 Write-ProgressHelper -Activity $activity -StepNumber ($stepCounter++) -Message "Retrieving log shipping information from the secondary instance"
                 $logshipping_details = $server.Query($query)
             } catch {
@@ -227,11 +227,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($server.Databases[$secondarydb].Status -notin ('Normal, Standby', 'Standby', 'Restoring')) {
                         Stop-Function -Message "The database $db doesn't have the right status to be recovered" -Continue -FunctionName Invoke-DbaDbLogShipRecovery
                     } else {
-                        Write-Message -Message "Started Recovery for $secondarydb" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                        Write-Message -Message "Started Recovery for $secondarydb" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
 
                         # Start the job to get the latest files
                         if ($PSCmdlet.ShouldProcess($server.name, ("Starting copy job $($ls.copyjob)"))) {
-                            Write-Message -Message "Starting copy job $($ls.copyjob)" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                            Write-Message -Message "Starting copy job $($ls.copyjob)" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
 
                             Write-ProgressHelper -Activity $activity -StepNumber ($stepCounter++) -Message "Starting copy job"
                             try {
@@ -243,9 +243,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
 
                             if ($recoverResult -ne 'Failed') {
-                                Write-Message -Message "Copying files to $($ls.backup_destination_directory)" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                Write-Message -Message "Copying files to $($ls.backup_destination_directory)" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
 
-                                Write-Message -Message "Waiting for the copy action to complete.." -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                Write-Message -Message "Waiting for the copy action to complete.." -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
 
                                 # Get the job status
                                 $jobStatus = Get-DbaAgentJob -SqlInstance $instance -SqlCredential $SqlCredential -Job $ls.copyjob
@@ -267,7 +267,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                 $jobOutputs += $jobStatus
 
-                                Write-Message -Message "Copying of backup files finished" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                Write-Message -Message "Copying of backup files finished" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
                             }
                         } # if should process
 
@@ -277,7 +277,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                             if ($PSCmdlet.ShouldProcess($server.name, "Disabling copy job $($ls.copyjob)")) {
                                 try {
-                                    Write-Message -Message "Disabling copy job $($ls.copyjob)" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                    Write-Message -Message "Disabling copy job $($ls.copyjob)" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
                                     $null = Set-DbaAgentJob -SqlInstance $instance -SqlCredential $SqlCredential -Job $ls.copyjob -Disabled
                                 } catch {
                                     $recoverResult = "Failed"
@@ -292,7 +292,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             Write-ProgressHelper -Activity $activity -StepNumber ($stepCounter++) -Message "Starting restore job"
 
                             if ($PSCmdlet.ShouldProcess($server.name, ("Starting restore job " + $ls.restorejob))) {
-                                Write-Message -Message "Starting restore job $($ls.restorejob)" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                Write-Message -Message "Starting restore job $($ls.restorejob)" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
                                 try {
                                     $null = Start-DbaAgentJob -SqlInstance $instance -SqlCredential $SqlCredential -Job $ls.restorejob
                                 } catch {
@@ -300,7 +300,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     Stop-Function -Message "Something went wrong starting the restore job.`n$($_)" -ErrorRecord $_ -Target $server.name -FunctionName Invoke-DbaDbLogShipRecovery
                                 }
 
-                                Write-Message -Message "Waiting for the restore action to complete.." -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                Write-Message -Message "Waiting for the restore action to complete.." -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
 
                                 # Get the job status
                                 $jobStatus = Get-DbaAgentJob -SqlInstance $instance -SqlCredential $SqlCredential -Job $ls.restorejob
@@ -328,7 +328,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             # Disable the log shipping restore job on the secondary instance
                             if ($PSCmdlet.ShouldProcess($server.name, "Disabling restore job $($ls.restorejob)")) {
                                 try {
-                                    Write-Message -Message ("Disabling restore job " + $ls.restorejob) -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                    Write-Message -Message ("Disabling restore job " + $ls.restorejob) -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
                                     $null = Set-DbaAgentJob -SqlInstance $instance -SqlCredential $SqlCredential -Job $ls.restorejob -Disabled
                                 } catch {
                                     $recoverResult = "Failed"
@@ -342,7 +342,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             # Check if the database needs to recovered to its normal state
                             if ($NoRecovery -eq $false) {
                                 if ($PSCmdlet.ShouldProcess($secondarydb, "Restoring database with recovery")) {
-                                    Write-Message -Message "Restoring the database to it's normal state" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                    Write-Message -Message "Restoring the database to it's normal state" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
                                     try {
                                         $query = "RESTORE DATABASE [$secondarydb] WITH RECOVERY"
                                         $server.Query($query)
@@ -355,10 +355,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 }
                             } else {
                                 $comment = "Skipping restore with recovery."
-                                Write-Message -Message "Skipping restore with recovery" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                                Write-Message -Message "Skipping restore with recovery" -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
                             }
 
-                            Write-Message -Message ("Finished Recovery for $secondarydb") -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery
+                            Write-Message -Message ("Finished Recovery for $secondarydb") -Level Verbose -FunctionName Invoke-DbaDbLogShipRecovery -ModuleName "dbatools"
                         }
 
                         # Reset the log ship details
