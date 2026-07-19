@@ -23,21 +23,20 @@ namespace Dataplat.Dbatools.Commands;
 /// built, and $instance, read by the rename-collision message outside its own loop). Its begin block also
 /// derives $NewSecurePassword (from a PSCredential or SecureString, which rides live and is never flattened)
 /// and arms the Stop-Function interrupt latch that the process block checks via Test-FunctionInterrupt - a
-/// scope-relative variable, not a callstack lookup. A per-record hop would lose all of that, so the port is
-/// COLLECT-THEN-ENDPROCESSING in one scope: BeginProcessing captures the by-name bound flags, ProcessRecord
-/// collects one batch per record, and EndProcessing runs ONE hop - the begin block, then a per-batch
-/// dot-sourced replay of the process body. InputObject is the only pipeline-bound parameter, so every
+/// scope-relative variable, not a callstack lookup. DEF-014: the source is begin/process with NO end block,
+/// so this port STREAMS per record - BeginProcessing captures the by-name bound flags and runs the begin
+/// block once (handing out $NewSecurePassword and its interrupt latch), and ProcessRecord runs the process
+/// body for THAT record and emits immediately. InputObject is the only pipeline-bound parameter, so every
 /// pipeline record is a rebind (the engine reassigns the parameter before each process invocation even when
 /// the same array instance arrives twice, discarding the body's += mutation like the function world does);
 /// only a by-name InputObject persists across the whole run, and it seeds the hop unoverridden.
-/// KNOWN DIVERGENCE of this architecture: the work runs at end-of-pipeline, so an upstream producer is
-/// fully enumerated before the first emission, where the script function emits during each process
-/// invocation - a downstream early stop (Select-Object -First 1) therefore stops the producer later than
-/// in the function world. The cross-record state above cannot ride per-record hops without sentinel
-/// machinery, so the single shared scope is the lesser divergence. $InputObject is a typed local ([Smo.Login[]]) so the body's += keeps the
-/// source's typed-array re-coercion. The dot-source keeps each record's return local to that batch, and the
-/// interrupt latch, $passwordChanged, $instance, and the per-batch $allLogins re-init all behave natively in
-/// the shared scope.
+/// That KNOWN DIVERGENCE is now GONE. The buffered shape enumerated the whole producer before emitting
+/// anything, so a downstream early stop (Select-Object -First 1) stopped the producer later than in the
+/// function world - and, the reason DEF-014 was raised, a producer that THROWS discarded every record's
+/// work outright, because PowerShell never calls EndProcessing in that case. The cross-record state that
+/// made buffering attractive rides a state bag instead: restored at hop entry, captured in finally. $InputObject is a typed local ([Smo.Login[]]) so the body's += keeps the
+/// source's typed-array re-coercion. try/finally keeps each record's early return from skipping the handoff, and the
+/// interrupt latch, $passwordChanged, $instance and $allLogins are all carried explicitly across records.
 /// </para>
 /// <para>
 /// The command emits one result object per modified login and can Stop-Function-terminate later in the run
@@ -142,7 +141,11 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     /// <summary>One batch per pipeline record: { inputRebound, InputObject }.</summary>
-    private readonly List<object?[]?> _batches = new List<object?[]?>();
+    /// <summary>$NewSecurePassword from the begin block, plus the process block's cross-record state.</summary>
+    private object? _newSecurePasswordState;
+    private Hashtable? _processState;
+    private bool _beginInterrupted;
+    private bool _processInterrupted;
 
     /// <summary>Whether -InputObject was bound by name (captured before any pipeline record arrives).</summary>
     private bool _inputObjectByName;
@@ -192,22 +195,54 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
         // and leak the previous record's expanded $InputObject.
         _inputObjectByName = MyInvocation.BoundParameters.ContainsKey("InputObject");
         _byNameInputObject = InputObject;
+
+        // DEF-014: the begin block runs ONCE here rather than inside a single end-hop, handing out the
+        // $NewSecurePassword it resolves and its interrupt latch so every record's hop sees them.
+        // STREAMING, not buffered: a begin-block Stop-Function -Continue raises a ContinueException that
+        // prevents a buffered collection from ever being returned, discarding warnings it already produced.
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+            }
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
+                item.Properties["__SetDbaLoginBeginComplete"]?.Value))
+            {
+                _newSecurePasswordState = UnwrapHopValue(item.Properties["NewSecurePassword"]?.Value);
+                _beginInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+            }
+            else if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }, BeginScript,
+            Login, SecurePassword, PasswordHash, NewName, EnableException.ToBool(),
+            _sqlInstanceBound, _loginBound, _securePasswordBound, _passwordHashBound, _defaultDatabaseBound,
+            _unlockBound, _passwordMustChangeBound, _newNameBound, _disableBound, _enableBound,
+            _denyLoginBound, _grantLoginBound, _passwordPolicyEnforcedBound, _passwordExpirationEnabledBound, _forceBound,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
-    /// <summary>Records each pipeline record's input as a batch; the work runs once in EndProcessing.</summary>
+    /// <summary>
+    /// Runs the process body for THIS record and emits immediately.
+    /// </summary>
+    /// <remarks>
+    /// DEF-014: the source is begin/process with NO end block, so it streams - each record's work is done
+    /// and emitted as it arrives. This port previously buffered every record and did the work in
+    /// EndProcessing, which PowerShell never calls when the upstream producer terminates, so a throwing
+    /// producer silently discarded everything the source would already have emitted. The shared scope the
+    /// single end-hop provided is reconstructed by carrying the process state across records.
+    /// </remarks>
     protected override void ProcessRecord()
     {
-        if (Interrupted)
+        if (_beginInterrupted || _processInterrupted || Interrupted)
             return;
 
-        _batches.Add(new object?[] { !_inputObjectByName, InputObject });
-    }
-
-    /// <summary>Runs the begin block once, then replays the process body per batch, in one shared scope.</summary>
-    protected override void EndProcessing()
-    {
-        if (Interrupted)
-            return;
+        // Bimodal binding, unchanged from the buffered shape: InputObject is either bound BY NAME (one
+        // record, the by-name value stands) or rebound on EVERY pipeline record.
+        object? effectiveInputObject = _inputObjectByName ? _byNameInputObject : InputObject;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
@@ -216,19 +251,41 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
-            else
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
+                item.Properties["__SetDbaLoginProcessComplete"]?.Value))
+            {
+                _processState = UnwrapHopValue(item.Properties["State"]?.Value) as Hashtable;
+                _processInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+            }
+            else if (item is not null)
             {
                 WriteObject(item);
             }
         }, ProcessScript,
-            _batches.ToArray(), _byNameInputObject, SqlInstance, SqlCredential, Login, SecurePassword, PasswordHash, DefaultDatabase,
+            effectiveInputObject, SqlInstance, SqlCredential, Login, SecurePassword, PasswordHash, DefaultDatabase,
             Unlock.ToBool(), PasswordMustChange.ToBool(), NewName, Disable.ToBool(), Enable.ToBool(), DenyLogin.ToBool(), GrantLogin.ToBool(),
             PasswordPolicyEnforced.ToBool(), PasswordExpirationEnabled.ToBool(), AddRole, RemoveRole, Force.ToBool(), EnableException.ToBool(), this,
+            _newSecurePasswordState, _processState,
             _sqlInstanceBound, _loginBound, _securePasswordBound, _passwordHashBound, _defaultDatabaseBound,
             _unlockBound, _passwordMustChangeBound, _newNameBound, _disableBound, _enableBound,
             _denyLoginBound, _grantLoginBound, _passwordPolicyEnforcedBound, _passwordExpirationEnabledBound, _forceBound,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+    }
+
+    /// <summary>Unwraps a value the hop carried out through its sentinel.</summary>
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        foreach (PSMemberInfo member in wrapper.Members)
+        {
+            if (member is PSNoteProperty)
+                return wrapper;
+        }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -258,12 +315,13 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin block once, then a per-batch dot-sourced replay of the process body, all in one scope.
+    // PS: the begin block, run ONCE in BeginProcessing and handing out $NewSecurePassword plus its interrupt
+    // latch through a sentinel; the process body then runs PER RECORD in its own hop (DEF-014).
     // Substitutions only: $Pscmdlet -> $__realCmdlet (the ShouldProcess gate); the Test-Bound reads -> carried
     // by-name flags; -FunctionName on the 24 DIRECT Stop-Function calls; -FunctionName + -ModuleName "dbatools"
     // on the 9 DIRECT Write-Message calls. EnableException and the switches received untyped.
-    private const string ProcessScript = """
-param($__batches, $__byNameInputObject, $SqlInstance, $SqlCredential, $Login, $SecurePassword, $PasswordHash, $DefaultDatabase, $Unlock, $PasswordMustChange, $NewName, $Disable, $Enable, $DenyLogin, $GrantLogin, $PasswordPolicyEnforced, $PasswordExpirationEnabled, $AddRole, $RemoveRole, $Force, $EnableException, $__realCmdlet, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    private const string BeginScript = """
+param($Login, $SecurePassword, $PasswordHash, $NewName, $EnableException, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -271,12 +329,11 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    [CmdletBinding(SupportsShouldProcess)]
-    param($__batches, $__byNameInputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Login, $SecurePassword, [string]$PasswordHash, [string]$DefaultDatabase, $Unlock, $PasswordMustChange, [string]$NewName, $Disable, $Enable, $DenyLogin, $GrantLogin, $PasswordPolicyEnforced, $PasswordExpirationEnabled, [string[]]$AddRole, [string[]]$RemoveRole, $Force, $EnableException, $__realCmdlet, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    [CmdletBinding()]
+    param([string[]]$Login, $SecurePassword, [string]$PasswordHash, [string]$NewName, $EnableException, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        [Microsoft.SqlServer.Management.Smo.Login[]]$InputObject = $__byNameInputObject
-
+    . {
         # Check the parameters
         if (($__sqlInstanceBound) -and (-not $__loginBound)) {
             Stop-Function -Message 'You must specify a Login when using SqlInstance' -FunctionName Set-DbaLogin
@@ -323,10 +380,31 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if (($__passwordMustChangeBound) -and (-not $__securePasswordBound)) {
             Stop-Function -Message 'You must specify a password when using the -PasswordMustChange parameter. See the command help for more details.' -FunctionName Set-DbaLogin
         }
+    }
 
-        foreach ($__batch in $__batches) {
-            if ($__batch[0]) { $InputObject = $__batch[1] }
-            . {
+    [pscustomobject]@{ __SetDbaLoginBeginComplete = $true; NewSecurePassword = $NewSecurePassword; Interrupted = (Test-FunctionInterrupt) }
+} $Login $SecurePassword $PasswordHash $NewName $EnableException $__sqlInstanceBound $__loginBound $__securePasswordBound $__passwordHashBound $__defaultDatabaseBound $__unlockBound $__passwordMustChangeBound $__newNameBound $__disableBound $__enableBound $__denyLoginBound $__grantLoginBound $__passwordPolicyEnforcedBound $__passwordExpirationEnabledBound $__forceBound $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+
+    // PS: the process body VERBATIM, now STREAMED per record (DEF-014).
+    private const string ProcessScript = """
+param($InputObject, $SqlInstance, $SqlCredential, $Login, $SecurePassword, $PasswordHash, $DefaultDatabase, $Unlock, $PasswordMustChange, $NewName, $Disable, $Enable, $DenyLogin, $GrantLogin, $PasswordPolicyEnforced, $PasswordExpirationEnabled, $AddRole, $RemoveRole, $Force, $EnableException, $__realCmdlet, $NewSecurePassword, $__carryState, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding(SupportsShouldProcess)]
+    param([Microsoft.SqlServer.Management.Smo.Login[]]$InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Login, $SecurePassword, [string]$PasswordHash, [string]$DefaultDatabase, $Unlock, $PasswordMustChange, [string]$NewName, $Disable, $Enable, $DenyLogin, $GrantLogin, $PasswordPolicyEnforced, $PasswordExpirationEnabled, [string[]]$AddRole, [string[]]$RemoveRole, $Force, $EnableException, $__realCmdlet, $NewSecurePassword, $__carryState, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # DEF-014: this port STREAMS per record (source is begin/process, no end block). The shared scope the
+    # single end-hop provided is reconstructed by carrying process state; finally so the interrupt gate's
+    # early return cannot skip the handoff.
+    if ($__carryState) { foreach ($__k in $__carryState.Keys) { Set-Variable -Name $__k -Value $__carryState[$__k] } }
+    try {
         if (Test-FunctionInterrupt) { return }
 
         $allLogins = @{ }
@@ -584,9 +662,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Select-DefaultView -InputObject $l -Property $defaults
             }
         }
-            }
-        }
-} $__batches $__byNameInputObject $SqlInstance $SqlCredential $Login $SecurePassword $PasswordHash $DefaultDatabase $Unlock $PasswordMustChange $NewName $Disable $Enable $DenyLogin $GrantLogin $PasswordPolicyEnforced $PasswordExpirationEnabled $AddRole $RemoveRole $Force $EnableException $__realCmdlet $__sqlInstanceBound $__loginBound $__securePasswordBound $__passwordHashBound $__defaultDatabaseBound $__unlockBound $__passwordMustChangeBound $__newNameBound $__disableBound $__enableBound $__denyLoginBound $__grantLoginBound $__passwordPolicyEnforcedBound $__passwordExpirationEnabledBound $__forceBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
-
+    } finally {
+    [pscustomobject]@{ __SetDbaLoginProcessComplete = $true; Interrupted = (Test-FunctionInterrupt); State = @{ allLogins = $allLogins; checkExpiration = $checkExpiration; checkPolicy = $checkPolicy; defaults = $defaults; loginName = $loginName; notes = $notes; passwordChanged = $passwordChanged; rolenames = $rolenames; roles = $roles; server = $server; sql = $sql } }
+    }
+} $InputObject $SqlInstance $SqlCredential $Login $SecurePassword $PasswordHash $DefaultDatabase $Unlock $PasswordMustChange $NewName $Disable $Enable $DenyLogin $GrantLogin $PasswordPolicyEnforced $PasswordExpirationEnabled $AddRole $RemoveRole $Force $EnableException $__realCmdlet $NewSecurePassword $__carryState $__sqlInstanceBound $__loginBound $__securePasswordBound $__passwordHashBound $__defaultDatabaseBound $__unlockBound $__passwordMustChangeBound $__newNameBound $__disableBound $__enableBound $__denyLoginBound $__grantLoginBound $__passwordPolicyEnforcedBound $__passwordExpirationEnabledBound $__forceBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

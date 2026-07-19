@@ -57,10 +57,22 @@ public sealed class SyncDbaLoginPermissionCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    /// <summary>
+    /// Set once the hop body latches the dbatools interrupt (DEF-011).
+    /// </summary>
+    /// <remarks>
+    /// The body opens with `if (Test-FunctionInterrupt) { return }`, so in the function world one hard
+    /// Stop-Function latches the interrupt in the persistent function scope and EVERY later record returns
+    /// immediately. An in-hop Stop-Function cannot set DbaBaseCmdlet.Interrupted, and each record gets a
+    /// fresh hop scope, so without carrying the latch out the gate never fires and later records re-run the
+    /// work - warning once per record instead of once per invocation.
+    /// </remarks>
+    private bool _interruptLatched;
+
     /// <summary>Syncs login permissions for one pipeline record.</summary>
     protected override void ProcessRecord()
     {
-        if (Interrupted)
+        if (_interruptLatched || Interrupted)
             return;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
@@ -70,7 +82,12 @@ public sealed class SyncDbaLoginPermissionCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
-            else
+            else if (item is not null && LanguagePrimitives.IsTrue(
+                item.Properties["__SyncDbaLoginPermissionProcessComplete"]?.Value))
+            {
+                _interruptLatched = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+            }
+            else if (item is not null)
             {
                 WriteObject(item);
             }
@@ -122,6 +139,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [System.Management.Automation.PSCredential]$SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, [System.Management.Automation.PSCredential]$DestinationSqlCredential, [string[]]$Login, [string[]]$ExcludeLogin, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    # try/finally, NOT a trailing line: the body RETURNS early at the interrupt gate and again after the
+    # connection-failure Stop-Function - which is the very call that latches the interrupt. A trailing
+    # sentinel would be skipped exactly when the latch matters most. finally always runs.
+    try {
         if (Test-FunctionInterrupt) { return }
 
         try {
@@ -193,6 +214,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
+
+    } finally {
+    [pscustomobject]@{ __SyncDbaLoginPermissionProcessComplete = $true; Interrupted = [bool](Test-FunctionInterrupt) }
+    }
 } $Source $SourceSqlCredential $Destination $DestinationSqlCredential $Login $ExcludeLogin $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;

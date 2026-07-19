@@ -67,6 +67,19 @@ public sealed class GetDbaServerRoleMemberCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    /// <summary>
+    /// The process block's cross-record state.
+    /// </summary>
+    /// <remarks>
+    /// The script's process block is ONE function scope for the whole pipeline. If a later record's
+    /// Get-DbaLogin throws, its assignment to $logins is aborted and the variable RETAINS the previous
+    /// record's value, which the body then keeps filtering against - so the script still returns results
+    /// for that record. A per-record hop starts with $logins null and filters everything out. Measured
+    /// by codex against mocked servers: source returned two results, the port one. Every variable the
+    /// process block assigns is carried, so the body's own assignments still land where the source's do.
+    /// </remarks>
+    private Hashtable? _processState;
+
     /// <summary>Returns the role members for the instances bound to the current record.</summary>
     protected override void ProcessRecord()
     {
@@ -80,7 +93,12 @@ public sealed class GetDbaServerRoleMemberCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
-            else
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
+                item.Properties["__GetDbaServerRoleMemberProcessComplete"]?.Value))
+            {
+                _processState = UnwrapHopValue(item.Properties["State"]?.Value) as Hashtable;
+            }
+            else if (item is not null)
             {
                 WriteObject(item);
             }
@@ -88,8 +106,31 @@ public sealed class GetDbaServerRoleMemberCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, ServerRole, ExcludeServerRole, Login, ExcludeFixedRole.ToBool(),
             EnableException.ToBool(),
             TestBound(nameof(Login)), TestBound(nameof(ServerRole)), TestBound(nameof(ExcludeServerRole)),
-            TestBound(nameof(ExcludeFixedRole)),
+            TestBound(nameof(ExcludeFixedRole)), _processState,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+    }
+
+    /// <summary>
+    /// Unwraps a value the hop carried out through its sentinel.
+    /// </summary>
+    /// <remarks>
+    /// A value the script left unset arrives as AutomationNull, which behaves as $null in PowerShell but
+    /// unwraps to a truthy, property-less object - so it comes back as null instead. Otherwise the value is
+    /// unwrapped ONLY when the wrapper adds nothing: note properties live on the PSObject wrapper rather
+    /// than the BaseObject, so unwrapping such a value silently discards them.
+    /// </remarks>
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        foreach (PSMemberInfo member in wrapper.Members)
+        {
+            if (member is PSNoteProperty)
+                return wrapper;
+        }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -124,15 +165,20 @@ public sealed class GetDbaServerRoleMemberCommand : DbaBaseCmdlet
     // -FunctionName on the two DIRECT Stop-Function calls; -FunctionName + -ModuleName "dbatools" on the
     // five DIRECT Write-Message calls. Switches and EnableException are received untyped.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $ServerRole, $ExcludeServerRole, $Login, $ExcludeFixedRole, $EnableException, $__loginBound, $__serverRoleBound, $__excludeServerRoleBound, $__excludeFixedRoleBound, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $ServerRole, $ExcludeServerRole, $Login, $ExcludeFixedRole, $EnableException, $__loginBound, $__serverRoleBound, $__excludeServerRoleBound, $__excludeFixedRoleBound, $__carryState, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$ServerRole, [string[]]$ExcludeServerRole, [object[]]$Login, $ExcludeFixedRole, $EnableException, $__loginBound, $__serverRoleBound, $__excludeServerRoleBound, $__excludeFixedRoleBound, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$ServerRole, [string[]]$ExcludeServerRole, [object[]]$Login, $ExcludeFixedRole, $EnableException, $__loginBound, $__serverRoleBound, $__excludeServerRoleBound, $__excludeFixedRoleBound, $__carryState, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # Process-scope state as the previous record left it - the script keeps ONE function scope for the
+    # whole pipeline. try/finally because the body can return early; finally always hands the state back.
+    if ($__carryState) { foreach ($__k in $__carryState.Keys) { Set-Variable -Name $__k -Value $__carryState[$__k] } }
+    try {
 
         foreach ($instance in $SqlInstance) {
             try {
@@ -201,7 +247,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-} $SqlInstance $SqlCredential $ServerRole $ExcludeServerRole $Login $ExcludeFixedRole $EnableException $__loginBound $__serverRoleBound $__excludeServerRoleBound $__excludeFixedRoleBound $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    } finally {
+    [pscustomobject]@{ __GetDbaServerRoleMemberProcessComplete = $true; State = @{ server = $server; roles = $roles; logins = $logins; loginRoles = $loginRoles; members = $members; loginList = $loginList } }
+    }
+} $SqlInstance $SqlCredential $ServerRole $ExcludeServerRole $Login $ExcludeFixedRole $EnableException $__loginBound $__serverRoleBound $__excludeServerRoleBound $__excludeFixedRoleBound $__carryState $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
 }
