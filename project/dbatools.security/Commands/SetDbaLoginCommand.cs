@@ -198,12 +198,9 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
 
         // DEF-014: the begin block runs ONCE here rather than inside a single end-hop, handing out the
         // $NewSecurePassword it resolves and its interrupt latch so every record's hop sees them.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Login, SecurePassword, PasswordHash, NewName, EnableException.ToBool(),
-            _sqlInstanceBound, _loginBound, _securePasswordBound, _passwordHashBound, _defaultDatabaseBound,
-            _unlockBound, _passwordMustChangeBound, _newNameBound, _disableBound, _enableBound,
-            _denyLoginBound, _grantLoginBound, _passwordPolicyEnforcedBound, _passwordExpirationEnabledBound, _forceBound,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // STREAMING, not buffered: a begin-block Stop-Function -Continue raises a ContinueException that
+        // prevents a buffered collection from ever being returned, discarding warnings it already produced.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -220,7 +217,12 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BeginScript,
+            Login, SecurePassword, PasswordHash, NewName, EnableException.ToBool(),
+            _sqlInstanceBound, _loginBound, _securePasswordBound, _passwordHashBound, _defaultDatabaseBound,
+            _unlockBound, _passwordMustChangeBound, _newNameBound, _disableBound, _enableBound,
+            _denyLoginBound, _grantLoginBound, _passwordPolicyEnforcedBound, _passwordExpirationEnabledBound, _forceBound,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>
@@ -395,7 +397,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param($InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Login, $SecurePassword, [string]$PasswordHash, [string]$DefaultDatabase, $Unlock, $PasswordMustChange, [string]$NewName, $Disable, $Enable, $DenyLogin, $GrantLogin, $PasswordPolicyEnforced, $PasswordExpirationEnabled, [string[]]$AddRole, [string[]]$RemoveRole, $Force, $EnableException, $__realCmdlet, $NewSecurePassword, $__carryState, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Microsoft.SqlServer.Management.Smo.Login[]]$InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Login, $SecurePassword, [string]$PasswordHash, [string]$DefaultDatabase, $Unlock, $PasswordMustChange, [string]$NewName, $Disable, $Enable, $DenyLogin, $GrantLogin, $PasswordPolicyEnforced, $PasswordExpirationEnabled, [string[]]$AddRole, [string[]]$RemoveRole, $Force, $EnableException, $__realCmdlet, $NewSecurePassword, $__carryState, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # DEF-014: this port STREAMS per record (source is begin/process, no end block). The shared scope the
