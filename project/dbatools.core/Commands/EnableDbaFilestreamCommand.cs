@@ -10,10 +10,14 @@ namespace Dataplat.Dbatools.Commands;
 /// <summary>
 /// Enables SQL Server FileStream at the service and instance levels. Port of
 /// public/Enable-DbaFilestream.ps1 (W3-010), the sibling of W3-006 Disable-DbaFilestream.
-/// Pure per-record process command: the begin block only sets local constants (the
-/// $FileStreamLevel name->int normalization, $level, $OutputLookup, the -Force
-/// ConfirmPreference tweak) consumed inside the same process body, so there is NO cross-record
-/// accumulator and NO end hop - the begin constants inline into the process script. DEF-001
+/// Begin-inline process command with ONE piece of cross-record state: $level starts as the
+/// $FileStreamLevel name->int normalization but the source's 3->2 downgrade (level 3 falls
+/// back to 2 at the instance layer) MUTATES it, and the function world's begin scope carries
+/// the mutated value into later pipeline records - so the hop emits $level through the
+/// __dbatoolsEfLevelCarrier sentinel and the next record's hop seeds from it (codex r1/r2).
+/// The other begin constants ($OutputLookup, the -Force ConfirmPreference tweak) are true
+/// per-record locals, and there is NO end hop - the begin constants inline into the process
+/// script. DEF-001
 /// cond1+cond2 (the process foreach EMITS Get-DbaFilestream per instance AND has reachable
 /// Stop-Function -Continue at Connect-DbaInstance / Set-DbaSpConfigure), so the hop STREAMS via
 /// InvokeScopedStreaming - a buffered hop would lose an earlier instance's emit when a later
