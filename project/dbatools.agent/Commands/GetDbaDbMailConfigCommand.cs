@@ -42,9 +42,7 @@ public sealed class GetDbaDbMailConfigCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Name, InputObject, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -55,7 +53,9 @@ public sealed class GetDbaDbMailConfigCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, Name, InputObject, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

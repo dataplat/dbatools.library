@@ -73,9 +73,7 @@ public sealed class GetDbaDbMailLogCommand : DbaBaseCmdlet
                 return;
             }
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, since, Type, EnableException.ToBool(), _server,
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -92,7 +90,9 @@ public sealed class GetDbaDbMailLogCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+            new[] { instance }, SqlCredential, since, Type, EnableException.ToBool(), _server,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
