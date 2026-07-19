@@ -55,11 +55,7 @@ public sealed class CopyDbaAgentAlertCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
-            Alert, ExcludeAlert, IncludeDefaults.ToBool(), Force.ToBool(),
-            EnableException.ToBool(), this, BoundCommonParameter("Verbose"),
-            BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -70,7 +66,11 @@ public sealed class CopyDbaAgentAlertCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
+            Alert, ExcludeAlert, IncludeDefaults.ToBool(), Force.ToBool(),
+            EnableException.ToBool(), this, BoundCommonParameter("Verbose"),
+            BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

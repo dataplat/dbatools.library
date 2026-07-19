@@ -54,9 +54,7 @@ public sealed class GetDbaDbMailHistoryCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, since, Status, EnableException.ToBool(), _server,
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -73,7 +71,9 @@ public sealed class GetDbaDbMailHistoryCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+            new[] { instance }, SqlCredential, since, Status, EnableException.ToBool(), _server,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 

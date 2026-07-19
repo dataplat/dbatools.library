@@ -81,10 +81,7 @@ public sealed class RemoveDbaAgentJobStepCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Job, StepName, EnableException.ToBool(), _jobStep, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__removeDbaAgentJobStepState"))
             {
@@ -92,19 +89,22 @@ public sealed class RemoveDbaAgentJobStepCommand : DbaBaseCmdlet
                 {
                     _jobStep = state["JobStep"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             if (item is not null)
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Job, StepName, EnableException.ToBool(), _jobStep, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()

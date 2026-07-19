@@ -79,10 +79,7 @@ public sealed class TestDbaAgentJobOwnerCommand : DbaBaseCmdlet
 
         object? carriedLogin = _loginSeeded ? _login : Login;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Job, ExcludeJob, EnableException.ToBool(),
-            MyInvocation.BoundParameters.ContainsKey("Login"), _return, _results, carriedLogin,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__testDbaAgentJobOwnerState"))
             {
@@ -93,16 +90,19 @@ public sealed class TestDbaAgentJobOwnerCommand : DbaBaseCmdlet
                     _login = state["Login"] as string;
                     _loginSeeded = true;
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, Job, ExcludeJob, EnableException.ToBool(),
+            MyInvocation.BoundParameters.ContainsKey("Login"), _return, _results, carriedLogin,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
