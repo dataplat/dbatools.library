@@ -450,7 +450,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # Loop through the tables
             foreach ($tableobject in $tablecollection) {
-                Write-Message -Message "Processing table [$($tableobject.Schema)].[$($tableobject.Name)]" -Level Verbose -FunctionName New-DbaDbMaskingConfig
+                Write-Message -Message "Processing table [$($tableobject.Schema)].[$($tableobject.Name)]" -Level Verbose -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
 
                 $hasUniqueIndex = $false
 
@@ -472,32 +472,32 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     # Skip incompatible columns
                     if ($columnobject.Identity) {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is an identity column" -FunctionName New-DbaDbMaskingConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is an identity column" -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                         continue
                     }
 
                     if ($columnobject.IsForeignKey) {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a foreign key" -FunctionName New-DbaDbMaskingConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a foreign key" -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                         continue
                     }
 
                     if ($columnobject.Computed) {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a computed column" -FunctionName New-DbaDbMaskingConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a computed column" -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                         continue
                     }
 
                     if ($server.VersionMajor -ge 13 -and $columnobject.GeneratedAlwaysType -ne 'None') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a computed column for temporal tables" -FunctionName New-DbaDbMaskingConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a computed column for temporal tables" -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                         continue
                     }
 
                     if ($columnobject.DataType.Name -notin $supportedDataTypes) {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is not a supported data type" -FunctionName New-DbaDbMaskingConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is not a supported data type" -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                         continue
                     }
 
                     if ($columnobject.DataType.SqlDataType.ToString().ToLowerInvariant() -eq 'xml') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a xml column" -FunctionName New-DbaDbMaskingConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a xml column" -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                         continue
                     }
 
@@ -642,7 +642,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 }
                                 $knownName = $null
                             } else {
-                                Write-Message -Level Verbose -Message "No known names found to perform check on" -FunctionName New-DbaDbMaskingConfig
+                                Write-Message -Level Verbose -Message "No known names found to perform check on" -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                             }
 
                             # Go through the second check to see if any column is found with a known type
@@ -688,11 +688,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                             $patternobject = $null
                                         }
                                     } else {
-                                        Write-Message -Message "Table $($tableobject.Name) does not contain any rows" -Level Verbose -FunctionName New-DbaDbMaskingConfig
+                                        Write-Message -Message "Table $($tableobject.Name) does not contain any rows" -Level Verbose -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                                     }
                                 }
                             } else {
-                                Write-Message -Level Verbose -Message "No patterns found to perform check on" -FunctionName New-DbaDbMaskingConfig
+                                Write-Message -Level Verbose -Message "No patterns found to perform check on" -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                             }
                         }
                     }
@@ -796,7 +796,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         FilterQuery    = $null
                     }
                 } else {
-                    Write-Message -Message "No columns match for masking in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbMaskingConfig
+                    Write-Message -Message "No columns match for masking in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                 }
             }
 
@@ -808,12 +808,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Tables = $tables
                 }
             } else {
-                Write-Message -Message "No columns match for masking in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbMaskingConfig
+                Write-Message -Message "No columns match for masking in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
             }
 
             # Write the data to the Path
             if ($maskingconfig) {
-                Write-Message -Message "Writing masking config" -Level Verbose -FunctionName New-DbaDbMaskingConfig
+                Write-Message -Message "Writing masking config" -Level Verbose -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
                 try {
                     $filenamepart = $server.Name.Replace('\', '$').Replace('TCP:', '').Replace(',', '.')
 
@@ -837,7 +837,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Stop-Function -Message "Something went wrong writing the results to the '$Path'" -Target $Path -Continue -ErrorRecord $_ -FunctionName New-DbaDbMaskingConfig
                 }
             } else {
-                Write-Message -Message "No tables to save for database $($db.Name) on $($server.Name)" -Level Verbose -FunctionName New-DbaDbMaskingConfig
+                Write-Message -Message "No tables to save for database $($db.Name) on $($server.Name)" -Level Verbose -FunctionName New-DbaDbMaskingConfig -ModuleName "dbatools"
             }
         }
     }

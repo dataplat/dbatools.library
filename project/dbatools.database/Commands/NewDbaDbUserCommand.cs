@@ -245,25 +245,25 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     . {
         ### To help analyzing bugs in commands using parameter sets, we write the used parameter set to verbose output.
-        Write-Message -Level Verbose -Message "Using parameter set $__parameterSetName." -FunctionName New-DbaDbUser
+        Write-Message -Level Verbose -Message "Using parameter set $__parameterSetName." -FunctionName New-DbaDbUser -ModuleName "dbatools"
 
         ### To help analyzing bugs, we write at least one line to verbose output per code path. This can also be used as a kind of comment.
         ### Changing parameter values is only allowed in the begin block, so that every execution of the process block or the instance loop in the process block has the same set of parameter values.
         if ($Login -and -not $User) {
-            Write-Message -Level Verbose -Message "No user name provided, so login name [$Login] will be used as user name." -FunctionName New-DbaDbUser
+            Write-Message -Level Verbose -Message "No user name provided, so login name [$Login] will be used as user name." -FunctionName New-DbaDbUser -ModuleName "dbatools"
             $User = $Login
         }
 
         # Set appropriate user type based on provided parameters.
         # See https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.management.smo.usertype for details.
         if ($ExternalProvider) {
-            Write-Message -Level Verbose -Message "Using UserType [External]." -FunctionName New-DbaDbUser
+            Write-Message -Level Verbose -Message "Using UserType [External]." -FunctionName New-DbaDbUser -ModuleName "dbatools"
             $userType = [Microsoft.SqlServer.Management.Smo.UserType]::External
         } elseif ($SecurePassword -or $Login) {
-            Write-Message -Level Verbose -Message "Using UserType [SqlUser]." -FunctionName New-DbaDbUser
+            Write-Message -Level Verbose -Message "Using UserType [SqlUser]." -FunctionName New-DbaDbUser -ModuleName "dbatools"
             $userType = [Microsoft.SqlServer.Management.Smo.UserType]::SqlUser
         } else {
-            Write-Message -Level Verbose -Message "Using UserType [NoLogin]." -FunctionName New-DbaDbUser
+            Write-Message -Level Verbose -Message "Using UserType [NoLogin]." -FunctionName New-DbaDbUser -ModuleName "dbatools"
             $userType = [Microsoft.SqlServer.Management.Smo.UserType]::NoLogin
         }
     }
@@ -327,7 +327,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $databases = $databases | Where-Object IsUpdateable
             foreach ($db in $databases) {
                 ### Where should be a verbose message at the start of each loop to help analyzing issues.
-                Write-Message -Level Verbose -Message "Processing database $db on instance $server." -FunctionName New-DbaDbUser
+                Write-Message -Level Verbose -Message "Processing database $db on instance $server." -FunctionName New-DbaDbUser -ModuleName "dbatools"
 
                 ### Run checks that need a database object. The same rules as for the instance checks apply.
                 if (-not $db.Schemas[$DefaultSchema]) {

@@ -213,12 +213,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     . {
 
         if ((-not $__boundSqlInstance -and -not $__boundInputObject)) {
-            Write-Message -Level Warning -Message "You must specify either a SQL instance or pipe a database collection" -FunctionName Invoke-DbaDbUpgrade
+            Write-Message -Level Warning -Message "You must specify either a SQL instance or pipe a database collection" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
             continue
         }
 
         if ((-not $__boundDatabase -and -not $__boundInputObject -and -not $__boundExcludeDatabase -and -not $__boundAllUserDatabases)) {
-            Write-Message -Level Warning -Message "You must explicitly specify a database. Use -Database, -ExcludeDatabase, -AllUserDatabases or pipe a database collection" -FunctionName Invoke-DbaDbUpgrade
+            Write-Message -Level Warning -Message "You must explicitly specify a database. Use -Database, -ExcludeDatabase, -AllUserDatabases or pipe a database collection" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
             continue
         }
 
@@ -243,7 +243,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # create objects to use in updates
             $server = $db.Parent
             $serverVersion = $server.VersionMajor
-            Write-Message -Level Verbose -Message "SQL Server is using Version: $serverVersion" -FunctionName Invoke-DbaDbUpgrade
+            Write-Message -Level Verbose -Message "SQL Server is using Version: $serverVersion" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
 
             $dbLevel = $db.CompatibilityLevel
             $serverLevel = [Microsoft.SqlServer.Management.Smo.CompatibilityLevel]"Version$($serverVersion)0"
@@ -253,12 +253,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if (-not $Force) {
                 # skip over databases at the correct level and correct target recovery time, unless -Force
                 if ($levelOk -and $timeOk) {
-                    Write-Message -Level VeryVerbose -Message "Skipping $db because compatibility is at the correct level and target recovery time is correct. Use -Force if you want to run all the additional steps." -FunctionName Invoke-DbaDbUpgrade
+                    Write-Message -Level VeryVerbose -Message "Skipping $db because compatibility is at the correct level and target recovery time is correct. Use -Force if you want to run all the additional steps." -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                     continue
                 }
             }
 
-            Write-Message -Level Verbose -Message "Updating $db compatibility to SQL Instance level" -FunctionName Invoke-DbaDbUpgrade
+            Write-Message -Level Verbose -Message "Updating $db compatibility to SQL Instance level" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
             if (-not $levelOk) {
                 If ($__realCmdlet.ShouldProcess($server, "Updating $db compatibility on $server from $dbLevel to $serverLevel")) {
                     try {
@@ -266,7 +266,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $db.Alter()
                         $CompatibilityResult = $serverLevel.ToString().Replace('Version', '')
                     } catch {
-                        Write-Message -Level Warning -Message "Failed run Compatibility Upgrade" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade
+                        Write-Message -Level Warning -Message "Failed run Compatibility Upgrade" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                         $CompatibilityResult = "Fail"
                     }
                 }
@@ -274,7 +274,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $CompatibilityResult = "No change"
             }
 
-            Write-Message -Level Verbose -Message "Updating $db target recovery time to 60 seconds on SQL Server 2016 or newer" -FunctionName Invoke-DbaDbUpgrade
+            Write-Message -Level Verbose -Message "Updating $db target recovery time to 60 seconds on SQL Server 2016 or newer" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
             if (-not $timeOk) {
                 If ($__realCmdlet.ShouldProcess($server, "Updating $db target recovery time on $server from $($db.TargetRecoveryTime) seconds to 60 seconds")) {
                     try {
@@ -282,7 +282,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $db.Alter()
                         $targetRecoveryTimeResult = 60
                     } catch {
-                        Write-Message -Level Warning -Message "Failed to change target recovery time" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade
+                        Write-Message -Level Warning -Message "Failed to change target recovery time" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                         $targetRecoveryTimeResult = "Fail"
                     }
                 }
@@ -291,57 +291,57 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if (!($NoCheckDb)) {
-                Write-Message -Level Verbose -Message "Updating $db with DBCC CHECKDB DATA_PURITY" -FunctionName Invoke-DbaDbUpgrade
+                Write-Message -Level Verbose -Message "Updating $db with DBCC CHECKDB DATA_PURITY" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                 If ($__realCmdlet.ShouldProcess($server, "Updating $db with DBCC CHECKDB DATA_PURITY")) {
                     $tsqlCheckDB = "DBCC CHECKDB ('$($db.Name)') WITH DATA_PURITY, NO_INFOMSGS"
                     try {
                         $db.ExecuteNonQuery($tsqlCheckDB)
                         $DataPurityResult = "Success"
                     } catch {
-                        Write-Message -Level Warning -Message "Failed run DBCC CHECKDB with DATA_PURITY on $db" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade
+                        Write-Message -Level Warning -Message "Failed run DBCC CHECKDB with DATA_PURITY on $db" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                         $DataPurityResult = "Fail"
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "Ignoring CHECKDB DATA_PURITY" -FunctionName Invoke-DbaDbUpgrade
+                Write-Message -Level Verbose -Message "Ignoring CHECKDB DATA_PURITY" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
             }
 
             if (!($NoUpdateUsage)) {
-                Write-Message -Level Verbose -Message "Updating $db with DBCC UPDATEUSAGE" -FunctionName Invoke-DbaDbUpgrade
+                Write-Message -Level Verbose -Message "Updating $db with DBCC UPDATEUSAGE" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                 If ($__realCmdlet.ShouldProcess($server, "Updating $db with DBCC UPDATEUSAGE")) {
                     $tsqlUpdateUsage = "DBCC UPDATEUSAGE ($db) WITH NO_INFOMSGS;"
                     try {
                         $db.ExecuteNonQuery($tsqlUpdateUsage)
                         $UpdateUsageResult = "Success"
                     } catch {
-                        Write-Message -Level Warning -Message "Failed to run DBCC UPDATEUSAGE on $db" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade
+                        Write-Message -Level Warning -Message "Failed to run DBCC UPDATEUSAGE on $db" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                         $UpdateUsageResult = "Fail"
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "Ignore DBCC UPDATEUSAGE" -FunctionName Invoke-DbaDbUpgrade
+                Write-Message -Level Verbose -Message "Ignore DBCC UPDATEUSAGE" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                 $UpdateUsageResult = "Skipped"
             }
 
             if (!($NoUpdatestats)) {
-                Write-Message -Level Verbose -Message "Updating $db statistics" -FunctionName Invoke-DbaDbUpgrade
+                Write-Message -Level Verbose -Message "Updating $db statistics" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                 If ($__realCmdlet.ShouldProcess($server, "Updating $db statistics")) {
                     $tsqlStats = "EXEC sp_updatestats;"
                     try {
                         $db.ExecuteNonQuery($tsqlStats)
                         $UpdateStatsResult = "Success"
                     } catch {
-                        Write-Message -Level Warning -Message "Failed to run sp_updatestats on $db" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade
+                        Write-Message -Level Warning -Message "Failed to run sp_updatestats on $db" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                         $UpdateStatsResult = "Fail"
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "Ignoring sp_updatestats" -FunctionName Invoke-DbaDbUpgrade
+                Write-Message -Level Verbose -Message "Ignoring sp_updatestats" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                 $UpdateStatsResult = "Skipped"
             }
 
             if (!($NoRefreshView)) {
-                Write-Message -Level Verbose -Message "Refreshing $db Views" -FunctionName Invoke-DbaDbUpgrade
+                Write-Message -Level Verbose -Message "Refreshing $db Views" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                 $dbViews = $db.Views | Where-Object IsSystemObject -eq $false
                 $RefreshViewResult = "Success"
                 foreach ($dbview in $dbviews) {
@@ -355,13 +355,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         try {
                             $db.ExecuteNonQuery($tsqlupdateView)
                         } catch {
-                            Write-Message -Level Warning -Message "Failed update view $fullName on $db" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade
+                            Write-Message -Level Warning -Message "Failed update view $fullName on $db" -ErrorRecord $_ -Target $instance -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                             $RefreshViewResult = "Fail"
                         }
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "Ignore View Refreshes" -FunctionName Invoke-DbaDbUpgrade
+                Write-Message -Level Verbose -Message "Ignore View Refreshes" -FunctionName Invoke-DbaDbUpgrade -ModuleName "dbatools"
                 $RefreshViewResult = "Skipped"
             }
 

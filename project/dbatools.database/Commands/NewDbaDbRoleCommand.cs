@@ -178,7 +178,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             $server = $db.Parent
-            Write-Message -Level 'Verbose' -Message "Getting Database Roles for $db on $server" -FunctionName New-DbaDbRole
+            Write-Message -Level 'Verbose' -Message "Getting Database Roles for $db on $server" -FunctionName New-DbaDbRole -ModuleName "dbatools"
 
             $dbRoles = $db.Roles
 
@@ -187,7 +187,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Stop-Function -Message "The $r role already exist within database $db on instance $server." -Target $db -Continue -FunctionName New-DbaDbRole
                 }
 
-                Write-Message -Level Verbose -Message "Add roles to Database $db on target $server" -FunctionName New-DbaDbRole
+                Write-Message -Level Verbose -Message "Add roles to Database $db on target $server" -FunctionName New-DbaDbRole -ModuleName "dbatools"
 
                 if ($__realCmdlet.ShouldProcess("Creating new DatabaseRole $role on database $db", $server)) {
                     try {

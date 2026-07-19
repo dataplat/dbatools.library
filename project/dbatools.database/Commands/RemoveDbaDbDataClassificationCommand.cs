@@ -155,7 +155,7 @@ WHERE SCHEMA_NAME(o.schema_id) = '$escapedSchema'
                         }
                     } catch {
                         $errors += $propName
-                        Write-Message -Level Warning -Message "Failed to drop extended property '$propName' from $target : $_" -FunctionName Remove-DbaDbDataClassification
+                        Write-Message -Level Warning -Message "Failed to drop extended property '$propName' from $target : $_" -FunctionName Remove-DbaDbDataClassification -ModuleName "dbatools"
                     }
                 }
 

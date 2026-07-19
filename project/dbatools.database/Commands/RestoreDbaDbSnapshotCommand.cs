@@ -165,7 +165,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 if ($Snapshot) {
                     # Restore databases from these snapshots
-                    Write-Message -Level Verbose -Message "Selected only snapshots" -FunctionName Restore-DbaDbSnapshot
+                    Write-Message -Level Verbose -Message "Selected only snapshots" -FunctionName Restore-DbaDbSnapshot -ModuleName "dbatools"
                     $dbs = $InputObject | Where-Object { $Snapshot -contains $_.Name }
                     $baseDatabases = $dbs | Select-Object -ExpandProperty DatabaseSnapshotBaseName | Get-Unique
                     if ($baseDatabases.Count -ne $Snapshot.Count -and $dbs.Count -ne 0) {
@@ -228,7 +228,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     $retryCount++
                                     if ($retryCount -lt $maxRetries) {
                                         $waitSeconds = [Math]::Pow(2, $retryCount)
-                                        Write-Message -Level Verbose -Message "Deadlock detected during restore of $db on $server. Retrying in $waitSeconds seconds (attempt $retryCount of $maxRetries)" -FunctionName Restore-DbaDbSnapshot
+                                        Write-Message -Level Verbose -Message "Deadlock detected during restore of $db on $server. Retrying in $waitSeconds seconds (attempt $retryCount of $maxRetries)" -FunctionName Restore-DbaDbSnapshot -ModuleName "dbatools"
                                         Start-Sleep -Seconds $waitSeconds
                                     } else {
                                         Stop-Function -Message "Failiure attempting to restore $db on $server after $maxRetries attempts due to deadlock" -ErrorRecord $_ -Continue -FunctionName Restore-DbaDbSnapshot
@@ -260,12 +260,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         }
                         if ($changeflag -ne 0) {
-                            Write-Message -Level Verbose -Message "Restoring original settings for log file" -FunctionName Restore-DbaDbSnapshot
+                            Write-Message -Level Verbose -Message "Restoring original settings for log file" -FunctionName Restore-DbaDbSnapshot -ModuleName "dbatools"
                             $log.Alter()
                         }
                     }
 
-                    Write-Message -Level Verbose -Message "Restored. Remember to take a backup now, and also to remove the snapshot if not needed." -FunctionName Restore-DbaDbSnapshot
+                    Write-Message -Level Verbose -Message "Restored. Remember to take a backup now, and also to remove the snapshot if not needed." -FunctionName Restore-DbaDbSnapshot -ModuleName "dbatools"
                     Get-DbaDatabase -SqlInstance $server -Database $db.Name
                 }
             }

@@ -266,7 +266,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # Loop through the tables
             foreach ($tableobject in $tablecollection) {
-                Write-Message -Message "Processing table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig
+                Write-Message -Message "Processing table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
 
                 $hasUniqueIndex = $false
 
@@ -281,23 +281,23 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 foreach ($columnobject in $columncollection) {
                     if ($columnobject.Computed) {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a computed column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a computed column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
                     if ($columnobject.DataType.Name -eq 'hierarchyid') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a hierarchyid column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a hierarchyid column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
                     if ($columnobject.DataType.Name -eq 'geography') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a geography column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a geography column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
                     if ($columnobject.DataType.Name -eq 'geometry') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a geometry column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a geometry column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
                     if ($columnobject.DataType.SqlDataType.ToString().ToLowerInvariant() -eq 'xml') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a xml column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a xml column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
 
@@ -428,7 +428,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         Rows           = $Rows
                     }
                 } else {
-                    Write-Message -Message "No columns match for data generation in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig
+                    Write-Message -Message "No columns match for data generation in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                 }
             }
 
@@ -440,7 +440,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Tables = $tables
                 }
             } else {
-                Write-Message -Message "No columns match for data generation in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig
+                Write-Message -Message "No columns match for data generation in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
             }
         }
 
@@ -459,7 +459,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Something went wrong writing the results to the Path" -Target $Path -Continue -ErrorRecord $_ -FunctionName New-DbaDbDataGeneratorConfig
             }
         } else {
-            Write-Message -Message "No tables to save for database $($db.Name) on $($server.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig
+            Write-Message -Message "No tables to save for database $($db.Name) on $($server.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
         }
     }
 } $SqlInstance $SqlCredential $Database $Table $ResetIdentity $TruncateTable $Rows $Path $Force $EnableException $__beginState $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

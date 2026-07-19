@@ -150,19 +150,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $inputType = $input.GetType().FullName
             switch ($inputType) {
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbRoleMember
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbRoleMember -ModuleName "dbatools"
                     $dbRoles = Get-DbaDbRole -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -Role $Role
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbRoleMember
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbRoleMember -ModuleName "dbatools"
                     $dbRoles = Get-DbaDbRole -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -Role $Role
                 }
                 'Microsoft.SqlServer.Management.Smo.Database' {
-                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbRoleMember
+                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbRoleMember -ModuleName "dbatools"
                     $dbRoles = $input | Get-DbaDbRole -Role $Role
                 }
                 'Microsoft.SqlServer.Management.Smo.DatabaseRole' {
-                    Write-Message -Level Verbose -Message "Processing DatabaseRole through InputObject" -FunctionName Remove-DbaDbRoleMember
+                    Write-Message -Level Verbose -Message "Processing DatabaseRole through InputObject" -FunctionName Remove-DbaDbRoleMember -ModuleName "dbatools"
                     $dbRoles = $input
                 }
                 default {
@@ -180,14 +180,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $db = $dbRole.Parent
                 $instance = $db.Parent
 
-                Write-Message -Level 'Verbose' -Message "Getting Database Role Members for $dbRole in $db on $instance" -FunctionName Remove-DbaDbRoleMember
+                Write-Message -Level 'Verbose' -Message "Getting Database Role Members for $dbRole in $db on $instance" -FunctionName Remove-DbaDbRoleMember -ModuleName "dbatools"
 
                 $members = $dbRole.EnumMembers()
 
                 foreach ($username in $User) {
                     if ($members -contains $username) {
                         if ($__realCmdlet.ShouldProcess($instance, "Removing User $username from role: $dbRole in database $db")) {
-                            Write-Message -Level 'Verbose' -Message "Removing User $username from role: $dbRole in database $db on $instance" -FunctionName Remove-DbaDbRoleMember
+                            Write-Message -Level 'Verbose' -Message "Removing User $username from role: $dbRole in database $db on $instance" -FunctionName Remove-DbaDbRoleMember -ModuleName "dbatools"
                             $dbRole.DropMember($username)
                         }
                     }

@@ -147,7 +147,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         $sql = "EXEC master.dbo.xp_create_subdir '$Path'"
-        Write-Message -Level Debug -Message $sql -FunctionName New-DbaDirectory
+        Write-Message -Level Debug -Message $sql -FunctionName New-DbaDirectory -ModuleName "dbatools"
         if ($__realCmdlet.ShouldProcess($path, "Creating a new path on $($server.name)")) {
             try {
                 $null = $server.Query($sql)

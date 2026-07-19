@@ -203,15 +203,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 switch ($inputType) {
                     'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                        Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Test-DbaDbQueryStore
+                        Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Test-DbaDbQueryStore -ModuleName "dbatools"
                         $dbDatabases = Get-DbaDatabase -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -OnlyAccessible
                     }
                     'Microsoft.SqlServer.Management.Smo.Server' {
-                        Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Test-DbaDbQueryStore
+                        Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Test-DbaDbQueryStore -ModuleName "dbatools"
                         $dbDatabases = Get-DbaDatabase -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -OnlyAccessible
                     }
                     'Microsoft.SqlServer.Management.Smo.Database' {
-                        Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Test-DbaDbQueryStore
+                        Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Test-DbaDbQueryStore -ModuleName "dbatools"
                         $dbDatabases = $input | Where-Object { $_.Name -notin $ExcludeDatabase }
                     }
                     default {
@@ -285,7 +285,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 try {
-                    Write-Message -Level Verbose -Message "Evaluating Query Store options" -FunctionName Test-DbaDbQueryStore
+                    Write-Message -Level Verbose -Message "Evaluating Query Store options" -FunctionName Test-DbaDbQueryStore -ModuleName "dbatools"
                     $currentOptions = Get-DbaDbQueryStoreOption -SqlInstance $server -Database $dbDatabases.name
 
                     foreach ($db in $currentOptions) {

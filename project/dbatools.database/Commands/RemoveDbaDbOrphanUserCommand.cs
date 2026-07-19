@@ -226,17 +226,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             #if SQL 2012 or higher only validate databases with ContainmentType = NONE
                             if ($server.versionMajor -gt 10) {
                                 if ($db.ContainmentType -ne [Microsoft.SqlServer.Management.Smo.ContainmentType]::None) {
-                                    Write-Message -Level Warning -Message "Database '$db' is a contained database. Contained databases can't have orphaned users. Skipping validation." -FunctionName Remove-DbaDbOrphanUser
+                                    Write-Message -Level Warning -Message "Database '$db' is a contained database. Contained databases can't have orphaned users. Skipping validation." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                     Continue
                                 }
                             }
 
                             if ($StackSource -eq "Repair-DbaDbOrphanUser") {
-                                Write-Message -Level Verbose -Message "Call origin: Repair-DbaDbOrphanUser." -FunctionName Remove-DbaDbOrphanUser
+                                Write-Message -Level Verbose -Message "Call origin: Repair-DbaDbOrphanUser." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                 #Will use collection from parameter ($User)
                                 $users = $User
                             } else {
-                                Write-Message -Level Verbose -Message "Validating users on database $db." -FunctionName Remove-DbaDbOrphanUser
+                                Write-Message -Level Verbose -Message "Validating users on database $db." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
 
                                 $users = (Get-DbaDbOrphanUser -SqlInstance $server -Database $db.Name).SmoUser
                                 if ($User.Count -gt 0) {
@@ -245,7 +245,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
 
                             if ($users.Count -gt 0) {
-                                Write-Message -Level Verbose -Message "Orphan users found." -FunctionName Remove-DbaDbOrphanUser
+                                Write-Message -Level Verbose -Message "Orphan users found." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                 foreach ($dbuser in $users) {
                                     $SkipUser = $false
 
@@ -273,7 +273,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                         $Schemas = $db.Schemas | Where-Object Owner -eq $dbuser.Name
 
                                         if (@($Schemas).Count -gt 0) {
-                                            Write-Message -Level Verbose -Message "User $dbuser owns one or more schemas." -FunctionName Remove-DbaDbOrphanUser
+                                            Write-Message -Level Verbose -Message "User $dbuser owns one or more schemas." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
 
                                             foreach ($sch in $Schemas) {
                                                 <#
@@ -290,7 +290,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                                 if ($NumberObjects -gt 0) {
                                                     if ($Force) {
-                                                        Write-Message -Level Verbose -Message "Parameter -Force was used! The schema '$($sch.Name)' have $NumberObjects underlying objects. We will change schema owner to 'dbo' and drop the user." -FunctionName Remove-DbaDbOrphanUser
+                                                        Write-Message -Level Verbose -Message "Parameter -Force was used! The schema '$($sch.Name)' have $NumberObjects underlying objects. We will change schema owner to 'dbo' and drop the user." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
 
                                                         if ($__realCmdlet.ShouldProcess($db.Name, "Changing schema '$($sch.Name)' owner to 'dbo'. -Force used.")) {
                                                             $AlterSchemaOwner += "ALTER AUTHORIZATION ON SCHEMA::[$($sch.Name)] TO [dbo]$eol"
@@ -307,13 +307,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                                             }
                                                         }
                                                     } else {
-                                                        Write-Message -Level Warning -Message "Schema '$($sch.Name)' owned by user $($dbuser.Name) have $NumberObjects underlying objects. If you want to change the schemas' owner to 'dbo' and drop the user anyway, use -Force parameter. Skipping user '$dbuser'." -FunctionName Remove-DbaDbOrphanUser
+                                                        Write-Message -Level Warning -Message "Schema '$($sch.Name)' owned by user $($dbuser.Name) have $NumberObjects underlying objects. If you want to change the schemas' owner to 'dbo' and drop the user anyway, use -Force parameter. Skipping user '$dbuser'." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                                         $SkipUser = $true
                                                         break
                                                     }
                                                 } else {
                                                     if ($sch.Name -eq $dbuser.Name) {
-                                                        Write-Message -Level Verbose -Message "The schema '$($sch.Name)' have the same name as user $dbuser. Schema will be dropped." -FunctionName Remove-DbaDbOrphanUser
+                                                        Write-Message -Level Verbose -Message "The schema '$($sch.Name)' have the same name as user $dbuser. Schema will be dropped." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
 
                                                         if ($__realCmdlet.ShouldProcess($db.Name, "Dropping schema '$($sch.Name)'.")) {
                                                             $DropSchema += "DROP SCHEMA [$($sch.Name)]"
@@ -330,7 +330,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                                             }
                                                         }
                                                     } else {
-                                                        Write-Message -Level Warning -Message "Schema '$($sch.Name)' does not have any underlying object. Ownership will be changed to 'dbo' so the user can be dropped. Remember to re-check permissions on this schema." -FunctionName Remove-DbaDbOrphanUser
+                                                        Write-Message -Level Warning -Message "Schema '$($sch.Name)' does not have any underlying object. Ownership will be changed to 'dbo' so the user can be dropped. Remember to re-check permissions on this schema." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
 
                                                         if ($__realCmdlet.ShouldProcess($db.Name, "Changing schema '$($sch.Name)' owner to 'dbo'.")) {
                                                             $AlterSchemaOwner += "ALTER AUTHORIZATION ON SCHEMA::[$($sch.Name)] TO [dbo]$eol"
@@ -351,7 +351,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                             }
 
                                         } else {
-                                            Write-Message -Level Verbose -Message "User $dbuser does not own any schema. Will be dropped." -FunctionName Remove-DbaDbOrphanUser
+                                            Write-Message -Level Verbose -Message "User $dbuser does not own any schema. Will be dropped." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                         }
 
                                         # https://github.com/dataplat/dbatools/issues/7130
@@ -362,7 +362,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                         $query = "$AlterSchemaOwner $eol$DropSchema $($eol)DROP USER " + $dbUserName
 
-                                        Write-Message -Level Debug -Message $query -FunctionName Remove-DbaDbOrphanUser
+                                        Write-Message -Level Debug -Message $query -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                     } else {
                                         $query = "EXEC master.dbo.sp_droplogin @loginame = N'$($dbuser.name)'"
                                     }
@@ -372,10 +372,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                             if ($Force) {
                                                 if ($__realCmdlet.ShouldProcess($db.Name, "Dropping user $dbuser using -Force")) {
                                                     $server.Databases[$db.Name].ExecuteNonQuery($query) | Out-Null
-                                                    Write-Message -Level Verbose -Message "User $dbuser was dropped from $($db.Name). -Force parameter was used." -FunctionName Remove-DbaDbOrphanUser
+                                                    Write-Message -Level Verbose -Message "User $dbuser was dropped from $($db.Name). -Force parameter was used." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                                 }
                                             } else {
-                                                Write-Message -Level Warning -Message "Orphan user $($dbuser.Name) has a matching login. The user will not be dropped. If you want to drop anyway, use -Force parameter." -FunctionName Remove-DbaDbOrphanUser
+                                                Write-Message -Level Warning -Message "Orphan user $($dbuser.Name) has a matching login. The user will not be dropped. If you want to drop anyway, use -Force parameter." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                                 Continue
                                             }
                                         }
@@ -383,13 +383,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                         if (-not $SkipUser) {
                                             if ($__realCmdlet.ShouldProcess($db.Name, "Dropping user $dbuser")) {
                                                 $server.Databases[$db.Name].ExecuteNonQuery($query) | Out-Null
-                                                Write-Message -Level Verbose -Message "User $dbuser was dropped from $($db.Name)." -FunctionName Remove-DbaDbOrphanUser
+                                                Write-Message -Level Verbose -Message "User $dbuser was dropped from $($db.Name)." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                                             }
                                         }
                                     }
                                 }
                             } else {
-                                Write-Message -Level Verbose -Message "No orphan users found on database $db." -FunctionName Remove-DbaDbOrphanUser
+                                Write-Message -Level Verbose -Message "No orphan users found on database $db." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                             }
                             #reset collection
                             $users = $null
@@ -398,7 +398,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
                     }
                 } else {
-                    Write-Message -Level Verbose -Message "There are no databases to analyse." -FunctionName Remove-DbaDbOrphanUser
+                    Write-Message -Level Verbose -Message "There are no databases to analyse." -FunctionName Remove-DbaDbOrphanUser -ModuleName "dbatools"
                 }
             }
 

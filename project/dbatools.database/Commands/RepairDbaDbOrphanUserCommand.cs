@@ -178,7 +178,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     foreach ($db in $DatabaseCollection) {
                         try {
 
-                            Write-Message -Level Verbose -Message "Validating users on database '$db'." -FunctionName Repair-DbaDbOrphanUser
+                            Write-Message -Level Verbose -Message "Validating users on database '$db'." -FunctionName Repair-DbaDbOrphanUser -ModuleName "dbatools"
 
                             $UsersToWork = (Get-DbaDbOrphanUser -SqlInstance $server -Database $db.Name).SmoUser
                             if ($Users.Count -gt 0) {
@@ -186,7 +186,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
 
                             if ($UsersToWork.Count -gt 0) {
-                                Write-Message -Level Verbose -Message "Orphan users found" -FunctionName Repair-DbaDbOrphanUser
+                                Write-Message -Level Verbose -Message "Orphan users found" -FunctionName Repair-DbaDbOrphanUser -ModuleName "dbatools"
                                 $UsersToRemove = @()
                                 foreach ($User in $UsersToWork) {
                                     $ExistLogin = $server.logins | Where-Object {
@@ -205,7 +205,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                         if ($__realCmdlet.ShouldProcess($db.Name, "Mapping user '$($User.Name)'")) {
                                             $server.Databases[$db.Name].ExecuteNonQuery($query) | Out-Null
-                                            Write-Message -Level Verbose -Message "User '$($User.Name)' mapped with their login." -FunctionName Repair-DbaDbOrphanUser
+                                            Write-Message -Level Verbose -Message "User '$($User.Name)' mapped with their login." -FunctionName Repair-DbaDbOrphanUser -ModuleName "dbatools"
 
                                             [PSCustomObject]@{
                                                 ComputerName = $server.ComputerName
@@ -221,7 +221,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                             #add user to collection
                                             $UsersToRemove += $User
                                         } else {
-                                            Write-Message -Level Verbose -Message "Orphan user $($User.Name) does not have matching login." -FunctionName Repair-DbaDbOrphanUser
+                                            Write-Message -Level Verbose -Message "Orphan user $($User.Name) does not have matching login." -FunctionName Repair-DbaDbOrphanUser -ModuleName "dbatools"
                                             [PSCustomObject]@{
                                                 ComputerName = $server.ComputerName
                                                 InstanceName = $server.ServiceName
@@ -238,18 +238,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 if ($RemoveNotExisting) {
                                     if ($Force) {
                                         if ($__realCmdlet.ShouldProcess($db.Name, "Remove-DbaDbOrphanUser")) {
-                                            Write-Message -Level Verbose -Message "Calling 'Remove-DbaDbOrphanUser' with -Force." -FunctionName Repair-DbaDbOrphanUser
+                                            Write-Message -Level Verbose -Message "Calling 'Remove-DbaDbOrphanUser' with -Force." -FunctionName Repair-DbaDbOrphanUser -ModuleName "dbatools"
                                             Remove-DbaDbOrphanUser -SqlInstance $server -Database $db.Name -User $UsersToRemove -Force
                                         }
                                     } else {
                                         if ($__realCmdlet.ShouldProcess($db.Name, "Remove-DbaDbOrphanUser")) {
-                                            Write-Message -Level Verbose -Message "Calling 'Remove-DbaDbOrphanUser'." -FunctionName Repair-DbaDbOrphanUser
+                                            Write-Message -Level Verbose -Message "Calling 'Remove-DbaDbOrphanUser'." -FunctionName Repair-DbaDbOrphanUser -ModuleName "dbatools"
                                             Remove-DbaDbOrphanUser -SqlInstance $server -Database $db.Name -User $UsersToRemove
                                         }
                                     }
                                 }
                             } else {
-                                Write-Message -Level Verbose -Message "No orphan users found on database '$db'." -FunctionName Repair-DbaDbOrphanUser
+                                Write-Message -Level Verbose -Message "No orphan users found on database '$db'." -FunctionName Repair-DbaDbOrphanUser -ModuleName "dbatools"
                             }
                             #reset collection
                             $UsersToWork = $null
@@ -258,7 +258,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
                     }
                 } else {
-                    Write-Message -Level Verbose -Message "There are no databases to analyse." -FunctionName Repair-DbaDbOrphanUser
+                    Write-Message -Level Verbose -Message "There are no databases to analyse." -FunctionName Repair-DbaDbOrphanUser -ModuleName "dbatools"
                 }
             }
 
