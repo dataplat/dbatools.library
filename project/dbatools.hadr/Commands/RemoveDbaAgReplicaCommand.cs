@@ -24,10 +24,12 @@ public sealed class RemoveDbaAgReplicaCommand : DbaBaseCmdlet
 
     /// <summary>The availability group or groups to remove the replicas from.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? AvailabilityGroup { get; set; }
 
     /// <summary>The replica or replicas to remove.</summary>
     [Parameter(Position = 3)]
+    [PsStringArrayCast]
     public string[]? Replica { get; set; }
 
     /// <summary>Replica objects piped from Get-DbaAgReplica.</summary>

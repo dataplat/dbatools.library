@@ -44,6 +44,7 @@ public sealed partial class InvokeDbaDbMirroringCommand : DbaBaseCmdlet
 
     /// <summary>The databases to mirror.</summary>
     [Parameter(Position = 6)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>Endpoint encryption requirement.</summary>

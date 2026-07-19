@@ -28,6 +28,7 @@ public sealed class ResumeDbaAgDbDataMovementCommand : DbaBaseCmdlet
 
     /// <summary>The database or databases to resume data movement on.</summary>
     [Parameter(Position = 3)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>Availability database objects piped from Get-DbaAgDatabase.</summary>

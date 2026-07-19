@@ -59,6 +59,7 @@ public sealed partial class NewDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>The databases to add to the availability group.</summary>
     [Parameter(Position = 9)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>Network share readable by every replica, used to stage seeding backups.</summary>
@@ -100,6 +101,7 @@ public sealed partial class NewDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>Explicit endpoint URLs, one per replica (primary first).</summary>
     [Parameter(Position = 18)]
+    [PsStringArrayCast]
     public string[]? EndpointUrl { get; set; }
 
     /// <summary>Certificate used to authenticate the mirroring endpoint.</summary>
