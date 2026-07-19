@@ -28,19 +28,19 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class ExportDbaSpConfigureCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative credential for the target instances.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>Directory for the exported script (defaults to the configured export path).</summary>
-    [Parameter]
+    [Parameter(Position = 2)]
     public string? Path { get; set; }
 
     /// <summary>Explicit output file path.</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     [Alias("OutFile", "FileName")]
     public string? FilePath { get; set; }
 
