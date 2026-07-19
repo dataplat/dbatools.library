@@ -25,6 +25,7 @@ public sealed class SetDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>The availability group or groups to modify.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? AvailabilityGroup { get; set; }
 
     /// <summary>Modify every availability group on the instance.</summary>

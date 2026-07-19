@@ -24,6 +24,7 @@ public sealed class SetDbaEndpointCommand : DbaBaseCmdlet
 
     /// <summary>The endpoint or endpoints to modify.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Endpoint { get; set; }
 
     /// <summary>The new owner of the endpoint.</summary>
