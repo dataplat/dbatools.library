@@ -35,6 +35,12 @@ internal static partial class NestedCommand
         string prior = "$__dbatoolsPriorModuleRoot_" + seedToken;
         string priorValue = "$__dbatoolsPriorModuleRootValue_" + seedToken;
         return
+            // Module-scope repair FIRST: bodies with a module-scoped inner hop
+            // (& $__dbatoolsModule { ... }) resolve $script:PSModuleRoot against the MODULE's
+            // script scope, which the same Pester churn empties and which the caller-scope seed
+            // below cannot reach. Its correct value IS ModuleBase (what the psm1 set at import),
+            // so this is a repair, not an override - no prior-value dance needed.
+            "$null = Get-Module -Name dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1 | ForEach-Object { & $_ { Set-Variable -Name PSModuleRoot -Scope Script -Value ([Dataplat.Dbatools.dbaSystem.SystemHost]::ModuleBase) -Force -WhatIf:$false -Confirm:$false -ErrorAction Ignore } }\n" +
             prior + " = Get-Variable -Name PSModuleRoot -Scope Script -ErrorAction Ignore\n" +
             priorValue + " = if ($null -ne " + prior + ") { " + prior + ".Value } else { $null }\n" +
             "Set-Variable -Name PSModuleRoot -Scope Script -Value ([Dataplat.Dbatools.dbaSystem.SystemHost]::ModuleBase) -Force -WhatIf:$false -Confirm:$false -ErrorAction Ignore\n" +
