@@ -126,8 +126,17 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { computer }, Credential, UseWindowsCredentials.ToBool(),
+            NestedCommand.InvokeScopedStreaming(this, item =>
+            {
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                    return;
+                }
+                WriteObject(item);
+            }, ProcessScript,
+            new[] { computer }, Credential, UseWindowsCredentials.ToBool(),
                 OverrideExplicitCredential.ToBool(), DisabledConnectionTypes,
                 DisableBadCredentialCache.ToBool(), DisableCimPersistence.ToBool(),
                 DisableCredentialAutoRegister.ToBool(), EnableCredentialFailover.ToBool(),
@@ -140,16 +149,7 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
                 TestBound(nameof(WindowsCredentialsAreBad)), TestBound(nameof(CimWinRMOptions)),
                 TestBound(nameof(CimDCOMOptions)), this,
                 BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-            {
-                if (item?.BaseObject is ErrorRecord nestedError)
-                {
-                    RemoveHopErrorBookkeeping(nestedError);
-                    WriteError(nestedError);
-                    continue;
-                }
-                WriteObject(item);
-            }
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 

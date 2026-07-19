@@ -92,20 +92,20 @@ public sealed class NewDbaCredentialCommand : DbaBaseCmdlet
         // only ONE scriptblock invocation reproduces that. Per-element is INELIGIBLE
         // here unless the gates are re-routed to $__realCmdlet first; the Debug
         // interleave granularity rides the DEF-001 buffered-output systemic.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, _nameState, Identity, SecurePassword,
-            MappedClassType, ProviderName ?? "", Force.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, _nameState, Identity, SecurePassword,
+            MappedClassType, ProviderName ?? "", Force.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

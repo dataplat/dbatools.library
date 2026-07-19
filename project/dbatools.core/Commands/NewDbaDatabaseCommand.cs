@@ -175,7 +175,26 @@ public sealed class NewDbaDatabaseCommand : DbaBaseCmdlet
         if (_hopInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w3066State"))
+            {
+                _state = sentinel["__w3066State"] as Hashtable;
+                if (_state is not null && LanguagePrimitives.IsTrue(_state["interrupted"]))
+                {
+                    _hopInterrupted = true;
+                }
+                return;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, Name, Collation, RecoveryModel, Owner ?? "",
             DataFilePath, LogFilePath, PrimaryFilesize, PrimaryFileGrowth, PrimaryFileMaxSize,
             LogSize, LogGrowth, LogMaxSize, SecondaryFilesize, SecondaryFileGrowth,
@@ -190,26 +209,7 @@ public sealed class NewDbaDatabaseCommand : DbaBaseCmdlet
             TestBound(nameof(SecondaryFileMaxSize)), TestBound(nameof(SecondaryFileCount)),
             this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            Hashtable? sentinel = item?.BaseObject as Hashtable;
-            if (sentinel is not null && sentinel.ContainsKey("__w3066State"))
-            {
-                _state = sentinel["__w3066State"] as Hashtable;
-                if (_state is not null && LanguagePrimitives.IsTrue(_state["interrupted"]))
-                {
-                    _hopInterrupted = true;
-                }
-                continue;
-            }
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

@@ -96,26 +96,26 @@ public sealed class SetDbaDbOwnerCommand : DbaBaseCmdlet
         if (!inputObjectPipedThisRecord && _state is not null && _state.ContainsKey("InputObject"))
             effectiveInputObject = _state["InputObject"];
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, effectiveInputObject,
-            TargetLogin, EnableException.ToBool(), _state, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3088State"))
             {
                 _state = sentinel["__w3088State"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, effectiveInputObject,
+            TargetLogin, EnableException.ToBool(), _state, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
 
         // Engine restore semantics: after a record where InputObject was PIPELINE-bound,
         // the fn-scope variable snaps back to its pre-pipeline value - any accumulation

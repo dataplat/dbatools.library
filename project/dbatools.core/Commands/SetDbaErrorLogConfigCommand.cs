@@ -65,21 +65,21 @@ public sealed class SetDbaErrorLogConfigCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { instance }, SqlCredential, LogCount, LogSize,
-                TestBound(nameof(LogCount)), TestBound(nameof(LogSize)),
-                EnableException.ToBool(), this,
-                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+            new[] { instance }, SqlCredential, LogCount, LogSize,
+                TestBound(nameof(LogCount)), TestBound(nameof(LogSize)),
+                EnableException.ToBool(), this,
+                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 

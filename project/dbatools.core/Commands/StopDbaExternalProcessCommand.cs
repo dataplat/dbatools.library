@@ -55,25 +55,25 @@ public sealed class StopDbaExternalProcessCommand : DbaBaseCmdlet
         // deliberately colliding hashtable passing through as ordinary output).
         object continueMarker = new object();
         bool continueEscaped = false;
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            ComputerName, Credential, ProcessId, EnableException.ToBool(), this,
-            continueMarker,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (ReferenceEquals(item?.BaseObject, continueMarker))
             {
                 continueEscaped = true;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            ComputerName, Credential, ProcessId, EnableException.ToBool(), this,
+            continueMarker,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
 
         // CONTINUE RELAY, C# half: the hop completed (output drained, warnings
         // replayed); now let the source's escaped `continue` leave this cmdlet exactly
