@@ -197,8 +197,8 @@ public sealed class GetDbaQueryExecutionTimeCommand : DbaInstanceCmdlet
             }
             Server server = connection.Server!;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, InstanceProjectionScript, server, instance, _sql, Database, ExcludeDatabase, ExcludeSystem.ToBool(), EnableException.ToBool(), BoundVerbose()))
-                WriteObject(item);
+            NestedCommand.InvokeScopedStreaming(this, item => WriteObject(item), InstanceProjectionScript,
+                server, instance, _sql, Database, ExcludeDatabase, ExcludeSystem.ToBool(), EnableException.ToBool(), BoundVerbose());
         }
     }
 

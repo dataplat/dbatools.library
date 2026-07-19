@@ -166,8 +166,8 @@ public sealed class GetDbaPfDataCollectorCounterSampleCommand : DbaBaseCmdlet
 
             // The hop owns the whole per-object body; the only throw-through is the
             // EE Stop-Function (the function's terminating path), which propagates.
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, SampleProjectionScript, counterObject, effectiveCredential, Continuous.ToBool(), ListSet, MaxSamples, SampleInterval, EnableException.ToBool(), BoundVerbose()))
-                WriteObject(item);
+            NestedCommand.InvokeScopedStreaming(this, item => WriteObject(item), SampleProjectionScript,
+                    counterObject, effectiveCredential, Continuous.ToBool(), ListSet, MaxSamples, SampleInterval, EnableException.ToBool(), BoundVerbose());
         }
     }
 
