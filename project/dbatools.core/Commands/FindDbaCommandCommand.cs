@@ -1,0 +1,169 @@
+#nullable enable
+
+using System;
+using System.Collections;
+using System.Management.Automation;
+
+namespace Dataplat.Dbatools.Commands;
+
+/// <summary>
+/// Finds dbatools commands via the help index. Port of public/Find-DbaCommand.ps1 (W3-019).
+/// The command takes NO pipeline input, so the process block runs exactly once - and the begin
+/// block only DEFINES the nested Get-DbaIndex function and sets $moduleDirectory (both consumed
+/// in process), with no side effect of its own. Because process runs once and begin is pure
+/// setup, begin and process fold into a SINGLE process hop (the begin function definition and
+/// $moduleDirectory assignment lead the process body verbatim) - splitting them would strand the
+/// nested function and variable across separate scriptblock scopes. There is a single terminal
+/// emit (Select-DefaultView) and no Stop-Function anywhere, so DEF-001's buffered-emit-then-throw
+/// shape cannot arise; the hop still runs through InvokeScopedStreaming for uniformity. The only
+/// substitution is $Pscmdlet.ShouldProcess -> $__realCmdlet.ShouldProcess (ConfirmImpact MEDIUM,
+/// the SupportsShouldProcess default, mirrored); the body is otherwise verbatim. Surface pinned by
+/// migration/baselines/Find-DbaCommand.json.
+/// </summary>
+[Cmdlet(VerbsCommon.Find, "DbaCommand", SupportsShouldProcess = true)]
+public sealed class FindDbaCommandCommand : DbaBaseCmdlet
+{
+    /// <summary>Text pattern to match against command help.</summary>
+    [Parameter]
+    public string? Pattern { get; set; }
+
+    /// <summary>Tag(s) to filter by.</summary>
+    [Parameter]
+    public string[]? Tag { get; set; }
+
+    /// <summary>Author to filter by.</summary>
+    [Parameter]
+    public string? Author { get; set; }
+
+    /// <summary>Minimum version to filter by.</summary>
+    [Parameter]
+    public string? MinimumVersion { get; set; }
+
+    /// <summary>Maximum version to filter by.</summary>
+    [Parameter]
+    public string? MaximumVersion { get; set; }
+
+    /// <summary>Rebuilds the help index before searching.</summary>
+    [Parameter]
+    public SwitchParameter Rebuild { get; set; }
+
+    // EnableException is inherited from DbaBaseCmdlet - never redeclared.
+
+    protected override void ProcessRecord()
+    {
+        if (Interrupted)
+            return;
+
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
+            Pattern, Tag, Author, MinimumVersion, MaximumVersion, Rebuild.ToBool(), EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+    }
+
+    private object? BoundCommonParameter(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    private void RemoveHopErrorBookkeeping(ErrorRecord record)
+    {
+        try
+        {
+            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+                return;
+            if (errorList[0] is not ErrorRecord first)
+                return;
+            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
+                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
+            {
+                errorList.RemoveAt(0);
+            }
+        }
+        catch
+        {
+            // Best-effort bookkeeping only.
+        }
+    }
+
+    // PS: the begin block's Get-DbaIndex function definition and $moduleDirectory assignment lead
+    // the process body VERBATIM (folded - the command has no pipeline input, so both blocks run
+    // once). Substitution only: $Pscmdlet -> $__realCmdlet.
+    private const string ProcessScript = """
+param($Pattern, $Tag, $Author, $MinimumVersion, $MaximumVersion, $Rebuild, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding(SupportsShouldProcess)]
+    param([String]$Pattern, [String[]]$Tag, [String]$Author, [String]$MinimumVersion, [String]$MaximumVersion, $Rebuild, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    function Get-DbaIndex() {
+        if ($__realCmdlet.ShouldProcess($dest, "Recreating index")) {
+            $dbamodule = Get-Module -Name dbatools
+            $allCommands = $dbamodule.ExportedCommands.Values | Where-Object CommandType -In 'Function', 'Cmdlet' | Where-Object Name -NotIn 'Write-Message' | Sort-Object -Property Name | Select-Object -Unique
+            #Had to add Unique because Select-DbaObject was getting populated twice once written to the index file
+
+            $helpcoll = New-Object System.Collections.Generic.List[System.Object]
+            foreach ($command in $allCommands) {
+                $x = Get-DbaHelp "$command"
+                $helpcoll.Add($x)
+            }
+            # $dest = Get-DbatoolsConfigValue -Name 'Path.TagCache' -Fallback "$(Resolve-Path $PSScriptRoot\..)\dbatools-index.json"
+            $dest = Resolve-Path "$moduleDirectory\bin\dbatools-index.json"
+            $helpcoll | ConvertTo-Json -Depth 4 | Out-File $dest -Encoding Unicode
+        }
+    }
+
+    $moduleDirectory = $script:PSModuleRoot
+
+    $Pattern = $Pattern.TrimEnd("s")
+    $idxFile = Resolve-Path "$moduleDirectory\bin\dbatools-index.json"
+    if (!(Test-Path $idxFile) -or $Rebuild) {
+        Write-Message -Level Verbose -Message "Rebuilding index into $idxFile"
+        $swRebuild = [system.diagnostics.stopwatch]::StartNew()
+        Get-DbaIndex
+        Write-Message -Level Verbose -Message "Rebuild done in $($swRebuild.ElapsedMilliseconds)ms"
+    }
+    $consolidated = Get-Content -Raw $idxFile | ConvertFrom-Json
+    $result = $consolidated
+    if ($Pattern.Length -gt 0) {
+        $result = $result | Where-Object { $_.PsObject.Properties.Value -like "*$Pattern*" }
+    }
+
+    if ($Tag.Length -gt 0) {
+        foreach ($t in $Tag) {
+            $result = $result | Where-Object Tags -Contains $t
+        }
+    }
+
+    if ($Author.Length -gt 0) {
+        $result = $result | Where-Object Author -Like "*$Author*"
+    }
+
+    if ($MinimumVersion.Length -gt 0) {
+        $result = $result | Where-Object MinimumVersion -GE $MinimumVersion
+    }
+
+    if ($MaximumVersion.Length -gt 0) {
+        $result = $result | Where-Object MaximumVersion -LE $MaximumVersion
+    }
+
+    Select-DefaultView -InputObject $result -Property CommandName, Synopsis
+} $Pattern $Tag $Author $MinimumVersion $MaximumVersion $Rebuild $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+}
