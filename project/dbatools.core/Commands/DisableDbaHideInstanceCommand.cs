@@ -40,10 +40,13 @@ public sealed class DisableDbaHideInstanceCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // PS: [DbaInstanceParameter[]]$SqlInstance = $env:COMPUTERNAME - apply the default when
-        // the parameter is unbound (a compiled parameter cannot default to a runtime expression).
+        // PS: [DbaInstanceParameter[]]$SqlInstance = $env:COMPUTERNAME - apply the default ONLY
+        // when the parameter is genuinely ABSENT (a compiled parameter cannot default to a
+        // runtime expression). An EXPLICITLY bound $null/@() must NOT fall back to localhost:
+        // the function world's foreach over the bound empty value is a no-op, and defaulting
+        // here would touch the local registry the caller never named (codex).
         DbaInstanceParameter[]? instances = SqlInstance;
-        if (instances is null || instances.Length == 0)
+        if (!MyInvocation.BoundParameters.ContainsKey("SqlInstance") && (instances is null || instances.Length == 0))
         {
             string? machine = Environment.GetEnvironmentVariable("COMPUTERNAME");
             if (!string.IsNullOrEmpty(machine))
