@@ -72,10 +72,7 @@ public sealed class InvokeDbaDbCloneCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Database, SqlInstance, ExcludeStatistics.ToBool(), ExcludeQueryStore.ToBool(), EnableException.ToBool(),
-            TestBound(nameof(ExcludeStatistics)), TestBound(nameof(ExcludeQueryStore)),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__cloneBegin"))
             {
@@ -89,16 +86,19 @@ public sealed class InvokeDbaDbCloneCommand : DbaBaseCmdlet
                     _sql2016min = state["Sql2016min"];
                     _beginInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Database, SqlInstance, ExcludeStatistics.ToBool(), ExcludeQueryStore.ToBool(), EnableException.ToBool(),
+            TestBound(nameof(ExcludeStatistics)), TestBound(nameof(ExcludeQueryStore)),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -108,20 +108,20 @@ public sealed class InvokeDbaDbCloneCommand : DbaBaseCmdlet
         if (Interrupted || _beginInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, InputObject, CloneDatabase, EnableException.ToBool(),
-            _sqlStats, _sqlWith, _sql2012min, _sql2014min, _sql2014CuMin, _sql2016min, this,
-            TestBound(nameof(CloneDatabase)), TestBound(nameof(ExcludeStatistics)), TestBound(nameof(ExcludeQueryStore)),
-            TestBound(nameof(UpdateStatistics)), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, InputObject, CloneDatabase, EnableException.ToBool(),
+            _sqlStats, _sqlWith, _sql2012min, _sql2014min, _sql2014CuMin, _sql2016min, this,
+            TestBound(nameof(CloneDatabase)), TestBound(nameof(ExcludeStatistics)), TestBound(nameof(ExcludeQueryStore)),
+            TestBound(nameof(UpdateStatistics)), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

@@ -97,10 +97,7 @@ public sealed class ImportDbaBinaryFileCommand : DbaBaseCmdlet
         if (Interrupted || _processInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, Table, Schema, Statement, FileNameColumn, BinaryColumn,
-            NoFileNameColumn.ToBool(), InputObject, FilePath, Path, EnableException.ToBool(),
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__ibfProcess"))
             {
@@ -108,16 +105,19 @@ public sealed class ImportDbaBinaryFileCommand : DbaBaseCmdlet
                 {
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, Table, Schema, Statement, FileNameColumn, BinaryColumn,
+            NoFileNameColumn.ToBool(), InputObject, FilePath, Path, EnableException.ToBool(),
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

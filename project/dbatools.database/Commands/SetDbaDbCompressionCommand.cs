@@ -154,13 +154,7 @@ public sealed class SetDbaDbCompressionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Table,
-            CompressionType, MaxRunTime, PercentCompression,
-            ForceOfflineRebuilds.ToBool(), SortInTempDB.ToBool(),
-            InputObject, EnableException.ToBool(),
-            TestBound(nameof(InputObject)), _carriedTables, _carriedCompressionSuggestion,
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__setDbaDbCompressionProcess"))
             {
@@ -169,16 +163,22 @@ public sealed class SetDbaDbCompressionCommand : DbaBaseCmdlet
                     _carriedTables = state["Tables"];
                     _carriedCompressionSuggestion = state["CompressionSuggestion"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, Table,
+            CompressionType, MaxRunTime, PercentCompression,
+            ForceOfflineRebuilds.ToBool(), SortInTempDB.ToBool(),
+            InputObject, EnableException.ToBool(),
+            TestBound(nameof(InputObject)), _carriedTables, _carriedCompressionSuggestion,
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

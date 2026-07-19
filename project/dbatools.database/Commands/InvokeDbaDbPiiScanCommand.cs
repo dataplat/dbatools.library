@@ -114,20 +114,20 @@ public sealed class InvokeDbaDbPiiScanCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ScanScript,
-            SqlInstance, SqlCredential, Database, Table, Column, Country, CountryCode, ExcludeTable,
-            ExcludeColumn, SampleCount, KnownNameFilePath, PatternFilePath,
-            ExcludeDefaultKnownName.ToBool(), ExcludeDefaultPattern.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ScanScript,
+            SqlInstance, SqlCredential, Database, Table, Column, Country, CountryCode, ExcludeTable,
+            ExcludeColumn, SampleCount, KnownNameFilePath, PatternFilePath,
+            ExcludeDefaultKnownName.ToBool(), ExcludeDefaultPattern.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

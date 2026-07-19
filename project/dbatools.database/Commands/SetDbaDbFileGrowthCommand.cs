@@ -80,20 +80,20 @@ public sealed class SetDbaDbFileGrowthCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, GrowthType, Growth, FileType, InputObject,
-            EnableException.ToBool(),
-            TestBound(nameof(Database)), TestBound(nameof(InputObject)), TestBound(nameof(SqlInstance)),
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, GrowthType, Growth, FileType, InputObject,
+            EnableException.ToBool(),
+            TestBound(nameof(Database)), TestBound(nameof(InputObject)), TestBound(nameof(SqlInstance)),
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

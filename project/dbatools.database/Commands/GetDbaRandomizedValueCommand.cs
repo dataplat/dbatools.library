@@ -84,18 +84,18 @@ public sealed class GetDbaRandomizedValueCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            DataType, RandomizerType, RandomizerSubType, Min, Max, Precision, CharacterString, Format, Symbol,
-            Separator, Value, Locale, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            DataType, RandomizerType, RandomizerSubType, Min, Max, Precision, CharacterString, Format, Symbol,
+            Separator, Value, Locale, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

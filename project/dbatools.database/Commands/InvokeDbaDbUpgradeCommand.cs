@@ -123,7 +123,21 @@ public sealed class InvokeDbaDbUpgradeCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__invokeDbaDbUpgradeState"))
+            {
+                _state = sentinel["__invokeDbaDbUpgradeState"] as Hashtable;
+                return;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, Database, ExcludeDatabase, NoCheckDb.ToBool(),
             NoUpdateUsage.ToBool(), NoUpdateStats.ToBool(), NoRefreshView.ToBool(),
             AllUserDatabases.ToBool(), Force.ToBool(), InputObject, EnableException.ToBool(), _state, this,
@@ -133,21 +147,7 @@ public sealed class InvokeDbaDbUpgradeCommand : DbaBaseCmdlet
             MyInvocation.BoundParameters.ContainsKey("ExcludeDatabase"),
             MyInvocation.BoundParameters.ContainsKey("AllUserDatabases"),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__invokeDbaDbUpgradeState"))
-            {
-                _state = sentinel["__invokeDbaDbUpgradeState"] as Hashtable;
-                continue;
-            }
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

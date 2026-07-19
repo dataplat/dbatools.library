@@ -121,23 +121,23 @@ public sealed class ExportDbaDbRoleCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, TestBound(nameof(Path)), TestBound(nameof(ScriptingOptionsObject)), ScriptingOptionsObject,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__exportDbaDbRoleBegin"))
             {
                 _state = sentinel["__exportDbaDbRoleBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Path, TestBound(nameof(Path)), TestBound(nameof(ScriptingOptionsObject)), ScriptingOptionsObject,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -145,10 +145,7 @@ public sealed class ExportDbaDbRoleCommand : DbaBaseCmdlet
         if (Interrupted || _processInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, InputObject, Database, Role, ExcludeRole,
-            ExcludeFixedRole.ToBool(), IncludeRoleMember.ToBool(), EnableException.ToBool(), _state,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__exportDbaDbRoleProcess"))
             {
@@ -157,16 +154,19 @@ public sealed class ExportDbaDbRoleCommand : DbaBaseCmdlet
                     _state = state["State"] as Hashtable ?? _state;
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, InputObject, Database, Role, ExcludeRole,
+            ExcludeFixedRole.ToBool(), IncludeRoleMember.ToBool(), EnableException.ToBool(), _state,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
@@ -174,20 +174,20 @@ public sealed class ExportDbaDbRoleCommand : DbaBaseCmdlet
         if (Interrupted || _processInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            Passthru.ToBool(), Path, TestBound(nameof(Path)), FilePath, BatchSeparator, TestBound(nameof(BatchSeparator)),
-            NoPrefix.ToBool(), Encoding, NoClobber.ToBool(), Append.ToBool(), _state,
-            TestBound(nameof(Path)) ? (object?)Path : null, TestBound(nameof(FilePath)) ? (object?)FilePath : null,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, EndScript,
+            Passthru.ToBool(), Path, TestBound(nameof(Path)), FilePath, BatchSeparator, TestBound(nameof(BatchSeparator)),
+            NoPrefix.ToBool(), Encoding, NoClobber.ToBool(), Append.ToBool(), _state,
+            TestBound(nameof(Path)) ? (object?)Path : null, TestBound(nameof(FilePath)) ? (object?)FilePath : null,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

@@ -106,10 +106,7 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, FilePath, EnableException.ToBool(),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__exportDbaBinaryFileBegin"))
             {
@@ -117,16 +114,19 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
                 {
                     _beginInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Path, FilePath, EnableException.ToBool(),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -134,22 +134,22 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
         if (Interrupted || _beginInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, Table, Schema, FileNameColumn, BinaryColumn,
-            Path, Query, FilePath, InputObject, EnableException.ToBool(),
-            TestBound(nameof(Query)), TestBound(nameof(FileNameColumn)), TestBound(nameof(BinaryColumn)),
-            TestBound(nameof(FilePath)),
-            this, BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, Table, Schema, FileNameColumn, BinaryColumn,
+            Path, Query, FilePath, InputObject, EnableException.ToBool(),
+            TestBound(nameof(Query)), TestBound(nameof(FileNameColumn)), TestBound(nameof(BinaryColumn)),
+            TestBound(nameof(FilePath)),
+            this, BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

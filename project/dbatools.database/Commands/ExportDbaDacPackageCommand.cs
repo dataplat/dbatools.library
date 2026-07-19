@@ -108,9 +108,7 @@ public sealed class ExportDbaDacPackageCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, TestBound(nameof(Path)), ParameterSetName, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable beginState && beginState.ContainsKey("__exportDbaDacPackageBegin"))
             {
@@ -118,16 +116,18 @@ public sealed class ExportDbaDacPackageCommand : DbaBaseCmdlet
                 {
                     _beginInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Path, TestBound(nameof(Path)), ParameterSetName, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -135,13 +135,7 @@ public sealed class ExportDbaDacPackageCommand : DbaBaseCmdlet
         if (Interrupted || _beginInterrupted || _processInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, AllUserDatabases.ToBool(), Path,
-            FilePath, DacOption, ExtendedParameters, ExtendedProperties, Type, Table,
-            EnableException.ToBool(), ParameterSetName,
-            TestBound(nameof(Database)), TestBound(nameof(ExcludeDatabase)), TestBound(nameof(AllUserDatabases)),
-            TestBound(nameof(Path)) ? (object?)Path : null, TestBound(nameof(FilePath)) ? (object?)FilePath : null,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable procState && procState.ContainsKey("__exportDbaDacPackageProcess"))
             {
@@ -149,16 +143,22 @@ public sealed class ExportDbaDacPackageCommand : DbaBaseCmdlet
                 {
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, AllUserDatabases.ToBool(), Path,
+            FilePath, DacOption, ExtendedParameters, ExtendedProperties, Type, Table,
+            EnableException.ToBool(), ParameterSetName,
+            TestBound(nameof(Database)), TestBound(nameof(ExcludeDatabase)), TestBound(nameof(AllUserDatabases)),
+            TestBound(nameof(Path)) ? (object?)Path : null, TestBound(nameof(FilePath)) ? (object?)FilePath : null,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
