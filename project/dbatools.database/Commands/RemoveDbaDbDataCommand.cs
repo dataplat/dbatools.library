@@ -18,15 +18,23 @@ namespace Dataplat.Dbatools.Commands;
 /// meets all three conditions: Test-FunctionInterrupt opens the process block, three Stop-Function
 /// calls are hard (no -Continue), and -InputObject is ValueFromPipeline.
 ///
-/// THE BEGIN HALF IS THE DANGEROUS ONE. The source's begin block is a single line -
-/// `$null = Test-ExportDirectory -Path $Path` - and that helper can itself Stop-Function when the
-/// export directory is unusable. That is precisely WHY the process block opens with
-/// `if (Test-FunctionInterrupt) { return }`: in the function world a begin failure stops every
-/// record. begin and process are separate scoped invocations in a hop, so an uncarried begin
-/// interrupt is simply LOST - and the very next thing this command does is truncate every table in
-/// the database. A port without this carry destroys data the source refuses to touch when -Path is
-/// bad. The begin hop therefore reports Test-FunctionInterrupt through its sentinel into
-/// _beginInterrupted, and ProcessRecord refuses to run when it is set.
+/// THE BEGIN HALF. The source's begin block is a single line -
+/// `$null = Test-ExportDirectory -Path $Path` - and that helper can Stop-Function when the export
+/// directory is unusable. That is why the process block opens with
+/// `if (Test-FunctionInterrupt) { return }`. begin and process are separate scoped invocations in a
+/// hop, so an uncarried begin interrupt would be LOST; the begin hop therefore reports
+/// Test-FunctionInterrupt through its sentinel into _beginInterrupted, and ProcessRecord refuses to
+/// run when it is set.
+///
+/// MEASURED CORRECTION, and it matters because this text is safety-critical: I first wrote here that
+/// a port without this carry "destroys data the source refuses to touch when -Path is bad". THE
+/// SOURCE DOES NOT REFUSE. Probed with -Path pointing at a file (the input that actually makes
+/// Test-ExportDirectory call Stop-Function), the legacy function truncated exactly as the port did -
+/// before=3 after=0 with one warning in BOTH worlds - because Stop-Function only sets the interrupt
+/// variable in its -EnableException branch, so in default mode the source's own guard never fires.
+/// The latch carry still belongs (the standing order requires it, and it IS reachable on
+/// -EnableException paths) but its honest status is CORRECT-BY-CONSTRUCTION and
+/// UNVERIFIED-BY-MEASUREMENT: no input has yet been found that exercises it on this command.
 ///
 /// THE PROCESS HALF is the ordinary cross-record latch: an in-hop Stop-Function cannot set
 /// DbaBaseCmdlet.Interrupted (private setter), so without a carry each record would start fresh and
@@ -50,10 +58,14 @@ namespace Dataplat.Dbatools.Commands;
 /// the body's type switch dispatches on that full name and still matches values bound through the
 /// accelerator.
 ///
-/// -Path defaults to `Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport'`. That default is
-/// evaluated by CALLING THROUGH to the config system inside the hop when the caller did not supply
-/// one, never by inlining whatever the value happened to be at build time - a literal would freeze
-/// one machine's export path into the assembly.
+/// -Path defaults to `Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport'`. The source evaluates
+/// that default ONCE, at parameter binding, before begin. So the port resolves it ONCE in the begin
+/// hop - and only when the parameter was not BOUND, since an explicitly bound $null or '' is the
+/// caller's own value that the source keeps - then carries the resolved value on the begin sentinel
+/// for every process record to reuse. Review caught the first version resolving it independently in
+/// begin AND again per record, which on a command that truncates tables could validate one directory
+/// and write to another. It is also never inlined at build time; a literal would freeze one machine's
+/// export path into the assembly.
 ///
 /// PRESERVED SOURCE BEHAVIOUR worth flagging for review, none of it tidied:
 ///   * the catch around truncation runs the _Create.Sql recovery script and does NOT rethrow, so a
@@ -102,6 +114,11 @@ public sealed class RemoveDbaDbDataCommand : DbaBaseCmdlet
     // Test-ExportDirectory; _interruptLatched carries a stop raised while handling an earlier record.
     // Without them a hop forgets the stop and keeps truncating - see the class remarks.
     private bool _beginInterrupted;
+
+    // The -Path default, resolved ONCE in the begin hop exactly as the source's parameter default is
+    // evaluated once at binding. Every process record reuses this, so begin validates and the
+    // truncation writes to the SAME directory.
+    private object? _resolvedPath;
     private bool _interruptLatched;
 
     protected override void BeginProcessing()
@@ -110,12 +127,14 @@ public sealed class RemoveDbaDbDataCommand : DbaBaseCmdlet
             return;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, EnableException.ToBool(),
+            Path, TestBound(nameof(Path)), EnableException.ToBool(),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item is not null && LanguagePrimitives.IsTrue(item.Properties["__removeDbaDbDataBeginComplete"]?.Value))
             {
                 _beginInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+                _resolvedPath = item.Properties["ResolvedPath"]?.Value;
                 continue;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
@@ -136,7 +155,7 @@ public sealed class RemoveDbaDbDataCommand : DbaBaseCmdlet
             return;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, InputObject, Path,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, InputObject, _resolvedPath,
             EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
@@ -187,34 +206,43 @@ public sealed class RemoveDbaDbDataCommand : DbaBaseCmdlet
     // when the caller supplied none. Edit: the trailing completion sentinel, which reports whether
     // Test-ExportDirectory stopped the command so ProcessRecord can refuse to truncate.
     private const string BeginScript = """
-param($Path, $EnableException, $__boundVerbose, $__boundDebug)
+param($Path, $__boundPath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    [CmdletBinding()]
-    param($Path, $EnableException, $__boundVerbose, $__boundDebug)
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
+    param([string]$Path, $__boundPath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     try {
-        if (-not $PSBoundParameters.ContainsKey('Path') -or $null -eq $Path -or '' -eq $Path) {
+        # The source evaluates the -Path default ONCE, at parameter binding, before begin runs. It is
+        # resolved here and ONLY when the caller did not BIND the parameter: an explicitly bound $null
+        # or '' is the caller's own value and the source keeps it, so testing the VALUE rather than the
+        # bound flag would substitute a default the source never substitutes.
+        if (-not $__boundPath) {
             $Path = (Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport')
         }
 
         $null = Test-ExportDirectory -Path $Path
     } finally {
-        # Hop mechanism, not source: report whether Test-ExportDirectory stopped the command, so the
-        # process hop can honour the source's begin-wide stop instead of truncating anyway. Emitted
-        # from FINALLY so it is reported even if the body throws or returns.
-        [pscustomobject]@{ __removeDbaDbDataBeginComplete = $true; Interrupted = [bool](Test-FunctionInterrupt) }
+        # Hop mechanism, not source: report the RESOLVED path, plus whether Test-ExportDirectory
+        # stopped the command so the process hop can honour the source's begin-wide stop instead of
+        # truncating anyway. Emitted from FINALLY so both survive a throw or return. Carrying the
+        # resolved path is what keeps begin's validation and the truncation's writes on the SAME
+        # directory - re-deriving it per record could validate one and write to another.
+        [pscustomobject]@{ __removeDbaDbDataBeginComplete = $true; Interrupted = [bool](Test-FunctionInterrupt); ResolvedPath = $Path }
     }
-} $Path $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $Path $__boundPath $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the process block verbatim. Edits: $Pscmdlet -> $__realCmdlet, -FunctionName
-    // Remove-DbaDbData on the direct Stop-Function and Write-Message sites, the same -Path default
-    // resolution as the begin hop, and the trailing completion sentinel carrying the interrupt latch.
+    // Remove-DbaDbData on the direct Stop-Function and Write-Message sites, and the trailing
+    // completion sentinel carrying the interrupt latch. $Path arrives ALREADY RESOLVED from the begin
+    // hop and is deliberately not re-derived here.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $InputObject, $Path, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -225,12 +253,12 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$ExcludeDatabase, [object[]]$InputObject, $Path, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$ExcludeDatabase, [object[]]$InputObject, [string]$Path, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    if ($null -eq $Path -or '' -eq $Path) {
-        $Path = (Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport')
-    }
+    # NO -Path resolution here, deliberately: $Path arrives already resolved from the begin hop, so
+    # every record writes to the exact directory begin validated. Re-resolving per record would let
+    # begin check one path and the truncation write to another.
 
     # try/finally is HOP MECHANISM, not source. The body below has FOUR hard returns, three of them
     # immediately after a Stop-Function - which are exactly the paths that set the interrupt. A
@@ -329,5 +357,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $InputObject $Path $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
+
+
+
+
 
 
