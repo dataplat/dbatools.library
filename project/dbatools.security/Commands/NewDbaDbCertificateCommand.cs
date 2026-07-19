@@ -274,7 +274,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     # $smocert as the previous record left it: in the script one process scope spans every record, so a
     # record whose New-Object throws before assigning it reports the PREVIOUS record's certificate.
-    $smocert = $__smocertCarry
+    if ($null -ne $__smocertCarry) { $smocert = $__smocertCarry }
 
         if ($SqlInstance) {
             $InputObject += Get-DbaDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $Database
