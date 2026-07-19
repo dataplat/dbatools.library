@@ -24,10 +24,12 @@ public sealed class RevokeDbaAgPermissionCommand : DbaBaseCmdlet
 
     /// <summary>The login or logins to revoke permissions from.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Login { get; set; }
 
     /// <summary>The availability group or groups to act on.</summary>
     [Parameter(Position = 3)]
+    [PsStringArrayCast]
     public string[]? AvailabilityGroup { get; set; }
 
     /// <summary>The permission type - Endpoint and/or AvailabilityGroup.</summary>

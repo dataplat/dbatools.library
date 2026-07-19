@@ -24,6 +24,7 @@ public sealed class TestDbaEndpointCommand : DbaBaseCmdlet
 
     /// <summary>The endpoint or endpoints to test.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Endpoint { get; set; }
 
     /// <summary>Endpoint objects piped from Get-DbaEndpoint.</summary>

@@ -24,6 +24,7 @@ public sealed class StopDbaEndpointCommand : DbaBaseCmdlet
 
     /// <summary>The endpoint or endpoints to stop.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Endpoint { get; set; }
 
     /// <summary>Stop all endpoints on the instance.</summary>

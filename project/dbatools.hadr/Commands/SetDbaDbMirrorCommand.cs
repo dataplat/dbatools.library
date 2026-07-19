@@ -24,6 +24,7 @@ public sealed class SetDbaDbMirrorCommand : DbaBaseCmdlet
 
     /// <summary>The database or databases to modify.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>The mirroring partner endpoint URL.</summary>

@@ -24,6 +24,7 @@ public sealed class StartDbaEndpointCommand : DbaBaseCmdlet
 
     /// <summary>The endpoint or endpoints to start.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Endpoint { get; set; }
 
     /// <summary>Start all endpoints on the instance.</summary>

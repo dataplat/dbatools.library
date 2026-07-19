@@ -24,6 +24,7 @@ public sealed class TestDbaAgPolicyStateCommand : DbaBaseCmdlet
 
     /// <summary>The availability group or groups to test.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? AvailabilityGroup { get; set; }
 
     /// <summary>The secondary replica instance(s). Declared on the source surface; the body does not reference it.</summary>

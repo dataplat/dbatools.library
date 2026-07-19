@@ -24,10 +24,12 @@ public sealed class TestDbaDbLogShipStatusCommand : DbaBaseCmdlet
 
     /// <summary>Only test the specified database(s).</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? Database { get; set; }
 
     /// <summary>Exclude the specified database(s).</summary>
     [Parameter(Position = 3)]
+    [PsStringArrayCast]
     public string[]? ExcludeDatabase { get; set; }
 
     /// <summary>Return a condensed default view.</summary>

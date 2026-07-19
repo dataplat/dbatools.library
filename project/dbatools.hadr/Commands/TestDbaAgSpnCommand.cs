@@ -28,10 +28,12 @@ public sealed class TestDbaAgSpnCommand : DbaBaseCmdlet
 
     /// <summary>The availability group or groups to test.</summary>
     [Parameter(Position = 3)]
+    [PsStringArrayCast]
     public string[]? AvailabilityGroup { get; set; }
 
     /// <summary>Restrict the test to specific listener name(s).</summary>
     [Parameter(Position = 4)]
+    [PsStringArrayCast]
     public string[]? Listener { get; set; }
 
     /// <summary>Availability group objects piped from Get-DbaAvailabilityGroup.</summary>

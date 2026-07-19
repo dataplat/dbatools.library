@@ -36,6 +36,7 @@ public sealed class TestDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>Databases to test for add-readiness to the availability group.</summary>
     [Parameter]
+    [PsStringArrayCast]
     public string[]? AddDatabase { get; set; }
 
     /// <summary>The seeding mode to validate against.</summary>
