@@ -111,12 +111,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } catch {
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Enable-DbaStartupProcedure
         }
-        Write-Message -Level Verbose -Message "Getting startup procedures for $instance"
+        Write-Message -Level Verbose -Message "Getting startup procedures for $instance" -FunctionName Enable-DbaStartupProcedure -ModuleName "dbatools"
 
         $db = $server.Databases['master']
 
         foreach ($proc in $StartupProcedure) {
-            Write-Message -Level Verbose -Message "Preparing to get object parts for $proc"
+            Write-Message -Level Verbose -Message "Preparing to get object parts for $proc" -FunctionName Enable-DbaStartupProcedure -ModuleName "dbatools"
             $procParts = Get-ObjectNameParts $proc
 
             if ($procParts.Parsed) {
@@ -127,7 +127,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } else {
                     try {
                         if ($sp.Startup -eq $startup) {
-                            Write-Message -Level Verbose -Message "No work being performed. Startup property already $startup"
+                            Write-Message -Level Verbose -Message "No work being performed. Startup property already $startup" -FunctionName Enable-DbaStartupProcedure -ModuleName "dbatools"
                             $status = $false
                             $note = "Action $action already performed"
                         } else {
