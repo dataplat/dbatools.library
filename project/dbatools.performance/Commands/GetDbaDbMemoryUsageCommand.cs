@@ -100,12 +100,7 @@ public sealed class GetDbaDbMemoryUsageCommand : DbaInstanceCmdlet
 
             try
             {
-                // Materialize EAGERLY inside the try: InvokeScoped is a deferred iterator, so
-                // without this the query executes at the row-loop enumeration BELOW - outside
-                // this catch - and a query fault under -EnableException surfaces as a raw
-                // RuntimeException instead of the source's Stop-Function-shaped "Issue
-                // collecting data" error (measured while probing the DEF-001 scope question).
-                _results = new Collection<PSObject>(new List<PSObject>(NestedCommand.InvokeScoped(this, ServerQueryScript, server, Sql)));
+                _results = NestedCommand.InvokeScoped(this, ServerQueryScript, server, Sql);
             }
             catch (PipelineStoppedException)
             {
