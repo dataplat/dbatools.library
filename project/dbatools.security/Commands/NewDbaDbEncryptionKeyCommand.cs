@@ -190,7 +190,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     # $smoencryptionkey as the previous record left it: in the script one process scope spans every
     # record, so a record whose New-Object throws before assigning it reports the PREVIOUS record's key.
-    $smoencryptionkey = $__smoEncryptionKeyCarry
+    if ($null -ne $__smoEncryptionKeyCarry) { $smoencryptionkey = $__smoEncryptionKeyCarry }
 
         if ($SqlInstance) {
             $InputObject += Get-DbaDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $Database

@@ -231,7 +231,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     # $masterkey as the previous record left it: in the script one process scope spans every record, so a
     # record whose New-Object throws before assigning it reports the PREVIOUS record's master key.
-    $masterkey = $__masterKeyCarry
+    if ($null -ne $__masterKeyCarry) { $masterkey = $__masterKeyCarry }
 
         if ($SqlInstance) {
             $InputObject += Get-DbaDatabase -SqlInstance $SqlInstance -Database $Database -ExcludeDatabase $ExcludeDatabase -SqlCredential $SqlCredential
