@@ -51,9 +51,7 @@ public sealed class GetDbaAgentScheduleCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, Schedule, ScheduleUid, Id, EnableException.ToBool(),
-                _server, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -69,7 +67,9 @@ public sealed class GetDbaAgentScheduleCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+                new[] { instance }, SqlCredential, Schedule, ScheduleUid, Id, EnableException.ToBool(),
+                _server, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 

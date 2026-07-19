@@ -47,10 +47,7 @@ public sealed class GetDbaAgentOperatorCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, Operator, ExcludeOperator,
-                EnableException.ToBool(), _server, _alertLastEmail,
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -67,7 +64,10 @@ public sealed class GetDbaAgentOperatorCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+                new[] { instance }, SqlCredential, Operator, ExcludeOperator,
+                EnableException.ToBool(), _server, _alertLastEmail,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
