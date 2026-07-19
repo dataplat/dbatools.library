@@ -84,14 +84,21 @@ public sealed class TestDbaDbLogShipStatusCommand : DbaBaseCmdlet
             return;
         }
 
-        // WHOLE-RECORD hop. The begin-built $sql rides the __w4067State sentinel from the begin hop
-        // and is seeded before the process body. NO Test-Bound (no bound flags), NO ShouldProcess
-        // (no transplant/gate), NO param carry beyond $sql. The only begin->process state is $sql;
+        // WHOLE-RECORD hop. Cross-record state rides the __w4067State sentinel and is re-updated
+        // each record: the begin-built $sql (from the begin hop, constant thereafter) PLUS the
+        // three timestamp leaks $lastBackup/$lastCopy/$lastRestore (codex-caught DEF-012: assigned
+        // only in the Status-in-0,1 branch but read unconditionally at output, so they leak the
+        // prior record's values in the source's shared process scope - carried bug-for-bug). NO
+        // Test-Bound (no bound flags), NO ShouldProcess (no transplant/gate), NO param carry.
         // $Database/$ExcludeDatabase are not read in process. Switches Simple/Primary/Secondary and
         // EnableException are passed UNTYPED/.ToBool() (switch-shift rule). $instance/$server/
-        // $result/$results/$statusDetails/$object are all process-locals.
+        // $result/$results/$statusDetails/$object are process-locals reset before use each record.
         //
-        // T8/DEF-002 exposure on Database/ExcludeDatabase [string[]] (shared-runtime, blocked on A).
+        // [DEF-001] buffered InvokeScoped: this row emits per-result and per-instance and can lose
+        // an earlier emit if a later instance throws terminating under -EnableException, and a
+        // downstream `| Select -First 1` stops the source but not the buffered port. Same shared-
+        // runtime class W4-063/W4-052 await A on (InvokeScopedStreaming, 0/80 hadr commands use it).
+        // [T8/DEF-002] on Database/ExcludeDatabase [string[]]. Both blocked on A.
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, Simple.ToBool(), Primary.ToBool(), Secondary.ToBool(),
             _state,
@@ -242,8 +249,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, $Simple, $Primary, $Secondary, $__state, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    # seed the begin-built query carried from the begin hop
+    # seed the begin-built query carried from the begin hop, AND the three cross-record timestamp
+    # leaks. $lastBackup/$lastCopy/$lastRestore are assigned only in the Status-in-0,1 branch
+    # (:272-288) but read UNCONDITIONALLY when building the output object (:298/302/304), so in the
+    # source's shared process scope a later record whose result has Status NOT in 0,1 inherits the
+    # PRIOR record's timestamps. That is the W4-055 per-branch DEF-012 leak; carried bug-for-bug,
+    # restore-if-carried only (NOT initialised - matches the source, undefined until first assigned).
     if ($null -ne $__state -and $__state.ContainsKey('sql')) { $sql = $__state.sql }
+    if ($null -ne $__state -and $__state.ContainsKey('lastBackup')) { $lastBackup = $__state.lastBackup }
+    if ($null -ne $__state -and $__state.ContainsKey('lastCopy')) { $lastCopy = $__state.lastCopy }
+    if ($null -ne $__state -and $__state.ContainsKey('lastRestore')) { $lastRestore = $__state.lastRestore }
 
     . {
         foreach ($instance in $SqlInstance) {
@@ -363,6 +378,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
+
+    @{ __w4067State = @{ sql = $sql; lastBackup = $lastBackup; lastCopy = $lastCopy; lastRestore = $lastRestore } }
 } $SqlInstance $SqlCredential $Simple $Primary $Secondary $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
