@@ -51,6 +51,7 @@ public sealed class GetDbaRandomizedValueCommand : DbaBaseCmdlet
 
     /// <summary>The number of decimal places (default 2).</summary>
     [Parameter(Position = 5)]
+    [PsIntCast]
     public int Precision { get; set; } = 2;
 
     /// <summary>The character set to draw string values from.</summary>

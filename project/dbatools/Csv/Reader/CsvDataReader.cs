@@ -84,6 +84,11 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         // Buffer for efficient reading - using ArrayPool
         private char[] _buffer;
+        // Guards the two _buffer MUTATION points against the dispose-during-read race: the
+        // refill (which WRITES into the array) and Close's pool return. The per-char read loop
+        // stays lock-free on a local snapshot - a racy read of recycled contents yields
+        // undefined DATA in an already-undefined window, but never a cross-renter WRITE.
+        private readonly object _bufferLifecycleLock = new object();
         private bool _bufferFromPool;
         private int _bufferLength;
         private int _bufferPosition;

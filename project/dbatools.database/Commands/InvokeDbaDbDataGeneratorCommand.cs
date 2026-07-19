@@ -84,6 +84,10 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
 
     private object? _supportedDataTypes, _supportedFakerMaskingTypes, _supportedFakerSubTypes;
     private bool _processInterrupted;
+    // DEF-011/012: prior-record process-scope state carried between hops via the sentinel.
+    private object? _uniqueValueColumns;
+    private object? _transaction;
+    private object? _elapsed;
 
     protected override void BeginProcessing()
     {
@@ -125,6 +129,9 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
                 if (sentinel["__dgProcess"] is Hashtable state)
                 {
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
+                    _uniqueValueColumns = state["UniqueValueColumns"];
+                    _transaction = state["Transaction"];
+                    _elapsed = state["Elapsed"];
                 }
                 return;
             }
@@ -139,7 +146,8 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Database, FilePath, Locale, CharacterString, Table, Column, ExcludeTable,
             ExcludeColumn, MaxValue, ModulusFactor, EnableException.ToBool(),
             _supportedDataTypes, _supportedFakerMaskingTypes, _supportedFakerSubTypes, this,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            _uniqueValueColumns, _transaction, _elapsed);
     }
 
     private object? BoundCommonParameter(string name)
@@ -201,15 +209,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $FilePath, $Locale, $CharacterString, $Table, $Column, $ExcludeTable, $ExcludeColumn, $MaxValue, $ModulusFactor, $EnableException, $supportedDataTypes, $supportedFakerMaskingTypes, $supportedFakerSubTypes, $__realCmdlet, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $FilePath, $Locale, $CharacterString, $Table, $Column, $ExcludeTable, $ExcludeColumn, $MaxValue, $ModulusFactor, $EnableException, $supportedDataTypes, $supportedFakerMaskingTypes, $supportedFakerSubTypes, $__realCmdlet, $__boundVerbose, $__boundDebug, $__carriedUniqueValueColumns, $__carriedTransaction, $__carriedElapsed)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [object]$FilePath, [string]$Locale, [string]$CharacterString, [string[]]$Table, [string[]]$Column, [string[]]$ExcludeTable, [string[]]$ExcludeColumn, [int]$MaxValue, [int]$ModulusFactor, $EnableException, $supportedDataTypes, $supportedFakerMaskingTypes, $supportedFakerSubTypes, $__realCmdlet, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [object]$FilePath, [string]$Locale, [string]$CharacterString, [string[]]$Table, [string[]]$Column, [string[]]$ExcludeTable, [string[]]$ExcludeColumn, [int]$MaxValue, [int]$ModulusFactor, $EnableException, $supportedDataTypes, $supportedFakerMaskingTypes, $supportedFakerSubTypes, $__realCmdlet, $__boundVerbose, $__boundDebug, $__carriedUniqueValueColumns, $__carriedTransaction, $__carriedElapsed)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+    # DEF-011/012 cross-record carries (codex r2): the function world's process scope persists
+    # $uniqueValueColumns / $transaction / $elapsed across pipeline records; each hop is a fresh
+    # scope, so they are seeded from the sentinel-carried prior-record values here and emitted
+    # back below. The verbatim body is untouched.
+    if ($null -ne $__carriedUniqueValueColumns) { $uniqueValueColumns = $__carriedUniqueValueColumns }
+    if ($null -ne $__carriedTransaction) { $transaction = $__carriedTransaction }
+    if ($null -ne $__carriedElapsed) { $elapsed = $__carriedElapsed }
     . {
         if (Test-FunctionInterrupt) { return }
 
@@ -586,7 +601,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
-    @{ __dgProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
-} $SqlInstance $SqlCredential $Database $FilePath $Locale $CharacterString $Table $Column $ExcludeTable $ExcludeColumn $MaxValue $ModulusFactor $EnableException $supportedDataTypes $supportedFakerMaskingTypes $supportedFakerSubTypes $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    @{ __dgProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value); UniqueValueColumns = $uniqueValueColumns; Transaction = $transaction; Elapsed = $elapsed } }
+} $SqlInstance $SqlCredential $Database $FilePath $Locale $CharacterString $Table $Column $ExcludeTable $ExcludeColumn $MaxValue $ModulusFactor $EnableException $supportedDataTypes $supportedFakerMaskingTypes $supportedFakerSubTypes $__realCmdlet $__boundVerbose $__boundDebug $__carriedUniqueValueColumns $__carriedTransaction $__carriedElapsed @__commonParameters 3>&1 2>&1
 """;
 }

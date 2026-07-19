@@ -50,10 +50,14 @@ namespace Dataplat.Dbatools.Csv.Reader
                     _reader.Dispose();
                 }
 
-                // Return pooled buffer
-                if (_bufferFromPool && _buffer != null)
+                // Return pooled buffer - under the lifecycle lock so a concurrent refill
+                // cannot write into an array that has already gone back to the pool.
+                lock (_bufferLifecycleLock)
                 {
-                    ArrayPool<char>.Shared.Return(_buffer);
+                    if (_bufferFromPool && _buffer != null)
+                    {
+                        ArrayPool<char>.Shared.Return(_buffer);
+                    }
                     _buffer = null;
                 }
             }
