@@ -114,6 +114,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, $Parallel, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    # Named-wrapper shim: the body runs inside a function carrying the command's name so that
+    # call-stack-deriving helpers see Stop-DbaDbEncryption as they do in the function world.
+    # Write-ProgressHelper builds its Activity string from (Get-PSCallStack)[1].Command, which from
+    # an anonymous scriptblock frame reads '<ScriptBlock>'. This row passes -TotalSteps explicitly,
+    # so only the Activity label diverged - but it diverged on every progress record it emits.
+    function Stop-DbaDbEncryption {
         $splatDatabase = @{
             SqlInstance   = $SqlInstance
             SqlCredential = $SqlCredential
@@ -280,6 +286,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $runspacePool.Close()
             $runspacePool.Dispose()
         }
+    }
+    . Stop-DbaDbEncryption
 } $SqlInstance $SqlCredential $Parallel $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
