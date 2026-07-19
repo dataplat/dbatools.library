@@ -54,6 +54,13 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     private object? _effectiveInputObject;
+    // The invocation-bound InputObject as it stood BEFORE any pipeline record: the engine only
+    // rebinds the property for records that PIPE workload groups, so a reference transition
+    // from this snapshot is the per-record rebind signal (codex r2: BoundParameters.ContainsKey
+    // stays true for invocation-bound -InputObject across piped SqlInstance records, which must
+    // ACCUMULATE like the function world's process scope, not reset).
+    private object? _invocationInputObject;
+    private bool _invocationInputCaptured;
 
     protected override void ProcessRecord()
     {
@@ -81,14 +88,27 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             }
         }, ProcessScript,
             SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
-            // DEF-011/012 (the row's confirmed P1, codex cross-vendor round): the function
-            // world's process scope ACCUMULATES $InputObject += across pipeline records, so a
-            // record without a bound InputObject must start from the prior records' carrier
-            // total - not from the empty bound parameter - or EndProcessing removes only the
-            // LAST record's groups. A bound InputObject wins for its record exactly like the
-            // engine's per-record VFP rebinding does.
-            MyInvocation.BoundParameters.ContainsKey("InputObject") ? (object?)InputObject : _effectiveInputObject,
+            // DEF-011/012 (the row's confirmed P1, codex cross-vendor rounds 1+2): the
+            // function world's process scope ACCUMULATES $InputObject += across pipeline
+            // records. Only a genuine per-record PIPELINE rebind (reference transition from
+            // the invocation-time snapshot) starts fresh, exactly like the engine's VFP
+            // rebinding; otherwise the hop seeds from the accumulated carrier total (falling
+            // back to the invocation-bound value on the first record).
+            SelectProcessInputObject(),
             EnableException.ToBool(), BoundVerbose());
+    }
+
+    private object? SelectProcessInputObject()
+    {
+        if (!_invocationInputCaptured)
+        {
+            _invocationInputCaptured = true;
+            _invocationInputObject = InputObject;
+        }
+        bool pipelineRebound = !ReferenceEquals(InputObject, _invocationInputObject);
+        if (pipelineRebound)
+            return InputObject;
+        return _effectiveInputObject ?? InputObject;
     }
 
     protected override void EndProcessing()
