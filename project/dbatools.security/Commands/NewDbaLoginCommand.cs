@@ -168,11 +168,44 @@ public sealed class NewDbaLoginCommand : DbaBaseCmdlet
     private object? _sidState;
     private object? _hashedPasswordState;
 
+    /// <summary>
+    /// The PROCESS block's own cross-record state.
+    /// </summary>
+    /// <remarks>
+    /// The script's process block runs in ONE function scope for the whole pipeline, so values it
+    /// assigns survive into later records. Three distinct leaks depend on that and a per-record hop
+    /// would silently reset all of them:
+    /// $SecurePassword is MUTATED when the body prompts for a password, so the script prompts ONCE and
+    /// reuses that password for every later record - a per-record hop re-prompts and can create logins
+    /// with different passwords. The $current* family is reset at the top of the plain-name branch, but
+    /// that reset list deliberately OMITS $currentPasswordMustChange and $currentHashedPassword, and the
+    /// SMO-login branch has no reset at all, so a value read off one source login carries onto a later
+    /// one. And $currentCredential is assigned only when EnumCredentials() is non-empty, so a credential
+    /// from one record stays active for a following login that has none. All of it is carried.
+    /// </remarks>
+    private object? _securePasswordState;
+    private object? _currentSid;
+    private object? _currentDefaultDatabase;
+    private object? _currentLanguage;
+    private object? _currentPasswordExpirationEnabled;
+    private object? _currentPasswordPolicyEnforced;
+    private object? _currentPasswordMustChange;
+    private object? _currentDisabled;
+    private object? _currentDenyWindowsLogin;
+    private object? _currentAsymmetricKey;
+    private object? _currentCertificate;
+    private object? _currentCredential;
+    private object? _currentHashedPassword;
+
+    /// <summary>Set once the PROCESS block latches the dbatools interrupt (the script's line-267 gate).</summary>
+    private bool _processInterrupted;
+
     /// <summary>Runs the begin block once and captures the values and latch it produced.</summary>
     protected override void BeginProcessing()
     {
         _sidState = Sid;
         _hashedPasswordState = HashedPassword;
+        _securePasswordState = SecurePassword;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             Force.ToBool(), Sid, HashedPassword, EnableException.ToBool(),
@@ -200,7 +233,11 @@ public sealed class NewDbaLoginCommand : DbaBaseCmdlet
     /// <summary>Creates the logins for the current record.</summary>
     protected override void ProcessRecord()
     {
-        if (_beginInterrupted || Interrupted)
+        // The script's process block opens with `if (Test-FunctionInterrupt) { return }`, so once ANY
+        // record latches the interrupt every later record returns immediately. In-hop Stop-Function
+        // cannot set DbaBaseCmdlet.Interrupted (DEF-011), so the latch is carried out of each hop and
+        // short-circuited here instead.
+        if (_beginInterrupted || _processInterrupted || Interrupted)
             return;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
@@ -210,12 +247,30 @@ public sealed class NewDbaLoginCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
-            else
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
+                item.Properties["__NewDbaLoginProcessComplete"]?.Value))
+            {
+                _securePasswordState = UnwrapHopValue(item.Properties["SecurePassword"]?.Value);
+                _currentSid = UnwrapHopValue(item.Properties["CurrentSid"]?.Value);
+                _currentDefaultDatabase = UnwrapHopValue(item.Properties["CurrentDefaultDatabase"]?.Value);
+                _currentLanguage = UnwrapHopValue(item.Properties["CurrentLanguage"]?.Value);
+                _currentPasswordExpirationEnabled = UnwrapHopValue(item.Properties["CurrentPasswordExpirationEnabled"]?.Value);
+                _currentPasswordPolicyEnforced = UnwrapHopValue(item.Properties["CurrentPasswordPolicyEnforced"]?.Value);
+                _currentPasswordMustChange = UnwrapHopValue(item.Properties["CurrentPasswordMustChange"]?.Value);
+                _currentDisabled = UnwrapHopValue(item.Properties["CurrentDisabled"]?.Value);
+                _currentDenyWindowsLogin = UnwrapHopValue(item.Properties["CurrentDenyWindowsLogin"]?.Value);
+                _currentAsymmetricKey = UnwrapHopValue(item.Properties["CurrentAsymmetricKey"]?.Value);
+                _currentCertificate = UnwrapHopValue(item.Properties["CurrentCertificate"]?.Value);
+                _currentCredential = UnwrapHopValue(item.Properties["CurrentCredential"]?.Value);
+                _currentHashedPassword = UnwrapHopValue(item.Properties["CurrentHashedPassword"]?.Value);
+                _processInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+            }
+            else if (item is not null)
             {
                 WriteObject(item);
             }
         }, ProcessScript,
-            SqlInstance, SqlCredential, Login, SecurePassword, _hashedPasswordState, MapToCertificate,
+            SqlInstance, SqlCredential, Login, _securePasswordState, _hashedPasswordState, MapToCertificate,
             MapToAsymmetricKey, MapToCredential, _sidState, DefaultDatabase, Language,
             PasswordExpirationEnabled.ToBool(), PasswordPolicyEnforced.ToBool(), PasswordMustChange.ToBool(),
             Disabled.ToBool(), DenyWindowsLogin.ToBool(), NewSid.ToBool(), ExternalProvider.ToBool(),
@@ -231,6 +286,10 @@ public sealed class NewDbaLoginCommand : DbaBaseCmdlet
             TestBound(nameof(PasswordMustChange)), TestBound(nameof(MapToAsymmetricKey)),
             TestBound(nameof(MapToCertificate)), TestBound(nameof(MapToCredential)),
             TestBound(nameof(Disabled)),
+            _currentSid, _currentDefaultDatabase, _currentLanguage, _currentPasswordExpirationEnabled,
+            _currentPasswordPolicyEnforced, _currentPasswordMustChange, _currentDisabled,
+            _currentDenyWindowsLogin, _currentAsymmetricKey, _currentCertificate, _currentCredential,
+            _currentHashedPassword,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -335,7 +394,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
 
 
-param($SqlInstance, $SqlCredential, $Login, $SecurePassword, $HashedPassword, $MapToCertificate, $MapToAsymmetricKey, $MapToCredential, $Sid, $DefaultDatabase, $Language, $PasswordExpirationEnabled, $PasswordPolicyEnforced, $PasswordMustChange, $Disabled, $DenyWindowsLogin, $NewSid, $ExternalProvider, $InputObject, $LoginRenameHashtable, $Force, $EnableException, $__realCmdlet, $__denyWindowsLoginBound, $__parameterSetName, $__boundPasswordExpirationEnabled, $__boundPasswordPolicyEnforced, $__boundPasswordMustChange, $__boundMapToAsymmetricKey, $__boundMapToCertificate, $__boundMapToCredential, $__boundDisabled, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Login, $SecurePassword, $HashedPassword, $MapToCertificate, $MapToAsymmetricKey, $MapToCredential, $Sid, $DefaultDatabase, $Language, $PasswordExpirationEnabled, $PasswordPolicyEnforced, $PasswordMustChange, $Disabled, $DenyWindowsLogin, $NewSid, $ExternalProvider, $InputObject, $LoginRenameHashtable, $Force, $EnableException, $__realCmdlet, $__denyWindowsLoginBound, $__parameterSetName, $__boundPasswordExpirationEnabled, $__boundPasswordPolicyEnforced, $__boundPasswordMustChange, $__boundMapToAsymmetricKey, $__boundMapToCertificate, $__boundMapToCredential, $__boundDisabled, $__carryCurrentSid, $__carryCurrentDefaultDatabase, $__carryCurrentLanguage, $__carryCurrentPasswordExpirationEnabled, $__carryCurrentPasswordPolicyEnforced, $__carryCurrentPasswordMustChange, $__carryCurrentDisabled, $__carryCurrentDenyWindowsLogin, $__carryCurrentAsymmetricKey, $__carryCurrentCertificate, $__carryCurrentCredential, $__carryCurrentHashedPassword, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -344,11 +403,27 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param($SqlInstance, $SqlCredential, $Login, $SecurePassword, $HashedPassword, $MapToCertificate, $MapToAsymmetricKey, $MapToCredential, $Sid, $DefaultDatabase, $Language, $PasswordExpirationEnabled, $PasswordPolicyEnforced, $PasswordMustChange, $Disabled, $DenyWindowsLogin, $NewSid, $ExternalProvider, $InputObject, $LoginRenameHashtable, $Force, $EnableException, $__realCmdlet, $__denyWindowsLoginBound, $__parameterSetName, $__boundPasswordExpirationEnabled, $__boundPasswordPolicyEnforced, $__boundPasswordMustChange, $__boundMapToAsymmetricKey, $__boundMapToCertificate, $__boundMapToCredential, $__boundDisabled, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param($SqlInstance, $SqlCredential, $Login, $SecurePassword, $HashedPassword, $MapToCertificate, $MapToAsymmetricKey, $MapToCredential, $Sid, $DefaultDatabase, $Language, $PasswordExpirationEnabled, $PasswordPolicyEnforced, $PasswordMustChange, $Disabled, $DenyWindowsLogin, $NewSid, $ExternalProvider, $InputObject, $LoginRenameHashtable, $Force, $EnableException, $__realCmdlet, $__denyWindowsLoginBound, $__parameterSetName, $__boundPasswordExpirationEnabled, $__boundPasswordPolicyEnforced, $__boundPasswordMustChange, $__boundMapToAsymmetricKey, $__boundMapToCertificate, $__boundMapToCredential, $__boundDisabled, $__carryCurrentSid, $__carryCurrentDefaultDatabase, $__carryCurrentLanguage, $__carryCurrentPasswordExpirationEnabled, $__carryCurrentPasswordPolicyEnforced, $__carryCurrentPasswordMustChange, $__carryCurrentDisabled, $__carryCurrentDenyWindowsLogin, $__carryCurrentAsymmetricKey, $__carryCurrentCertificate, $__carryCurrentCredential, $__carryCurrentHashedPassword, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # The begin block's -Force fold rides at process-hop top, where the ShouldProcess gates read it.
     if ($Force) { $ConfirmPreference = 'none' }
+
+    # PROCESS-scope cross-record state as the previous record left it. The script's process block is ONE
+    # function scope for the whole pipeline, so these survive between records; a per-record hop would
+    # reset them. The body's own resets still run exactly where the source runs them.
+    $currentSid = $__carryCurrentSid
+    $currentDefaultDatabase = $__carryCurrentDefaultDatabase
+    $currentLanguage = $__carryCurrentLanguage
+    $currentPasswordExpirationEnabled = $__carryCurrentPasswordExpirationEnabled
+    $currentPasswordPolicyEnforced = $__carryCurrentPasswordPolicyEnforced
+    $currentPasswordMustChange = $__carryCurrentPasswordMustChange
+    $currentDisabled = $__carryCurrentDisabled
+    $currentDenyWindowsLogin = $__carryCurrentDenyWindowsLogin
+    $currentAsymmetricKey = $__carryCurrentAsymmetricKey
+    $currentCertificate = $__carryCurrentCertificate
+    $currentCredential = $__carryCurrentCredential
+    $currentHashedPassword = $__carryCurrentHashedPassword
 
         if (Test-FunctionInterrupt) { return }
 
@@ -714,7 +789,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-} $SqlInstance $SqlCredential $Login $SecurePassword $HashedPassword $MapToCertificate $MapToAsymmetricKey $MapToCredential $Sid $DefaultDatabase $Language $PasswordExpirationEnabled $PasswordPolicyEnforced $PasswordMustChange $Disabled $DenyWindowsLogin $NewSid $ExternalProvider $InputObject $LoginRenameHashtable $Force $EnableException $__realCmdlet $__denyWindowsLoginBound $__parameterSetName $__boundPasswordExpirationEnabled $__boundPasswordPolicyEnforced $__boundPasswordMustChange $__boundMapToAsymmetricKey $__boundMapToCertificate $__boundMapToCredential $__boundDisabled $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    [pscustomobject]@{ __NewDbaLoginProcessComplete = $true; SecurePassword = $SecurePassword; CurrentSid = $currentSid; CurrentDefaultDatabase = $currentDefaultDatabase; CurrentLanguage = $currentLanguage; CurrentPasswordExpirationEnabled = $currentPasswordExpirationEnabled; CurrentPasswordPolicyEnforced = $currentPasswordPolicyEnforced; CurrentPasswordMustChange = $currentPasswordMustChange; CurrentDisabled = $currentDisabled; CurrentDenyWindowsLogin = $currentDenyWindowsLogin; CurrentAsymmetricKey = $currentAsymmetricKey; CurrentCertificate = $currentCertificate; CurrentCredential = $currentCredential; CurrentHashedPassword = $currentHashedPassword; Interrupted = (Test-FunctionInterrupt) }
+} $SqlInstance $SqlCredential $Login $SecurePassword $HashedPassword $MapToCertificate $MapToAsymmetricKey $MapToCredential $Sid $DefaultDatabase $Language $PasswordExpirationEnabled $PasswordPolicyEnforced $PasswordMustChange $Disabled $DenyWindowsLogin $NewSid $ExternalProvider $InputObject $LoginRenameHashtable $Force $EnableException $__realCmdlet $__denyWindowsLoginBound $__parameterSetName $__boundPasswordExpirationEnabled $__boundPasswordPolicyEnforced $__boundPasswordMustChange $__boundMapToAsymmetricKey $__boundMapToCertificate $__boundMapToCredential $__boundDisabled $__carryCurrentSid $__carryCurrentDefaultDatabase $__carryCurrentLanguage $__carryCurrentPasswordExpirationEnabled $__carryCurrentPasswordPolicyEnforced $__carryCurrentPasswordMustChange $__carryCurrentDisabled $__carryCurrentDenyWindowsLogin $__carryCurrentAsymmetricKey $__carryCurrentCertificate $__carryCurrentCredential $__carryCurrentHashedPassword $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
 }
