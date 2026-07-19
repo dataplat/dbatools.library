@@ -133,7 +133,6 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
 
     /// <summary>$InputObject as the body left it, applied only in the by-name case (see ProcessRecord).</summary>
     private object? _inputObjectState;
-    private bool _processInterrupted;
 
     /// <summary>Whether -InputObject was bound by name (captured before any pipeline record arrives).</summary>
     private bool _inputObjectByName;
@@ -177,7 +176,11 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
     /// </remarks>
     protected override void ProcessRecord()
     {
-        if (_processInterrupted || Interrupted)
+        // NO interrupt latch: Start-DbaDbEncryption's source has NO Test-FunctionInterrupt gate, so a
+        // per-record validation Stop-Function warns and returns for THAT record only - later records still
+        // run and warn. Latching (as the DEF-011 rows correctly do) would suppress them. Only the
+        // DbaBaseCmdlet-level Interrupted (a hard -EnableException terminating throw) short-circuits here.
+        if (Interrupted)
             return;
 
         // Bimodal binding, unchanged: InputObject bound BY NAME stands for the whole run; otherwise every
@@ -202,7 +205,6 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
                 // += genuinely persists. EncryptorName stays in the bag - it is NOT pipeline-bound, so
                 // its mutation persisting is exactly the source behaviour this row needed shared scope for.
                 _inputObjectState = UnwrapHopValue(item.Properties["MutInputObject"]?.Value);
-                _processInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
             }
             else if (item is not null)
             {
@@ -728,7 +730,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         . Start-DbaDbEncryption
     } finally {
-    [pscustomobject]@{ __StartDbaDbEncryptionProcessComplete = $true; Interrupted = (Test-FunctionInterrupt); MutInputObject = $InputObject; State = @{ databases = $databases; db = $db; dbatools = $dbatools; dbmasterkeytest = $dbmasterkeytest; encryptionScript = $encryptionScript; EncryptorName = $EncryptorName; encryptorNameToUse = $encryptorNameToUse; handle = $handle; initialSessionState = $initialSessionState; instanceGroups = $instanceGroups; masterasym = $masterasym; mastercert = $mastercert; mastercerttest = $mastercerttest; masterkey = $masterkey; param = $param; params = $params; result = $result; runspacePool = $runspacePool; server = $server; servername = $servername; splatAsymmetricKey = $splatAsymmetricKey; splatBackupCertificate = $splatBackupCertificate; splatBackupMasterKey = $splatBackupMasterKey; splatCertificate = $splatCertificate; splatConnection = $splatConnection; splatMasterKey = $splatMasterKey; splatRunspace = $splatRunspace; stepCounter = $stepCounter; thread = $thread; threads = $threads; totalRetrievedThreads = $totalRetrievedThreads; totalThreads = $totalThreads } }
+    [pscustomobject]@{ __StartDbaDbEncryptionProcessComplete = $true; MutInputObject = $InputObject; State = @{ databases = $databases; db = $db; dbatools = $dbatools; dbmasterkeytest = $dbmasterkeytest; encryptionScript = $encryptionScript; EncryptorName = $EncryptorName; encryptorNameToUse = $encryptorNameToUse; handle = $handle; initialSessionState = $initialSessionState; instanceGroups = $instanceGroups; masterasym = $masterasym; mastercert = $mastercert; mastercerttest = $mastercerttest; masterkey = $masterkey; param = $param; params = $params; result = $result; runspacePool = $runspacePool; server = $server; servername = $servername; splatAsymmetricKey = $splatAsymmetricKey; splatBackupCertificate = $splatBackupCertificate; splatBackupMasterKey = $splatBackupMasterKey; splatCertificate = $splatCertificate; splatConnection = $splatConnection; splatMasterKey = $splatMasterKey; splatRunspace = $splatRunspace; stepCounter = $stepCounter; thread = $thread; threads = $threads; totalRetrievedThreads = $totalRetrievedThreads; totalThreads = $totalThreads } }
     }
 } $InputObject $SqlInstance $SqlCredential $EncryptorName $EncryptorType $Database $ExcludeDatabase $BackupPath $MasterKeySecurePassword $CertificateSubject $CertificateStartDate $CertificateExpirationDate $CertificateActiveForServiceBrokerDialog $BackupSecurePassword $AllUserDatabases $Force $Parallel $EnableException $__carryState $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;

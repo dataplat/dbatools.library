@@ -119,9 +119,6 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     [Parameter]
     public SwitchParameter ExcludeGoBatchSeparator { get; set; }
 
-    /// <summary>The InputObject value seen at the previous ProcessRecord, to detect a genuine pipeline rebind.</summary>
-    private object? _prevInputObject;
-
     /// <summary>The begin block's state, then the process block's, carried across records.</summary>
     private Hashtable? _carryState;
     private bool _beginInterrupted;
@@ -146,7 +143,6 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     /// <summary>Runs the begin block once, before any record.</summary>
     protected override void BeginProcessing()
     {
-        _prevInputObject = InputObject;
         _inputObjectState = InputObject;
         _appendState = Append.ToBool();
         _filePathState = FilePath;
@@ -195,9 +191,12 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
         if (_beginInterrupted || _processInterrupted || Interrupted)
             return;
 
-        bool inputRebound = !ReferenceEquals(InputObject, _prevInputObject);
-        _prevInputObject = InputObject;
-        if (inputRebound)
+        // A non-null InputObject means a value bound to the InputObject pipeline slot THIS record
+        // (databases piped), so reset to it - and a repeated IDENTICAL array instance is still a genuine
+        // new record, which reference-identity detection could not tell from a non-rebind. A null
+        // InputObject means instances were piped to SqlInstance instead and the body accumulates into
+        // $InputObject via +=, so the carried accumulation is kept.
+        if (InputObject != null)
             _inputObjectState = InputObject;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
