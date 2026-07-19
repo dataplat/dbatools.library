@@ -95,20 +95,24 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
         if (_beginInterrupted || Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            Destination, DestinationSqlCredential, Login, ExcludeLogin, ExcludeSystemLogin.ToBool(),
-            _sourceServer, _sourceLogins, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             if (item is not null)
                 WriteObject(item);
-        }
+        }, ProcessScript,
+            Destination, DestinationSqlCredential, Login, ExcludeLogin, ExcludeSystemLogin.ToBool(),
+            _sourceServer, _sourceLogins, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>

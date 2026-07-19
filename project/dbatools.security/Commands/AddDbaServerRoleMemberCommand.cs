@@ -156,26 +156,31 @@ public sealed class AddDbaServerRoleMemberCommand : DbaBaseCmdlet
             effectiveInputObject = InputObject ?? _beginInputObject;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            effectiveInputObject, SqlCredential, ServerRole, Login, Role,
-            EnableException.ToBool(), this, TestBound(nameof(ServerRole)),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] streamed via InvokeScopedStreaming: the body loops the members emitting per-add and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException); a
+        // buffered InvokeScoped would lose an earlier member's emit when a later one throws. The
+        // interrupt-latch sentinel (__AddDbaServerRoleMemberProcessComplete) still rides the callback as
+        // the last emitted item, harvested into _interruptLatched exactly as before.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__AddDbaServerRoleMemberProcessComplete"]?.Value))
             {
                 _interruptLatched = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BodyScript,
+            effectiveInputObject, SqlCredential, ServerRole, Login, Role,
+            EnableException.ToBool(), this, TestBound(nameof(ServerRole)),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

@@ -78,21 +78,25 @@ public sealed class BackupDbaDbMasterKeyCommand : DbaBaseCmdlet
         // passed on as-is; it is not converted here.
         System.Security.SecureString? effectivePassword = Credential != null ? Credential.Password : SecurePassword;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Credential, Database, ExcludeDatabase, effectivePassword,
-            Path, FileBaseName, InputObject, EnableException.ToBool(), this,
-            TestBound(nameof(Path)),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Credential, Database, ExcludeDatabase, effectivePassword,
+            Path, FileBaseName, InputObject, EnableException.ToBool(), this,
+            TestBound(nameof(Path)),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
