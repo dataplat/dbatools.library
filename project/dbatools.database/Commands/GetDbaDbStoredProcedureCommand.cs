@@ -176,7 +176,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $Name $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
-    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbStoredProcedure on the four Write-Message; -ModuleName "dbatools"
+    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbStoredProcedure on the four Write-Message;
     // Test-Bound SqlInstance -> $__boundSqlInstance; $ExcludeSystemSpIsBound = Test-Bound -ParameterName
     // ExcludeSystemSp -> = $__boundExcludeSystemSp. $fqtns arrives carried from begin. Continues are loop-bound.
     private const string ProcessScript = """

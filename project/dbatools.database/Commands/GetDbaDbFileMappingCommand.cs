@@ -90,7 +90,7 @@ public sealed class GetDbaDbFileMappingCommand : DbaBaseCmdlet
         }
     }
     // PS: the process block VERBATIM. Edits: the two Test-Bound reads -> carried boundness flags (each
-    // keeping the if parentheses), and -FunctionName Get-DbaDbFileMapping on the three Write-Message. The -ModuleName "dbatools"
+    // keeping the if parentheses), and -FunctionName Get-DbaDbFileMapping on the three Write-Message. The
     // neither-bound guard exits via a bare return that leaves the hop scriptblock cleanly (not dot-sourced).
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $InputObject, $EnableException, $__boundSqlInstance, $__boundInputObject, $__boundVerbose, $__boundDebug)

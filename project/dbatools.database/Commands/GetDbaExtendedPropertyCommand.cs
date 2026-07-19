@@ -93,7 +93,7 @@ public sealed class GetDbaExtendedPropertyCommand : DbaBaseCmdlet
             // Best-effort bookkeeping only.
         }
     }
-    // PS: the process block VERBATIM. Edit: -FunctionName Get-DbaExtendedProperty on the one Write-Message. The -ModuleName "dbatools"
+    // PS: the process block VERBATIM. Edit: -FunctionName Get-DbaExtendedProperty on the one Write-Message. The
     // if ($SqlInstance) check is truthiness (no Test-Bound); the one continue is inside foreach ($object) - loop-bound.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $Name, $InputObject, $EnableException, $__boundVerbose, $__boundDebug)

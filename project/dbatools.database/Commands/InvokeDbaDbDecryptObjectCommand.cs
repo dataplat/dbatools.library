@@ -495,7 +495,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     @{ __invokeDbaDbDecryptObjectProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value); State = @{ ObjectCollection = $objectCollection } } }
 } $SqlInstance $SqlCredential $Database $ObjectName $EncodingType $ExportDestination $EnableException $__state $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
-    // PS: the end block VERBATIM. Edit: -FunctionName on the one Write-Message. -ModuleName "dbatools"
+    // PS: the end block VERBATIM. Edit: -FunctionName on the one Write-Message.
     private const string EndScript = """
 param($__boundVerbose, $__boundDebug)
 $__commonParameters = @{}

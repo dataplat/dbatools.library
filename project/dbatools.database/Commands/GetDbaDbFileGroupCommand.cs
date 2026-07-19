@@ -97,7 +97,7 @@ public sealed class GetDbaDbFileGroupCommand : DbaBaseCmdlet
     }
     // PS: the process block VERBATIM. Edits: the four Test-Bound reads -> carried boundness flags
     // ($__boundSqlInstance/$__boundInputObject/$__boundDatabase/$__boundFilegroup, each keeping the if
-    // parentheses), and -FunctionName Get-DbaDbFileGroup on the four Write-Message. The neither-bound guard -ModuleName "dbatools"
+    // parentheses), and -FunctionName Get-DbaDbFileGroup on the four Write-Message. The neither-bound guard
     // returns to exit the hop scriptblock cleanly (not dot-sourced; no re-emit).
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $InputObject, $FileGroup, $EnableException, $__boundSqlInstance, $__boundInputObject, $__boundDatabase, $__boundFilegroup, $__boundVerbose, $__boundDebug)

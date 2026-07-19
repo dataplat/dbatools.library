@@ -96,7 +96,7 @@ public sealed class GetDbaDbCompatibilityCommand : DbaBaseCmdlet
     // PS: the process block, wrapped in foreach ($__continueGuard in @(1)) so the guard's bare continue
     // (which has no enclosing loop) exits the wrapper instead of propagating out of the hop scriptblock.
     // Edits: Test-Bound -not 'SqlInstance','InputObject' -> the carried $__boundSqlInstance/$__boundInputObject
-    // flags, and -FunctionName Get-DbaDbCompatibility on the two Write-Message. -ModuleName "dbatools"
+    // flags, and -FunctionName Get-DbaDbCompatibility on the two Write-Message.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $InputObject, $EnableException, $__boundSqlInstance, $__boundInputObject, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
