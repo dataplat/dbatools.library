@@ -19,9 +19,12 @@ namespace Dataplat.Dbatools.Commands;
 /// DisplayName) coincides with an empty $regRoot, which Stop-Function -Continues before the emit - so
 /// no carrier is needed (unlike W3-006/010's reachable $result). The SqlInstance default
 /// ($env:COMPUTERNAME) is applied in ProcessRecord ONLY when the parameter was not explicitly bound.
-/// Substitutions only: $PScmdlet.ShouldProcess -> $__realCmdlet.ShouldProcess (ConfirmImpact LOW
-/// mirrored) and explicit -FunctionName Get-DbaExtendedProtection on Stop-Function (W1-090); the body
-/// is otherwise verbatim. Surface pinned by migration/baselines/Get-DbaExtendedProtection.json.
+/// Intentional rewrites (the body is otherwise verbatim): $PScmdlet.ShouldProcess ->
+/// $__realCmdlet.ShouldProcess (ConfirmImpact LOW mirrored); explicit -FunctionName
+/// Get-DbaExtendedProtection on Stop-Function (W1-090); -FunctionName/-ModuleName on the five
+/// direct Write-Message calls (DEF-006); and the W3-084 named-wrapper shim around
+/// Test-ElevationRequirement (Get-PSCallStack caller-frame attribution, matching the Set
+/// sibling). Surface pinned by migration/baselines/Get-DbaExtendedProtection.json.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaExtendedProtection", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Low, DefaultParameterSetName = "Default")]
 public sealed class GetDbaExtendedProtectionCommand : DbaBaseCmdlet
@@ -93,9 +96,10 @@ public sealed class GetDbaExtendedProtectionCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the process body VERBATIM per record (no begin/end blocks). Substitutions only:
-    // $PScmdlet -> $__realCmdlet, explicit -FunctionName Get-DbaExtendedProtection on Stop-Function
-    // (W1-090). SqlInstance arrives already defaulted to the computer name by ProcessRecord.
+    // PS: the process body per record (no begin/end blocks). Intentional rewrites: $PScmdlet ->
+    // $__realCmdlet; -FunctionName on Stop-Function (W1-090); DEF-006 attribution on the five
+    // Write-Message calls; the W3-084 elevation-shim wrapper. SqlInstance arrives already
+    // defaulted to the computer name by ProcessRecord.
     private const string ProcessScript = """
 param($SqlInstance, $Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
