@@ -27,6 +27,16 @@ public sealed class SuspendDbaAgDbDataMovementCommand : DbaBaseCmdlet
     public string? AvailabilityGroup { get; set; }
 
     /// <summary>The database or databases to suspend data movement for.</summary>
+    // T8/DEF-002 EXPOSURE, BLOCKED ON SHARED RUNTIME (see the block comment in ProcessRecord and
+    // the → A escalation). The source's [string[]]$Database casts AT BIND TIME, so `-Database
+    // @($null)` coerces the null element to "" before Get-DbaAgDatabase sees it; the compiled
+    // binder keeps the raw null and the hop's inner [string[]] param does NOT re-cast a null
+    // ELEMENT, so the two worlds pass <''> vs <null> to the lookup - measured directly against the
+    // real cmdlet. The documented fix is [PsStringArrayCast], BUT that attribute is `internal` to
+    // dbatools.core and is NOT visible to the hadr satellite (its exemplars all live in core), so
+    // it cannot be applied here until A exposes the PsCompat casts to satellites. This is the ONLY
+    // value-flowing string parameter: $AvailabilityGroup's value is never used (only its
+    // Test-Bound binding is), so it needs no cast even once the attribute is available.
     [Parameter(Position = 3)]
     public string[]? Database { get; set; }
 
@@ -72,13 +82,30 @@ public sealed class SuspendDbaAgDbDataMovementCommand : DbaBaseCmdlet
         //
         // SOURCE BUG PRESERVED BUG-FOR-BUG (NOT a leak, NOT carried): the gate at :119 reads $ag
         // and $db, and NEITHER is ever assigned anywhere in the function - the loop variable is
-        // $agdb, and there is no module-scope $ag/$db (verified). So both resolve to $null in BOTH
-        // worlds: the source function scope-walks an undefined variable to $null, and the hop
-        // scope-walks the same undefined name through the same module scope to the same $null.
-        // This is the W4-054 situation (a variable undefined-in-function resolves identically),
-        // NOT the W4-055 leak (a variable ASSIGNED in one branch and read in another). Carrying
-        // them would be wrong: there is nothing to carry, and the ShouldProcess target/message are
-        // consistently null/empty in source and port alike.
+        // $agdb. Both resolve IDENTICALLY in BOTH worlds: the source function scope-walks the
+        // undefined name outward, and the hop scope-walks the same undefined name through the SAME
+        // module session-state chain. With no $script:ag/$global:ag defined (the normal case) that
+        // is $null, so the ShouldProcess target/message come through empty; if such a variable
+        // DID exist both worlds would resolve it to the same value (codex correction - the claim
+        // is IDENTICAL-resolution, not unconditionally-null; the parity probe clears $script/
+        // $global $ag/$db so its emptiness assertion is not accidentally satisfied by ambient
+        // state). This is the W4-054 situation (a variable undefined-in-function resolves
+        // identically), NOT the W4-055 leak (assigned in one branch, read in another). Carrying
+        // them would be wrong: there is nothing to carry.
+        //
+        // TWO SHARED-RUNTIME EXPOSURES codex surfaced on this row, BOTH blocked on lane A and BOTH
+        // uniform across the hadr satellite (0 of 80 hadr commands use streaming; hadr carries no
+        // PsCompat at all), so NEITHER is a defect unique to this port and NEITHER can be fixed
+        // from this seat:
+        //   [DEF-001] buffered InvokeScoped: this command emits $agdb per record and can throw
+        //     terminating under -EnableException (Stop-Function -Continue still throws when
+        //     EnableException is set), so an earlier record's already-emitted object can be lost;
+        //     a downstream `| Select -First 1` likewise stops the source early but not the buffered
+        //     port. The canonical fix is NestedCommand.InvokeScopedStreaming (W2-030 @3acfd56),
+        //     which no hadr command has adopted. Same class W4-052 is parked on awaiting A's
+        //     consolidated shared-runtime answer.
+        //   [T8/DEF-002] the -Database @($null) bind-time cast (see the Database property comment):
+        //     needs [PsStringArrayCast], which is internal to dbatools.core and absent from hadr.
         //
         // W3-082 PROMPT-STATE TRANSPLANT: VFP + per-record + an inner $Pscmdlet gate at :119
         // under ConfirmImpact High.
