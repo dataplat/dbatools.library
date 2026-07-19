@@ -111,12 +111,7 @@ public sealed class FindDbaAgentJobCommand : DbaBaseCmdlet
             return;
 
         object? since = TestBound(nameof(Since)) ? Since : null;
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, JobName, ExcludeJobName, StepName, LastUsed,
-            IsDisabled.ToBool(), IsFailed.ToBool(), IsNotScheduled.ToBool(),
-            IsNoEmailNotification.ToBool(), Category, Owner, since,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"),
-            BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -127,7 +122,12 @@ public sealed class FindDbaAgentJobCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, JobName, ExcludeJobName, StepName, LastUsed,
+            IsDisabled.ToBool(), IsFailed.ToBool(), IsNotScheduled.ToBool(),
+            IsNoEmailNotification.ToBool(), Category, Owner, since,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"),
+            BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
