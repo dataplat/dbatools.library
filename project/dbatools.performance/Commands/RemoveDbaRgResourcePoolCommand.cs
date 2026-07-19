@@ -51,9 +51,7 @@ public sealed class RemoveDbaRgResourcePoolCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, ResourcePool, Type, SkipReconfigure.ToBool(),
-            InputObject, TestBound("Type"), EnableException.ToBool(), this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -64,7 +62,9 @@ public sealed class RemoveDbaRgResourcePoolCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, ResourcePool, Type, SkipReconfigure.ToBool(),
+            InputObject, TestBound("Type"), EnableException.ToBool(), this, BoundVerbose());
     }
 
     private object? BoundVerbose()

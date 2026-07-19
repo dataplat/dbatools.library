@@ -51,9 +51,7 @@ public sealed class TestDbaManagementObjectCommand : DbaBaseCmdlet
                 : new[] { new DbaInstanceParameter(defaultComputer) };
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            computers, Credential, VersionNumber, EnableException.ToBool(), _remoteScript,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -64,7 +62,9 @@ public sealed class TestDbaManagementObjectCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            computers, Credential, VersionNumber, EnableException.ToBool(), _remoteScript,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

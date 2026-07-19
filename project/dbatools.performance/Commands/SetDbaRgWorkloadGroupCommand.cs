@@ -83,17 +83,7 @@ public sealed class SetDbaRgWorkloadGroupCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
-            Importance, RequestMaximumMemoryGrantPercentage,
-            RequestMaximumCpuTimeInSeconds, RequestMemoryGrantTimeoutInSeconds,
-            MaximumDegreeOfParallelism, GroupMaximumRequests,
-            SkipReconfigure.ToBool(), InputObject,
-            TestBound("Importance"), TestBound("RequestMaximumMemoryGrantPercentage"),
-            TestBound("RequestMaximumCpuTimeInSeconds"),
-            TestBound("RequestMemoryGrantTimeoutInSeconds"),
-            TestBound("MaximumDegreeOfParallelism"), TestBound("GroupMaximumRequests"),
-            EnableException.ToBool(), this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -104,7 +94,17 @@ public sealed class SetDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
+            Importance, RequestMaximumMemoryGrantPercentage,
+            RequestMaximumCpuTimeInSeconds, RequestMemoryGrantTimeoutInSeconds,
+            MaximumDegreeOfParallelism, GroupMaximumRequests,
+            SkipReconfigure.ToBool(), InputObject,
+            TestBound("Importance"), TestBound("RequestMaximumMemoryGrantPercentage"),
+            TestBound("RequestMaximumCpuTimeInSeconds"),
+            TestBound("RequestMemoryGrantTimeoutInSeconds"),
+            TestBound("MaximumDegreeOfParallelism"), TestBound("GroupMaximumRequests"),
+            EnableException.ToBool(), this, BoundVerbose());
     }
 
     private object? BoundVerbose()

@@ -41,10 +41,7 @@ public sealed class TestDbaOptimizeForAdHocCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, EnableException.ToBool(), _notesAdHocZero,
-            _notesAsRecommended, _recommendedValue,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -55,7 +52,10 @@ public sealed class TestDbaOptimizeForAdHocCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, EnableException.ToBool(), _notesAdHocZero,
+            _notesAsRecommended, _recommendedValue,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

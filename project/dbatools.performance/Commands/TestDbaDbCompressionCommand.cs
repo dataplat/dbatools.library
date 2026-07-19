@@ -92,10 +92,7 @@ public sealed class TestDbaDbCompressionCommand : DbaInstanceCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase,
-            TestBound("ExcludeDatabase"), _sqlSchemaWhere, _sqlTableWhere, _sqlRestrict,
-            _staleDatabase, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -110,7 +107,10 @@ public sealed class TestDbaDbCompressionCommand : DbaInstanceCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase,
+            TestBound("ExcludeDatabase"), _sqlSchemaWhere, _sqlTableWhere, _sqlRestrict,
+            _staleDatabase, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private string[] BoundParameterNames()

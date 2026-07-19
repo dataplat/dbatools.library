@@ -53,10 +53,7 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, Table, SqlCms, ServersFromFile, InputObject,
-            EnableException.ToBool(), TestBound("SqlCms"), TestBound("ServersFromFile"),
-            TestBound("InputObject"), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             PSPropertyInfo? warningProperty = item?.Properties["__dbatoolsHopWarning"];
             object? warningValue = warningProperty?.Value;
@@ -65,7 +62,7 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
             if (warningValue is WarningRecord hopWarning)
             {
                 _pendingHopWarnings.Add(hopWarning);
-                continue;
+                return;
             }
 
             PSPropertyInfo? failureProperty = item?.Properties["__dbatoolsHopFailure"];
@@ -88,7 +85,10 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, Table, SqlCms, ServersFromFile, InputObject,
+            EnableException.ToBool(), TestBound("SqlCms"), TestBound("ServersFromFile"),
+            TestBound("InputObject"), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private void PersistHopWarnings(object? warnings)

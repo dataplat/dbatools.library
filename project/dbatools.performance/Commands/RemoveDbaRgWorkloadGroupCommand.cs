@@ -63,9 +63,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
         // The earlier _skipEnd whole-cmdlet stop diverged (opus W1-117 round 1).
         if (Interrupted) { return; }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
-            InputObject, EnableException.ToBool(), BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -81,7 +79,9 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
+            InputObject, EnableException.ToBool(), BoundVerbose());
     }
 
     protected override void EndProcessing()

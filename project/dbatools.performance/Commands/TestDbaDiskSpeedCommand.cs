@@ -64,9 +64,7 @@ public sealed class TestDbaDiskSpeedCommand : DbaInstanceCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, AggregateBy, EnableException.ToBool(),
-            _sql, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -77,7 +75,9 @@ public sealed class TestDbaDiskSpeedCommand : DbaInstanceCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, AggregateBy, EnableException.ToBool(),
+            _sql, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
