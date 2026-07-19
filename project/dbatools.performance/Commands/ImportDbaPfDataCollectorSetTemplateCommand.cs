@@ -146,16 +146,7 @@ public sealed class ImportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
             _displayNameInitialized = true;
         }
 
-        Collection<PSObject> results = NestedCommand.InvokeScoped(this, ProcessScript,
-            ComputerName, Credential, _displayNameState, SchedulesEnabled.ToBool(), RootPath ?? "",
-            Segment.ToBool(), SegmentMaxDuration, SegmentMaxSize, Subdirectory ?? "",
-            SubdirectoryFormat, SubdirectoryFormatPattern, Task ?? "", TaskRunAsSelf.ToBool(),
-            TaskArguments ?? "", TaskUserTextArguments ?? "", StopOnCompletion.ToBool(),
-            _pathState, Template, Instance, _moduleRoot, _state,
-            TestBound("Path"), TestBound("Template"), TestBound("DisplayName"), TestBound("RootPath"),
-            EnableException.ToBool(), this, BoundVerbose());
-
-        foreach (PSObject? item in results)
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w1107State"))
@@ -166,16 +157,23 @@ public sealed class ImportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
                     _pathState = _state["Path"];
                     _displayNameState = _state["DisplayName"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            ComputerName, Credential, _displayNameState, SchedulesEnabled.ToBool(), RootPath ?? "",
+            Segment.ToBool(), SegmentMaxDuration, SegmentMaxSize, Subdirectory ?? "",
+            SubdirectoryFormat, SubdirectoryFormatPattern, Task ?? "", TaskRunAsSelf.ToBool(),
+            TaskArguments ?? "", TaskUserTextArguments ?? "", StopOnCompletion.ToBool(),
+            _pathState, Template, Instance, _moduleRoot, _state,
+            TestBound("Path"), TestBound("Template"), TestBound("DisplayName"), TestBound("RootPath"),
+            EnableException.ToBool(), this, BoundVerbose());
     }
 
     /// <summary>Removes the silent $error copy the nested pipeline bagged for a merged-back
