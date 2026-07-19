@@ -163,7 +163,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # NO continue-guard wrapper here, DELIBERATELY - see the class remarks. The bare continue below
     # must keep escaping to the caller, exactly as the source's does.
         if ((-not $__boundSqlInstance) -and (-not $__boundInputObject)) {
-            Write-Message -Level Warning -Message 'You must specify either a SQL instance or pipe a database collection' -FunctionName Set-DbaDbCompatibility
+            Write-Message -Level Warning -Message 'You must specify either a SQL instance or pipe a database collection' -FunctionName Set-DbaDbCompatibility -ModuleName "dbatools"
             continue
         }
 
@@ -174,14 +174,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         foreach ($db in $InputObject) {
             $server = $db.Parent
             $dbLevel = $db.CompatibilityLevel
-            Write-Message -Level Verbose -Message "Database $db current Compatibility Level: $dbLevel" -FunctionName Set-DbaDbCompatibility
+            Write-Message -Level Verbose -Message "Database $db current Compatibility Level: $dbLevel" -FunctionName Set-DbaDbCompatibility -ModuleName "dbatools"
 
             if ($__boundCompatibility) {
                 $targetCompatibility = $Compatibility
             } else {
                 $serverVersion = $server.VersionMajor
                 $targetCompatibility = [Microsoft.SqlServer.Management.Smo.CompatibilityLevel]"Version$($serverVersion)0"
-                Write-Message -Level Verbose -Message "No Compatibility value provided, setting databases to match the SQL Server Instance version: $targetCompatibility" -FunctionName Set-DbaDbCompatibility
+                Write-Message -Level Verbose -Message "No Compatibility value provided, setting databases to match the SQL Server Instance version: $targetCompatibility" -FunctionName Set-DbaDbCompatibility -ModuleName "dbatools"
             }
 
             if ($dbLevel -ne $targetCompatibility) {
@@ -203,7 +203,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "Database $db current Compatibility Level matches target level [$targetCompatibility]" -FunctionName Set-DbaDbCompatibility
+                Write-Message -Level Verbose -Message "Database $db current Compatibility Level matches target level [$targetCompatibility]" -FunctionName Set-DbaDbCompatibility -ModuleName "dbatools"
             }
         }
 } $SqlInstance $SqlCredential $Database $Compatibility $InputObject $EnableException $__boundSqlInstance $__boundInputObject $__boundCompatibility $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

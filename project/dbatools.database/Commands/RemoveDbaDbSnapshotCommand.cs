@@ -251,7 +251,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     } | Select-DefaultView -Property $defaultProps
                 }
             } catch {
-                Write-Message -Level Verbose -Message "Could not drop database $db on $server" -FunctionName Remove-DbaDbSnapshot
+                Write-Message -Level Verbose -Message "Could not drop database $db on $server" -FunctionName Remove-DbaDbSnapshot -ModuleName "dbatools"
 
                 [PSCustomObject]@{
                     ComputerName = $server.ComputerName

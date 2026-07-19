@@ -92,7 +92,7 @@ public sealed class GetDbaDbServiceBrokerQueueCommand : DbaBaseCmdlet
             // Best-effort bookkeeping only.
         }
     }
-    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbServiceBrokerQueue on the two Write-Message;
+    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbServiceBrokerQueue on the two Write-Message; -ModuleName "dbatools"
     // Test-Bound SqlInstance -> $__boundSqlInstance and Test-Bound -ParameterName ExcludeSystemQueue ->
     // $__boundExcludeSystemQueue (carried flags). The three continues are inside foreach loops - loop-bound.
     private const string ProcessScript = """
@@ -112,11 +112,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if (!$db.IsAccessible) {
-                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbServiceBrokerQueue
+                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbServiceBrokerQueue -ModuleName "dbatools"
                 continue
             }
             if ($db.ServiceBroker.Queues.Count -eq 0) {
-                Write-Message -Message "No Service Broker Queues exist in the $db database on $instance" -Target $db -Level Output -FunctionName Get-DbaDbServiceBrokerQueue
+                Write-Message -Message "No Service Broker Queues exist in the $db database on $instance" -Target $db -Level Output -FunctionName Get-DbaDbServiceBrokerQueue -ModuleName "dbatools"
                 continue
             }
 

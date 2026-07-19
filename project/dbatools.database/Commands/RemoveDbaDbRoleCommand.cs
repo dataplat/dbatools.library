@@ -182,19 +182,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $inputType = $input.GetType().FullName
         switch ($inputType) {
             'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbRole
+                Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                 $dbRoles = Get-DbaDbRole -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -Role $Role -ExcludeRole $ExcludeRole -ExcludeFixedRole:$True
             }
             'Microsoft.SqlServer.Management.Smo.Server' {
-                Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbRole
+                Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                 $dbRoles = Get-DbaDbRole -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -Role $Role -ExcludeRole $ExcludeRole -ExcludeFixedRole:$True
             }
             'Microsoft.SqlServer.Management.Smo.Database' {
-                Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbRole
+                Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                 $dbRoles = $input | Get-DbaDbRole -ExcludeDatabase $ExcludeDatabase -Role $Role -ExcludeRole $ExcludeRole -ExcludeFixedRole:$True
             }
             'Microsoft.SqlServer.Management.Smo.DatabaseRole' {
-                Write-Message -Level Verbose -Message "Processing DatabaseRole through InputObject" -FunctionName Remove-DbaDbRole
+                Write-Message -Level Verbose -Message "Processing DatabaseRole through InputObject" -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                 $dbRoles = $input
             }
             default {
@@ -217,7 +217,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $ownedSchemas = $db.Schemas | Where-Object { $_.Owner -eq $dbRole.Name }
 
                         if ($ownedSchemas) {
-                            Write-Message -Level Verbose -Message "Role $dbRole owns $($ownedSchemas.Count) schema(s)." -FunctionName Remove-DbaDbRole
+                            Write-Message -Level Verbose -Message "Role $dbRole owns $($ownedSchemas.Count) schema(s)." -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
 
                             # Need to gather up the schema changes so they can be done in a non-destructive order
                             foreach ($schema in $ownedSchemas) {
@@ -228,7 +228,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     if (-not $ownedUrns) {
                                         $dropSchemas += $schema
                                     } else {
-                                        Write-Message -Level Warning -Message "Role $dbRole owns the Schema $schema, which owns $($ownedUrns.Count) object(s). Role $dbRole will not be removed." -FunctionName Remove-DbaDbRole
+                                        Write-Message -Level Warning -Message "Role $dbRole owns the Schema $schema, which owns $($ownedUrns.Count) object(s). Role $dbRole will not be removed." -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                                         $ownedObjects = $true
                                     }
                                 }
@@ -240,7 +240,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     if (($ownedUrns -and $Force) -or (-not $ownedUrns)) {
                                         $alterSchemas += $schema
                                     } else {
-                                        Write-Message -Level Warning -Message "Role $dbRole owns the Schema $schema, which owns $($ownedUrns.Count) object(s). If you want to change the schema's owner to [dbo] and drop the role anyway, use -Force parameter. Role $dbRole will not be removed." -FunctionName Remove-DbaDbRole
+                                        Write-Message -Level Warning -Message "Role $dbRole owns the Schema $schema, which owns $($ownedUrns.Count) object(s). If you want to change the schema's owner to [dbo] and drop the role anyway, use -Force parameter. Role $dbRole will not be removed." -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                                         $ownedObjects = $true
                                     }
                                 }
@@ -251,7 +251,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             try {
                                 # Alter Schemas
                                 foreach ($schema in $alterSchemas) {
-                                    Write-Message -Level Verbose -Message "Owner of Schema $schema will be changed to [dbo]." -FunctionName Remove-DbaDbRole
+                                    Write-Message -Level Verbose -Message "Owner of Schema $schema will be changed to [dbo]." -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                                     if ($__realCmdlet.ShouldProcess($instance, "Change the owner of Schema $schema to [dbo].")) {
                                         $schema.Owner = "dbo"
                                         $schema.Alter()
@@ -267,17 +267,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                 # Drop the role
                                 $dbRole.Drop()
-                                Write-Message -Level Verbose -Message "Role $dbRole removed from database $db on instance $instance" -FunctionName Remove-DbaDbRole
+                                Write-Message -Level Verbose -Message "Role $dbRole removed from database $db on instance $instance" -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                             } catch {
                                 Stop-Function -Message "Failed to remove role $dbRole from database $db on instance $instance" -ErrorRecord $_ -Continue -FunctionName Remove-DbaDbRole
                             }
                         }
                     }
                 } else {
-                    Write-Message -Level Verbose -Message "Cannot remove fixed role $dbRole from database $db on instance $instance" -FunctionName Remove-DbaDbRole
+                    Write-Message -Level Verbose -Message "Cannot remove fixed role $dbRole from database $db on instance $instance" -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
                 }
             } else {
-                Write-Message -Level Verbose -Message "Can only remove roles from System database when IncludeSystemDbs switch used." -FunctionName Remove-DbaDbRole
+                Write-Message -Level Verbose -Message "Can only remove roles from System database when IncludeSystemDbs switch used." -FunctionName Remove-DbaDbRole -ModuleName "dbatools"
             }
         }
     }

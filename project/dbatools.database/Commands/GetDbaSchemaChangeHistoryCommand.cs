@@ -119,7 +119,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $TraceFile = $server.Query($TraceFileQuery) | Select-Object Path
 
             if (!$TraceFile -or !$TraceFile.Path) {
-                Write-Message -Level Warning -Message "No default trace file found on $instance. Schema change tracking requires the default trace to be enabled." -FunctionName Get-DbaSchemaChangeHistory
+                Write-Message -Level Warning -Message "No default trace file found on $instance. Schema change tracking requires the default trace to be enabled." -FunctionName Get-DbaSchemaChangeHistory -ModuleName "dbatools"
                 continue
             }
 
@@ -131,7 +131,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             foreach ($db in $Databases) {
                 if ($db.IsAccessible -eq $false) {
-                    Write-Message -Level Verbose -Message "$($db.name) is not accessible, skipping" -FunctionName Get-DbaSchemaChangeHistory
+                    Write-Message -Level Verbose -Message "$($db.name) is not accessible, skipping" -FunctionName Get-DbaSchemaChangeHistory -ModuleName "dbatools"
                 }
 
                 $sql = "SELECT  SERVERPROPERTY('MachineName') ComputerName
@@ -166,8 +166,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 $sql = $sql + " ORDER BY tt.StartTime ASC"
-                Write-Message -Level Verbose -Message "Querying Database $db on $instance" -FunctionName Get-DbaSchemaChangeHistory
-                Write-Message -Level Debug -Message "SQL: $sql" -FunctionName Get-DbaSchemaChangeHistory
+                Write-Message -Level Verbose -Message "Querying Database $db on $instance" -FunctionName Get-DbaSchemaChangeHistory -ModuleName "dbatools"
+                Write-Message -Level Debug -Message "SQL: $sql" -FunctionName Get-DbaSchemaChangeHistory -ModuleName "dbatools"
 
                 $db.Query($sql) | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, DatabaseName, DateModified, LoginName, UserName, ApplicationName, DDLOperation, Object, ObjectType
             }

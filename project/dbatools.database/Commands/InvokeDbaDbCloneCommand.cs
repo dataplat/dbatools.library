@@ -295,7 +295,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ( ($__boundUpdateStatistics) -and (-not $__boundExcludeStatistics) ) {
                 if ($__realCmdlet.ShouldProcess($instance, "Update statistics in $($db.Name)")) {
                     try {
-                        Write-Message -Level Verbose -Message "Updating statistics" -FunctionName Invoke-DbaDbClone
+                        Write-Message -Level Verbose -Message "Updating statistics" -FunctionName Invoke-DbaDbClone -ModuleName "dbatools"
                         $null = $db.Invoke($sqlStats)
                     } catch {
                         Stop-Function -Message "Failure" -ErrorRecord $_ -Target $server -FunctionName Invoke-DbaDbClone -Continue
@@ -306,14 +306,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dbName = $db.Name
 
             foreach ($clonedb in $CloneDatabase) {
-                Write-Message -Level Verbose -Message "Cloning $clonedb from $db" -FunctionName Invoke-DbaDbClone
+                Write-Message -Level Verbose -Message "Cloning $clonedb from $db" -FunctionName Invoke-DbaDbClone -ModuleName "dbatools"
                 if ($server.Databases[$clonedb]) {
                     Stop-Function -Message "Destination clone database $clonedb already exists" -Target $instance -FunctionName Invoke-DbaDbClone -Continue
                 } else {
                     if ($__realCmdlet.ShouldProcess($instance, "Execute DBCC CloneDatabase($dbName, $clonedb)")) {
                         try {
                             $sql = "DBCC CLONEDATABASE('$dbName','$clonedb') $sqlWith"
-                            Write-Message -Level Debug -Message "Sql Statement: $sql" -FunctionName Invoke-DbaDbClone
+                            Write-Message -Level Debug -Message "Sql Statement: $sql" -FunctionName Invoke-DbaDbClone -ModuleName "dbatools"
                             $null = $db.Invoke($sql)
                             $server.Databases.Refresh()
                             Get-DbaDatabase -SqlInstance $server -Database $clonedb

@@ -161,7 +161,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     if ($RowLimit -gt 0) {
-        Write-Message -Message "Limiting results to $RowLimit rows" -Level Verbose -FunctionName Read-DbaTransactionLog
+        Write-Message -Message "Limiting results to $RowLimit rows" -Level Verbose -FunctionName Read-DbaTransactionLog -ModuleName "dbatools"
         $RowLimitSql = " TOP $RowLimit "
         $IgnoreLimit = $true
     } else {
@@ -170,7 +170,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
 
     if ($IgnoreLimit) {
-        Write-Message -Level Verbose -Message "Please be aware that ignoring the recommended limits may impact on the performance of the SQL Server database and the calling system" -FunctionName Read-DbaTransactionLog
+        Write-Message -Level Verbose -Message "Please be aware that ignoring the recommended limits may impact on the performance of the SQL Server database and the calling system" -FunctionName Read-DbaTransactionLog -ModuleName "dbatools"
     } else {
         #Warn if more than 0.5GB of live log. Dodgy conversion as SMO returns the value in an unhelpful format :(
         $SqlSizeCheck = "SELECT
@@ -185,8 +185,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     $sql = "SELECT $RowLimitSql * FROM fn_dblog(NULL,NULL)"
-    Write-Message -Level Debug -Message $sql -FunctionName Read-DbaTransactionLog
-    Write-Message -Level Verbose -Message "Starting Log retrieval" -FunctionName Read-DbaTransactionLog
+    Write-Message -Level Debug -Message $sql -FunctionName Read-DbaTransactionLog -ModuleName "dbatools"
+    Write-Message -Level Verbose -Message "Starting Log retrieval" -FunctionName Read-DbaTransactionLog -ModuleName "dbatools"
     $server.Query($sql, $Database)
 } $SqlInstance $SqlCredential $Database $IgnoreLimit $RowLimit $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;

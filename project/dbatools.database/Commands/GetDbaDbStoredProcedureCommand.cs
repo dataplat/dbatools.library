@@ -155,7 +155,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $fqtn = Get-ObjectNameParts -ObjectName $t
 
                 if (!$fqtn.Parsed) {
-                    Write-Message -Level Warning -Message "Please check you are using proper two-part or three-part names. If your search value contains special characters you must use [ ] to wrap the name. The value $t could not be parsed as a valid name." -FunctionName Get-DbaDbStoredProcedure
+                    Write-Message -Level Warning -Message "Please check you are using proper two-part or three-part names. If your search value contains special characters you must use [ ] to wrap the name. The value $t could not be parsed as a valid name." -FunctionName Get-DbaDbStoredProcedure -ModuleName "dbatools"
                     Continue
                 }
 
@@ -176,7 +176,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $Name $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
-    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbStoredProcedure on the four Write-Message;
+    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbStoredProcedure on the four Write-Message; -ModuleName "dbatools"
     // Test-Bound SqlInstance -> $__boundSqlInstance; $ExcludeSystemSpIsBound = Test-Bound -ParameterName
     // ExcludeSystemSp -> = $__boundExcludeSystemSp. $fqtns arrives carried from begin. Continues are loop-bound.
     private const string ProcessScript = """
@@ -198,7 +198,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if (!$db.IsAccessible) {
-                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbStoredProcedure
+                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbStoredProcedure -ModuleName "dbatools"
                 continue
             }
 
@@ -207,11 +207,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             try {
                 $db.StoredProcedures.ClearAndInitialize('', [string[]]('Schema', 'Name', 'ID', 'CreateDate', 'DateLastModified', 'ImplementationType', 'Startup', 'IsSystemObject'))
             } catch {
-                Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbStoredProcedure
+                Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbStoredProcedure -ModuleName "dbatools"
             }
 
             if ($db.StoredProcedures.Count -eq 0) {
-                Write-Message -Message "No Stored Procedures exist in the $db database on $instance" -Target $db -Level Output -FunctionName Get-DbaDbStoredProcedure
+                Write-Message -Message "No Stored Procedures exist in the $db database on $instance" -Target $db -Level Output -FunctionName Get-DbaDbStoredProcedure -ModuleName "dbatools"
                 continue
             }
 
@@ -229,7 +229,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $p = $db.StoredProcedures | Where-Object { $_.Name -in $fqtn.Procedure -and $fqtn.Schema -in ($_.Schema, $null) -and $fqtn.Database -in ($_.Parent.Name, $null) }
 
                     if (-not $p) {
-                        Write-Message -Level Verbose -Message "Could not find procedure $($fqtn.Name) in $db on $server" -FunctionName Get-DbaDbStoredProcedure
+                        Write-Message -Level Verbose -Message "Could not find procedure $($fqtn.Name) in $db on $server" -FunctionName Get-DbaDbStoredProcedure -ModuleName "dbatools"
                     }
 
                     $procs += $p

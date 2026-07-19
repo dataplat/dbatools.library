@@ -121,7 +121,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             foreach ($db in $databases) {
                 if (!$db.IsAccessible) {
-                    Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbPartitionFunction
+                    Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbPartitionFunction -ModuleName "dbatools"
                     continue
                 }
 
@@ -132,7 +132,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if (!$partitionfunctions) {
-                    Write-Message -Message "No Partition Functions exist in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbPartitionFunction
+                    Write-Message -Message "No Partition Functions exist in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbPartitionFunction -ModuleName "dbatools"
                     continue
                 }
 

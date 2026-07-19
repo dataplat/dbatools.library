@@ -157,7 +157,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dbs = Get-DbaDatabase -SqlInstance $server -ExcludeDatabase $ExcludeDatabase -Database $Database | Where-Object IsAccessible
 
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Processing $($db.Name) on $instance" -FunctionName Get-DbaDbQueryStoreOption
+                Write-Message -Level Verbose -Message "Processing $($db.Name) on $instance" -FunctionName Get-DbaDbQueryStoreOption -ModuleName "dbatools"
                 $qso = $db.QueryStoreOptions
 
                 if ($server.VersionMajor -eq 14) {

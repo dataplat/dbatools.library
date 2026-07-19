@@ -124,7 +124,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 continue
             }
             $server = $db.Parent
-            Write-Message -Level 'Verbose' -Message "Getting Database Sequences for $db on $server" -FunctionName Get-DbaDbSequence
+            Write-Message -Level 'Verbose' -Message "Getting Database Sequences for $db on $server" -FunctionName Get-DbaDbSequence -ModuleName "dbatools"
 
             $dbSequences = $db.Sequences
 

@@ -114,7 +114,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($DatabaseCollection.Count -gt 0) {
                 foreach ($db in $DatabaseCollection) {
                     try {
-                        Write-Message -Level Verbose -Message "Validating users on database '$db'." -FunctionName Get-DbaDbOrphanUser
+                        Write-Message -Level Verbose -Message "Validating users on database '$db'." -FunctionName Get-DbaDbOrphanUser -ModuleName "dbatools"
                         $UsersToWork = @()
                         # ContainmentType is SQL Server 2012+ only, so keep the legacy path for older versions.
                         $isContainedDatabase = (
@@ -125,11 +125,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         if (-not $isContainedDatabase) {
                             $UsersToWork += $db.Users | Where-Object { ($_.Login -eq "") -and ($_.ID -gt 4) -and ($_.Sid.Length -eq 16) -and ($_.LoginType -in "SqlLogin", "Certificate") }
                         } else {
-                            Write-Message -Level Verbose -Message "Skipping SQL login orphan check on contained database '$db' (ContainmentType: $($db.ContainmentType))." -FunctionName Get-DbaDbOrphanUser
+                            Write-Message -Level Verbose -Message "Skipping SQL login orphan check on contained database '$db' (ContainmentType: $($db.ContainmentType))." -FunctionName Get-DbaDbOrphanUser -ModuleName "dbatools"
                         }
                         $UsersToWork += $db.Users | Where-Object { ($_.Login -notin $server.Logins.Name) -and ($_.ID -gt 4) -and ($_.Sid.Length -gt 16 -and $_.LoginType -in "WindowsUser", "WindowsGroup") }
                         if ($UsersToWork.Count -gt 0) {
-                            Write-Message -Level Verbose -Message "Orphan users found" -FunctionName Get-DbaDbOrphanUser
+                            Write-Message -Level Verbose -Message "Orphan users found" -FunctionName Get-DbaDbOrphanUser -ModuleName "dbatools"
                             foreach ($user in $UsersToWork) {
                                 [PSCustomObject]@{
                                     ComputerName = $server.ComputerName
@@ -141,7 +141,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 } | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, DatabaseName, User
                             }
                         } else {
-                            Write-Message -Level Verbose -Message "No orphan users found on database '$db'." -FunctionName Get-DbaDbOrphanUser
+                            Write-Message -Level Verbose -Message "No orphan users found on database '$db'." -FunctionName Get-DbaDbOrphanUser -ModuleName "dbatools"
                         }
                         #reset collection
                         $UsersToWork = $null
@@ -150,7 +150,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
             } else {
-                Write-Message -Level VeryVerbose -Message "There are no databases to analyse." -FunctionName Get-DbaDbOrphanUser
+                Write-Message -Level VeryVerbose -Message "There are no databases to analyse." -FunctionName Get-DbaDbOrphanUser -ModuleName "dbatools"
             }
         }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

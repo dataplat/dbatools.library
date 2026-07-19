@@ -274,7 +274,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 foreach ($tableobject in $tables.Tables) {
 
                     if ($tableobject.Name -in $ExcludeTable -or ($Table -and $tableobject.Name -notin $Table)) {
-                        Write-Message -Level Verbose -Message "Skipping $($tableobject.Name) because it is explicitly excluded" -FunctionName Invoke-DbaDbDataGenerator
+                        Write-Message -Level Verbose -Message "Skipping $($tableobject.Name) because it is explicitly excluded" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                         continue
                     }
 
@@ -287,7 +287,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # Check if the table contains unique indexes
                     if ($tableobject.HasUniqueIndex) {
                         # Loop through the rows and generate a unique value for each row
-                        Write-Message -Level Verbose -Message "Generating unique values for $($tableobject.Name)" -FunctionName Invoke-DbaDbDataGenerator
+                        Write-Message -Level Verbose -Message "Generating unique values for $($tableobject.Name)" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
 
                         for ($i = 0; $i -lt $tableobject.Rows; $i++) {
                             $rowValue = New-Object PSCustomObject
@@ -377,7 +377,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if (-not $tablecolumns) {
-                        Write-Message -Level Verbose "No columns to process in $($db.Name).$($tableobject.Schema).$($tableobject.Name), moving on" -FunctionName Invoke-DbaDbDataGenerator
+                        Write-Message -Level Verbose "No columns to process in $($db.Name).$($tableobject.Schema).$($tableobject.Name), moving on" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                         continue
                     }
 
@@ -394,7 +394,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             try {
                                 $null = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $db.Name -Query $query
                             } catch {
-                                Write-Message -Level VeryVerbose -Message "$query" -FunctionName Invoke-DbaDbDataGenerator
+                                Write-Message -Level VeryVerbose -Message "$query" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                                 $errormessage = $_.Exception.Message.ToString()
                                 Stop-Function -Message "Error truncating $($tableobject.Schema).$($tableobject.Name): $errormessage" -Target $query -Continue -ErrorRecord $_ -FunctionName Invoke-DbaDbDataGenerator
                             }
@@ -418,7 +418,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     }
                                 }
                             } catch {
-                                Write-Message -Level VeryVerbose -Message "$query" -FunctionName Invoke-DbaDbDataGenerator
+                                Write-Message -Level VeryVerbose -Message "$query" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                                 $errormessage = $_.Exception.Message.ToString()
                                 Stop-Function -Message "Error getting identity values from $($tableobject.Schema).$($tableobject.Name): $errormessage" -Target $query -Continue -ErrorRecord $_ -FunctionName Invoke-DbaDbDataGenerator
                             }
@@ -550,7 +550,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $sqlcmd = New-Object Microsoft.Data.SqlClient.SqlCommand($insertQuery, $sqlconn, $transaction)
                             $null = $sqlcmd.ExecuteNonQuery()
                         } catch {
-                            Write-Message -Level VeryVerbose -Message "$insertQuery" -FunctionName Invoke-DbaDbDataGenerator
+                            Write-Message -Level VeryVerbose -Message "$insertQuery" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                             $errormessage = $_.Exception.Message.ToString()
                             Stop-Function -Message "Error inserting $($tableobject.Schema).$($tableobject.Name): $errormessage" -Target $insertQuery -Continue -ErrorRecord $_ -FunctionName Invoke-DbaDbDataGenerator
                         }

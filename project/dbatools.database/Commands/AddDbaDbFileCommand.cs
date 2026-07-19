@@ -215,7 +215,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     # For MemoryOptimizedDataFileGroup, we create a different type of file
                     if ($fileGroupObject.FileGroupType -eq "MemoryOptimizedDataFileGroup") {
-                        Write-Message -Level Verbose -Message "Creating memory-optimized container $FileName in filegroup $FileGroup" -FunctionName Add-DbaDbFile
+                        Write-Message -Level Verbose -Message "Creating memory-optimized container $FileName in filegroup $FileGroup" -FunctionName Add-DbaDbFile -ModuleName "dbatools"
 
                         $newFile = New-Object Microsoft.SqlServer.Management.Smo.DataFile -ArgumentList $fileGroupObject, $FileName
                         $newFile.FileName = $Path
@@ -234,7 +234,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $db.FileGroups[$FileGroup].Files[$FileName]
                     } else {
                         # Standard data file creation
-                        Write-Message -Level Verbose -Message "Creating data file $FileName in filegroup $FileGroup" -FunctionName Add-DbaDbFile
+                        Write-Message -Level Verbose -Message "Creating data file $FileName in filegroup $FileGroup" -FunctionName Add-DbaDbFile -ModuleName "dbatools"
 
                         $newFile = New-Object Microsoft.SqlServer.Management.Smo.DataFile -ArgumentList $fileGroupObject, $FileName
                         $newFile.FileName = $Path

@@ -248,13 +248,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dbs = $dbs | Where-Object { $_.Name -NotIn $ExcludeDatabase }
         }
         foreach ($db in $dbs) {
-            Write-Message -Level Verbose -Message "Querying $instance - $db" -FunctionName Set-DbaDbCompression
+            Write-Message -Level Verbose -Message "Querying $instance - $db" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
             if ($db.Status -ne 'Normal') {
-                Write-Message -Level Warning -Message "$db has status $($db.Status) and will be skipped." -Target $db -FunctionName Set-DbaDbCompression
+                Write-Message -Level Warning -Message "$db has status $($db.Status) and will be skipped." -Target $db -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                 continue
             }
             if ($db.CompatibilityLevel -lt 'Version100') {
-                Write-Message -Level Warning -Message "$db has a compatibility level lower than Version100 and will be skipped." -FunctionName Set-DbaDbCompression
+                Write-Message -Level Warning -Message "$db has a compatibility level lower than Version100 and will be skipped." -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                 continue
             }
             $isOnlineRebuildSupported = $false
@@ -272,16 +272,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
             }
-            Write-Message -Level Verbose -Message "Are Online Rebuilds supported ? $isOnlineRebuildSupported" -FunctionName Set-DbaDbCompression
+            Write-Message -Level Verbose -Message "Are Online Rebuilds supported ? $isOnlineRebuildSupported" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
             $CanDoOnlineOperation = $false
             if ($IsOnlineRebuildSupported -and !$ForceOfflineRebuilds) {
                 $CanDoOnlineOperation = $true
-                Write-Message -Level Verbose -Message "Using Online Rebuilds where possible" -FunctionName Set-DbaDbCompression
+                Write-Message -Level Verbose -Message "Using Online Rebuilds where possible" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
             }
 
             if ($CompressionType -eq "Recommended") {
                 if ($__boundInputObject) {
-                    Write-Message -Level Verbose -Message "Using passed in compression suggestions" -FunctionName Set-DbaDbCompression
+                    Write-Message -Level Verbose -Message "Using passed in compression suggestions" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                     $compressionSuggestion = $InputObject | Where-Object { $_.Database -eq $db.Name }
                 } else {
                     if ($__realCmdlet.ShouldProcess($db, "Testing database for compression suggestions on $instance")) {
@@ -297,12 +297,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $objects = $compressionSuggestion | Select-Object *, @{l = 'AlreadyProcessed'; e = { "False" } }
                     foreach ($obj in ($objects | Where-Object { $_.CompressionTypeRecommendation -notin @('NO_GAIN', '?') -and $_.PercentCompression -ge $PercentCompression } | Sort-Object PercentCompression -Descending)) {
                         if ($MaxRunTime -ne 0 -and ($(Get-Date) - $starttime).TotalMinutes -ge $MaxRunTime) {
-                            Write-Message -Level Warning -Message "Reached max run time of $MaxRunTime" -FunctionName Set-DbaDbCompression
+                            Write-Message -Level Warning -Message "Reached max run time of $MaxRunTime" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                             break
                         }
                         if ($obj.indexId -le 1) {
                             ##heaps and clustered indexes
-                            Write-Message -Level Verbose -Message "Applying $($obj.CompressionTypeRecommendation) compression to $($obj.Database).$($obj.Schema).$($obj.TableName)" -FunctionName Set-DbaDbCompression
+                            Write-Message -Level Verbose -Message "Applying $($obj.CompressionTypeRecommendation) compression to $($obj.Database).$($obj.Schema).$($obj.TableName)" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                             try {
                                 ($server.Databases[$obj.Database].Tables[$obj.TableName, $obj.Schema].PhysicalPartitions | Where-Object { $_.PartitionNumber -eq $obj.Partition }).DataCompression = $obj.CompressionTypeRecommendation
                                 $server.Databases[$obj.Database].Tables[$obj.TableName, $obj.Schema].OnlineHeapOperation = $CanDoOnlineOperation
@@ -312,7 +312,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         } else {
                             ##nonclustered indexes
-                            Write-Message -Level Verbose -Message "Applying $($obj.CompressionTypeRecommendation) compression to $($obj.Database).$($obj.Schema).$($obj.TableName).$($obj.IndexName)" -FunctionName Set-DbaDbCompression
+                            Write-Message -Level Verbose -Message "Applying $($obj.CompressionTypeRecommendation) compression to $($obj.Database).$($obj.Schema).$($obj.TableName).$($obj.IndexName)" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                             try {
                                 $underlyingObj = $server.Databases[$obj.Database].Tables[$obj.TableName, $obj.Schema].Indexes[$obj.IndexName]
                                 ($underlyingObj.PhysicalPartitions | Where-Object { $_.PartitionNumber -eq $obj.Partition }).DataCompression = $obj.CompressionTypeRecommendation
@@ -343,11 +343,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     foreach ($obj in $tables | Where-Object { !$_.IsMemoryOptimized -and !$_.HasSparseColumn }) {
                         if ($MaxRunTime -ne 0 -and ($(Get-Date) - $starttime).TotalMinutes -ge $MaxRunTime) {
-                            Write-Message -Level Warning -Message "Reached max run time of $MaxRunTime" -FunctionName Set-DbaDbCompression
+                            Write-Message -Level Warning -Message "Reached max run time of $MaxRunTime" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                             break
                         }
                         foreach ($p in $($obj.PhysicalPartitions | Where-Object { $_.DataCompression -notin ($CompressionType, 'ColumnStore', 'ColumnStoreArchive') })) {
-                            Write-Message -Level Verbose -Message "Compressing table $($obj.Schema).$($obj.Name)" -FunctionName Set-DbaDbCompression
+                            Write-Message -Level Verbose -Message "Compressing table $($obj.Schema).$($obj.Name)" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                             try {
                                 $($obj.PhysicalPartitions | Where-Object { $_.PartitionNumber -eq $p.PartitionNumber }).DataCompression = $CompressionType
                                 $obj.OnlineHeapOperation = $CanDoOnlineOperation
@@ -380,11 +380,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                         foreach ($index in $($obj.Indexes | Where-Object { !$_.IsMemoryOptimized -and $_.IndexType -notmatch 'Columnstore' })) {
                             if ($MaxRunTime -ne 0 -and ($(Get-Date) - $starttime).TotalMinutes -ge $MaxRunTime) {
-                                Write-Message -Level Warning -Message "Reached max run time of $MaxRunTime" -FunctionName Set-DbaDbCompression
+                                Write-Message -Level Warning -Message "Reached max run time of $MaxRunTime" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                                 break
                             }
                             foreach ($p in $($index.PhysicalPartitions | Where-Object { $_.DataCompression -ne $CompressionType })) {
-                                Write-Message -Level Verbose -Message "Compressing $($Index.IndexType) $($Index.Name) Partition $($p.PartitionNumber)" -FunctionName Set-DbaDbCompression
+                                Write-Message -Level Verbose -Message "Compressing $($Index.IndexType) $($Index.Name) Partition $($p.PartitionNumber)" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                                 try {
                                     ## There is a bug in SMO where setting compression to None at the index level doesn't work
                                     ## Once this UserVoice item is fixed the workaround can be removed
@@ -435,7 +435,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     foreach ($index in $($server.Databases[$($db.name)].Views | Where-Object { $_.Indexes }).Indexes) {
                         $parentView = $index.Parent
                         foreach ($p in $($index.PhysicalPartitions | Where-Object { $_.DataCompression -ne $CompressionType })) {
-                            Write-Message -Level Verbose -Message "Compressing $($index.IndexType) $($index.Name) Partition $($p.PartitionNumber)" -FunctionName Set-DbaDbCompression
+                            Write-Message -Level Verbose -Message "Compressing $($index.IndexType) $($index.Name) Partition $($p.PartitionNumber)" -FunctionName Set-DbaDbCompression -ModuleName "dbatools"
                             try {
                                 ## There is a bug in SMO where setting compression to None at the index level doesn't work
                                 ## Once this UserVoice item is fixed the workaround can be removed
