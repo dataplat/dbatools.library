@@ -87,6 +87,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Collection<PSObject> raw;
             if (pipelineInput is null)
             {
@@ -140,6 +141,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             ScriptBlock script = ScriptBlock.Create(
                 "param($__nestedCommandArguments)\n& {\n" + scriptText + "\n} @__nestedCommandArguments");
             Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, script, null, new object?[] { scriptArgs });
@@ -189,6 +191,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
             string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
             string wrapper =
@@ -285,6 +288,7 @@ internal static partial class NestedCommand
 
             if (terminatingError is not null)
             {
+                bridge.Complete(terminatingError);
                 RemoveCapturedErrorBookkeeping(host, terminatingError);
                 host.InvokeCommand.InvokeScript(
                     false,
@@ -339,6 +343,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             ScriptBlock script = ScriptBlock.Create("param($__parameters) & " + commandName + " @__parameters 3>&1");
             SteppablePipeline pipeline = script.GetSteppablePipeline(CommandOrigin.Internal, new object[] { parameters });
             bool stopped = false;

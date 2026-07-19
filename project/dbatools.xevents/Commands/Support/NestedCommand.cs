@@ -53,6 +53,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
             string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
             ScriptBlock script = ScriptBlock.Create(
@@ -71,6 +72,7 @@ internal static partial class NestedCommand
                 {
                     if (termination["ErrorRecord"] is not ErrorRecord terminatingError)
                         throw new InvalidOperationException("Nested command terminated without an ErrorRecord.");
+                    bridge.Complete(terminatingError);
                     RemoveCapturedErrorBookkeeping(host, terminatingError);
                     host.InvokeCommand.InvokeScript(
                         false,
@@ -102,6 +104,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
             string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
             string wrapper =
@@ -201,6 +204,7 @@ internal static partial class NestedCommand
 
             if (terminatingError is not null)
             {
+                bridge.Complete(terminatingError);
                 RemoveCapturedErrorBookkeeping(host, terminatingError);
                 host.InvokeCommand.InvokeScript(
                     false,

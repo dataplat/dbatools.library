@@ -81,6 +81,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Collection<PSObject> raw;
             if (pipelineInput is null)
             {
@@ -130,6 +131,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             // The carrier param is the ONLY name bound in the caller's scope; the args
             // array travels as a single element so null elements survive the InvokeScript
             // object[]-unpacking (W5-016), then splats positionally into the real scope.
@@ -162,6 +164,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             ScriptBlock script = ScriptBlock.Create("param($__parameters) & " + commandName + " @__parameters 3>&1");
             SteppablePipeline pipeline = script.GetSteppablePipeline(CommandOrigin.Internal, new object[] { parameters });
             bool stopped = false;
@@ -220,6 +223,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
             string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
             string wrapper =
@@ -317,6 +321,7 @@ internal static partial class NestedCommand
 
             if (terminatingError is not null)
             {
+                bridge.Complete(terminatingError);
                 RemoveCapturedErrorBookkeeping(host, terminatingError);
                 host.InvokeCommand.InvokeScript(
                     false,

@@ -81,6 +81,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Collection<PSObject> raw;
             if (pipelineInput is null)
             {
@@ -119,6 +120,7 @@ internal static partial class NestedCommand
         using (ShieldDefaultParameterValues(host))
         using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             ScriptBlock script = ScriptBlock.Create("param($__parameters) & " + commandName + " @__parameters 3>&1");
             SteppablePipeline pipeline = script.GetSteppablePipeline(CommandOrigin.Internal, new object[] { parameters });
             bool stopped = false;
