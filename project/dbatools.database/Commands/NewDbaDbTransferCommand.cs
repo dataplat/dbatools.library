@@ -262,7 +262,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     $__oc = Get-Variable -Name objectCollection -Scope 0 -ErrorAction Ignore
-    @{ __newDbaDbTransferBegin = @{ ObjectCollection = $(if ($__oc) { $__oc.Value } else { $null }) } }
+    # PLAIN ASSIGNMENT, never "$( if (...) { $__oc.Value } )". A $() subexpression sends its result
+    # through the pipeline, which ENUMERATES collections: an EMPTY ArrayList becomes $null and a
+    # populated one collapses to its single element (measured: an ArrayList of one string came back
+    # typed String). Either way the carried collection is destroyed and .Add() accumulates nothing.
+    $__ocv = $null
+    if ($__oc) { $__ocv = $__oc.Value }
+    @{ __newDbaDbTransferBegin = @{ ObjectCollection = $__ocv } }
 } $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
     // PS: the process block VERBATIM, dot-sourced so its three early returns exit only the body.
@@ -303,7 +309,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     $__oc = Get-Variable -Name objectCollection -Scope 0 -ErrorAction Ignore
-    @{ __newDbaDbTransferProcess = @{ ObjectCollection = $(if ($__oc) { $__oc.Value } else { $null }) } }
+    # plain assignment - see the note in BeginScript; $() would enumerate the ArrayList away
+    $__ocv = $null
+    if ($__oc) { $__ocv = $__oc.Value }
+    @{ __newDbaDbTransferProcess = @{ ObjectCollection = $__ocv } }
 } $SqlInstance $Database $InputObject $EnableException $__state $__boundSqlInstance $__boundDatabase $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
     // PS: the end block VERBATIM, dot-sourced so its early returns exit only the body. Edits: three

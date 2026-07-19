@@ -63,7 +63,7 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// The two $Pscmdlet.ShouldProcess gates (:253 dropping an existing user under -Force, :265 creating)
 /// route to the real cmdlet via $__realCmdlet - which matters at ConfirmImpact Medium, where the
-/// prompt is reachable at the default $ConfirmPreference. The five in-loop Stop-Function calls all
+/// prompt is reachable at the default $ConfirmPreference. The SIX in-loop Stop-Function calls all
 /// carry -Continue. In-hop Stop-Function/Write-Message calls carry -FunctionName. The two switches
 /// (IncludeSystem, Force) and the inherited EnableException cross as SwitchParameter OBJECTS received
 /// untyped, per B's combined rule. Surface pinned by migration/baselines/New-DbaDbUser.json.
