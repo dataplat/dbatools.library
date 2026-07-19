@@ -188,7 +188,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $Login = $SqlCredential.UserName
             $SecurePassword = $SqlCredential.Password
         }
-        . {
+        # Named-wrapper shim: the body runs inside a function carrying the command's name so that
+        # call-stack-deriving helpers see Reset-DbaAdmin as they do in the function world.
+        # Write-ProgressHelper builds BOTH its Activity string and its TotalSteps lookup from
+        # (Get-PSCallStack)[1].Command; from an anonymous scriptblock frame that reads '<ScriptBlock>',
+        # so all NINE calls here - none of which pass -Activity or -TotalSteps - emitted
+        # 'Executing <ScriptBlock>' at a flat 0%. Dot-sourced, so the body stays in the hop scope.
+        function Reset-DbaAdmin {
         foreach ($instance in $SqlInstance) {
             $stepcounter = 0
             $baseaddress = $instance.ComputerName
@@ -462,6 +468,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         }
         }
+        . Reset-DbaAdmin
         Write-Message -Level Verbose -Message "Script complete." -FunctionName Reset-DbaAdmin -ModuleName "dbatools"
 } $SqlInstance $SqlCredential $Login $SecurePassword $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
