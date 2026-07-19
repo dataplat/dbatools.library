@@ -25,15 +25,15 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class DisableDbaFilestreamCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true)]
+    [Parameter(Mandatory = true, Position = 0, ValueFromPipelineByPropertyName = true)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative credential for the target instance.</summary>
-    [Parameter(ValueFromPipelineByPropertyName = true)]
+    [Parameter(Position = 1, ValueFromPipelineByPropertyName = true)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>Alternative Windows credential for the target server.</summary>
-    [Parameter(ValueFromPipelineByPropertyName = true)]
+    [Parameter(Position = 2, ValueFromPipelineByPropertyName = true)]
     public PSCredential? Credential { get; set; }
 
     /// <summary>Bypasses confirmation and restarts the SQL Server service to apply changes immediately.</summary>

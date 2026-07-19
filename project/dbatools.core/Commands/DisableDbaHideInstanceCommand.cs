@@ -26,11 +26,11 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class DisableDbaHideInstanceCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances. Defaults to the local computer.</summary>
-    [Parameter(ValueFromPipeline = true)]
+    [Parameter(Position = 0, ValueFromPipeline = true)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative Windows credential for the target server.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? Credential { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
