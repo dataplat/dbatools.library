@@ -112,21 +112,21 @@ public sealed class ExportDbaXESessionCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlCredential, _batches.ToArray(), Session, Path, FilePath, Encoding, BatchSeparator,
-            Passthru.ToBool(), NoPrefix.ToBool(), NoClobber.ToBool(), Append.ToBool(), EnableException.ToBool(),
-            TestBound(nameof(Path)), TestBound(nameof(BatchSeparator)),
-            BoundValue("Path"), BoundValue("FilePath"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlCredential, _batches.ToArray(), Session, Path, FilePath, Encoding, BatchSeparator,
+            Passthru.ToBool(), NoPrefix.ToBool(), NoClobber.ToBool(), Append.ToBool(), EnableException.ToBool(),
+            TestBound(nameof(Path)), TestBound(nameof(BatchSeparator)),
+            BoundValue("Path"), BoundValue("FilePath"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundValue(string name)
