@@ -124,6 +124,7 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     private bool _beginInterrupted;
     private bool _processInterrupted;
     private object? _inputObjectState;
+    private bool _inputObjectByName;
 
     /// <summary>
     /// Parameters the BODY mutates and the script keeps across records: -Append flips true when a user
@@ -143,6 +144,10 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     /// <summary>Runs the begin block once, before any record.</summary>
     protected override void BeginProcessing()
     {
+        // InputObject is bimodal: bound BY NAME (a fixed value the body accumulates ON TOP of via +=
+        // across records) or bound from the PIPELINE (databases piped, rebinds each record). ContainsKey
+        // captured before any record distinguishes them - exactly as W2-245 does for its lone pipeline param.
+        _inputObjectByName = MyInvocation.BoundParameters.ContainsKey("InputObject");
         _inputObjectState = InputObject;
         _appendState = Append.ToBool();
         _filePathState = FilePath;
@@ -191,12 +196,11 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
         if (_beginInterrupted || _processInterrupted || Interrupted)
             return;
 
-        // A non-null InputObject means a value bound to the InputObject pipeline slot THIS record
-        // (databases piped), so reset to it - and a repeated IDENTICAL array instance is still a genuine
-        // new record, which reference-identity detection could not tell from a non-rebind. A null
-        // InputObject means instances were piped to SqlInstance instead and the body accumulates into
-        // $InputObject via +=, so the carried accumulation is kept.
-        if (InputObject != null)
+        // Reset to the current InputObject ONLY when it was pipeline-bound this record (databases piped):
+        // a non-null value is then a genuine new record, identical instance or not. If InputObject was
+        // bound BY NAME it is a fixed value the body accumulates on top of (with SqlInstance piped), so it
+        // must NOT reset; and a null InputObject (instances piped to SqlInstance) keeps the accumulation.
+        if (!_inputObjectByName && InputObject != null)
             _inputObjectState = InputObject;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
