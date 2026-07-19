@@ -7,13 +7,16 @@ using System.Management.Automation;
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Drops database synonyms. Port of public/Remove-DbaDbDataClassification.ps1; the workflow remains a
-/// module-scoped PowerShell compatibility hop.
+/// Drops the sensitivity-classification extended properties from a column. Port of
+/// public/Remove-DbaDbDataClassification.ps1; the workflow remains a module-scoped PowerShell
+/// compatibility hop.
 ///
 /// Process-only: the source has no begin or end block, so the hop is a single per-record
-/// invocation. No local needs a cross-record carry - $input, $inputType, $dbSynonyms, $dbSynonym,
-/// $db and $instance are each assigned and read inside one loop iteration, and $InputObject is
-/// re-bound from the pipeline on every record before the body re-points it at $SqlInstance.
+/// invocation. No local needs a cross-record carry - $classObj, $db, $server, $schemaName,
+/// $tableName, $columnName, $target, the three $escaped* locals, $status and $errors are each
+/// assigned and read inside ONE iteration of the $InputObject loop. $errors in particular is
+/// re-initialised to @( ) inside that loop, immediately before the property loop that appends to it,
+/// so a partial-failure list cannot leak into the next column's status string.
 ///
 /// No graceful-stop latch: the source has no Test-FunctionInterrupt guard, so a later record
 /// re-enters the process body and re-evaluates its input guard, warning again. Carrying a latch
@@ -23,15 +26,21 @@ namespace Dataplat.Dbatools.Commands;
 /// prompts by default and -Confirm's "Yes to All" answer - which lives on the invoking runtime -
 /// must survive between records rather than being forgotten by a per-record inner runtime.
 ///
-/// Two source shapes ship unchanged because parity is the contract. The element loop variable is
-/// $input, shadowing the PowerShell automatic; that was probed across the function,
-/// module-scriptblock and production-hop shapes and behaves identically in all three, so it needs
-/// no shim. And the default branch of the input-type switch does Stop-Function then a bare return,
-/// which abandons the whole record rather than just that element.
+/// InputObject carries an implicit position, and that is deliberate rather than an oversight. The
+/// source declares [parameter(ValueFromPipeline, Mandatory)] with no Position, and its only other
+/// parameter is a switch - which is never positional - so PowerShell assigns InputObject the first
+/// implicit position and the port declares Position = 0 to match. This is the OPPOSITE case to the
+/// ports where every parameter carries an explicit [Parameter()] and no implicit position exists;
+/// the compiled surface diff is the arbiter and reports PASS, 0 breaking, on this shape.
 ///
-/// The hop streams rather than buffers. This command DROPS synonyms and each emitted object records
-/// one that was actually dropped, so a buffered invocation would discard the audit trail of
-/// completed drops if a later synonym threw under -EnableException.
+/// The failure handling ships unchanged because parity is the contract: a failed
+/// sp_dropextendedproperty does NOT abandon the column. It appends the property name to $errors,
+/// warns, and the record is still emitted with a "Partial - failed to remove: ..." status, so a
+/// caller sees which of the four properties survived.
+///
+/// The hop streams rather than buffers. This command DROPS extended properties and each emitted
+/// object records a column that was actually processed, so a buffered invocation would discard the
+/// audit trail of completed drops if a later column threw under -EnableException.
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "DbaDbDataClassification", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(PSObject))]
