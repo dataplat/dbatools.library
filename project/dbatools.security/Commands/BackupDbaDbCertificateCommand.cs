@@ -331,13 +331,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $missingCerts = $Certificate | Where-Object { $InputObject.Name -notcontains $_ }
 
             if ($missingCerts) {
-                Write-Message -Level Warning -Message "Database certificate(s) $missingCerts not found in Database(s)=$Database on Instance(s)=$SqlInstance" -FunctionName Backup-DbaDbCertificate
+                Write-Message -Level Warning -Message "Database certificate(s) $missingCerts not found in Database(s)=$Database on Instance(s)=$SqlInstance" -FunctionName Backup-DbaDbCertificate -ModuleName "dbatools"
             }
         }
 
         foreach ($cert in $InputObject) {
             if ($cert.Name.StartsWith("##")) {
-                Write-Message -Level Verbose -Message "Skipping system cert $cert" -FunctionName Backup-DbaDbCertificate
+                Write-Message -Level Verbose -Message "Skipping system cert $cert" -FunctionName Backup-DbaDbCertificate -ModuleName "dbatools"
             } else {
                 export-cert $cert
             }

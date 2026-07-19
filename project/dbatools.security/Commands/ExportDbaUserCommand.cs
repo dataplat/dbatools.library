@@ -432,7 +432,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $ScriptingOptionsObject.IncludeIfNotExists = $true
             }
 
-            Write-Message -Level Verbose -Message "Validating users on database $db" -FunctionName Export-DbaUser
+            Write-Message -Level Verbose -Message "Validating users on database $db" -FunctionName Export-DbaUser -ModuleName "dbatools"
 
             if ($User) {
                 $users = $db.Users | Where-Object { $User -contains $_.Name -and $_.IsSystemObject -eq $false -and $_.Name -notlike "##*" }

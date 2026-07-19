@@ -269,7 +269,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             switch ($inputType) {
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Add-DbaServerRoleMember
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Add-DbaServerRoleMember -ModuleName "dbatools"
                     try {
                         $serverRoles = Get-DbaServerRole -SqlInstance $input -SqlCredential $SqlCredential -ServerRole $ServerRole -EnableException
                     } catch {
@@ -277,7 +277,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Add-DbaServerRoleMember
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Add-DbaServerRoleMember -ModuleName "dbatools"
                     try {
                         $serverRoles = Get-DbaServerRole -SqlInstance $input -SqlCredential $SqlCredential -ServerRole $ServerRole -EnableException
                     } catch {
@@ -285,7 +285,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
                 'Microsoft.SqlServer.Management.Smo.ServerRole' {
-                    Write-Message -Level Verbose -Message "Processing ServerRole through InputObject" -FunctionName Add-DbaServerRoleMember
+                    Write-Message -Level Verbose -Message "Processing ServerRole through InputObject" -FunctionName Add-DbaServerRoleMember -ModuleName "dbatools"
                     try {
                         $serverRoles = $inputObject
                     } catch {
@@ -302,11 +302,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $instance = $sr.Parent
                 foreach ($l in $Login) {
                     if ( $sr.EnumMemberNames().Contains($l.Name) ) {
-                        Write-Message -Level Warning -Message "Login $l is already a member in server-level role: $sr" -FunctionName Add-DbaServerRoleMember
+                        Write-Message -Level Warning -Message "Login $l is already a member in server-level role: $sr" -FunctionName Add-DbaServerRoleMember -ModuleName "dbatools"
                         continue
                     } else {
                         if ($__realCmdlet.ShouldProcess($instance, "Adding login $l to server-level role: $sr")) {
-                            Write-Message -Level Verbose -Message "Adding login $l to server-level role: $sr on $instance" -FunctionName Add-DbaServerRoleMember
+                            Write-Message -Level Verbose -Message "Adding login $l to server-level role: $sr on $instance" -FunctionName Add-DbaServerRoleMember -ModuleName "dbatools"
                             try {
                                 $sr.AddMember($l)
                             } catch {
@@ -323,11 +323,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         continue
                     }
                     if (-not $isServerRole) {
-                        Write-Message -Level Warning -Message "$r server-level role was not found on $instance" -FunctionName Add-DbaServerRoleMember
+                        Write-Message -Level Warning -Message "$r server-level role was not found on $instance" -FunctionName Add-DbaServerRoleMember -ModuleName "dbatools"
                         continue
                     }
                     if ($__realCmdlet.ShouldProcess($instance, "Adding role $r to server-level role: $sr")) {
-                        Write-Message -Level Verbose -Message "Adding role $r to server-level role: $sr on $instance" -FunctionName Add-DbaServerRoleMember
+                        Write-Message -Level Verbose -Message "Adding role $r to server-level role: $sr on $instance" -FunctionName Add-DbaServerRoleMember -ModuleName "dbatools"
                         try {
                             $sr.AddMembershipToRole($r)
                         } catch {

@@ -170,14 +170,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $actualPath = "$Path".TrimEnd('\').TrimEnd('/')
 
         if (-not $db.IsAccessible) {
-            Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Backup-DbaDbMasterKey
+            Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             continue
         }
 
         $masterkey = $db.MasterKey
 
         if (-not $masterkey) {
-            Write-Message -Message "No master key exists in the $dbname database on $instance" -Target $db -Level Verbose -FunctionName Backup-DbaDbMasterKey
+            Write-Message -Message "No master key exists in the $dbname database on $instance" -Target $db -Level Verbose -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             continue
         }
 
@@ -218,7 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $status = "Success"
             } catch {
                 $status = "Failure"
-                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaDbMasterKey
+                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             }
 
             Add-Member -Force -InputObject $masterkey -MemberType NoteProperty -Name ComputerName -value $server.ComputerName

@@ -143,7 +143,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($__realCmdlet.ShouldProcess($server.Name, "Enabling encryption on $($db.Name)")) {
             try {
                 if (-not $db.DatabaseEncryptionKey.EncryptionAlgorithm) {
-                    Write-Message -Level Verbose -Message "No Encryption Key found, creating one" -FunctionName Enable-DbaDbEncryption
+                    Write-Message -Level Verbose -Message "No Encryption Key found, creating one" -FunctionName Enable-DbaDbEncryption -ModuleName "dbatools"
                     $null = $db | New-DbaDbEncryptionKey -Force:$Force -EncryptorName $EncryptorName -EnableException
                 }
                 $db.EncryptionEnabled = $true

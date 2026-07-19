@@ -148,7 +148,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $all = $store.PolicycategorySubscriptions
 
             foreach ($current in $all) {
-                Write-Message -Level Verbose -Message "Processing $current" -FunctionName Get-DbaPbmCategorySubscription
+                Write-Message -Level Verbose -Message "Processing $current" -FunctionName Get-DbaPbmCategorySubscription -ModuleName "dbatools"
                 Add-Member -Force -InputObject $current -MemberType NoteProperty ComputerName -value $store.ComputerName
                 Add-Member -Force -InputObject $current -MemberType NoteProperty InstanceName -value $store.InstanceName
                 Add-Member -Force -InputObject $current -MemberType NoteProperty SqlInstance -value $store.SqlInstance

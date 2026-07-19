@@ -259,7 +259,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $inputType = $input.GetType().FullName
                     switch ($inputType) {
                         'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                            Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaLogin
+                            Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                             try {
                                 $server = Connect-DbaInstance -SqlInstance $input -SqlCredential $SqlCredential
                             } catch {
@@ -267,16 +267,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         }
                         'Microsoft.SqlServer.Management.Smo.Server' {
-                            Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaLogin
+                            Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                             $server = Connect-DbaInstance -SqlInstance $input -SqlCredential $SqlCredential
                         }
                         'Microsoft.SqlServer.Management.Smo.Database' {
-                            Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Export-DbaLogin
+                            Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                             $server = $input.Parent
                             $Database = $input
                         }
                         'Microsoft.SqlServer.Management.Smo.Login' {
-                            Write-Message -Level Verbose -Message "Processing Login through InputObject" -FunctionName Export-DbaLogin
+                            Write-Message -Level Verbose -Message "Processing Login through InputObject" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                             $server = $input.Parent
                             $Login = $input
                         }
@@ -331,16 +331,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
         
                     foreach ($sourceLogin in $serverLogins) {
-                        Write-Message -Level Verbose -Message "Processing login $sourceLogin" -FunctionName Export-DbaLogin
+                        Write-Message -Level Verbose -Message "Processing login $sourceLogin" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                         $userName = $sourceLogin.name
         
                         if ($ExcludeLogin -contains $userName) {
-                            Write-Message -Level Warning -Message "Skipping $userName" -FunctionName Export-DbaLogin
+                            Write-Message -Level Warning -Message "Skipping $userName" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                             continue
                         }
         
                         if ($userName.StartsWith("##") -or $userName -eq 'sa') {
-                            Write-Message -Level Warning -Message "Skipping $userName" -FunctionName Export-DbaLogin
+                            Write-Message -Level Warning -Message "Skipping $userName" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                             continue
                         }
         
@@ -349,14 +349,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $userBase = ($userName.Split("\")[0]).ToLowerInvariant()
                         if ($serverName -eq $userBase -or $userName.StartsWith("NT ")) {
                             if ($__realCmdlet.ShouldProcess("console", "Stating $userName is skipped because it is a local machine name")) {
-                                Write-Message -Level Warning -Message "$userName is skipped because it is a local machine name" -FunctionName Export-DbaLogin
+                                Write-Message -Level Warning -Message "$userName is skipped because it is a local machine name" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                                 continue
                             }
                         }
         
                         if ($__realCmdlet.ShouldProcess("Outfile", "Adding T-SQL for login $userName")) {
                             if ($Path -or $FilePath) {
-                                Write-Message -Level Verbose -Message "Exporting $userName" -FunctionName Export-DbaLogin
+                                Write-Message -Level Verbose -Message "Exporting $userName" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                             }
         
                             $outsql += "$($eol)USE master$eol"
@@ -428,7 +428,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                             # This script does not currently support certificate mapped or asymmetric key users.
                             else {
-                                Write-Message -Level Warning -Message "$($sourceLogin.LoginType) logins not supported. $($sourceLogin.Name) skipped" -FunctionName Export-DbaLogin
+                                Write-Message -Level Warning -Message "$($sourceLogin.LoginType) logins not supported. $($sourceLogin.Name) skipped" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                                 continue
                             }
         
@@ -558,7 +558,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                                 $rolePermissionScripts += $roleScript | Select-Object -Skip $roleDefinitionScript.Count
                                             }
                                         } catch {
-                                            Write-Message -Level Warning -Message "Failed to export permissions for role $($role.Name) in database $dbName : $($_.Exception.Message)" -FunctionName Export-DbaLogin
+                                            Write-Message -Level Warning -Message "Failed to export permissions for role $($role.Name) in database $dbName : $($_.Exception.Message)" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                                         }
                                     }
                                 }
@@ -593,7 +593,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                         $sql = $server.Databases[$dbName].Users[$dbUserName].Script($scriptOptions)
                                         $outsql += $sql
                                     } catch {
-                                        Write-Message -Level Warning -Message "User cannot be found in selected database" -FunctionName Export-DbaLogin
+                                        Write-Message -Level Warning -Message "User cannot be found in selected database" -FunctionName Export-DbaLogin -ModuleName "dbatools"
                                     }
         
                                     if ($roleDefinitionScripts) {

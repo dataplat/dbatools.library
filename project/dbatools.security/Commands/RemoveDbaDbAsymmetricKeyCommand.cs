@@ -131,7 +131,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # erroractionprefs are not invoked for .net methods suddenly (??), so use Invoke-DbaQuery
                     # Avoids modifying the collection
                     Invoke-DbaQuery -SqlInstance $server -Database $db.Name -Query "DROP ASYMMETRIC KEY $($askey.Name)" -EnableException
-                    Write-Message -Level Verbose -Message "Successfully removed asymmetric key named $Name from the $db database on $server" -FunctionName Remove-DbaDbAsymmetricKey
+                    Write-Message -Level Verbose -Message "Successfully removed asymmetric key named $Name from the $db database on $server" -FunctionName Remove-DbaDbAsymmetricKey -ModuleName "dbatools"
                     [PSCustomObject]@{
                         ComputerName = $server.ComputerName
                         InstanceName = $server.ServiceName

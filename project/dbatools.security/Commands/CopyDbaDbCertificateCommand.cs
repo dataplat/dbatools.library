@@ -298,9 +298,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if (($sourcecertificates | Where-Object PrivateKeyEncryptionType -eq MasterKey)) {
             $masterkey = Get-DbaDbMasterKey -SqlInstance $destServer -Database master
             if (-not $masterkey) {
-                Write-Message -Level Verbose -Message "master key not found, seeing if MasterKeyPassword was specified" -FunctionName Copy-DbaDbCertificate
+                Write-Message -Level Verbose -Message "master key not found, seeing if MasterKeyPassword was specified" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                 if ($MasterKeyPassword) {
-                    Write-Message -Level Verbose -Message "master key not found, creating one" -FunctionName Copy-DbaDbCertificate
+                    Write-Message -Level Verbose -Message "master key not found, creating one" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                     try {
                         $params = @{
                             SqlInstance     = $destServer
@@ -330,7 +330,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $masterkey = Get-DbaDbMasterKey -SqlInstance $db.Parent -Database $db.Name
 
                 if (-not $masterkey) {
-                    Write-Message -Level Verbose -Message "Master key not found, seeing if MasterKeyPassword was specified" -FunctionName Copy-DbaDbCertificate
+                    Write-Message -Level Verbose -Message "Master key not found, seeing if MasterKeyPassword was specified" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                     if ($MasterKeyPassword) {
                         try {
                             $params = @{
@@ -354,7 +354,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 foreach ($cert in $sourcerts) {
                     $certname = $cert.Name
-                    Write-Message -Level VeryVerbose -Message "Processing $certname on $dbName" -FunctionName Copy-DbaDbCertificate
+                    Write-Message -Level VeryVerbose -Message "Processing $certname on $dbName" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
 
                     $copyDbCertificateStatus = [PSCustomObject]@{
                         SourceServer          = $cert.Parent.Parent.Name
@@ -375,7 +375,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyDbCertificateStatus.Status = "Skipped"
                             $copyDbCertificateStatus.Notes = $domasterkeymessage
                             $copyDbCertificateStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message $domasterkeymessage -FunctionName Copy-DbaDbCertificate
+                            Write-Message -Level Verbose -Message $domasterkeymessage -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                         }
                         continue
                     }
@@ -385,7 +385,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyDbCertificateStatus.Status = "Skipped"
                             $copyDbCertificateStatus.Notes = "Master service key not found and MasterKeyPassword not provided for auto-creation"
                             $copyDbCertificateStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Master service key not found and MasterKeyPassword not provided for auto-creation" -FunctionName Copy-DbaDbCertificate
+                            Write-Message -Level Verbose -Message "Master service key not found and MasterKeyPassword not provided for auto-creation" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                         }
                         continue
                     }
@@ -395,7 +395,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyDbCertificateStatus.Status = "Skipped"
                             $copyDbCertificateStatus.Notes = "Already exists on destination"
                             $copyDbCertificateStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Certificate $certname exists at destination in the $dbName database" -FunctionName Copy-DbaDbCertificate
+                            Write-Message -Level Verbose -Message "Certificate $certname exists at destination in the $dbName database" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                         }
                         continue
                     }
@@ -413,7 +413,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 EncryptionPassword = $backupEncryptionPassword
                                 DecryptionPassword = $DecryptionPassword
                             }
-                            Write-Message -Level Verbose -Message "Backing up certificate $cername for $($dbName) on $($server.Name)" -FunctionName Copy-DbaDbCertificate
+                            Write-Message -Level Verbose -Message "Backing up certificate $cername for $($dbName) on $($server.Name)" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                             try {
                                 $tempPath = Join-DbaPath -SqlInstance $server -Path $SharedPath -ChildPath "$certname.cer"
                                 $tempKey = Join-DbaPath -SqlInstance $server -Path $SharedPath -ChildPath "$certname.pvk"
@@ -425,7 +425,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     }
                                     # if files exist, then try to be helpful, otherwise, it just kills the whole process
                                     # this workaround exists because if you rename the back file, you'll rename the cert on restore
-                                    Write-Message -Level Verbose -Message "ATTEMPTING TO USE FILES THAT ALREADY EXIST: $tempPath and $tempKey" -FunctionName Copy-DbaDbCertificate
+                                    Write-Message -Level Verbose -Message "ATTEMPTING TO USE FILES THAT ALREADY EXIST: $tempPath and $tempKey" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                                     $usingtempfiles = $true
                                 } else {
                                     $export = Backup-DbaDbCertificate @params
@@ -440,7 +440,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                             $acl.SetAccessRule($accessRule)
                                             Set-Acl -Path $filePath -AclObject $acl
                                         } catch {
-                                            Write-Message -Level Verbose -Message "Failed to set permission for [$filePath]: $_" -FunctionName Copy-DbaDbCertificate
+                                            Write-Message -Level Verbose -Message "Failed to set permission for [$filePath]: $_" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                                         }
                                     }
                                 }
@@ -448,7 +448,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $copyDbCertificateStatus.Status = "Failed $PSItem"
                                 $copyDbCertificateStatus.Notes = $PSItem
                                 $copyDbCertificateStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                Write-Message -Level Verbose -Message "Failed to create certificate $certname for $dbName on $destinstance | $PSItem" -FunctionName Copy-DbaDbCertificate
+                                Write-Message -Level Verbose -Message "Failed to create certificate $certname for $dbName on $destinstance | $PSItem" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                                 continue
                             }
 
@@ -472,9 +472,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyDbCertificateStatus.Notes = $PSItem
                             $copyDbCertificateStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                             if ($usingtempfiles) {
-                                Write-Message -Level Verbose -Message "Issue creating certificate $certname from $($export.Path) for $dbname on $($db.Parent.Name). Note that $($export.Path) and $($export.Key) already existed so we tried to use them. If this is an issue, please move or rename both files and try again." -FunctionName Copy-DbaDbCertificate
+                                Write-Message -Level Verbose -Message "Issue creating certificate $certname from $($export.Path) for $dbname on $($db.Parent.Name). Note that $($export.Path) and $($export.Key) already existed so we tried to use them. If this is an issue, please move or rename both files and try again." -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                             } else {
-                                Write-Message -Level Verbose -Message "Issue creating certificate $certname from $($export.Path) for $dbname on $($db.Parent.Name) | $PSItem" -FunctionName Copy-DbaDbCertificate
+                                Write-Message -Level Verbose -Message "Issue creating certificate $certname from $($export.Path) for $dbname on $($db.Parent.Name) | $PSItem" -FunctionName Copy-DbaDbCertificate -ModuleName "dbatools"
                             }
                         } finally {
                             if ($export.Path -and -not $usingtempfiles) {

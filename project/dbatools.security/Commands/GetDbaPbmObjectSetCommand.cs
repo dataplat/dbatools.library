@@ -165,7 +165,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($currentset in $all) {
-                Write-Message -Level Verbose -Message "Processing $currentset" -FunctionName Get-DbaPbmObjectSet
+                Write-Message -Level Verbose -Message "Processing $currentset" -FunctionName Get-DbaPbmObjectSet -ModuleName "dbatools"
                 Add-Member -Force -InputObject $currentset -MemberType NoteProperty ComputerName -value $store.ComputerName
                 Add-Member -Force -InputObject $currentset -MemberType NoteProperty InstanceName -value $store.InstanceName
                 Add-Member -Force -InputObject $currentset -MemberType NoteProperty SqlInstance -value $store.SqlInstance

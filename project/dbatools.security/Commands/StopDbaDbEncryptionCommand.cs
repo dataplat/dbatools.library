@@ -136,7 +136,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($db.EncryptionEnabled) {
                         $db | Disable-DbaDbEncryption -Confirm:$false
                     } else {
-                        Write-Message -Level Verbose "Encryption was not enabled for $($db.Name) on $($server.Name)" -FunctionName Stop-DbaDbEncryption
+                        Write-Message -Level Verbose "Encryption was not enabled for $($db.Name) on $($server.Name)" -FunctionName Stop-DbaDbEncryption -ModuleName "dbatools"
                         $db | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, "Name as DatabaseName", EncryptionEnabled
                     }
                 } catch {
@@ -240,7 +240,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     EnableException = $EnableException
                 }
 
-                Write-Message -Level Verbose "Queuing database $($db.Name) on $($db.Parent.Name) for decryption" -FunctionName Stop-DbaDbEncryption
+                Write-Message -Level Verbose "Queuing database $($db.Name) on $($db.Parent.Name) for decryption" -FunctionName Stop-DbaDbEncryption -ModuleName "dbatools"
 
                 $thread = [powershell]::Create()
                 $thread.RunspacePool = $runspacePool

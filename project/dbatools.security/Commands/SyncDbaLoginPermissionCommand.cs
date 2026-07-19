@@ -172,7 +172,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             foreach ($sourceLogin in $allLogins) {
                 $loginName = $sourceLogin.Name
                 if ($currentLogin -eq $loginName) {
-                    Write-Message -Level Verbose -Message "Sync does not modify the permissions of the current login '$loginName'. Skipping." -FunctionName Sync-DbaLoginPermission
+                    Write-Message -Level Verbose -Message "Sync does not modify the permissions of the current login '$loginName'. Skipping." -FunctionName Sync-DbaLoginPermission -ModuleName "dbatools"
                     continue
                 }
 
@@ -180,12 +180,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $serverName = $sourceServer.ComputerName
                 $userBase = ($loginName.Split("\")[0]).ToLowerInvariant()
                 if ($serverName -eq $userBase -or $loginName.StartsWith("NT ")) {
-                    Write-Message -Level Verbose -Message "Sync does not modify the permissions of host or system login '$loginName'. Skipping." -FunctionName Sync-DbaLoginPermission
+                    Write-Message -Level Verbose -Message "Sync does not modify the permissions of host or system login '$loginName'. Skipping." -FunctionName Sync-DbaLoginPermission -ModuleName "dbatools"
                     continue
                 }
 
                 if ($null -eq ($destLogin = $destServer.Logins.Item($loginName))) {
-                    Write-Message -Level Verbose -Message "Login '$loginName' not found on destination. Skipping." -FunctionName Sync-DbaLoginPermission
+                    Write-Message -Level Verbose -Message "Login '$loginName' not found on destination. Skipping." -FunctionName Sync-DbaLoginPermission -ModuleName "dbatools"
                     continue
                 }
 

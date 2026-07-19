@@ -197,8 +197,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $servers = $logins | Select-Object -Unique -ExpandProperty Parent
 
         foreach ($serverinstance in $servers) {
-            Write-Message -Level Verbose -Message "Testing: same username as Password" -FunctionName Test-DbaLoginPassword
-            Write-Message -Level Verbose -Message "Testing: the following Passwords $CheckPasses" -FunctionName Test-DbaLoginPassword
+            Write-Message -Level Verbose -Message "Testing: same username as Password" -FunctionName Test-DbaLoginPassword -ModuleName "dbatools"
+            Write-Message -Level Verbose -Message "Testing: the following Passwords $CheckPasses" -FunctionName Test-DbaLoginPassword -ModuleName "dbatools"
             try {
                 $checkParts = , (Split-ArrayInChunks -source $CheckPasses -size $maxBatch)
 
@@ -214,7 +214,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $thisBatch += ", ($paramKey)"
                     }
                     $thisBatch += $sqlEnd
-                    Write-Message -Level Debug -Message "sql: $thisBatch" -FunctionName Test-DbaLoginPassword
+                    Write-Message -Level Debug -Message "sql: $thisBatch" -FunctionName Test-DbaLoginPassword -ModuleName "dbatools"
                     Invoke-DbaQuery -SqlInstance $serverinstance -Query $thisBatch -SqlParameter $sqlParams
                 }
 

@@ -144,7 +144,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Processing $db" -FunctionName Get-DbaDbEncryption
+                Write-Message -Level Verbose -Message "Processing $db" -FunctionName Get-DbaDbEncryption -ModuleName "dbatools"
 
                 if ($db.EncryptionEnabled) {
                     $returnCertificate = [PSCustomObject]@{

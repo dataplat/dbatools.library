@@ -173,7 +173,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($currentpolicy in $allpolicies) {
-                Write-Message -Level Verbose -Message "Processing $currentpolicy" -FunctionName Get-DbaPbmPolicy
+                Write-Message -Level Verbose -Message "Processing $currentpolicy" -FunctionName Get-DbaPbmPolicy -ModuleName "dbatools"
                 Add-Member -Force -InputObject $currentpolicy -MemberType NoteProperty ComputerName -value $store.ComputerName
                 Add-Member -Force -InputObject $currentpolicy -MemberType NoteProperty InstanceName -value $store.InstanceName
                 Add-Member -Force -InputObject $currentpolicy -MemberType NoteProperty SqlInstance -value $store.SqlInstance

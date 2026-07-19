@@ -153,7 +153,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($stepCounter -eq 100) {
                         $stepCounter = 0
                     }
-                    Write-Message -Level Verbose -Message "Database state for $($db.Name) on $($server.Name): $($db.DatabaseEncryptionKey.EncryptionState)" -FunctionName Disable-DbaDbEncryption
+                    Write-Message -Level Verbose -Message "Database state for $($db.Name) on $($server.Name): $($db.DatabaseEncryptionKey.EncryptionState)" -FunctionName Disable-DbaDbEncryption -ModuleName "dbatools"
                 }
                 while ($db.DatabaseEncryptionKey.EncryptionState -notin "Unencrypted", "None")
 
