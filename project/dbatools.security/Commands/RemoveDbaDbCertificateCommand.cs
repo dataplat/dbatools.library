@@ -133,7 +133,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # erroractionprefs are not invoked for .net methods suddenly (??), so use Invoke-DbaQuery
                     # Avoids modifying the collection
                     Invoke-DbaQuery -SqlInstance $server -Database $db.Name -Query "DROP CERTIFICATE $cert" -EnableException
-                    Write-Message -Level Verbose -Message "Successfully removed certificate named $cert from the $db database on $server" -FunctionName Remove-DbaDbCertificate
+                    Write-Message -Level Verbose -Message "Successfully removed certificate named $cert from the $db database on $server" -FunctionName Remove-DbaDbCertificate -ModuleName "dbatools"
                     [PSCustomObject]@{
                         ComputerName = $server.ComputerName
                         InstanceName = $server.ServiceName

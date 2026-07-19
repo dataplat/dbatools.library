@@ -318,7 +318,7 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
     // PS: the begin block, run ONCE in BeginProcessing and handing out $NewSecurePassword plus its interrupt
     // latch through a sentinel; the process body then runs PER RECORD in its own hop (DEF-014).
     // Substitutions only: $Pscmdlet -> $__realCmdlet (the ShouldProcess gate); the Test-Bound reads -> carried
-    // by-name flags; -FunctionName on the 24 DIRECT Stop-Function calls; -FunctionName + -ModuleName "dbatools"
+    // by-name flags; -FunctionName on the 24 DIRECT Stop-Function calls; -FunctionName +
     // on the 9 DIRECT Write-Message calls. EnableException and the switches received untyped.
     private const string BeginScript = """
 param($Login, $SecurePassword, $PasswordHash, $NewName, $EnableException, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundVerbose, $__boundDebug)

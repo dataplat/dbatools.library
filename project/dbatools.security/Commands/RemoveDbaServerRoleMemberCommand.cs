@@ -275,7 +275,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             switch ($inputType) {
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaServerRoleMember
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaServerRoleMember -ModuleName "dbatools"
                     try {
                         $serverRoles = Get-DbaServerRole -SqlInstance $input -SqlCredential $SqlCredential -ServerRole $ServerRole -EnableException
                     } catch {
@@ -283,7 +283,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaServerRoleMember
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaServerRoleMember -ModuleName "dbatools"
                     try {
                         $serverRoles = Get-DbaServerRole -SqlInstance $input -SqlCredential $SqlCredential -ServerRole $ServerRole -EnableException
                     } catch {
@@ -291,7 +291,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
                 'Microsoft.SqlServer.Management.Smo.ServerRole' {
-                    Write-Message -Level Verbose -Message "Processing ServerRole through InputObject" -FunctionName Remove-DbaServerRoleMember
+                    Write-Message -Level Verbose -Message "Processing ServerRole through InputObject" -FunctionName Remove-DbaServerRoleMember -ModuleName "dbatools"
                     try {
                         $serverRoles = $inputObject
                     } catch {
@@ -308,7 +308,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $instance = $sr.Parent
                 foreach ($l in $Login) {
                     if ($__realCmdlet.ShouldProcess($instance, "Removing login $l from server-level role: $sr")) {
-                        Write-Message -Level Verbose -Message "Removing login $l from server-level role: $sr on $instance" -FunctionName Remove-DbaServerRoleMember
+                        Write-Message -Level Verbose -Message "Removing login $l from server-level role: $sr on $instance" -FunctionName Remove-DbaServerRoleMember -ModuleName "dbatools"
                         try {
                             $sr.DropMember($l)
                         } catch {
@@ -325,11 +325,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         continue
                     }
                     if (-not $isServerRole) {
-                        Write-Message -Level Warning -Message "$r server-level role was not found on $instance" -FunctionName Remove-DbaServerRoleMember
+                        Write-Message -Level Warning -Message "$r server-level role was not found on $instance" -FunctionName Remove-DbaServerRoleMember -ModuleName "dbatools"
                         continue
                     }
                     if ($__realCmdlet.ShouldProcess($instance, "Removing role $r from server-level role: $sr")) {
-                        Write-Message -Level Verbose -Message "Removing role $r from server-level role: $sr on $instance" -FunctionName Remove-DbaServerRoleMember
+                        Write-Message -Level Verbose -Message "Removing role $r from server-level role: $sr on $instance" -FunctionName Remove-DbaServerRoleMember -ModuleName "dbatools"
                         try {
                             $sr.DropMembershipFromRole($r)
                         } catch {

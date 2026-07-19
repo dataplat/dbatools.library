@@ -151,7 +151,7 @@ public sealed class GetDbaLoginCommand : DbaBaseCmdlet
     }
 
     // PS: the begin block's two constant SQL templates, then the process body VERBATIM. Substitutions
-    // only: -FunctionName on the single DIRECT Stop-Function call; -FunctionName + -ModuleName "dbatools"
+    // only: -FunctionName on the single DIRECT Stop-Function call; -FunctionName +
     // on the two DIRECT Write-Message calls. The switches and EnableException are received untyped.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Login, $IncludeFilter, $ExcludeLogin, $ExcludeFilter, $ExcludeSystemLogin, $Type, $HasAccess, $Locked, $Disabled, $MustChangePassword, $Detailed, $EnableException, $__boundVerbose, $__boundDebug)

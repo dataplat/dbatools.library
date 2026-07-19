@@ -121,14 +121,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if (!$db.IsAccessible) {
-                Write-Message -Level Warning -Message "Database $db on $($db.Parent) is not accessible. Skipping." -FunctionName Get-DbaDbMasterKey
+                Write-Message -Level Warning -Message "Database $db on $($db.Parent) is not accessible. Skipping." -FunctionName Get-DbaDbMasterKey -ModuleName "dbatools"
                 continue
             }
             $instance = $db.Parent.Name
             $masterkey = $db.MasterKey
 
             if (!$masterkey) {
-                Write-Message -Message "No master key exists in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbMasterKey
+                Write-Message -Message "No master key exists in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbMasterKey -ModuleName "dbatools"
                 continue
             }
 

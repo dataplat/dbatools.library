@@ -156,7 +156,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if (-not $sourceLogins) {
-            Write-Message -Level Verbose -Message "No SQL Server authentication logins found on source instance $Source" -FunctionName Sync-DbaLoginPassword
+            Write-Message -Level Verbose -Message "No SQL Server authentication logins found on source instance $Source" -FunctionName Sync-DbaLoginPassword -ModuleName "dbatools"
             return
         }
 
@@ -178,13 +178,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 # Check if login exists on destination
                 $destLogin = $destServer.Logins[$loginName]
                 if (-not $destLogin) {
-                    Write-Message -Level Verbose -Message "Login '$loginName' not found on destination $dest. Skipping." -FunctionName Sync-DbaLoginPassword
+                    Write-Message -Level Verbose -Message "Login '$loginName' not found on destination $dest. Skipping." -FunctionName Sync-DbaLoginPassword -ModuleName "dbatools"
                     continue
                 }
 
                 # Verify destination login is SQL authentication
                 if ($destLogin.LoginType -ne "SqlLogin") {
-                    Write-Message -Level Verbose -Message "Login '$loginName' on destination $dest is not a SQL Server login. Skipping." -FunctionName Sync-DbaLoginPassword
+                    Write-Message -Level Verbose -Message "Login '$loginName' on destination $dest is not a SQL Server login. Skipping." -FunctionName Sync-DbaLoginPassword -ModuleName "dbatools"
                     continue
                 }
 
@@ -194,7 +194,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $passwordHash = Get-LoginPasswordHash -Login $sourceLogin
 
                         if (-not $passwordHash) {
-                            Write-Message -Level Warning -Message "Failed to retrieve password hash for login $loginName from source. Skipping." -FunctionName Sync-DbaLoginPassword
+                            Write-Message -Level Warning -Message "Failed to retrieve password hash for login $loginName from source. Skipping." -FunctionName Sync-DbaLoginPassword -ModuleName "dbatools"
                             continue
                         }
 

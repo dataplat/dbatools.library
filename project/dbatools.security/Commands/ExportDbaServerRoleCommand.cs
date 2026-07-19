@@ -293,15 +293,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $inputType = $input.GetType().FullName
             switch ($inputType) {
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     $serverRoles = Get-DbaServerRole -SqlInstance $input -SqlCredential $SqlCredential  -ServerRole $ServerRole -ExcludeServerRole $ExcludeServerRole -ExcludeFixedRole:$ExcludeFixedRole
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     $serverRoles = Get-DbaServerRole -SqlInstance $input -SqlCredential $SqlCredential -ServerRole $ServerRole -ExcludeServerRole $ExcludeServerRole -ExcludeFixedRole:$ExcludeFixedRole
                 }
                 'Microsoft.SqlServer.Management.Smo.ServerRole' {
-                    Write-Message -Level Verbose -Message "Processing ServerRole through InputObject" -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "Processing ServerRole through InputObject" -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     $serverRoles = $input
                 }
                 default {
@@ -395,7 +395,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             } elseif ($Path -Or $FilePath) {
                 $outputFileName = $instanceName.Replace('\', '$')
                 if ($outputFileArray -notcontains $outputFileName) {
-                    Write-Message -Level Verbose -Message "New File $outputFileName " -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "New File $outputFileName " -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     if ($null -ne $prefix) {
                         $sql = "$prefix$eol$sql"
                     }
@@ -404,7 +404,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $outputFileArray += $outputFileName
                     Get-ChildItem $scriptPath
                 } else {
-                    Write-Message -Level Verbose -Message "Adding to $outputFileName " -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "Adding to $outputFileName " -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     $sql | Out-File -Encoding $Encoding -LiteralPath $scriptPath -Append
                 }
             } else {

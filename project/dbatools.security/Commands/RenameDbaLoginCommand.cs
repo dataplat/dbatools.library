@@ -170,7 +170,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $db = $databases | Where-Object Name -eq $mapping.DBName
                     $user = $db.Users[$Login]
                     if ($user) {
-                        Write-Message -Level Verbose -Message "Starting update for $db" -FunctionName Rename-DbaLogin
+                        Write-Message -Level Verbose -Message "Starting update for $db" -FunctionName Rename-DbaLogin -ModuleName "dbatools"
 
                         if ($__realCmdlet.ShouldProcess($SqlInstance, "Changing database $db user $user from [$Login] to [$NewLogin]")) {
                             try {
@@ -188,7 +188,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     Status        = "Successful"
                                 }
                             } catch {
-                                Write-Message -Level Warning -Message "Rolling back update to login: $Login" -FunctionName Rename-DbaLogin
+                                Write-Message -Level Warning -Message "Rolling back update to login: $Login" -FunctionName Rename-DbaLogin -ModuleName "dbatools"
                                 $null = $currentLogin.Rename($Login)
 
                                 [PSCustomObject]@{

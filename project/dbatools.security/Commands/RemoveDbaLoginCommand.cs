@@ -140,7 +140,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Warn if specific logins were requested but not found
             foreach ($requestedLogin in $Login) {
                 if ($requestedLogin -notin $foundLoginNames) {
-                    Write-Message -Level Warning -Message "Login '$requestedLogin' not found on instance $instance" -FunctionName Remove-DbaLogin
+                    Write-Message -Level Warning -Message "Login '$requestedLogin' not found on instance $instance" -FunctionName Remove-DbaLogin -ModuleName "dbatools"
                 }
             }
 

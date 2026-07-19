@@ -132,7 +132,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     # Avoids modifying the collection
                     Invoke-DbaQuery -SqlInstance $server -Database $db.Name -Query "DROP DATABASE ENCRYPTION KEY" -EnableException
-                    Write-Message -Level Verbose -Message "Successfully removed encryption key from the $db database on $server" -FunctionName Remove-DbaDbEncryptionKey
+                    Write-Message -Level Verbose -Message "Successfully removed encryption key from the $db database on $server" -FunctionName Remove-DbaDbEncryptionKey -ModuleName "dbatools"
                     [PSCustomObject]@{
                         ComputerName = $server.ComputerName
                         InstanceName = $server.ServiceName
