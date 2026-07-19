@@ -105,7 +105,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } catch {
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaStartupProcedure
         }
-        Write-Message -Level Verbose -Message "Getting startup procedures for $servername"
+        Write-Message -Level Verbose -Message "Getting startup procedures for $servername" -FunctionName Get-DbaStartupProcedure -ModuleName "dbatools"
 
         $startupProcs = $server.EnumStartupProcedures()
 
@@ -117,7 +117,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     foreach ($proc in $StartupProcedure) {
                         $procParts = Get-ObjectNameParts $proc
                         if (-not $procParts.Parsed) {
-                            Write-Message -Level Verbose -Message "Requested procedure $proc could not be parsed."
+                            Write-Message -Level Verbose -Message "Requested procedure $proc could not be parsed." -FunctionName Get-DbaStartupProcedure -ModuleName "dbatools"
                             Continue
                         }
                         if (($procParts.Name -eq $startupProc.Name) -and ($procParts.Schema -eq $startupProc.Schema)) {
