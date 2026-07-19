@@ -134,8 +134,11 @@ public sealed class TestDbaAgSpnCommand : DbaBaseCmdlet
     }
 
     // PS: the source process block VERBATIM, CRLF-preserved and byte-proven against source
-    // lines 109-227 (extracted programmatically) after stripping one -FunctionName append and
-    // reversing the single Test-Bound rewrite (the guard at :109). The source's inline comments
+    // lines 109-227 (extracted programmatically) after stripping the Stop-Function -FunctionName
+    // append, reversing the single Test-Bound rewrite (the guard at :109), and reversing the 9
+    // direct-Write-Message DEF-006 rewrites (each carries a # SOURCE: marker; -FunctionName +
+    // -ModuleName "dbatools" so the anonymous hop stamps the command/module as the function world
+    // does). The source's inline comments
     // (the GetHostEntry note, the "spare the cmdlet" note, the virtual-account notes) ride
     // untouched, as does the undefined $resolved at :185. The seed block replicates begin{} for
     // record 1 and restores the three carries thereafter; the harvest re-exports them. The
@@ -170,7 +173,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         foreach ($ag in $InputObject) {
-            Write-Message -Level Verbose -Message "Processing $($ag.Name) on $($ag.Parent.Name)"
+            Write-Message -Level Verbose -Message "Processing $($ag.Name) on $($ag.Parent.Name)" -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Processing $($ag.Name) on $($ag.Parent.Name)"
             if ($Listener) {
                 $listeners = $ag | Get-DbaAgListener -Listener $Listener
             } else {
@@ -179,7 +182,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # ([System.Net.Dns]::GetHostEntry($hostEntry)).HostName
             foreach ($aglistener in $listeners) {
-                Write-Message -Level Verbose -Message "Processing $($aglistener.Name) on $($aglistener.Parent.Name)"
+                Write-Message -Level Verbose -Message "Processing $($aglistener.Name) on $($aglistener.Parent.Name)" -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Processing $($aglistener.Name) on $($aglistener.Parent.Name)"
                 $server = $aglistener.Parent.Parent
                 $platform = $server.Platform -split " " | Select-Object -Last 1
                 $version = $server.VersionString, $server.DatabaseEngineEdition, "Edition", $platform -join " "
@@ -232,27 +235,27 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         foreach ($spn in $spns) {
-            Write-Message -Level Verbose -Message "Processing SPN on $($spn.SqlInstance)"
+            Write-Message -Level Verbose -Message "Processing SPN on $($spn.SqlInstance)" -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Processing SPN on $($spn.SqlInstance)"
             $searchfor = 'User'
             if ($spn.InstanceServiceAccount -eq 'LocalSystem' -or $spn.InstanceServiceAccount -like 'NT SERVICE\*') {
-                Write-Message -Level Verbose -Message "Virtual account detected, changing target registration to computername"
+                Write-Message -Level Verbose -Message "Virtual account detected, changing target registration to computername" -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Virtual account detected, changing target registration to computername"
                 $spn.InstanceServiceAccount = "$($resolved.Domain)\$($resolved.ComputerName)$"
                 $searchfor = 'Computer'
             } elseif ($spn.InstanceServiceAccount -like '*\*$') {
-                Write-Message -Level Verbose -Message "Managed Service Account detected"
+                Write-Message -Level Verbose -Message "Managed Service Account detected" -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Level Verbose -Message "Managed Service Account detected"
                 $searchfor = 'Computer'
             }
 
             $serviceAccount = $spn.InstanceServiceAccount
             # spare the cmdlet to search for the same account over and over
             if ($spn.InstanceServiceAccount -notin $resultCache.Keys) {
-                Write-Message -Message "Searching for $serviceAccount" -Level Verbose
+                Write-Message -Message "Searching for $serviceAccount" -Level Verbose -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Message "Searching for $serviceAccount" -Level Verbose
                 try {
                     $result = Get-DbaADObject -ADObject $serviceAccount -Type $searchfor -Credential $Credential -EnableException
                     $resultCache[$spn.InstanceServiceAccount] = $result
                 } catch {
                     if (![System.String]::IsNullOrEmpty($spn.InstanceServiceAccount)) {
-                        Write-Message -Message "AD lookup failure. This may be because the domain cannot be resolved for the SQL Server service account ($serviceAccount)." -Level Warning
+                        Write-Message -Message "AD lookup failure. This may be because the domain cannot be resolved for the SQL Server service account ($serviceAccount)." -Level Warning -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Message "AD lookup failure. This may be because the domain cannot be resolved for the SQL Server service account ($serviceAccount)." -Level Warning
                     }
                 }
             } else {
@@ -265,11 +268,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $spn.IsSet = $true
                     }
                 } catch {
-                    Write-Message -Message "The SQL Service account ($serviceAccount) has been found, but you don't have enough permission to inspect its SPNs" -Level Warning
+                    Write-Message -Message "The SQL Service account ($serviceAccount) has been found, but you don't have enough permission to inspect its SPNs" -Level Warning -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Message "The SQL Service account ($serviceAccount) has been found, but you don't have enough permission to inspect its SPNs" -Level Warning
                     continue
                 }
             } else {
-                Write-Message -Level Warning -Message "SQL Service account not found. Results may not be accurate."
+                Write-Message -Level Warning -Message "SQL Service account not found. Results may not be accurate." -FunctionName Test-DbaAgSpn -ModuleName "dbatools" # SOURCE: Write-Message -Level Warning -Message "SQL Service account not found. Results may not be accurate."
                 $spn
                 continue
             }
