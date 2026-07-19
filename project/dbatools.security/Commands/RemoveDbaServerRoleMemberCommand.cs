@@ -20,15 +20,13 @@ namespace Dataplat.Dbatools.Commands;
 /// <para>
 /// The script keeps state across its begin/process blocks in one function scope, and it has TWO ValueFromPipeline
 /// parameters (SqlInstance and InputObject) plus a begin state-copy ($InputObject = $SqlInstance when SqlInstance
-/// is bound by name). A per-record hop would drop that, so the port is COLLECT-THEN-ENDPROCESSING in one scope
-/// (like W2-208 Export-DbaUser). BeginProcessing captures the by-name flags (ContainsKey before any pipeline
-/// record, so a piped SqlInstance reads false). ProcessRecord collects one batch per record, flagging a genuine
-/// InputObject rebind by reference change. EndProcessing runs ONE hop: the begin block (its Test-Bound checks
-/// mapped to the carried by-name flags; its early Stop-Function then return skips all work; then, in the by-name
-/// case, $InputObject = $SqlInstance), then a per-batch DOT-SOURCED replay of the process body. The replay
-/// overrides $InputObject only when the batch rebound it (the piped case); otherwise the begin's $InputObject
-/// (= $SqlInstance) stands (the by-name case), matching the script's single scope. The dot-source keeps each
-/// record's return/continue local to that batch.
+/// is bound by name). DEF-014: the source is begin/process with NO end block, so this port STREAMS per record
+/// rather than buffering to EndProcessing. BeginProcessing captures the by-name flags (ContainsKey before any
+/// pipeline record, so a piped SqlInstance reads false) and runs the begin block once. ProcessRecord runs the
+/// process body for THAT record and emits immediately, overriding $InputObject only on a genuine rebind
+/// (reference change); otherwise the begin's $InputObject (= $SqlInstance) stands. The shared scope the
+/// single end-hop used to provide is reconstructed by carrying the process state across records, captured
+/// in finally so an early return at the interrupt gate cannot skip the handoff.
 /// </para>
 /// <para>
 /// The command mutates (DropMember/DropMembershipFromRole) and emits nothing. $Pscmdlet is redirected to
@@ -68,11 +66,14 @@ public sealed class RemoveDbaServerRoleMemberCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    /// <summary>One batch per pipeline record: { inputRebound, InputObject }.</summary>
-    private readonly List<object?[]?> _batches = new List<object?[]?>();
-
     /// <summary>The InputObject seen at the previous ProcessRecord, to detect a genuine pipeline rebind.</summary>
     private object? _prevInputObject;
+
+    /// <summary>$InputObject as the begin block left it, plus the process block's cross-record state.</summary>
+    private object? _inputObjectState;
+    private Hashtable? _processState;
+    private bool _beginInterrupted;
+    private bool _processInterrupted;
 
     /// <summary>The by-name InputObject value snapshotted at begin (the hop's initial $InputObject).</summary>
     private object? _byNameInputObject;
@@ -92,40 +93,92 @@ public sealed class RemoveDbaServerRoleMemberCommand : DbaBaseCmdlet
         // a pipeline rebind (which would defeat the begin block's $InputObject = $SqlInstance state-copy).
         _byNameInputObject = InputObject;
         _prevInputObject = InputObject;
-    }
+        // The begin block's state-copy, mirrored here rather than round-tripped through the sentinel:
+        // an SMO/DbaInstanceParameter array carried out as a PSObject can come back wrapped, and the body's
+        // $input.GetType() dispatch then sees the wrapper instead of the element type.
+        _inputObjectState = _sqlInstanceByName ? SqlInstance : InputObject;
 
-    /// <summary>Records each pipeline record's input as a batch; the work runs once in EndProcessing.</summary>
-    protected override void ProcessRecord()
-    {
-        if (Interrupted)
-            return;
-
-        bool inputRebound = !ReferenceEquals(InputObject, _prevInputObject);
-        _prevInputObject = InputObject;
-        _batches.Add(new object?[] { inputRebound, InputObject });
-    }
-
-    /// <summary>Runs the begin block once, then replays the process body per batch, in one shared scope.</summary>
-    protected override void EndProcessing()
-    {
-        if (Interrupted)
-            return;
-
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            _batches.ToArray(), _byNameInputObject, SqlInstance, SqlCredential, ServerRole, Login, Role, EnableException.ToBool(), this,
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
+            _byNameInputObject, SqlInstance, EnableException.ToBool(),
             _sqlInstanceByName, _serverRoleByName, _loginByName,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
             }
-            if (item is not null)
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
+                item.Properties["__RemoveDbaServerRoleMemberBeginComplete"]?.Value))
+            {
+                _beginInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+            }
+            else if (item is not null)
+            {
                 WriteObject(item);
+            }
         }
+    }
+
+    /// <summary>
+    /// Runs the process body for THIS record and emits immediately.
+    /// </summary>
+    /// <remarks>
+    /// DEF-014: the source is begin/process with NO end block, so it streams - each record's work is done
+    /// and emitted as it arrives. This port previously buffered every record and did the work in
+    /// EndProcessing, which PowerShell never calls when the upstream producer terminates, so a throwing
+    /// producer silently discarded everything the source would already have emitted. The shared scope that
+    /// the single end-hop provided is reconstructed explicitly by carrying the process state per record.
+    /// </remarks>
+    protected override void ProcessRecord()
+    {
+        if (_beginInterrupted || _processInterrupted || Interrupted)
+            return;
+
+        // The begin block may have replaced $InputObject with $SqlInstance; a genuine pipeline rebind
+        // overrides it for this record, exactly as the parameter reassignment does in the function world.
+        bool inputRebound = !ReferenceEquals(InputObject, _prevInputObject);
+        _prevInputObject = InputObject;
+        if (inputRebound)
+            _inputObjectState = InputObject;
+
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+            }
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
+                item.Properties["__RemoveDbaServerRoleMemberProcessComplete"]?.Value))
+            {
+                _processState = UnwrapHopValue(item.Properties["State"]?.Value) as Hashtable;
+                _processInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+            }
+            else if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }, ProcessScript,
+            _inputObjectState, SqlInstance, SqlCredential, ServerRole, Login, Role,
+            EnableException.ToBool(), this, _serverRoleByName, _processState,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+    }
+
+    /// <summary>Unwraps a value the hop carried out through its sentinel.</summary>
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        foreach (PSMemberInfo member in wrapper.Members)
+        {
+            if (member is PSNoteProperty)
+                return wrapper;
+        }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -155,12 +208,13 @@ public sealed class RemoveDbaServerRoleMemberCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the begin block (its Test-Bound checks mapped to the carried by-name flags) then a per-batch dot-sourced
-    // replay of the process body, all in one scope. Substitutions only: $PSCmdlet -> $__realCmdlet (the two
+    // PS: the begin block (its Test-Bound checks mapped to the carried by-name flags), run ONCE in
+    // BeginProcessing and handing $InputObject plus its interrupt latch out through a sentinel; the process
+    // body then runs PER RECORD in its own hop (DEF-014). Substitutions only: $PSCmdlet -> $__realCmdlet (the two
     // ShouldProcess gates); Test-Bound SqlInstance/ServerRole/Login -> carried by-name flags; -FunctionName on the
     // 15 DIRECT Stop-Function/Write-Message calls. EnableException received untyped.
-    private const string ProcessScript = """
-param($__batches, $__byNameInputObject, $SqlInstance, $SqlCredential, $ServerRole, $Login, $Role, $EnableException, $__realCmdlet, $__sqlInstanceByName, $__serverRoleByName, $__loginByName, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    private const string BeginScript = """
+param($__byNameInputObject, $SqlInstance, $EnableException, $__sqlInstanceByName, $__serverRoleByName, $__loginByName, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -168,10 +222,11 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    [CmdletBinding(SupportsShouldProcess)]
-    param($__batches, $__byNameInputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$ServerRole, [string[]]$Login, [string[]]$Role, $EnableException, $__realCmdlet, $__sqlInstanceByName, $__serverRoleByName, $__loginByName, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    [CmdletBinding()]
+    param($__byNameInputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $EnableException, $__sqlInstanceByName, $__serverRoleByName, $__loginByName, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    . {
         $InputObject = $__byNameInputObject
         if ( (-not $__sqlInstanceByName) -and (-not $__serverRoleByName) -and (-not $__loginByName) ) {
             Stop-Function -Message "You must pipe in a ServerRole, Login, or specify a SqlInstance" -FunctionName Remove-DbaServerRoleMember
@@ -181,9 +236,33 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($__sqlInstanceByName) {
             $InputObject = $SqlInstance
         }
-        foreach ($__batch in $__batches) {
-            if ($__batch[0]) { $InputObject = $__batch[1] }
-            . {
+    }
+
+    [pscustomobject]@{ __RemoveDbaServerRoleMemberBeginComplete = $true; Interrupted = (Test-FunctionInterrupt) }
+} $__byNameInputObject $SqlInstance $EnableException $__sqlInstanceByName $__serverRoleByName $__loginByName $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+
+    // PS: the process body VERBATIM, now STREAMED per record (DEF-014 - the source is begin/process
+    // with no end block). Substitutions unchanged: $PSCmdlet -> $__realCmdlet on the two ShouldProcess
+    // gates, the Test-Bound checks -> carried by-name flags, and -FunctionName attribution.
+    private const string ProcessScript = """
+param($InputObject, $SqlInstance, $SqlCredential, $ServerRole, $Login, $Role, $EnableException, $__realCmdlet, $__serverRoleByName, $__carryState, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding(SupportsShouldProcess)]
+    param($InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$ServerRole, [string[]]$Login, [string[]]$Role, $EnableException, $__realCmdlet, $__serverRoleByName, $__carryState, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+    # Process-scope state as the previous record left it (DEF-014: this port now STREAMS per record to
+    # match the source's begin/process shape, so the shared scope the single end-hop provided is
+    # reconstructed explicitly). try/finally because the body returns early at the interrupt gate.
+    if ($__carryState) { foreach ($__k in $__carryState.Keys) { Set-Variable -Name $__k -Value $__carryState[$__k] } }
+    try {
         if (Test-FunctionInterrupt) { return }
 
         foreach ($input in $InputObject) {
@@ -260,9 +339,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-            }
-        }
-} $__batches $__byNameInputObject $SqlInstance $SqlCredential $ServerRole $Login $Role $EnableException $__realCmdlet $__sqlInstanceByName $__serverRoleByName $__loginByName $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
-
+    } finally {
+    [pscustomobject]@{ __RemoveDbaServerRoleMemberProcessComplete = $true; Interrupted = (Test-FunctionInterrupt); State = @{ inputType = $inputType; instance = $instance; isServerRole = $isServerRole; serverRoles = $serverRoles } }
+    }
+} $InputObject $SqlInstance $SqlCredential $ServerRole $Login $Role $EnableException $__realCmdlet $__serverRoleByName $__carryState $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
