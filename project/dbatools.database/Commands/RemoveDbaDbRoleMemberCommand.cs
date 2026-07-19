@@ -18,7 +18,16 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// No graceful-stop latch: the source has no Test-FunctionInterrupt guard, so a later record
 /// re-enters the process body and re-evaluates its input guard, warning again. Carrying a latch
-/// would suppress warnings the function repeats. There are no Test-Bound call sites.
+/// would suppress warnings the function repeats.
+///
+/// ONE Test-Bound call site is substituted: Test-Bound -Not -ParameterName Role becomes the carried
+/// $__boundRole flag, computed as MyInvocation.BoundParameters.ContainsKey(Role) rather than from the
+/// parameter truthiness, because Test-Bound reports BOUNDNESS - an explicit -Role $null is bound but
+/// falsy, and reading truthiness would disagree with the function on exactly those calls. The carrier
+/// is declared in BOTH param blocks and passed by the trailing invocation. An earlier revision
+/// referenced it WITHOUT wiring it, so it was $null on every call and the guard behaved as though
+/// -Role were never supplied, rejecting input the function accepts; Test-CarrierWiring.ps1 now fails
+/// the build on that shape.
 ///
 /// The ShouldProcess gate is routed to the OUTER cmdlet. ConfirmImpact is High, so this command
 /// prompts by default and -Confirm's "Yes to All" answer - which lives on the invoking runtime -
@@ -80,6 +89,7 @@ public sealed class RemoveDbaDbRoleMemberCommand : DbaBaseCmdlet
             WriteObject(item);
         }, BodyScript,
             SqlInstance, SqlCredential, Database, Role, User, InputObject, EnableException.ToBool(), this,
+            MyInvocation.BoundParameters.ContainsKey("Role"),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -115,7 +125,7 @@ public sealed class RemoveDbaDbRoleMemberCommand : DbaBaseCmdlet
     // gate is owned by the outer cmdlet, and -FunctionName on Stop-Function/Write-Message. The body
     // is embedded WITHOUT added indentation, since indenting rewrites multi-line string literals.
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Database, $Role, $User, $InputObject, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $Role, $User, $InputObject, $EnableException, $__realCmdlet, $__boundRole, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -124,7 +134,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$Role, [string[]]$User, [object[]]$InputObject, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$Role, [string[]]$User, [object[]]$InputObject, $EnableException, $__realCmdlet, $__boundRole, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
         if (-not $InputObject -and -not $SqlInstance) {
@@ -185,6 +195,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-} $SqlInstance $SqlCredential $Database $Role $User $InputObject $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $Role $User $InputObject $EnableException $__realCmdlet $__boundRole $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
