@@ -81,7 +81,14 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             }
         }, ProcessScript,
             SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
-            InputObject, EnableException.ToBool(), BoundVerbose());
+            // DEF-011/012 (the row's confirmed P1, codex cross-vendor round): the function
+            // world's process scope ACCUMULATES $InputObject += across pipeline records, so a
+            // record without a bound InputObject must start from the prior records' carrier
+            // total - not from the empty bound parameter - or EndProcessing removes only the
+            // LAST record's groups. A bound InputObject wins for its record exactly like the
+            // engine's per-record VFP rebinding does.
+            MyInvocation.BoundParameters.ContainsKey("InputObject") ? (object?)InputObject : _effectiveInputObject,
+            EnableException.ToBool(), BoundVerbose());
     }
 
     protected override void EndProcessing()
