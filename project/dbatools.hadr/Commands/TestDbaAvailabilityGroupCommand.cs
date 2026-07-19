@@ -24,6 +24,7 @@ public sealed class TestDbaAvailabilityGroupCommand : DbaBaseCmdlet
 
     /// <summary>The availability group to test.</summary>
     [Parameter(Mandatory = true)]
+    [PsStringCast]
     public string? AvailabilityGroup { get; set; }
 
     /// <summary>The secondary replica instance(s).</summary>

@@ -35,6 +35,7 @@ public sealed class RevokeDbaAgPermissionCommand : DbaBaseCmdlet
     /// <summary>The permission type - Endpoint and/or AvailabilityGroup.</summary>
     [Parameter(Mandatory = true, Position = 4)]
     [ValidateSet("Endpoint", "AvailabilityGroup")]
+    [PsStringArrayCast]
     public string[]? Type { get; set; }
 
     /// <summary>The permission or permissions to revoke.</summary>
@@ -42,6 +43,7 @@ public sealed class RevokeDbaAgPermissionCommand : DbaBaseCmdlet
     [ValidateSet("Alter", "Connect", "Control", "CreateAnyDatabase", "CreateSequence", "Delete",
         "Execute", "Impersonate", "Insert", "Receive", "References", "Select", "Send",
         "TakeOwnership", "Update", "ViewChangeTracking", "ViewDefinition")]
+    [PsStringArrayCast]
     public string[] Permission { get; set; } = new[] { "Connect" };
 
     /// <summary>Login objects piped from Get-DbaLogin.</summary>
