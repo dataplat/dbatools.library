@@ -70,13 +70,17 @@ public sealed class ResumeDbaAgDbDataMovementCommand : DbaBaseCmdlet
         // A SOURCE BUG THAT RIDES BUG-FOR-BUG - the ShouldProcess call at :122 reads
         //     $Pscmdlet.ShouldProcess($ag.Parent.Name, "Seting availability group $db to $($db.Parent.Name)")
         // but the loop variable is $agdb. Neither $ag nor $db exists, so the TARGET is empty and
-        // the message interpolates two empty strings (the "Seting" typo is the source's too). I
-        // verified this does not change meaning inside the hop: the body runs inside
-        // `& $__dbatoolsModule { ... }`, so an undefined local could in principle fall back to the
-        // module's script scope - but dbatools' module scope defines neither $ag nor $db (checked
-        // directly), so both resolve empty in the hop exactly as they do in the function. Had the
-        // module defined either name, the hop would have silently picked it up and the prompt text
-        // would have differed; that is why it was checked rather than assumed.
+        // the message interpolates two empty strings (the "Seting" typo is the source's too). Both
+        // resolve empty in the hop exactly as they do in the function - verified by querying the
+        // dbatools module script scope directly, which defines neither name.
+        //
+        // CORRECTION (codex r1, and it is right): an earlier version of this comment claimed that
+        // IF the module defined $ag or $db, the hop would silently pick it up and DIVERGE from the
+        // function. That reasoning was wrong. The source function is ITSELF module-bound - it lives
+        // in the dbatools module and resolves undefined locals against the SAME module script scope
+        // the hop does. A module-scope $ag would therefore be seen by BOTH worlds, and there is no
+        // divergence for it to create. The check was still worth running, but the hazard it was
+        // guarding against does not exist for a module-scoped source function.
         //
         // W3-082 PROMPT-STATE TRANSPLANT: VFP + per-record + inner-$Pscmdlet gate + ConfirmImpact
         // High.
