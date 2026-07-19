@@ -46,10 +46,7 @@ public sealed class GetDbaAgentProxyCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, Proxy, ExcludeProxy, EnableException.ToBool(),
-                TestBound(nameof(Proxy)), TestBound(nameof(ExcludeProxy)), _server,
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -65,7 +62,10 @@ public sealed class GetDbaAgentProxyCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+                new[] { instance }, SqlCredential, Proxy, ExcludeProxy, EnableException.ToBool(),
+                TestBound(nameof(Proxy)), TestBound(nameof(ExcludeProxy)), _server,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
