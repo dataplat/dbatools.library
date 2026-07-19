@@ -27,11 +27,11 @@ namespace Dataplat.Dbatools.Commands;
 /// SupportsShouldProcess, so -WhatIf/-Confirm set the preference New-Item inherits) - without the
 /// carry the port would create the -Path directory under -WhatIf.
 ///
-/// The process body reads $PSBoundParameters.Query/FileNameColumn/BinaryColumn/FilePath - boundness
+/// The process body reads $PSBoundParameters.Query/FileNameColumn/BinaryColumn/FilePath - a TRUTHINESS test of the bound VALUE (W2-071 fix:
 /// reads that cannot ride a hop, because inside the hop $PSBoundParameters is the inner
 /// scriptblock's own positional binding where every parameter looks bound. They are carried as
 /// flags from C# (MyInvocation.BoundParameters.ContainsKey) and each $PSBoundParameters.X is
-/// replaced by its carried flag - the same rule as Test-Bound.
+/// carried as the raw VALUE via BoundRaw, so -not $PSBoundParameters.X becomes -not on the value - was boundness/Test-Bound, which diverged on a bound-but-falsy value like -Query "".
 ///
 /// The single $Pscmdlet.ShouldProcess routes to the real cmdlet via $__realCmdlet (ConfirmImpact
 /// Medium); -WhatIf/-Confirm ride the carriers. In-hop Stop-Function/Write-Message carry
@@ -146,8 +146,8 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, Table, Schema, FileNameColumn, BinaryColumn,
             Path, Query, FilePath, InputObject, EnableException.ToBool(),
-            TestBound(nameof(Query)), TestBound(nameof(FileNameColumn)), TestBound(nameof(BinaryColumn)),
-            TestBound(nameof(FilePath)),
+            BoundRaw("Query"), BoundRaw("FileNameColumn"), BoundRaw("BinaryColumn"),
+            BoundRaw("FilePath"),
             this, BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -156,6 +156,13 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    private object? BoundRaw(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return value;
         return null;
     }
 
@@ -214,8 +221,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     // PS: the process block VERBATIM. Edits: $Pscmdlet.ShouldProcess -> $__realCmdlet, -FunctionName
-    // on direct Stop-Function/Write-Message, and each $PSBoundParameters.X boundness read replaced by
-    // its carried flag ($__boundQuery/$__boundFileNameColumn/$__boundBinaryColumn/$__boundFilePath).
+    // on direct Stop-Function/Write-Message, and each $PSBoundParameters.X TRUTHINESS read replaced by
+    // its carried raw VALUE via BoundRaw ($__boundQuery/$__boundFileNameColumn/$__boundBinaryColumn/$__boundFilePath).
     // The ExecuteReader binary-stream loop, the filestream/binarywriter, and the finally ride as-is.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $Table, $Schema, $FileNameColumn, $BinaryColumn, $Path, $Query, $FilePath, $InputObject, $EnableException, $__boundQuery, $__boundFileNameColumn, $__boundBinaryColumn, $__boundFilePath, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
