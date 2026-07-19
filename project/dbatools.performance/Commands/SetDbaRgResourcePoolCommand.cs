@@ -95,17 +95,7 @@ public sealed class SetDbaRgResourcePoolCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, ResourcePool, Type,
-            MinimumCpuPercentage, MaximumCpuPercentage, CapCpuPercentage,
-            MinimumMemoryPercentage, MaximumMemoryPercentage,
-            MinimumIOPSPerVolume, MaximumIOPSPerVolume, MaximumProcesses,
-            SkipReconfigure.ToBool(), InputObject,
-            TestBound("Type"), TestBound("MinimumCpuPercentage"),
-            TestBound("MaximumCpuPercentage"), TestBound("CapCpuPercentage"),
-            TestBound("MinimumMemoryPercentage"), TestBound("MaximumMemoryPercentage"),
-            TestBound("MinimumIOPSPerVolume"), TestBound("MaximumIOPSPerVolume"),
-            TestBound("MaximumProcesses"), EnableException.ToBool(), this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -116,7 +106,17 @@ public sealed class SetDbaRgResourcePoolCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, ResourcePool, Type,
+            MinimumCpuPercentage, MaximumCpuPercentage, CapCpuPercentage,
+            MinimumMemoryPercentage, MaximumMemoryPercentage,
+            MinimumIOPSPerVolume, MaximumIOPSPerVolume, MaximumProcesses,
+            SkipReconfigure.ToBool(), InputObject,
+            TestBound("Type"), TestBound("MinimumCpuPercentage"),
+            TestBound("MaximumCpuPercentage"), TestBound("CapCpuPercentage"),
+            TestBound("MinimumMemoryPercentage"), TestBound("MaximumMemoryPercentage"),
+            TestBound("MinimumIOPSPerVolume"), TestBound("MaximumIOPSPerVolume"),
+            TestBound("MaximumProcesses"), EnableException.ToBool(), this, BoundVerbose());
     }
 
     private object? BoundVerbose()

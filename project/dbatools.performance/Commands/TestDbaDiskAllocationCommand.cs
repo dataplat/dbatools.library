@@ -50,9 +50,7 @@ public sealed class TestDbaDiskAllocationCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            ComputerName, NoSqlCheck.ToBool(), SqlCredential, Credential,
-            EnableException.ToBool(), _sessionOptions, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -63,7 +61,9 @@ public sealed class TestDbaDiskAllocationCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            ComputerName, NoSqlCheck.ToBool(), SqlCredential, Credential,
+            EnableException.ToBool(), _sessionOptions, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;

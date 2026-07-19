@@ -40,9 +40,7 @@ public sealed class TestDbaInstantFileInitializationCommand : DbaBaseCmdlet
                 : new[] { new DbaInstanceParameter(defaultComputer) };
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            computers, Credential, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -53,7 +51,9 @@ public sealed class TestDbaInstantFileInitializationCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            computers, Credential, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

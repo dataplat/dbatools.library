@@ -71,7 +71,7 @@ public sealed class GetDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
             // Non-terminating provider errors (Get-ChildItem on a bad -Path) merge back
             // 2>&1 and re-emit with the silent-bag compensation (the W1-045 seam); EE
             // Stop-Function throws propagate uncaught (the function's terminating path).
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, DirectoryProjectionScript, directory, Template, _pattern, _metadata, EnableException.ToBool(), BoundVerbose()))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -82,7 +82,8 @@ public sealed class GetDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, DirectoryProjectionScript,
+            directory, Template, _pattern, _metadata, EnableException.ToBool(), BoundVerbose());
         }
     }
 

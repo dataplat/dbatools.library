@@ -115,9 +115,7 @@ public sealed class RemoveDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, MutationScript,
-            _accumulated.ToArray(), Counter, effectiveCredential, EnableException.ToBool(),
-            this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -128,7 +126,9 @@ public sealed class RemoveDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, MutationScript,
+            _accumulated.ToArray(), Counter, effectiveCredential, EnableException.ToBool(),
+            this, BoundVerbose());
     }
 
     private static bool PsTruthyList(List<object?> values)

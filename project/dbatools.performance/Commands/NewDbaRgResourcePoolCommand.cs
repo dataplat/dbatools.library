@@ -112,13 +112,7 @@ public sealed class NewDbaRgResourcePoolCommand : DbaBaseCmdlet
             // PS: $server keeps Connect-DbaInstance's wrapper (the W1-105 dispatch law).
             object serverValue = connection.RawServerValue ?? connection.Server!;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                serverValue, instance, ResourcePool, Type,
-                MinimumCpuPercentage, MaximumCpuPercentage, CapCpuPercentage,
-                MinimumMemoryPercentage, MaximumMemoryPercentage,
-                MinimumIOPSPerVolume, MaximumIOPSPerVolume, MaximumProcesses,
-                SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
-                this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -129,7 +123,13 @@ public sealed class NewDbaRgResourcePoolCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+            serverValue, instance, ResourcePool, Type,
+                MinimumCpuPercentage, MaximumCpuPercentage, CapCpuPercentage,
+                MinimumMemoryPercentage, MaximumMemoryPercentage,
+                MinimumIOPSPerVolume, MaximumIOPSPerVolume, MaximumProcesses,
+                SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
+                this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 

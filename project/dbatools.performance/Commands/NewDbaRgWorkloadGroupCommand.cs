@@ -108,13 +108,7 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             }
 
             object serverValue = connection.RawServerValue ?? connection.Server!;
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                serverValue, instance, WorkloadGroup, ResourcePool, ResourcePoolType,
-                Importance, RequestMaximumMemoryGrantPercentage,
-                RequestMaximumCpuTimeInSeconds, RequestMemoryGrantTimeoutInSeconds,
-                MaximumDegreeOfParallelism, GroupMaximumRequests,
-                SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
-                this, BoundVerbose(), pipelineItem))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -125,7 +119,13 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+            serverValue, instance, WorkloadGroup, ResourcePool, ResourcePoolType,
+                Importance, RequestMaximumMemoryGrantPercentage,
+                RequestMaximumCpuTimeInSeconds, RequestMemoryGrantTimeoutInSeconds,
+                MaximumDegreeOfParallelism, GroupMaximumRequests,
+                SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
+                this, BoundVerbose(), pipelineItem);
         }
     }
 

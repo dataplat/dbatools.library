@@ -44,9 +44,7 @@ public sealed class SetDbaResourceGovernorCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Enabled.ToBool(), Disabled.ToBool(),
-            ClassifierFunction, EnableException.ToBool(), this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -57,7 +55,9 @@ public sealed class SetDbaResourceGovernorCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, Enabled.ToBool(), Disabled.ToBool(),
+            ClassifierFunction, EnableException.ToBool(), this, BoundVerbose());
     }
 
     private object? BoundVerbose()

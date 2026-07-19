@@ -43,8 +43,7 @@ public sealed class SaveDbaDiagnosticQueryScriptCommand : DbaBaseCmdlet
         if (Path is null && !TestBound("Path"))
             LanguagePrimitives.ConvertTo(string.Empty, typeof(FileInfo),
                 System.Globalization.CultureInfo.InvariantCulture);
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Path, EnableException.ToBool(), BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -55,7 +54,8 @@ public sealed class SaveDbaDiagnosticQueryScriptCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            Path, EnableException.ToBool(), BoundVerbose());
     }
 
     private object? BoundVerbose()

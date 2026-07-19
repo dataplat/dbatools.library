@@ -69,11 +69,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
 
     protected override void BeginProcessing()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            MaxBehind, MaxTimeBehind,
-            TestBound("MinimumBuild"), TestBound("MaxBehind"),
-            TestBound("MaxTimeBehind"), TestBound("Latest"),
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -90,7 +86,11 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BeginScript,
+            MaxBehind, MaxTimeBehind,
+            TestBound("MinimumBuild"), TestBound("MaxBehind"),
+            TestBound("MaxTimeBehind"), TestBound("Latest"),
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()

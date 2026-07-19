@@ -40,9 +40,7 @@ public sealed class TestDbaConnectionAuthSchemeCommand : DbaInstanceCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Kerberos.ToBool(), Ntlm.ToBool(),
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -53,7 +51,9 @@ public sealed class TestDbaConnectionAuthSchemeCommand : DbaInstanceCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, Kerberos.ToBool(), Ntlm.ToBool(),
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
