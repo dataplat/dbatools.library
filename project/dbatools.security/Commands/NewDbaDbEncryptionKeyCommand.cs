@@ -106,7 +106,13 @@ public sealed class NewDbaDbEncryptionKeyCommand : DbaBaseCmdlet
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__NewDbaDbEncryptionKeyProcessComplete"]?.Value))
             {
-                _smoEncryptionKeyState = UnwrapHopValue(item.Properties["SmoEncryptionKey"]?.Value);
+                // W2-067 Assigned-flag: carry the value ONLY when the hop scope actually ASSIGNED it.
+                // Get-Variable -Scope 0 cannot see an up-scope variable, so a never-assigned local stays
+                // unset and the script's scope-walk to a module/global of the same name still happens.
+                // Restoring a plain null instead would create a local and BLOCK that walk.
+                _smoEncryptionKeyState = LanguagePrimitives.IsTrue(item.Properties["SmoEncryptionKeyAssigned"]?.Value)
+                    ? UnwrapHopValue(item.Properties["SmoEncryptionKey"]?.Value)
+                    : null;
             }
             else if (item is not null)
             {
@@ -266,8 +272,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $ErrorActionPreference = $eap
             }
         }
+    $__smoencryptionkeyAssigned = [bool](Get-Variable -Name smoencryptionkey -Scope 0 -ErrorAction SilentlyContinue)
 
-    [pscustomobject]@{ __NewDbaDbEncryptionKeyProcessComplete = $true; SmoEncryptionKey = $smoencryptionkey }
+    [pscustomobject]@{ __NewDbaDbEncryptionKeyProcessComplete = $true; SmoEncryptionKey = $(if ($__smoencryptionkeyAssigned) { $smoencryptionkey } else { $null }); SmoEncryptionKeyAssigned = $__smoencryptionkeyAssigned }
 } $SqlInstance $SqlCredential $Database $EncryptorName $Type $EncryptionAlgorithm $InputObject $Force $EnableException $__realCmdlet $__smoEncryptionKeyCarry $__encryptorNameBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;

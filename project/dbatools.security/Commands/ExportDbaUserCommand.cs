@@ -128,11 +128,30 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     private bool _processInterrupted;
     private object? _inputObjectState;
 
+    /// <summary>
+    /// Parameters the BODY mutates and the script keeps across records: -Append flips true when a user
+    /// recurs, -FilePath and -Path are computed, and the ScriptingOptions object is built once and reused.
+    /// </summary>
+    /// <remarks>
+    /// These ride their OWN carries, never the state bag. The bag is restored inside the hop AFTER the
+    /// engine has bound this record's parameters, so putting a parameter in it overwrites the freshly
+    /// bound value - which is exactly how an explicit -Append got dropped and an existing file overwritten.
+    /// The begin hop never receives most of these, so its capture of them is meaningless and is ignored.
+    /// </remarks>
+    private object? _appendState;
+    private object? _filePathState;
+    private object? _pathState;
+    private object? _scriptingState;
+
     /// <summary>Runs the begin block once, before any record.</summary>
     protected override void BeginProcessing()
     {
         _prevInputObject = InputObject;
         _inputObjectState = InputObject;
+        _appendState = Append.ToBool();
+        _filePathState = FilePath;
+        _pathState = Path;
+        _scriptingState = ScriptingOptionsObject;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             Path, DestinationVersion, ScriptingOptionsObject, EnableException.ToBool(),
@@ -148,6 +167,9 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
                 item.Properties["__ExportDbaUserBeginComplete"]?.Value))
             {
                 _carryState = UnwrapHopValue(item.Properties["State"]?.Value) as Hashtable;
+                // ONLY the two the begin hop actually receives; its view of the others is meaningless.
+                _pathState = UnwrapHopValue(item.Properties["MutPath"]?.Value);
+                _scriptingState = UnwrapHopValue(item.Properties["MutScripting"]?.Value);
                 _beginInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
             }
             else if (item is not null)
@@ -189,6 +211,10 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
                 item.Properties["__ExportDbaUserProcessComplete"]?.Value))
             {
                 _carryState = UnwrapHopValue(item.Properties["State"]?.Value) as Hashtable;
+                _appendState = UnwrapHopValue(item.Properties["MutAppend"]?.Value);
+                _filePathState = UnwrapHopValue(item.Properties["MutFilePath"]?.Value);
+                _pathState = UnwrapHopValue(item.Properties["MutPath"]?.Value);
+                _scriptingState = UnwrapHopValue(item.Properties["MutScripting"]?.Value);
                 _processInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
             }
             else if (item is not null)
@@ -197,8 +223,8 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
             }
         }, ProcessScript,
             SqlInstance, _inputObjectState, SqlCredential, Database, ExcludeDatabase, User, DestinationVersion,
-            Path, FilePath, Encoding, NoClobber.ToBool(), Append.ToBool(), Passthru.ToBool(), Template.ToBool(),
-            EnableException.ToBool(), ScriptingOptionsObject, ExcludeGoBatchSeparator.ToBool(),
+            _pathState, _filePathState, Encoding, NoClobber.ToBool(), _appendState, Passthru.ToBool(), Template.ToBool(),
+            EnableException.ToBool(), _scriptingState, ExcludeGoBatchSeparator.ToBool(),
             TestBound(nameof(Path)), TestBound(nameof(FilePath)), TestBound(nameof(ScriptingOptionsObject)),
             BoundValue("Path"), BoundValue("FilePath"), _carryState,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
@@ -319,7 +345,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $InputObject = $null
     }
 
-    [pscustomobject]@{ __ExportDbaUserBeginComplete = $true; Interrupted = (Test-FunctionInterrupt); State = @{ Append = $Append; dbUserInstance = $dbUserInstance; eol = $eol; escapedLogin = $escapedLogin; escapedUsername = $escapedUsername; execute = $execute; FilePath = $FilePath; GenerateFilePerUser = $GenerateFilePerUser; grantDatabasePermission = $grantDatabasePermission; grantee = $grantee; grantObjectPermission = $grantObjectPermission; InputObject = $InputObject; instanceArray = $instanceArray; isUserMember = $isUserMember; object = $object; outsql = $outsql; ownedSchemas = $ownedSchemas; ownerName = $ownerName; Path = $Path; permissionScript = $permissionScript; perms = $perms; progressMessage = $progressMessage; ScriptingOptionsObject = $ScriptingOptionsObject; scriptVersion = $scriptVersion; serverMajorVersion = $serverMajorVersion; serverVersionMap = $serverVersionMap; sql = $sql; stepCounter = $stepCounter; useDatabase = $useDatabase; users = $users; usersProcessed = $usersProcessed; versionName = $versionName; versionNameDesc = $versionNameDesc; versions = $versions; withGrant = $withGrant } }
+    [pscustomobject]@{ __ExportDbaUserBeginComplete = $true; Interrupted = (Test-FunctionInterrupt); MutAppend = $Append; MutFilePath = $FilePath; MutPath = $Path; MutScripting = $ScriptingOptionsObject; State = @{ dbUserInstance = $dbUserInstance; eol = $eol; escapedLogin = $escapedLogin; escapedUsername = $escapedUsername; execute = $execute; GenerateFilePerUser = $GenerateFilePerUser; grantDatabasePermission = $grantDatabasePermission; grantee = $grantee; grantObjectPermission = $grantObjectPermission; instanceArray = $instanceArray; isUserMember = $isUserMember; object = $object; outsql = $outsql; ownedSchemas = $ownedSchemas; ownerName = $ownerName; permissionScript = $permissionScript; perms = $perms; progressMessage = $progressMessage; scriptVersion = $scriptVersion; serverMajorVersion = $serverMajorVersion; serverVersionMap = $serverVersionMap; sql = $sql; stepCounter = $stepCounter; useDatabase = $useDatabase; users = $users; usersProcessed = $usersProcessed; versionName = $versionName; versionNameDesc = $versionNameDesc; versions = $versions; withGrant = $withGrant } }
 } $Path $DestinationVersion $ScriptingOptionsObject $EnableException $__pathBound $__scriptingBound $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
@@ -764,7 +790,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         . Export-DbaUser
     } finally {
-    [pscustomobject]@{ __ExportDbaUserProcessComplete = $true; Interrupted = (Test-FunctionInterrupt); State = @{ Append = $Append; dbUserInstance = $dbUserInstance; eol = $eol; escapedLogin = $escapedLogin; escapedUsername = $escapedUsername; execute = $execute; FilePath = $FilePath; GenerateFilePerUser = $GenerateFilePerUser; grantDatabasePermission = $grantDatabasePermission; grantee = $grantee; grantObjectPermission = $grantObjectPermission; InputObject = $InputObject; instanceArray = $instanceArray; isUserMember = $isUserMember; object = $object; outsql = $outsql; ownedSchemas = $ownedSchemas; ownerName = $ownerName; Path = $Path; permissionScript = $permissionScript; perms = $perms; progressMessage = $progressMessage; ScriptingOptionsObject = $ScriptingOptionsObject; scriptVersion = $scriptVersion; serverMajorVersion = $serverMajorVersion; serverVersionMap = $serverVersionMap; sql = $sql; stepCounter = $stepCounter; useDatabase = $useDatabase; users = $users; usersProcessed = $usersProcessed; versionName = $versionName; versionNameDesc = $versionNameDesc; versions = $versions; withGrant = $withGrant } }
+    [pscustomobject]@{ __ExportDbaUserProcessComplete = $true; Interrupted = (Test-FunctionInterrupt); MutAppend = $Append; MutFilePath = $FilePath; MutPath = $Path; MutScripting = $ScriptingOptionsObject; State = @{ dbUserInstance = $dbUserInstance; eol = $eol; escapedLogin = $escapedLogin; escapedUsername = $escapedUsername; execute = $execute; GenerateFilePerUser = $GenerateFilePerUser; grantDatabasePermission = $grantDatabasePermission; grantee = $grantee; grantObjectPermission = $grantObjectPermission; instanceArray = $instanceArray; isUserMember = $isUserMember; object = $object; outsql = $outsql; ownedSchemas = $ownedSchemas; ownerName = $ownerName; permissionScript = $permissionScript; perms = $perms; progressMessage = $progressMessage; scriptVersion = $scriptVersion; serverMajorVersion = $serverMajorVersion; serverVersionMap = $serverVersionMap; sql = $sql; stepCounter = $stepCounter; useDatabase = $useDatabase; users = $users; usersProcessed = $usersProcessed; versionName = $versionName; versionNameDesc = $versionNameDesc; versions = $versions; withGrant = $withGrant } }
     }
 } $SqlInstance $InputObject $SqlCredential $Database $ExcludeDatabase $User $DestinationVersion $Path $FilePath $Encoding $NoClobber $Append $Passthru $Template $EnableException $ScriptingOptionsObject $ExcludeGoBatchSeparator $__pathBound $__filePathBound $__scriptingBound $__boundPathValue $__boundFilePathValue $__carryState $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
