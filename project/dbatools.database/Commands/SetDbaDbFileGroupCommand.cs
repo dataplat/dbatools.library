@@ -86,22 +86,22 @@ public sealed class SetDbaDbFileGroupCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, FileGroup,
-            Default.ToBool(), ReadOnly.ToBool(), AutoGrowAllFiles.ToBool(),
-            InputObject, EnableException.ToBool(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(Database)), TestBound(nameof(FileGroup)),
-            TestBound(nameof(Default)), TestBound(nameof(ReadOnly)), TestBound(nameof(AutoGrowAllFiles)),
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, FileGroup,
+            Default.ToBool(), ReadOnly.ToBool(), AutoGrowAllFiles.ToBool(),
+            InputObject, EnableException.ToBool(),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(Database)), TestBound(nameof(FileGroup)),
+            TestBound(nameof(Default)), TestBound(nameof(ReadOnly)), TestBound(nameof(AutoGrowAllFiles)),
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

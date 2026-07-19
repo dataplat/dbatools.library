@@ -68,9 +68,7 @@ public sealed class FindDbaDatabaseCommand : DbaBaseCmdlet
 
         string patternForRecord = _pattern ?? Pattern;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Property, patternForRecord, Exact.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaDatabaseState"))
             {
@@ -78,16 +76,18 @@ public sealed class FindDbaDatabaseCommand : DbaBaseCmdlet
                 {
                     _pattern = state["Pattern"] as string;
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Property, patternForRecord, Exact.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

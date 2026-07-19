@@ -89,24 +89,24 @@ public sealed class AddDbaExtendedPropertyCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, Name, Value, InputObject,
-            EnableException.ToBool(), _state,
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__addDbaExtendedPropertyState"))
             {
                 _state = sentinel["__addDbaExtendedPropertyState"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, Name, Value, InputObject,
+            EnableException.ToBool(), _state,
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>Carries a bound common parameter into the hop scopes, which cannot see the

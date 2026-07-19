@@ -118,9 +118,7 @@ public sealed class SetDbaDbDataClassificationCommand : DbaBaseCmdlet
         _informationTypeId = InformationTypeId;
         _sensitivityLabelId = SensitivityLabelId;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            InformationType, InformationTypeId, SensitivityLabel, SensitivityLabelId,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__setDbaDbDataClassificationBegin"))
             {
@@ -129,16 +127,18 @@ public sealed class SetDbaDbDataClassificationCommand : DbaBaseCmdlet
                     _informationTypeId = state["InformationTypeId"];
                     _sensitivityLabelId = state["SensitivityLabelId"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            InformationType, InformationTypeId, SensitivityLabel, SensitivityLabelId,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -146,20 +146,20 @@ public sealed class SetDbaDbDataClassificationCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, Schema, Table, Column,
-            InformationType, _informationTypeId, SensitivityLabel, _sensitivityLabelId,
-            InputObject, EnableException.ToBool(),
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, Schema, Table, Column,
+            InformationType, _informationTypeId, SensitivityLabel, _sensitivityLabelId,
+            InputObject, EnableException.ToBool(),
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

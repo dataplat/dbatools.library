@@ -91,21 +91,21 @@ public sealed class AddDbaDbFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, FileGroup, FileName, Path,
-            Size, Growth, MaxSize, InputObject, EnableException.ToBool(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(Database)), TestBound(nameof(FileGroup)),
-            TestBound(nameof(FileName)), TestBound(nameof(Path)),
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, FileGroup, FileName, Path,
+            Size, Growth, MaxSize, InputObject, EnableException.ToBool(),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(Database)), TestBound(nameof(FileGroup)),
+            TestBound(nameof(FileName)), TestBound(nameof(Path)),
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>Carries a bound common parameter into the hop scopes, which cannot see the

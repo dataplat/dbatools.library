@@ -90,8 +90,7 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Locale, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__dgBegin"))
             {
@@ -101,16 +100,17 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
                     _supportedFakerMaskingTypes = state["SupportedFakerMaskingTypes"];
                     _supportedFakerSubTypes = state["SupportedFakerSubTypes"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Locale, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -118,11 +118,7 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
         if (Interrupted || _processInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, FilePath, Locale, CharacterString, Table, Column, ExcludeTable,
-            ExcludeColumn, MaxValue, ModulusFactor, EnableException.ToBool(),
-            _supportedDataTypes, _supportedFakerMaskingTypes, _supportedFakerSubTypes, this,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__dgProcess"))
             {
@@ -130,16 +126,20 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
                 {
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, FilePath, Locale, CharacterString, Table, Column, ExcludeTable,
+            ExcludeColumn, MaxValue, ModulusFactor, EnableException.ToBool(),
+            _supportedDataTypes, _supportedFakerMaskingTypes, _supportedFakerSubTypes, this,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

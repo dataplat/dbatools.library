@@ -86,26 +86,26 @@ public sealed class MountDbaDatabaseCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, FileStructure, DatabaseOwner, AttachOption,
-            EnableException.ToBool(), _state, this,
-            MyInvocation.BoundParameters.ContainsKey("FileStructure"),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__mountDbaDatabaseState"))
             {
                 _state = sentinel["__mountDbaDatabaseState"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, FileStructure, DatabaseOwner, AttachOption,
+            EnableException.ToBool(), _state, this,
+            MyInvocation.BoundParameters.ContainsKey("FileStructure"),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
