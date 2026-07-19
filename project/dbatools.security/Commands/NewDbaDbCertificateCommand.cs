@@ -185,7 +185,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__NewDbaDbCertificateProcessComplete"]?.Value))
             {
-                _smocertState = UnwrapHopValue(item.Properties["Smocert"]?.Value);
+                // W2-067 Assigned-flag: carry the value ONLY when the hop scope actually ASSIGNED it.
+                // Get-Variable -Scope 0 cannot see an up-scope variable, so a never-assigned local stays
+                // unset and the script's scope-walk to a module/global of the same name still happens.
+                // Restoring a plain null instead would create a local and BLOCK that walk.
+                _smocertState = LanguagePrimitives.IsTrue(item.Properties["SmocertAssigned"]?.Value)
+                    ? UnwrapHopValue(item.Properties["Smocert"]?.Value)
+                    : null;
             }
             else if (item is not null)
             {
@@ -331,8 +337,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
+    $__smocertAssigned = [bool](Get-Variable -Name smocert -Scope 0 -ErrorAction SilentlyContinue)
 
-    [pscustomobject]@{ __NewDbaDbCertificateProcessComplete = $true; Smocert = $smocert }
+    [pscustomobject]@{ __NewDbaDbCertificateProcessComplete = $true; Smocert = $(if ($__smocertAssigned) { $smocert } else { $null }); SmocertAssigned = $__smocertAssigned }
 } $SqlInstance $SqlCredential $Name $Database $Subject $StartDate $ExpirationDate $ActiveForServiceBrokerDialog $SecurePassword $InputObject $EnableException $__realCmdlet $__smocertCarry $__nameBound $__subjectBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;

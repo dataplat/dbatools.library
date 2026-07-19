@@ -120,7 +120,13 @@ public sealed class NewDbaDbMasterKeyCommand : DbaBaseCmdlet
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__NewDbaDbMasterKeyProcessComplete"]?.Value))
             {
-                _masterKeyState = UnwrapHopValue(item.Properties["MasterKey"]?.Value);
+                // W2-067 Assigned-flag: carry the value ONLY when the hop scope actually ASSIGNED it.
+                // Get-Variable -Scope 0 cannot see an up-scope variable, so a never-assigned local stays
+                // unset and the script's scope-walk to a module/global of the same name still happens.
+                // Restoring a plain null instead would create a local and BLOCK that walk.
+                _masterKeyState = LanguagePrimitives.IsTrue(item.Properties["MasterKeyAssigned"]?.Value)
+                    ? UnwrapHopValue(item.Properties["MasterKey"]?.Value)
+                    : null;
             }
             else if (item is not null)
             {
@@ -258,8 +264,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
+    $__masterkeyAssigned = [bool](Get-Variable -Name masterkey -Scope 0 -ErrorAction SilentlyContinue)
 
-    [pscustomobject]@{ __NewDbaDbMasterKeyProcessComplete = $true; MasterKey = $masterkey }
+    [pscustomobject]@{ __NewDbaDbMasterKeyProcessComplete = $true; MasterKey = $(if ($__masterkeyAssigned) { $masterkey } else { $null }); MasterKeyAssigned = $__masterkeyAssigned }
 } $SqlInstance $SqlCredential $Database $SecurePassword $InputObject $EnableException $__realCmdlet $__masterKeyCarry $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
