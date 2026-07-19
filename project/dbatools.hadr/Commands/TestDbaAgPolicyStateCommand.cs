@@ -74,20 +74,21 @@ public sealed class TestDbaAgPolicyStateCommand : DbaBaseCmdlet
         // there is no explicit post-emit throw or non-continue Stop-Function path, and a read-only
         // command can only lose partial report output, never conceal a completed mutation, so the
         // established read-only accept-and-link disposition applies).
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, AvailabilityGroup, InputObject,
-            EnableException.ToBool(),
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // DEF-001 closed via InvokeScopedStreaming (ab7492c); read-only so no WhatIf interaction.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, AvailabilityGroup, InputObject,
+            EnableException.ToBool(),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
