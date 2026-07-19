@@ -17,14 +17,17 @@ namespace Dataplat.Dbatools.Commands;
 /// DROPS rather than alters, carries THREE Test-Bound reads instead of six, and gates once instead of
 /// once-per-property.
 ///
-/// THREE Test-Bound reads become TWO carried flags:
+/// THREE Test-Bound reads become THREE carried flags:
 ///     Test-Bound -ParameterName SqlInstance    -> $__boundSqlInstance
 ///     Test-Bound -Not -ParameterName Database  -> -not $__boundDatabase
 ///     Test-Bound -Not -ParameterName FileGroup -> -not $__boundFileGroup
 /// All three are was-it-SUPPLIED tests that scope-walk the caller and therefore cannot ride the hop.
-/// The FileGroup one is not merely defensive: it fires per piped Database object, so an explicitly
-/// passed empty -FileGroup must still take the "Filegroup is required" path rather than silently
-/// iterating nothing.
+/// The FileGroup one fires per piped Database object rather than once up front, which is why it must
+/// be carried per record. NOTE ON ITS SEMANTICS, corrected after review caught me asserting the
+/// opposite: `Test-Bound -Not` is FALSE when the parameter WAS supplied, so an explicitly passed
+/// EMPTY -FileGroup does NOT take the "Filegroup is required" path - it falls through and silently
+/// iterates nothing. That is the source's behaviour and the port reproduces it; only an UNBOUND
+/// -FileGroup trips the guard.
 ///
 /// -InputObject is deliberately object[] rather than a typed Database[]: the body accepts BOTH
 /// Smo.Database and Smo.FileGroup objects and discriminates with -is, so narrowing the type would
@@ -48,7 +51,7 @@ namespace Dataplat.Dbatools.Commands;
 /// is skipped before ShouldProcess is ever consulted - meaning -WhatIf reports nothing for it. That
 /// is the source's ordering and is reproduced as-is.
 ///
-/// Only other body edit is -FunctionName Remove-DbaDbFileGroup on the four direct Stop-Function sites.
+/// Only other body edit is -FunctionName Remove-DbaDbFileGroup on the five direct Stop-Function sites.
 ///
 /// Surface pinned by migration/baselines/Remove-DbaDbFileGroup.json
 /// (sourceSha256 fb91adf6208556f410270aaa63b6675561f37ced2b7f0b5850ff18ec828e9974): no named parameter
@@ -194,3 +197,5 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $SqlInstance $SqlCredential $Database $FileGroup $InputObject $EnableException $__boundSqlInstance $__boundDatabase $__boundFileGroup $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
+
+
