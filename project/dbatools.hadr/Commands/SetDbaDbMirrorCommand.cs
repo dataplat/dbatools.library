@@ -88,10 +88,13 @@ public sealed class SetDbaDbMirrorCommand : DbaBaseCmdlet
         // in one body, which is why each was classified separately rather than as a family.
         //
         // W3-082 PROMPT-STATE TRANSPLANT, and this row leans on it harder than any sibling so far:
-        // FOUR separate $Pscmdlet.ShouldProcess gates under ConfirmImpact High, reachable in the
-        // same record. Without the transplant a "yes to all" answered at the partner gate would be
-        // forgotten by the safety-level gate one line later - re-prompting mid-record, not merely
-        // across records.
+        // FOUR separate $Pscmdlet.ShouldProcess gates under ConfirmImpact High, of which at most
+        // THREE are reachable per database - the witness gate is an elseif and is unreachable
+        // whenever -Partner is truthy (codex correction to my first phrasing, which said all four
+        // were reachable together; the parity probe's all-four scenario indeed observes three).
+        // Without the transplant a "yes to all" answered at the partner gate would be forgotten by
+        // the safety-level gate two lines later - re-prompting mid-record, not merely across
+        // records, which is what makes the transplant load-bearing here rather than precautionary.
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
             SqlInstance, SqlCredential, Database, Partner, Witness, SafetyLevel, State, InputObject,
             EnableException.ToBool(),
