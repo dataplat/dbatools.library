@@ -171,7 +171,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.isClustered) {
-                Write-Message -Level Warning -Message "$instance is a cluster. Microsoft does not support renaming clusters." -FunctionName Repair-DbaInstanceName
+                Write-Message -Level Warning -Message "$instance is a cluster. Microsoft does not support renaming clusters." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                 continue
             }
 
@@ -187,7 +187,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if (-not $nametest.Updatable) {
-                Write-Message -Level Output -Message "Test-DbaInstanceName reports that the rename cannot proceed with a rename in this $instance's current state." -FunctionName Repair-DbaInstanceName
+                Write-Message -Level Output -Message "Test-DbaInstanceName reports that the rename cannot proceed with a rename in this $instance's current state." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
 
                 foreach ($nametesterror in $nametest.Blockers) {
                     if ($nametesterror -like '*replication*') {
@@ -207,9 +207,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 if ($result -eq 1) {
                                     Stop-Function -Message "Failure" -Target $server -Continue -FunctionName Repair-DbaInstanceName
                                 } else {
-                                    Write-Message -Level Output -Message "`nPerforming sp_dropdistributor @no_checks = 1." -FunctionName Repair-DbaInstanceName
+                                    Write-Message -Level Output -Message "`nPerforming sp_dropdistributor @no_checks = 1." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                                     $sql = "EXEC dbo.sp_dropdistributor @no_checks = 1"
-                                    Write-Message -Level Debug -Message $sql -FunctionName Repair-DbaInstanceName
+                                    Write-Message -Level Debug -Message $sql -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                                     try {
                                         $null = $server.Query($sql)
                                     } catch {
@@ -231,16 +231,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $result = $host.ui.PromptForChoice($title, $message, $options, 1)
 
                                 if ($result -eq 1) {
-                                    Write-Message -Level Output -Message "Okay, moving on." -FunctionName Repair-DbaInstanceName
+                                    Write-Message -Level Output -Message "Okay, moving on." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                                 } else {
-                                    Write-Message -Level Verbose -Message "Removing Mirroring" -FunctionName Repair-DbaInstanceName
+                                    Write-Message -Level Verbose -Message "Removing Mirroring" -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
 
                                     foreach ($database in $server.Databases) {
                                         if ($database.IsMirroringEnabled) {
                                             $dbName = $database.name
 
                                             try {
-                                                Write-Message -Level Verbose -Message "Breaking mirror for $dbName." -FunctionName Repair-DbaInstanceName
+                                                Write-Message -Level Verbose -Message "Breaking mirror for $dbName." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                                                 $database.ChangeMirroringState([Microsoft.SqlServer.Management.Smo.MirroringOption]::Off)
                                                 $database.Alter()
                                                 $database.Refresh()
@@ -268,7 +268,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             try {
                 $allsqlservices = Get-Service -ComputerName $instance.ComputerName -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like "SQL*$instanceName*" -and $_.Status -eq "Running" }
             } catch {
-                Write-Message -Level Warning -Message "Can't contact $instance using Get-Service. This means the script will not be able to automatically restart SQL services." -FunctionName Repair-DbaInstanceName
+                Write-Message -Level Warning -Message "Can't contact $instance using Get-Service. This means the script will not be able to automatically restart SQL services." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
             }
 
             if ($nametest.Warnings -ne 'N/A') {
@@ -277,14 +277,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($reportingservice.Status -eq "Running") {
                     if ($Pscmdlet.ShouldProcess($server.name, "Reporting Services is running for this instance. Would you like to automatically stop this service?")) {
                         $reportingservice | Stop-Service
-                        Write-Message -Level Warning -Message "You must reconfigure Reporting Services using Reporting Services Configuration Manager or PowerShell once the server has been successfully renamed." -FunctionName Repair-DbaInstanceName
+                        Write-Message -Level Warning -Message "You must reconfigure Reporting Services using Reporting Services Configuration Manager or PowerShell once the server has been successfully renamed." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                     }
                 }
             }
 
             if ($Pscmdlet.ShouldProcess($server.name, "Performing sp_dropserver to remove the old server name, $oldServerName, then sp_addserver to add $newServerName")) {
                 $sql = "EXEC dbo.sp_dropserver '$oldServerName'"
-                Write-Message -Level Debug -Message $sql -FunctionName Repair-DbaInstanceName
+                Write-Message -Level Debug -Message $sql -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                 try {
                     $null = $server.Query($sql)
                 } catch {
@@ -293,7 +293,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 $sql = "EXEC dbo.sp_addserver '$newServerName', LOCAL"
-                Write-Message -Level Debug -Message $sql -FunctionName Repair-DbaInstanceName
+                Write-Message -Level Debug -Message $sql -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
 
                 try {
                     $null = $server.Query($sql)
@@ -305,14 +305,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($null -eq $allsqlservices) {
-                Write-Message -Level Warning -Message "Could not contact $($instance.ComputerName) using Get-Service. You must manually restart the SQL Server instance." -FunctionName Repair-DbaInstanceName
+                Write-Message -Level Warning -Message "Could not contact $($instance.ComputerName) using Get-Service. You must manually restart the SQL Server instance." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                 $needsrestart = $true
             } else {
                 if ($Pscmdlet.ShouldProcess($instance.ComputerName, "Rename complete! The SQL Service must be restarted to commit the changes. Would you like to restart the $instanceName instance now?")) {
                     try {
-                        Write-Message -Level Verbose -Message "Stopping SQL Services for the $instanceName instance" -FunctionName Repair-DbaInstanceName
+                        Write-Message -Level Verbose -Message "Stopping SQL Services for the $instanceName instance" -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                         $allsqlservices | Stop-Service -Force -WarningAction SilentlyContinue # because it reports the wrong name
-                        Write-Message -Level Verbose -Message "Starting SQL Services for the $instanceName instance." -FunctionName Repair-DbaInstanceName
+                        Write-Message -Level Verbose -Message "Starting SQL Services for the $instanceName instance." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                         $allsqlservices | Where-Object { $_.DisplayName -notlike "*reporting*" } | Start-Service -WarningAction SilentlyContinue # because it reports the wrong name
                     } catch {
                         Stop-Function -Message "Failure" -Target $server -ErrorRecord $_ -Continue -FunctionName Repair-DbaInstanceName
@@ -321,12 +321,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($renamed -eq $true) {
-                Write-Message -Level Verbose -Message "$instance successfully renamed from $oldServerName to $newServerName." -FunctionName Repair-DbaInstanceName
+                Write-Message -Level Verbose -Message "$instance successfully renamed from $oldServerName to $newServerName." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
                 Test-DbaInstanceName -SqlInstance $instance -SqlCredential $SqlCredential
             }
 
             if ($needsrestart -eq $true) {
-                Write-Message -Level Warning -Message "SQL Service restart for $newServerName still required." -FunctionName Repair-DbaInstanceName
+                Write-Message -Level Warning -Message "SQL Service restart for $newServerName still required." -FunctionName Repair-DbaInstanceName -ModuleName "dbatools"
             }
         }
     }

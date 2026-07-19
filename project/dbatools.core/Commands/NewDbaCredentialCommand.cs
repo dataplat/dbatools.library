@@ -173,7 +173,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if ($currentCred) {
             if ($force) {
-                Write-Message -Level Verbose -Message "Dropping credential $Name" -FunctionName New-DbaCredential
+                Write-Message -Level Verbose -Message "Dropping credential $Name" -FunctionName New-DbaCredential -ModuleName "dbatools"
                 try {
                     if ($Pscmdlet.ShouldProcess($SqlInstance, "Dropping credential '$Name' on $instance")) {
                         $currentCred.Drop()
@@ -196,10 +196,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
                 $instancecredential.ProviderName = $ProviderName
                 if ($SecurePassword) {
-                    Write-Message -Level Verbose -Message "Creating credential with identity '$Identity' with password" -FunctionName New-DbaCredential
+                    Write-Message -Level Verbose -Message "Creating credential with identity '$Identity' with password" -FunctionName New-DbaCredential -ModuleName "dbatools"
                     $instancecredential.Create($Identity, $SecurePassword)
                 } else {
-                    Write-Message -Level Verbose -Message "Password was not provided, creating credential with identity '$Identity' without password" -FunctionName New-DbaCredential
+                    Write-Message -Level Verbose -Message "Password was not provided, creating credential with identity '$Identity' without password" -FunctionName New-DbaCredential -ModuleName "dbatools"
                     $instancecredential.Create($Identity)
                 }
 

@@ -131,7 +131,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $computer = $set.ComputerName
         $status = $set.State
 
-        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Stop-DbaPfDataCollectorSet
+        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Stop-DbaPfDataCollectorSet -ModuleName "dbatools"
         if ($status -ne "Running") {
             Stop-Function -Message "$setname on $computer is already stopped." -Continue -FunctionName Stop-DbaPfDataCollectorSet
         }

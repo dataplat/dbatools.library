@@ -179,7 +179,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $currentspid = $session.spid
 
             if ($sourceserver.ConnectionContext.ProcessID -eq $currentspid) {
-                Write-Message -Level Warning -Message "Skipping spid $currentspid because you cannot use KILL to kill your own process." -Target $session -FunctionName Stop-DbaProcess
+                Write-Message -Level Warning -Message "Skipping spid $currentspid because you cannot use KILL to kill your own process." -Target $session -FunctionName Stop-DbaProcess -ModuleName "dbatools"
                 Continue
             }
 

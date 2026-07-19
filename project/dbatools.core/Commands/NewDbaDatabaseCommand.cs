@@ -251,7 +251,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    Write-Message -Message "Advanced data file configuration will be invoked" -Level Verbose -FunctionName New-DbaDatabase
+    Write-Message -Message "Advanced data file configuration will be invoked" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
 } $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
@@ -340,7 +340,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if (-not $logPathIsAzure -and -not (Test-DbaPath -SqlInstance $server -Path $logFileDirectoryPath)) {
                 try {
-                    Write-Message -Message "Creating directory $logFileDirectoryPath" -Level Verbose -FunctionName New-DbaDatabase
+                    Write-Message -Message "Creating directory $logFileDirectoryPath" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                     $null = New-DbaDirectory -SqlInstance $server -Path $logFileDirectoryPath -EnableException
                 } catch {
                     Stop-Function -Message "Error creating log file directory $logFileDirectoryPath" -Target $instance -Continue -FunctionName New-DbaDatabase
@@ -349,14 +349,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if (-not $dataPathIsAzure -and -not (Test-DbaPath -SqlInstance $server -Path $dataFileDirectoryPath)) {
                 try {
-                    Write-Message -Message "Creating directory $dataFileDirectoryPath" -Level Verbose -FunctionName New-DbaDatabase
+                    Write-Message -Message "Creating directory $dataFileDirectoryPath" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                     $null = New-DbaDirectory -SqlInstance $server -Path $dataFileDirectoryPath -EnableException
                 } catch {
                     Stop-Function -Message "Error creating secondary file directory $dataFileDirectoryPath on $instance" -Target $instance -Continue -FunctionName New-DbaDatabase
                 }
             }
 
-            Write-Message -Message "Set local data path to $dataFileDirectoryPath and local log path to $logFileDirectoryPath" -Level Verbose -FunctionName New-DbaDatabase
+            Write-Message -Message "Set local data path to $dataFileDirectoryPath and local log path to $logFileDirectoryPath" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
 
             foreach ($dbName in $Name) {
                 if ($server.Databases[$dbName].Name) {
@@ -364,25 +364,25 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 try {
-                    Write-Message -Message "Creating smo object for new database $dbName" -Level Verbose -FunctionName New-DbaDatabase
+                    Write-Message -Message "Creating smo object for new database $dbName" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                     $newdb = New-Object Microsoft.SqlServer.Management.Smo.Database($server, $dbName)
                 } catch {
                     Stop-Function -Message "Error creating database object for $dbName on server $server" -ErrorRecord $_ -Target $instance -Continue -FunctionName New-DbaDatabase
                 }
 
                 if ($Collation) {
-                    Write-Message -Message "Setting collation to $Collation" -Level Verbose -FunctionName New-DbaDatabase
+                    Write-Message -Message "Setting collation to $Collation" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                     $newdb.Collation = $Collation
                 }
 
                 if ($RecoveryModel) {
-                    Write-Message -Message "Setting recovery model to $RecoveryModel" -Level Verbose -FunctionName New-DbaDatabase
+                    Write-Message -Message "Setting recovery model to $RecoveryModel" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                     $newdb.RecoveryModel = $RecoveryModel
                 }
 
                 if ($advancedconfig) {
                     try {
-                        Write-Message -Message "Creating PRIMARY filegroup" -Level Verbose -FunctionName New-DbaDatabase
+                        Write-Message -Message "Creating PRIMARY filegroup" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                         $primaryfg = New-Object Microsoft.SqlServer.Management.Smo.Filegroup($newdb, "PRIMARY")
                         $newdb.Filegroups.Add($primaryfg)
                     } catch {
@@ -392,14 +392,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     #add the primary file
                     try {
                         $primaryfilename = $dbName + $DataFileSuffix
-                        Write-Message -Message "Creating file name $primaryfilename in filegroup PRIMARY" -Level Verbose -FunctionName New-DbaDatabase
+                        Write-Message -Message "Creating file name $primaryfilename in filegroup PRIMARY" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
 
                         # if PrimaryFilesize and PrimaryFileMaxSize were passed in then check the size of the modeldev file; if larger than our $PrimaryFilesize setting use that instead
                         if ($server.Databases["model"].FileGroups["PRIMARY"].Files["modeldev"].Size -gt ($PrimaryFilesize * 1024)) {
-                            Write-Message -Message "model database modeldev larger than our the PrimaryFilesize so using modeldev size for Primary file" -Level Verbose -FunctionName New-DbaDatabase
+                            Write-Message -Message "model database modeldev larger than our the PrimaryFilesize so using modeldev size for Primary file" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                             $PrimaryFilesize = ($server.Databases["model"].FileGroups["PRIMARY"].Files["modeldev"].Size / 1024)
                             if ($PrimaryFilesize -gt $PrimaryFileMaxSize) {
-                                Write-Message -Message "Resetting Primary File Max size to be the new Primary File Size setting" -Level Verbose -FunctionName New-DbaDatabase
+                                Write-Message -Message "Resetting Primary File Max size to be the new Primary File Size setting" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                                 $PrimaryFileMaxSize = $PrimaryFilesize
                             }
                         }
@@ -435,14 +435,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     try {
                         $logname = $dbName + $LogFileSuffix
-                        Write-Message -Message "Creating log $logname" -Level Verbose -FunctionName New-DbaDatabase
+                        Write-Message -Message "Creating log $logname" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
 
                         # if LogSize and LogMaxSize were passed in then check the size of the modellog file; if larger than our $LogSize setting use that instead
                         if ($server.Databases["model"].LogFiles["modellog"].Size -gt ($LogSize * 1024)) {
-                            Write-Message -Message "model database modellog larger than our the LogSize so using modellog size for Log file size" -Level Verbose -FunctionName New-DbaDatabase
+                            Write-Message -Message "model database modellog larger than our the LogSize so using modellog size for Log file size" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                             $LogSize = ($server.Databases["model"].LogFiles["modellog"].Size / 1024)
                             if ($LogSize -gt $LogMaxSize) {
-                                Write-Message -Message "Resetting Log File Max size to be the new Log File Size setting" -Level Verbose -FunctionName New-DbaDatabase
+                                Write-Message -Message "Resetting Log File Max size to be the new Log File Size setting" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                                 $LogMaxSize = $LogSize
                             }
                         }
@@ -478,7 +478,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         #add the Secondary data file group
                         try {
                             $secondaryfilegroupname = $dbName + $SecondaryDataFileSuffix
-                            Write-Message -Message "Creating Secondary filegroup $secondaryfilegroupname" -Level Verbose -FunctionName New-DbaDatabase
+                            Write-Message -Message "Creating Secondary filegroup $secondaryfilegroupname" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
 
                             $secondaryfg = New-Object Microsoft.SqlServer.Management.Smo.Filegroup($newdb, $secondaryfilegroupname)
                             $newdb.Filegroups.Add($secondaryfg)
@@ -488,10 +488,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                         # if SecondaryFilesize and SecondaryFileMaxSize were passed in then check the size of the modeldev file; if larger than our $SecondaryFilesize setting use that instead
                         if ($server.Databases["model"].FileGroups["PRIMARY"].Files["modeldev"].Size -gt ($SecondaryFilesize * 1024)) {
-                            Write-Message -Message "model database modeldev larger than our the SecondaryFilesize so using modeldev size for the Secondary file" -Level Verbose -FunctionName New-DbaDatabase
+                            Write-Message -Message "model database modeldev larger than our the SecondaryFilesize so using modeldev size for the Secondary file" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                             $SecondaryFilesize = ($server.Databases["model"].FileGroups["PRIMARY"].Files["modeldev"].Size / 1024)
                             if ($SecondaryFilesize -gt $SecondaryFileMaxSize) {
-                                Write-Message -Message "Resetting Secondary File Max size to be the new Secondary File Size setting" -Level Verbose -FunctionName New-DbaDatabase
+                                Write-Message -Message "Resetting Secondary File Max size to be the new Secondary File Size setting" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                                 $SecondaryFileMaxSize = $SecondaryFilesize
                             }
                         }
@@ -504,7 +504,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $secondaryfgcount++
                             try {
                                 $secondaryfilename = "$($secondaryfilegroupname)_$($secondaryfgcount)"
-                                Write-Message -Message "Creating file name $secondaryfilename in filegroup $secondaryfilegroupname" -Level Verbose -FunctionName New-DbaDatabase
+                                Write-Message -Message "Creating file name $secondaryfilename in filegroup $secondaryfilegroupname" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                                 $secondaryfile = New-Object Microsoft.SQLServer.Management.Smo.Datafile($secondaryfg, $secondaryfilename)
                                 $secondaryfile.FileName = $dataFileNamePath + $dataPathSeparator + $secondaryfilename + ".ndf"
 
@@ -536,7 +536,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
 
-                Write-Message -Message "Creating Database $dbName" -Level Verbose -FunctionName New-DbaDatabase
+                Write-Message -Message "Creating Database $dbName" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                 if ($__realCmdlet.ShouldProcess($instance, "Creating the database $dbName on instance $instance")) {
                     try {
                         $newdb.Create()
@@ -545,7 +545,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if ($Owner) {
-                        Write-Message -Message "Setting database owner to $Owner" -Level Verbose -FunctionName New-DbaDatabase
+                        Write-Message -Message "Setting database owner to $Owner" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                         try {
                             $newdb.SetOwner($Owner)
                             $newdb.Refresh()
@@ -555,7 +555,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if ($DefaultFileGroup -eq "Secondary") {
-                        Write-Message -Message "Setting default filegroup to $secondaryfilegroupname" -Level Verbose -FunctionName New-DbaDatabase
+                        Write-Message -Message "Setting default filegroup to $secondaryfilegroupname" -Level Verbose -FunctionName New-DbaDatabase -ModuleName "dbatools"
                         try {
                             $newdb.SetDefaultFileGroup($secondaryfilegroupname)
                         } catch {

@@ -92,7 +92,7 @@ public sealed class GetDbaDbServiceBrokerQueueCommand : DbaBaseCmdlet
             // Best-effort bookkeeping only.
         }
     }
-    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbServiceBrokerQueue on the two Write-Message; -ModuleName "dbatools"
+    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbServiceBrokerQueue on the two Write-Message;
     // Test-Bound SqlInstance -> $__boundSqlInstance and Test-Bound -ParameterName ExcludeSystemQueue ->
     // $__boundExcludeSystemQueue (carried flags). The three continues are inside foreach loops - loop-bound.
     private const string ProcessScript = """

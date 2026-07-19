@@ -257,7 +257,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
 
-            Write-Message -Level Debug -Message "Executing $sqlToRun" -FunctionName Test-DbaDiskSpeed
+            Write-Message -Level Debug -Message "Executing $sqlToRun" -FunctionName Test-DbaDiskSpeed -ModuleName "dbatools"
             $server.Query("$sqlToRun")
         }
 

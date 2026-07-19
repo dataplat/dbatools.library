@@ -297,7 +297,7 @@ try {
         foreach ($instance in $InputObject) {
 
             if (-not (Test-SqlSa $instance)) {
-                Write-Message -Level Warning -Message "Not a sysadmin on $instance, resultset would be underwhelming. Skipping." -FunctionName Watch-DbaDbLogin;
+                Write-Message -Level Warning -Message "Not a sysadmin on $instance, resultset would be underwhelming. Skipping." -FunctionName Watch-DbaDbLogin -ModuleName "dbatools";
                 continue
             }
 
@@ -332,7 +332,7 @@ try {
                     ON r.session_id = s.session_id"
             }
 
-            Write-Message -Level Debug -Message $sql -FunctionName Watch-DbaDbLogin
+            Write-Message -Level Debug -Message $sql -FunctionName Watch-DbaDbLogin -ModuleName "dbatools"
 
             $procs = $instance.Query($sql) | Where-Object { $_.Host -ne $instance.ComputerName -and ![string]::IsNullOrEmpty($_.Host) }
             $procs = $procs | Where-Object { $systemdbs -notcontains $_.Database -and $excludedPrograms -notcontains $_.Program }
@@ -340,9 +340,9 @@ try {
             if ($procs.Count -gt 0) {
                 $procs | Select-Object @{Label = "ComputerName"; Expression = { $instance.ComputerName } }, @{Label = "InstanceName"; Expression = { $instance.ServiceName } }, @{Label = "SqlInstance"; Expression = { $instance.DomainInstanceName } }, LoginTime, Login, Host, Program, DatabaseId, Database, IsSystem, CaptureTime | ConvertTo-DbaDataTable | Write-DbaDbTableData -SqlInstance $serverDest -Database $Database -Table $Table -AutoCreateTable
 
-                Write-Message -Level Output -Message "Added process information for $instance to datatable." -FunctionName Watch-DbaDbLogin
+                Write-Message -Level Output -Message "Added process information for $instance to datatable." -FunctionName Watch-DbaDbLogin -ModuleName "dbatools"
             } else {
-                Write-Message -Level Verbose -Message "No data returned for $instance." -FunctionName Watch-DbaDbLogin
+                Write-Message -Level Verbose -Message "No data returned for $instance." -FunctionName Watch-DbaDbLogin -ModuleName "dbatools"
             }
         }
 

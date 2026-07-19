@@ -166,7 +166,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $ipConf.TcpDynamicPorts = ''
                         $ipConf.TcpPort = $Port -join ','
                     } else {
-                        Write-Message -Level Warning -Message "IP address $ip not found, skipping." -FunctionName Set-DbaTcpPort
+                        Write-Message -Level Warning -Message "IP address $ip not found, skipping." -FunctionName Set-DbaTcpPort -ModuleName "dbatools"
                     }
                 }
 

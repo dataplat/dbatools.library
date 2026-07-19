@@ -219,7 +219,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $newGroup.create()
                         $reggroup.refresh()
                     } else {
-                        Write-Message -Level Verbose -Message "Group $group already exists. Will continue." -FunctionName Add-DbaRegServerGroup
+                        Write-Message -Level Verbose -Message "Group $group already exists. Will continue." -FunctionName Add-DbaRegServerGroup -ModuleName "dbatools"
                         $newGroup = $reggroup.ServerGroups[$group]
                     }
                     $reggroup = $reggroup.ServerGroups[$group]

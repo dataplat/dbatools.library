@@ -171,7 +171,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
                     }
                 } catch {
-                    Write-Message -Level Verbose -Message "Could not drop database $db on $server" -FunctionName Remove-DbaDatabase
+                    Write-Message -Level Verbose -Message "Could not drop database $db on $server" -FunctionName Remove-DbaDatabase -ModuleName "dbatools"
 
                     [PSCustomObject]@{
                         ComputerName = $server.ComputerName

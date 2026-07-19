@@ -140,8 +140,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__boundKeys, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    Write-Message -Level InternalComment -Message "Starting" -FunctionName Remove-DbaCmConnection
-    Write-Message -Level Verbose -Message "Bound parameters: $__boundKeys" -FunctionName Remove-DbaCmConnection
+    Write-Message -Level InternalComment -Message "Starting" -FunctionName Remove-DbaCmConnection -ModuleName "dbatools"
+    Write-Message -Level Verbose -Message "Bound parameters: $__boundKeys" -FunctionName Remove-DbaCmConnection -ModuleName "dbatools"
 } $__boundKeys $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
@@ -163,13 +163,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     foreach ($connectionObject in $ComputerName) {
         if (-not $connectionObject.Success) { Stop-Function -Message "Failed to interpret computername input: $($connectionObject.InputObject)" -Category InvalidArgument -Target $connectionObject.InputObject -Continue -FunctionName Remove-DbaCmConnection }
-        Write-Message -Level VeryVerbose -Message "Removing from connection cache: $($connectionObject.Connection.ComputerName)" -Target $connectionObject.Connection.ComputerName -FunctionName Remove-DbaCmConnection
+        Write-Message -Level VeryVerbose -Message "Removing from connection cache: $($connectionObject.Connection.ComputerName)" -Target $connectionObject.Connection.ComputerName -FunctionName Remove-DbaCmConnection -ModuleName "dbatools"
         if ($__realCmdlet.ShouldProcess($($connectionObject.Connection.ComputerName), "Removing Connection")) {
             if ([Dataplat.Dbatools.Connection.ConnectionHost]::Connections.ContainsKey($connectionObject.Connection.ComputerName)) {
                 $null = [Dataplat.Dbatools.Connection.ConnectionHost]::Connections.Remove($connectionObject.Connection.ComputerName)
-                Write-Message -Level Verbose -Message "Successfully removed $($connectionObject.Connection.ComputerName)" -Target $connectionObject.Connection.ComputerName -FunctionName Remove-DbaCmConnection
+                Write-Message -Level Verbose -Message "Successfully removed $($connectionObject.Connection.ComputerName)" -Target $connectionObject.Connection.ComputerName -FunctionName Remove-DbaCmConnection -ModuleName "dbatools"
             } else {
-                Write-Message -Level Verbose -Message "Not found: $($connectionObject.Connection.ComputerName)" -Target $connectionObject.Connection.ComputerName -FunctionName Remove-DbaCmConnection
+                Write-Message -Level Verbose -Message "Not found: $($connectionObject.Connection.ComputerName)" -Target $connectionObject.Connection.ComputerName -FunctionName Remove-DbaCmConnection -ModuleName "dbatools"
             }
         }
     }
@@ -188,7 +188,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    Write-Message -Level InternalComment -Message "Ending" -FunctionName Remove-DbaCmConnection
+    Write-Message -Level InternalComment -Message "Ending" -FunctionName Remove-DbaCmConnection -ModuleName "dbatools"
 } $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

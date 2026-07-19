@@ -92,7 +92,7 @@ public sealed class GetDbaDbUserDefinedTableTypeCommand : DbaBaseCmdlet
             // Best-effort bookkeeping only.
         }
     }
-    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbUserDefinedTableType on the two Write-Message; -ModuleName "dbatools"
+    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbUserDefinedTableType on the two Write-Message;
     // Test-Bound SqlInstance -> $__boundSqlInstance (carried flag). The three continues are inside foreach loops -
     // loop-bound. The system-object skip is a plain truthiness check (not a parameter).
     private const string ProcessScript = """

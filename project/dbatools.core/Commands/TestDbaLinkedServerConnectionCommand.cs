@@ -112,7 +112,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($ls in $linkedServerCollection) {
-                Write-Message -Level Verbose -Message "Testing linked server $($ls.name) on server $($ls.parent.name)" -FunctionName Test-DbaLinkedServerConnection
+                Write-Message -Level Verbose -Message "Testing linked server $($ls.name) on server $($ls.parent.name)" -FunctionName Test-DbaLinkedServerConnection -ModuleName "dbatools"
                 try {
                     $null = $ls.TestConnection()
                     $result = "Success"

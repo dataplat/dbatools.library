@@ -115,7 +115,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Test-DbaConnectionAuthScheme
         }
 
-        Write-Message -Level Verbose -Message "Getting results for the following query: $sql." -FunctionName Test-DbaConnectionAuthScheme
+        Write-Message -Level Verbose -Message "Getting results for the following query: $sql." -FunctionName Test-DbaConnectionAuthScheme -ModuleName "dbatools"
         try {
             $results = $server.Query($sql)
         } catch {

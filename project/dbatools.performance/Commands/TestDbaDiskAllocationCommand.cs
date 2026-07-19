@@ -119,7 +119,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Couldn't resolve hostname $computer. Skipping." -Continue -FunctionName Test-DbaDiskAllocation
             }
 
-            Write-Message -Level Verbose -Message "Creating CimSession on $fullComputerName over WSMan." -FunctionName Test-DbaDiskAllocation
+            Write-Message -Level Verbose -Message "Creating CimSession on $fullComputerName over WSMan." -FunctionName Test-DbaDiskAllocation -ModuleName "dbatools"
 
             if (!$Credential) {
                 $cimSession = New-CimSession -ComputerName $fullComputerName -ErrorAction SilentlyContinue
@@ -128,7 +128,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($null -eq $cimSession.id) {
-                Write-Message -Level Verbose -Message "Creating CimSession on $fullComputerName over WSMan failed. Creating CimSession on $fullComputerName over DCOM." -FunctionName Test-DbaDiskAllocation
+                Write-Message -Level Verbose -Message "Creating CimSession on $fullComputerName over WSMan failed. Creating CimSession on $fullComputerName over DCOM." -FunctionName Test-DbaDiskAllocation -ModuleName "dbatools"
 
                 if (!$Credential) {
                     $cimSession = New-CimSession -ComputerName $fullComputerName -SessionOption $sessionoptions -ErrorAction SilentlyContinue
@@ -141,10 +141,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Can't create CimSession on $fullComputerName" -Target $computer -FunctionName Test-DbaDiskAllocation
             }
 
-            Write-Message -Level Verbose -Message "Getting Disk Allocation from $computer" -FunctionName Test-DbaDiskAllocation
+            Write-Message -Level Verbose -Message "Getting Disk Allocation from $computer" -FunctionName Test-DbaDiskAllocation -ModuleName "dbatools"
 
             try {
-                Write-Message -Level Verbose -Message "Getting disk information from $computer." -FunctionName Test-DbaDiskAllocation
+                Write-Message -Level Verbose -Message "Getting disk information from $computer." -FunctionName Test-DbaDiskAllocation -ModuleName "dbatools"
                 $disks = Get-CimInstance -CimSession $cimSession -ClassName win32_volume -Filter "FileSystem='NTFS'" -ErrorAction Stop | Sort-Object -Property Name
             } catch {
                 Stop-Function -Message "Can't connect to WMI on $computer." -FunctionName Test-DbaDiskAllocation
@@ -152,9 +152,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($NoSqlCheck -eq $false) {
-                Write-Message -Level Verbose -Message "Checking for SQL Services" -FunctionName Test-DbaDiskAllocation
+                Write-Message -Level Verbose -Message "Checking for SQL Services" -FunctionName Test-DbaDiskAllocation -ModuleName "dbatools"
                 $sqlInstances = (Get-DbaService -ComputerName $fullComputerName -Type Engine -AdvancedProperties | Where-Object State -eq Running | Sort-Object -Property Name).SqlInstance
-                Write-Message -Level Verbose -Message "$($sqlInstances.Count) instance(s) found." -FunctionName Test-DbaDiskAllocation
+                Write-Message -Level Verbose -Message "$($sqlInstances.Count) instance(s) found." -FunctionName Test-DbaDiskAllocation -ModuleName "dbatools"
             }
 
             foreach ($disk in $disks) {

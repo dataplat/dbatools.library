@@ -130,7 +130,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $setname = $set.Name
         $computer = $set.ComputerName
         $status = $set.State
-        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Start-DbaPfDataCollectorSet
+        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Start-DbaPfDataCollectorSet -ModuleName "dbatools"
         if ($__realCmdlet.ShouldProcess($computer, "Starting Performance Monitor collection set")) {
             if ($status -eq "Running") {
                 Stop-Function -Message "$setname on $computer is already running." -Continue -FunctionName Start-DbaPfDataCollectorSet

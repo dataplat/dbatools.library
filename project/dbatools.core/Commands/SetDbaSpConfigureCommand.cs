@@ -172,7 +172,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 #If it's a dynamic setting we're all clear, otherwise let the user know that SQL needs to be restarted for the change to take
                 if ($isDynamic -eq $false) {
-                    Write-Message -Level Warning -Message "Configuration setting $configuration has been set, but restart of SQL Server is required for the new value `"$value`" to be used (old value: `"$currentRunValue`")" -Target $Instance -FunctionName Set-DbaSpConfigure
+                    Write-Message -Level Warning -Message "Configuration setting $configuration has been set, but restart of SQL Server is required for the new value `"$value`" to be used (old value: `"$currentRunValue`")" -Target $Instance -FunctionName Set-DbaSpConfigure -ModuleName "dbatools"
                 }
             } catch {
                 Stop-Function -Message "Unable to change config setting" -Target $Instance -ErrorRecord $_ -Continue -ContinueLabel main -FunctionName Set-DbaSpConfigure

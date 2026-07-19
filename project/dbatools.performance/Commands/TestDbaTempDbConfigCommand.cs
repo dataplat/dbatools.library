@@ -117,13 +117,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
 
-            Write-Message -Level Verbose -Message "TF 1118 evaluated" -FunctionName Test-DbaTempDbConfig
+            Write-Message -Level Verbose -Message "TF 1118 evaluated" -FunctionName Test-DbaTempDbConfig -ModuleName "dbatools"
 
             #get files and log files
             $tempdbFiles = Get-DbaDbFile -SqlInstance $server -Database tempdb
             [array]$dataFiles = $tempdbFiles | Where-Object Type -ne 1
             $logFiles = $tempdbFiles | Where-Object Type -eq 1
-            Write-Message -Level Verbose -Message "TempDB file objects gathered" -FunctionName Test-DbaTempDbConfig
+            Write-Message -Level Verbose -Message "TempDB file objects gathered" -FunctionName Test-DbaTempDbConfig -ModuleName "dbatools"
 
             [PSCustomObject]@{
                 ComputerName   = $server.ComputerName
@@ -136,7 +136,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Notes          = 'Microsoft recommends that the number of tempdb data files is equal to the number of logical cores up to 8.'
             }
 
-            Write-Message -Level Verbose -Message "File counts evaluated." -FunctionName Test-DbaTempDbConfig
+            Write-Message -Level Verbose -Message "File counts evaluated." -FunctionName Test-DbaTempDbConfig -ModuleName "dbatools"
 
             #test file growth
             $percData = $dataFiles | Where-Object GrowthType -ne 'KB' | Measure-Object
@@ -160,7 +160,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Notes          = 'Set file growth to explicit values, not by percent.'
             }
 
-            Write-Message -Level Verbose -Message "File growth settings evaluated." -FunctionName Test-DbaTempDbConfig
+            Write-Message -Level Verbose -Message "File growth settings evaluated." -FunctionName Test-DbaTempDbConfig -ModuleName "dbatools"
             #test file Location
 
             $cdata = ($dataFiles | Where-Object PhysicalName -like 'C:*' | Measure-Object).Count + ($logFiles | Where-Object PhysicalName -like 'C:*' | Measure-Object).Count
@@ -181,7 +181,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Notes          = "Do not place your tempdb files on C:\."
             }
 
-            Write-Message -Level Verbose -Message "File locations evaluated." -FunctionName Test-DbaTempDbConfig
+            Write-Message -Level Verbose -Message "File locations evaluated." -FunctionName Test-DbaTempDbConfig -ModuleName "dbatools"
 
             #Test growth limits
             $growthLimits = ($dataFiles | Where-Object MaxSize -gt 0 | Measure-Object).Count + ($logFiles | Where-Object MaxSize -gt 0 | Measure-Object).Count
@@ -202,7 +202,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Notes          = "Consider setting your tempdb files to unlimited growth."
             }
 
-            Write-Message -Level Verbose -Message "MaxSize values evaluated." -FunctionName Test-DbaTempDbConfig
+            Write-Message -Level Verbose -Message "MaxSize values evaluated." -FunctionName Test-DbaTempDbConfig -ModuleName "dbatools"
 
             #Test Data File Size Equal
             $distinctCountSizeDataFiles = ($dataFiles | Group-Object -Property Size | Measure-Object).Count
@@ -223,7 +223,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 IsBestPractice = $equalSizeDataFiles -eq $true
                 Notes          = "Consider creating equally sized data files."
             }
-            Write-Message -Level Verbose -Message "Data File Size Equal evaluated." -FunctionName Test-DbaTempDbConfig
+            Write-Message -Level Verbose -Message "Data File Size Equal evaluated." -FunctionName Test-DbaTempDbConfig -ModuleName "dbatools"
         }
 } $SqlInstance $SqlCredential $EnableException @__commonParameters 3>&1 2>&1
 """;

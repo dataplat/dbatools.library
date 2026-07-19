@@ -218,7 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($server.ResourceGovernor.ServerVersion.Major -ge 11) {
                     $resPool.CapCpuPercentage = $CapCpuPercentage
                 } elseif ($server.ResourceGovernor.ServerVersion.Major -lt 11) {
-                    Write-Message -Level Warning -Message "SQL Server version 2012+ required to specify a CPU percentage cap." -FunctionName Set-DbaRgResourcePool
+                    Write-Message -Level Warning -Message "SQL Server version 2012+ required to specify a CPU percentage cap." -FunctionName Set-DbaRgResourcePool -ModuleName "dbatools"
                 }
             }
         }
@@ -235,7 +235,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Reconfigure Resource Governor
         try {
             if ($SkipReconfigure) {
-                Write-Message -Level Warning -Message "Resource pool changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Set-DbaRgResourcePool
+                Write-Message -Level Warning -Message "Resource pool changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Set-DbaRgResourcePool -ModuleName "dbatools"
             } elseif ($__realCmdlet.ShouldProcess($server, "Reconfiguring the Resource Governor")) {
                 $server.ResourceGovernor.Alter()
             }

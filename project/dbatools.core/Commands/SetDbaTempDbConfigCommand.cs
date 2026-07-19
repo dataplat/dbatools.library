@@ -181,16 +181,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             #Set DataFileCount if not specified. If specified, check against best practices.
             if (-not $DataFileCount) {
                 $DataFileCount = $cores
-                Write-Message -Message "Data file count set to number of cores: $DataFileCount" -Level Verbose -FunctionName Set-DbaTempDbConfig
+                Write-Message -Message "Data file count set to number of cores: $DataFileCount" -Level Verbose -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
             } else {
                 if ($DataFileCount -gt $cores) {
-                    Write-Message -Message "Data File Count of $DataFileCount exceeds the Logical Core Count of $cores. This is outside of best practices." -Level Warning -FunctionName Set-DbaTempDbConfig
+                    Write-Message -Message "Data File Count of $DataFileCount exceeds the Logical Core Count of $cores. This is outside of best practices." -Level Warning -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
                 }
-                Write-Message -Message "Data file count set explicitly: $DataFileCount" -Level Verbose -FunctionName Set-DbaTempDbConfig
+                Write-Message -Message "Data file count set explicitly: $DataFileCount" -Level Verbose -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
             }
 
             $DataFilesizeSingle = $([Math]::Floor($DataFileSize / $DataFileCount))
-            Write-Message -Message "Single data file size (MB): $DataFilesizeSingle." -Level Verbose -FunctionName Set-DbaTempDbConfig
+            Write-Message -Message "Single data file size (MB): $DataFilesizeSingle." -Level Verbose -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
 
             if ($__boundDataPath) {
                 foreach ($dataDirPath in $DataPath) {
@@ -208,7 +208,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $DataPath = Split-Path $Filepath
             }
 
-            Write-Message -Message "Using data path(s): $DataPath." -Level Verbose -FunctionName Set-DbaTempDbConfig
+            Write-Message -Message "Using data path(s): $DataPath." -Level Verbose -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
 
             if ($__boundLogPath) {
                 if ((Test-DbaPath -SqlInstance $server -Path $LogPath) -eq $false) {
@@ -218,7 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $Filepath = $server.Databases['tempdb'].Query('SELECT physical_name AS PhysicalName FROM sys.database_files WHERE file_id = 2').PhysicalName
                 $LogPath = Split-Path $Filepath
             }
-            Write-Message -Message "Using log path: $LogPath." -Level Verbose -FunctionName Set-DbaTempDbConfig
+            Write-Message -Message "Using log path: $LogPath." -Level Verbose -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
 
             # Check if the file growth needs to be disabled
             if ($DisableGrowth) {
@@ -238,7 +238,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Current tempdb in $instance is not suitable to be reconfigured. The current tempdb has files with a size ($TooBigCount MB) larger than the calculated individual file configuration ($DataFilesizeSingle MB)." -Continue -FunctionName Set-DbaTempDbConfig
             }
 
-            Write-Message -Message "tempdb configuration validated." -Level Verbose -FunctionName Set-DbaTempDbConfig
+            Write-Message -Message "tempdb configuration validated." -Level Verbose -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
 
             $DataFiles = Get-DbaDbFile -SqlInstance $server -Database tempdb | Where-Object Type -eq 0 | Select-Object LogicalName, PhysicalName
 
@@ -293,8 +293,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $sql += "ALTER DATABASE tempdb MODIFY FILE(name=$LogicalName,filename='$NewPath',size=$LogFileSize MB,filegrowth=$LogFileGrowth);"
             }
 
-            Write-Message -Message "SQL Statement to resize tempdb." -Level Verbose -FunctionName Set-DbaTempDbConfig
-            Write-Message -Message ($sql -join "`n`n") -Level Verbose -FunctionName Set-DbaTempDbConfig
+            Write-Message -Message "SQL Statement to resize tempdb." -Level Verbose -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
+            Write-Message -Message ($sql -join "`n`n") -Level Verbose -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
 
             if ($OutputScriptOnly) {
                 return $sql
@@ -304,7 +304,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($__realCmdlet.ShouldProcess($instance, "Executing query and informing that a restart is required.")) {
                     try {
                         $server.Databases['master'].ExecuteNonQuery($sql)
-                        Write-Message -Level Verbose -Message "tempdb successfully reconfigured." -FunctionName Set-DbaTempDbConfig
+                        Write-Message -Level Verbose -Message "tempdb successfully reconfigured." -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
 
                         [PSCustomObject]@{
                             ComputerName       = $server.ComputerName
@@ -320,7 +320,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             LogFileGrowth      = [dbasize]($LogFileGrowth * 1024 * 1024)
                         }
 
-                        Write-Message -Level Output -Message "tempdb reconfigured. You must restart the SQL Service for settings to take effect." -FunctionName Set-DbaTempDbConfig
+                        Write-Message -Level Output -Message "tempdb reconfigured. You must restart the SQL Service for settings to take effect." -FunctionName Set-DbaTempDbConfig -ModuleName "dbatools"
                     } catch {
                         Stop-Function -Message "Unable to reconfigure tempdb. Exception: $_" -Target $sql -ErrorRecord $_ -Continue -FunctionName Set-DbaTempDbConfig
                     }

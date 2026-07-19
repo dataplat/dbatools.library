@@ -240,12 +240,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ((-not $SqlInstance -and -not $InputObject) -or $ServerObject) {
-            Write-Message -Level Verbose -Message "Parsing local" -FunctionName Add-DbaRegServer
+            Write-Message -Level Verbose -Message "Parsing local" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
             if (($Group)) {
                 if ($Group -is [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup]) {
                     $regServerGroup = Get-DbaRegServerGroup -Group $Group.Name
                 } else {
-                    Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer
+                    Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
                     $regServerGroup = Get-DbaRegServerGroup -Group $Group
                 }
                 if ($regServerGroup) {
@@ -255,12 +255,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($Group -is [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup]) {
                         $InputObject += Add-DbaRegServerGroup -Name $Group.Name
                     } else {
-                        Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer
+                        Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
                         $InputObject += Add-DbaRegServerGroup -Name $Group
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "No group passed, getting root" -FunctionName Add-DbaRegServer
+                Write-Message -Level Verbose -Message "No group passed, getting root" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
                 $InputObject += Get-DbaRegServerGroup -Id 1
             }
         }
@@ -279,7 +279,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($Group -is [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup]) {
                         $InputObject += Add-DbaRegServerGroup -SqlInstance $instance -SqlCredential $SqlCredential -Name $Group.Name
                     } else {
-                        Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer
+                        Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
                         $InputObject += Add-DbaRegServerGroup -SqlInstance $instance -SqlCredential $SqlCredential -Name $Group
                     }
                 }
@@ -292,7 +292,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($reggroup.Source -eq "Azure Data Studio") {
                 Stop-Function -Message "You cannot use dbatools to remove or add registered servers in Azure Data Studio" -Continue -FunctionName Add-DbaRegServer
             }
-            Write-Message -Level Verbose -Message "ID: $($reggroup.ID)" -FunctionName Add-DbaRegServer
+            Write-Message -Level Verbose -Message "ID: $($reggroup.ID)" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
             if ($reggroup.ID) {
                 $target = $reggroup.ParentServer.SqlInstance
             } else {

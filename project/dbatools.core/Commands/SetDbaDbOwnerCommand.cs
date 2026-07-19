@@ -191,7 +191,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 continue
             }
             if (!$db.IsAccessible) {
-                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Set-DbaDbOwner
+                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Set-DbaDbOwner -ModuleName "dbatools"
                 continue
             }
 
@@ -217,20 +217,20 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dbName = $db.name
             if ($__realCmdlet.ShouldProcess($instance, "Setting database owner for $dbName to $TargetLogin")) {
                 try {
-                    Write-Message -Level Verbose -Message "Setting database owner for $dbName to $TargetLogin on $instance." -FunctionName Set-DbaDbOwner
+                    Write-Message -Level Verbose -Message "Setting database owner for $dbName to $TargetLogin on $instance." -FunctionName Set-DbaDbOwner -ModuleName "dbatools"
                     # Set database owner to $TargetLogin (default 'sa')
                     # Ownership validations checks
 
                     if ($db.Status -notmatch 'Normal') {
-                        Write-Message -Level Warning -Message "$dbName on $instance is in a  $($db.Status) state and can not be altered. It will be skipped." -FunctionName Set-DbaDbOwner
+                        Write-Message -Level Warning -Message "$dbName on $instance is in a  $($db.Status) state and can not be altered. It will be skipped." -FunctionName Set-DbaDbOwner -ModuleName "dbatools"
                     }
                     #Database is updatable, not read-only
                     elseif ($db.IsUpdateable -eq $false) {
-                        Write-Message -Level Warning -Message "$dbName on $instance is not in an updateable state and can not be altered. It will be skipped." -FunctionName Set-DbaDbOwner
+                        Write-Message -Level Warning -Message "$dbName on $instance is not in an updateable state and can not be altered. It will be skipped." -FunctionName Set-DbaDbOwner -ModuleName "dbatools"
                     }
                     #Is the login mapped as a user? Logins already mapped in the database can not be the owner
                     elseif ($db.Users.name -contains $TargetLogin) {
-                        Write-Message -Level Warning -Message "$dbName on $instance has $TargetLogin as a mapped user. Mapped users can not be database owners." -FunctionName Set-DbaDbOwner
+                        Write-Message -Level Warning -Message "$dbName on $instance has $TargetLogin as a mapped user. Mapped users can not be database owners." -FunctionName Set-DbaDbOwner -ModuleName "dbatools"
                     } else {
                         # Make sure the Owner property in the SMO is filled befor the change. See #8528 for details.
                         $null = $db.Owner

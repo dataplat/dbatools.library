@@ -101,7 +101,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $glennberryResources = "https://glennsqlperformance.com/resources/"
 
-    Write-Message -Level Verbose -Message "Downloading Glenn Berry Resources Page" -FunctionName Save-DbaDiagnosticQueryScript
+    Write-Message -Level Verbose -Message "Downloading Glenn Berry Resources Page" -FunctionName Save-DbaDiagnosticQueryScript -ModuleName "dbatools"
 
     try {
         try {
@@ -237,14 +237,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         return
     }
 
-    Write-Message -Level Verbose -Message "Found $($glenberrysql.Count) documents to download" -FunctionName Save-DbaDiagnosticQueryScript
+    Write-Message -Level Verbose -Message "Found $($glenberrysql.Count) documents to download" -FunctionName Save-DbaDiagnosticQueryScript -ModuleName "dbatools"
 
     foreach ($doc in $glenberrysql) {
         try {
             $link = $doc.URL.ToString()
             # Extra safety: clean HTML entities one more time before download
             $link = $link -replace '&amp;', '&'
-            Write-Message -Level Verbose -Message "Downloading $link" -FunctionName Save-DbaDiagnosticQueryScript
+            Write-Message -Level Verbose -Message "Downloading $link" -FunctionName Save-DbaDiagnosticQueryScript -ModuleName "dbatools"
             Write-ProgressHelper -Activity "Downloading Glenn Berry's most recent DMVs" -ExcludePercent -Message "Downloading $link" -StepNumber 1
             $filename = Join-Path -Path $Path -ChildPath "SQLServerDiagnosticQueries_$($doc.SQLVersion).sql"
             Invoke-TlsWebRequest -Uri $link -OutFile $filename -ErrorAction Stop

@@ -176,7 +176,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($__realCmdlet.ShouldProcess("$db on $instance", "ALTER DATABASE $db SET RECOVERY $RecoveryModel")) {
                 $db.RecoveryModel = $RecoveryModel
                 $db.Alter()
-                Write-Message -Level Verbose -Message "Recovery Model set to $RecoveryModel for database $db" -FunctionName Set-DbaDbRecoveryModel
+                Write-Message -Level Verbose -Message "Recovery Model set to $RecoveryModel for database $db" -FunctionName Set-DbaDbRecoveryModel -ModuleName "dbatools"
             }
         }
         Get-DbaDbRecoveryModel -SqlInstance $db.Parent -Database $db.name

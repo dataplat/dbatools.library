@@ -187,7 +187,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.versionMajor -ge 13) {
-                Write-Message -Level Verbose -Message "Server '$instance' supports Max DOP configuration per database." -FunctionName Set-DbaMaxDop
+                Write-Message -Level Verbose -Message "Server '$instance' supports Max DOP configuration per database." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
 
                 # (Test-Bound -ParameterName Database, ExcludeDatabase -not) = NEITHER bound
                 if ((-not ($__boundDatabase -or $__boundExcludeDatabase))) {
@@ -215,19 +215,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             } else {
                 # (Test-Bound -ParameterName database) -or (Test-Bound -ParameterName AllDatabases)
                 if (($__boundDatabase) -or ($__boundAllDatabases)) {
-                    Write-Message -Level Warning -Message "Server '$instance' (v$($server.versionMajor)) does not support Max DOP configuration at the database level. Remember that this option is only available from SQL Server 2016 (v13). Run the command again without using database related parameters. Skipping." -FunctionName Set-DbaMaxDop
+                    Write-Message -Level Warning -Message "Server '$instance' (v$($server.versionMajor)) does not support Max DOP configuration at the database level. Remember that this option is only available from SQL Server 2016 (v13). Run the command again without using database related parameters. Skipping." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
                     Continue
                 }
             }
 
             foreach ($row in $InputObject | Where-Object { $_.SqlInstance -eq $instance }) {
                 if ($UseRecommended -and ($row.RecommendedMaxDop -eq $row.CurrentInstanceMaxDop) -and !($dbScopedConfiguration)) {
-                    Write-Message -Level Verbose -Message "$instance is configured properly. No change required." -FunctionName Set-DbaMaxDop
+                    Write-Message -Level Verbose -Message "$instance is configured properly. No change required." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
                     Continue
                 }
 
                 if ($UseRecommended -and ($row.RecommendedMaxDop -eq $row.DatabaseMaxDop) -and $dbScopedConfiguration) {
-                    Write-Message -Level Verbose -Message "Database $($row.Database) on $instance is configured properly. No change required." -FunctionName Set-DbaMaxDop
+                    Write-Message -Level Verbose -Message "Database $($row.Database) on $instance is configured properly. No change required." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
                     Continue
                 }
 
@@ -239,16 +239,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $row.PreviousDatabaseMaxDopValue = $row.DatabaseMaxDop
 
                             if ($resetDatabases) {
-                                Write-Message -Level Verbose -Message "Changing $($row.Database) database max DOP to $($row.DatabaseMaxDop)." -FunctionName Set-DbaMaxDop
+                                Write-Message -Level Verbose -Message "Changing $($row.Database) database max DOP to $($row.DatabaseMaxDop)." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
                                 $server.Databases["$($row.Database)"].MaxDop = $row.DatabaseMaxDop
                             } else {
-                                Write-Message -Level Verbose -Message "Changing $($row.Database) database max DOP from $($row.DatabaseMaxDop) to $($row.RecommendedMaxDop)." -FunctionName Set-DbaMaxDop
+                                Write-Message -Level Verbose -Message "Changing $($row.Database) database max DOP from $($row.DatabaseMaxDop) to $($row.RecommendedMaxDop)." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
                                 $server.Databases["$($row.Database)"].MaxDop = $row.RecommendedMaxDop
                                 $row.DatabaseMaxDop = $row.RecommendedMaxDop
                             }
 
                         } else {
-                            Write-Message -Level Verbose -Message "Changing $server SQL Server max DOP from $($row.CurrentInstanceMaxDop) to $($row.RecommendedMaxDop)." -FunctionName Set-DbaMaxDop
+                            Write-Message -Level Verbose -Message "Changing $server SQL Server max DOP from $($row.CurrentInstanceMaxDop) to $($row.RecommendedMaxDop)." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
                             $server.Configuration.MaxDegreeOfParallelism.ConfigValue = $row.RecommendedMaxDop
                             $row.CurrentInstanceMaxDop = $row.RecommendedMaxDop
                         }
@@ -256,11 +256,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         if ($dbScopedConfiguration) {
                             $row.PreviousDatabaseMaxDopValue = $row.DatabaseMaxDop
 
-                            Write-Message -Level Verbose -Message "Changing $($row.Database) database max DOP from $($row.DatabaseMaxDop) to $MaxDop." -FunctionName Set-DbaMaxDop
+                            Write-Message -Level Verbose -Message "Changing $($row.Database) database max DOP from $($row.DatabaseMaxDop) to $MaxDop." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
                             $server.Databases["$($row.Database)"].MaxDop = $MaxDop
                             $row.DatabaseMaxDop = $MaxDop
                         } else {
-                            Write-Message -Level Verbose -Message "Changing $instance SQL Server max DOP from $($row.CurrentInstanceMaxDop) to $MaxDop." -FunctionName Set-DbaMaxDop
+                            Write-Message -Level Verbose -Message "Changing $instance SQL Server max DOP from $($row.CurrentInstanceMaxDop) to $MaxDop." -FunctionName Set-DbaMaxDop -ModuleName "dbatools"
                             $server.Configuration.MaxDegreeOfParallelism.ConfigValue = $MaxDop
                             $row.CurrentInstanceMaxDop = $MaxDop
                         }

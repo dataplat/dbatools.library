@@ -255,7 +255,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($__realCmdlet.ShouldProcess("$computer", "Remove $countername from $collectorname with the $setname collection set")) {
             try {
                 $results = Invoke-Command2 -ComputerName $computer -Credential $Credential -ScriptBlock $setscript -ArgumentList $setname, $plainxml -ErrorAction Stop -Raw
-                Write-Message -Level Verbose -Message " $results" -FunctionName Remove-DbaPfDataCollectorCounter
+                Write-Message -Level Verbose -Message " $results" -FunctionName Remove-DbaPfDataCollectorCounter -ModuleName "dbatools"
                 [PSCustomObject]@{
                     ComputerName     = $computer
                     DataCollectorSet = $setname

@@ -130,7 +130,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             #region Retrieving partition/disk Information
             try {
-                Write-Message -Level Verbose -Message "Gathering information about first partition on each disk for $ComputerName." -FunctionName $FunctionName
+                Write-Message -Level Verbose -Message "Gathering information about first partition on each disk for $ComputerName." -FunctionName $FunctionName -ModuleName "dbatools"
 
                 try {
                     $partitions = Get-CimInstance -CimSession $cimSession -ClassName Win32_DiskPartition -Namespace "root\cimv2" -ErrorAction Stop
@@ -164,7 +164,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
 
-                Write-Message -Level Verbose -Message "Gathered CIM information." -FunctionName $FunctionName
+                Write-Message -Level Verbose -Message "Gathered CIM information." -FunctionName $FunctionName -ModuleName "dbatools"
             } catch {
                 Stop-Function -Message "Can't connect to CIM on $ComputerName." -FunctionName $FunctionName -InnerErrorRecord $_
                 return
@@ -173,14 +173,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             #region Retrieving Instances
             if (-not $NoSqlCheck) {
-                Write-Message -Level Verbose -Message "Checking for SQL Services." -FunctionName $FunctionName
+                Write-Message -Level Verbose -Message "Checking for SQL Services." -FunctionName $FunctionName -ModuleName "dbatools"
                 $sqlservices = Get-CimInstance -ClassName Win32_Service -CimSession $cimSession | Where-Object DisplayName -like 'SQL Server (*'
                 foreach ($service in $sqlservices) {
                     $instance = $service.DisplayName.Replace('SQL Server (', '')
                     $instance = $instance.TrimEnd(')')
 
                     $instanceName = $instance.Replace("MSSQLSERVER", "Default")
-                    Write-Message -Level Verbose -Message "Found instance $instanceName" -FunctionName $FunctionName
+                    Write-Message -Level Verbose -Message "Found instance $instanceName" -FunctionName $FunctionName -ModuleName "dbatools"
                     if ($instance -eq 'MSSQLSERVER') {
                         $SqlInstances += $ComputerName
                     } else {
@@ -188,7 +188,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
                 $sqlcount = $SqlInstances.Count
-                Write-Message -Level Verbose -Message "$sqlcount instance(s) found." -FunctionName $FunctionName
+                Write-Message -Level Verbose -Message "$sqlcount instance(s) found." -FunctionName $FunctionName -ModuleName "dbatools"
             }
             #endregion Retrieving Instances
 
@@ -207,8 +207,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
 
                             $sql = "SELECT COUNT(*) AS Count FROM sys.master_files WHERE physical_name LIKE '$diskname%'"
-                            Write-Message -Level Verbose -Message "Query is: $sql" -FunctionName $FunctionName
-                            Write-Message -Level Verbose -Message "SQL Server is: $instance." -FunctionName $FunctionName
+                            Write-Message -Level Verbose -Message "Query is: $sql" -FunctionName $FunctionName -ModuleName "dbatools"
+                            Write-Message -Level Verbose -Message "SQL Server is: $instance." -FunctionName $FunctionName -ModuleName "dbatools"
                             $sqlcount = $server.Query($sql).Count
                             if ($sqlcount -gt 0) {
                                 $sqldisk = $true
@@ -229,7 +229,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             #endregion Offsets
 
             #region Processing results
-            Write-Message -Level Verbose -Message "Checking $($offsets.count) partitions." -FunctionName $FunctionName
+            Write-Message -Level Verbose -Message "Checking $($offsets.count) partitions." -FunctionName $FunctionName -ModuleName "dbatools"
             foreach ($partition in $offsets) {
                 # Unfortunately "Windows does not have a reliable way to determine stripe unit Sizes. These values are obtained from vendor disk management software or from your SAN administrator."
                 # And this is the #1 most impactful issue with disk alignment :D
@@ -239,15 +239,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $stripe_units = @(64, 128, 256, 512, 1024) # still wish I had a better way to verify this or someone to pat my back and say its alright.
 
                 # testing dynamic disks, everyone states that info from dynamic disks is not to be trusted, so throw a warning.
-                Write-Message -Level Verbose -Message "Testing for dynamic disks." -FunctionName $FunctionName
+                Write-Message -Level Verbose -Message "Testing for dynamic disks." -FunctionName $FunctionName -ModuleName "dbatools"
                 if ($type -eq "Logical Disk Manager") {
                     $IsDynamicDisk = $true
-                    Write-Message -Level Warning -Message "Disk is dynamic, all Offset calculations should be suspect, please refer to your vendor to determine actual Offset calculations." -FunctionName $FunctionName
+                    Write-Message -Level Warning -Message "Disk is dynamic, all Offset calculations should be suspect, please refer to your vendor to determine actual Offset calculations." -FunctionName $FunctionName -ModuleName "dbatools"
                 } else {
                     $IsDynamicDisk = $false
                 }
 
-                Write-Message -Level Verbose -Message "Checking for best practices offsets." -FunctionName $FunctionName
+                Write-Message -Level Verbose -Message "Checking for best practices offsets." -FunctionName $FunctionName -ModuleName "dbatools"
 
                 if ($offset -ne 64 -and $offset -ne 128 -and $offset -ne 256 -and $offset -ne 512 -and $offset -ne 1024) {
                     $IsOffsetBestPractice = $false
@@ -287,7 +287,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($computer in $ComputerName) {
             $computer = $ogComputer = $computer.ComputerName
-            Write-Message -Level VeryVerbose -Message "Processing: $computer." -FunctionName Test-DbaDiskAlignment
+            Write-Message -Level VeryVerbose -Message "Processing: $computer." -FunctionName Test-DbaDiskAlignment -ModuleName "dbatools"
 
             $computer = Resolve-DbaNetworkName -ComputerName $computer -Credential $Credential
             $Computer = $computer.FullComputerName
@@ -297,7 +297,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             #region Connecting to server via Cim
-            Write-Message -Level Verbose -Message "Creating CimSession on $computer over WSMan" -FunctionName Test-DbaDiskAlignment
+            Write-Message -Level Verbose -Message "Creating CimSession on $computer over WSMan" -FunctionName Test-DbaDiskAlignment -ModuleName "dbatools"
 
             if (-not $Credential) {
                 $cimSession = New-CimSession -ComputerName $Computer -ErrorAction Ignore
@@ -306,7 +306,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($null -eq $cimSession.id) {
-                Write-Message -Level Verbose -Message "Creating CimSession on $computer over WSMan failed. Creating CimSession on $computer over DCOM." -FunctionName Test-DbaDiskAlignment
+                Write-Message -Level Verbose -Message "Creating CimSession on $computer over WSMan failed. Creating CimSession on $computer over DCOM." -FunctionName Test-DbaDiskAlignment -ModuleName "dbatools"
 
                 if (!$Credential) {
                     $cimSession = New-CimSession -ComputerName $Computer -SessionOption $sessionoption -ErrorAction Ignore
@@ -320,7 +320,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
             #endregion Connecting to server via Cim
 
-            Write-Message -Level Verbose -Message "Getting Disk Alignment information from $Computer." -FunctionName Test-DbaDiskAlignment
+            Write-Message -Level Verbose -Message "Getting Disk Alignment information from $Computer." -FunctionName Test-DbaDiskAlignment -ModuleName "dbatools"
 
 
             try {

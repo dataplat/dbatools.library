@@ -168,7 +168,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 & $__dbatoolsModule {
     [CmdletBinding()]
     param($Schema, $Table, $ResultSize, $Rank, $FilterBy, $__boundParameterNames, $EnableException)
-    Write-Message -Level System -Message "Bound parameters: $($__boundParameterNames -join ", ")" -FunctionName Test-DbaDbCompression
+    Write-Message -Level System -Message "Bound parameters: $($__boundParameterNames -join ", ")" -FunctionName Test-DbaDbCompression -ModuleName "dbatools"
 
         if ($Schema) {
             $schemaNames = $Schema | ForEach-Object { $_.Replace("'", "''") }
@@ -655,7 +655,7 @@ IF OBJECT_ID('tempdb..##tmpEstimatePage', 'U') IS NOT NULL
     DROP TABLE ##tmpEstimatePage;
 
 "
-            Write-Message -Level Debug -Message "SQL Statement: $sql" -FunctionName Test-DbaDbCompression
+            Write-Message -Level Debug -Message "SQL Statement: $sql" -FunctionName Test-DbaDbCompression -ModuleName "dbatools"
             [long]$instanceVersionNumber = $($server.VersionString).Replace(".", "")
 
 
@@ -686,9 +686,9 @@ IF OBJECT_ID('tempdb..##tmpEstimatePage', 'U') IS NOT NULL
                 try {
                     $dbCompatibilityLevel = [int]($db.CompatibilityLevel.ToString().Replace('Version', ''))
 
-                    Write-Message -Level Verbose -Message "Querying $instance - $db" -FunctionName Test-DbaDbCompression
+                    Write-Message -Level Verbose -Message "Querying $instance - $db" -FunctionName Test-DbaDbCompression -ModuleName "dbatools"
                     if ($db.status -ne 'Normal' -or $db.IsAccessible -eq $false) {
-                        Write-Message -Level Warning -Message "$db is not accessible." -Target $db -FunctionName Test-DbaDbCompression
+                        Write-Message -Level Warning -Message "$db is not accessible." -Target $db -FunctionName Test-DbaDbCompression -ModuleName "dbatools"
                         Continue
                     }
 

@@ -229,7 +229,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     #Reconfigure Resource Governor
                     if ($SkipReconfigure) {
-                        Write-Message -Level Warning -Message "Not reconfiguring the Resource Governor after creating a new pool may create problems." -FunctionName New-DbaRgResourcePool
+                        Write-Message -Level Warning -Message "Not reconfiguring the Resource Governor after creating a new pool may create problems." -FunctionName New-DbaRgResourcePool -ModuleName "dbatools"
                     } elseif ($__realCmdlet.ShouldProcess($instance, "Reconfiguring the Resource Governor")) {
                         $server.ResourceGovernor.Alter()
                     }

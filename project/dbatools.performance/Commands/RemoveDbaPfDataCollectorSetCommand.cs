@@ -136,7 +136,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         $null = Test-ElevationRequirement -ComputerName $computer -Continue
 
-        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Remove-DbaPfDataCollectorSet
+        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Remove-DbaPfDataCollectorSet -ModuleName "dbatools"
 
         if ($status -eq "Running") {
             Stop-Function -Message "$setname on $computer is running. Use Stop-DbaPfDataCollectorSet to stop first." -Continue -FunctionName Remove-DbaPfDataCollectorSet

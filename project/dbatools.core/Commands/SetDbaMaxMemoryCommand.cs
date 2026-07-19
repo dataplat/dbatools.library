@@ -129,17 +129,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         try {
             if ($UseRecommended) {
-                Write-Message -Level Verbose -Message "Change $server SQL Server Max Memory from $($result.MaxValue) to $($result.RecommendedValue) " -FunctionName Set-DbaMaxMemory
+                Write-Message -Level Verbose -Message "Change $server SQL Server Max Memory from $($result.MaxValue) to $($result.RecommendedValue) " -FunctionName Set-DbaMaxMemory -ModuleName "dbatools"
 
                 if ($result.RecommendedValue -eq 0 -or $null -eq $result.RecommendedValue) {
                     $maxMem = $result.RecommendedValue
-                    Write-Message -Level VeryVerbose -Message "Max memory recommended: $maxMem" -FunctionName Set-DbaMaxMemory
+                    Write-Message -Level VeryVerbose -Message "Max memory recommended: $maxMem" -FunctionName Set-DbaMaxMemory -ModuleName "dbatools"
                     $server.Configuration.MaxServerMemory.ConfigValue = $maxMem
                 } else {
                     $server.Configuration.MaxServerMemory.ConfigValue = $result.RecommendedValue
                 }
             } else {
-                Write-Message -Level Verbose -Message "Change $server SQL Server Max Memory from $($result.MaxValue) to $Max " -FunctionName Set-DbaMaxMemory
+                Write-Message -Level Verbose -Message "Change $server SQL Server Max Memory from $($result.MaxValue) to $Max " -FunctionName Set-DbaMaxMemory -ModuleName "dbatools"
                 $server.Configuration.MaxServerMemory.ConfigValue = $Max
             }
 

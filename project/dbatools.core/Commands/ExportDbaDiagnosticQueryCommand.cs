@@ -205,7 +205,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if (-not $NoPlanExport) {
-                Write-Message -Level Verbose -Message "Exporting $planfilename" -FunctionName Export-DbaDiagnosticQuery
+                Write-Message -Level Verbose -Message "Exporting $planfilename" -FunctionName Export-DbaDiagnosticQuery -ModuleName "dbatools"
                 if ($plan) { $plan | Out-File -FilePath $planfilename }
             }
         }
@@ -226,7 +226,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if (-not $NoQueryExport) {
-                Write-Message -Level Verbose -Message "Exporting $sqlfilename" -FunctionName Export-DbaDiagnosticQuery
+                Write-Message -Level Verbose -Message "Exporting $sqlfilename" -FunctionName Export-DbaDiagnosticQuery -ModuleName "dbatools"
                 if ($sql) {
                     $sql | Out-File -FilePath $sqlfilename
                     Get-ChildItem -Path $sqlfilename
@@ -240,22 +240,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     switch ($ConvertTo) {
         "Excel" {
             if ($row.DatabaseSpecific) {
-                Write-Message -Level Verbose -Message "Exporting $exceldbfilename" -FunctionName Export-DbaDiagnosticQuery
+                Write-Message -Level Verbose -Message "Exporting $exceldbfilename" -FunctionName Export-DbaDiagnosticQuery -ModuleName "dbatools"
                 $result | Export-Excel -Path $exceldbfilename -WorkSheetname $Name -AutoSize -AutoFilter -BoldTopRow -FreezeTopRow
                 Get-ChildItem -Path $exceldbfilename
             } else {
-                Write-Message -Level Verbose -Message "Exporting $excelfilename" -FunctionName Export-DbaDiagnosticQuery
+                Write-Message -Level Verbose -Message "Exporting $excelfilename" -FunctionName Export-DbaDiagnosticQuery -ModuleName "dbatools"
                 $result | Export-Excel -Path $excelfilename -WorkSheetname $Name -AutoSize -AutoFilter -BoldTopRow -FreezeTopRow
                 Get-ChildItem -Path $excelfilename
             }
         }
         "csv" {
             if ($row.DatabaseSpecific) {
-                Write-Message -Level Verbose -Message "Exporting $csvdbfilename" -FunctionName Export-DbaDiagnosticQuery
+                Write-Message -Level Verbose -Message "Exporting $csvdbfilename" -FunctionName Export-DbaDiagnosticQuery -ModuleName "dbatools"
                 $result | Export-Csv -Path $csvdbfilename -NoTypeInformation -Append
                 Get-ChildItem -Path $csvdbfilename
             } else {
-                Write-Message -Level Verbose -Message "Exporting $csvfilename" -FunctionName Export-DbaDiagnosticQuery
+                Write-Message -Level Verbose -Message "Exporting $csvfilename" -FunctionName Export-DbaDiagnosticQuery -ModuleName "dbatools"
                 $result | Export-Csv -Path $csvfilename -NoTypeInformation -Append
                 Get-ChildItem -Path $csvfilename
             }

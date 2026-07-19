@@ -107,14 +107,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Test-DbaMaxMemory
             }
 
-            Write-Message -Level Verbose -Target $instance -Message "Retrieving maximum memory statistics from $instance" -FunctionName Test-DbaMaxMemory
+            Write-Message -Level Verbose -Target $instance -Message "Retrieving maximum memory statistics from $instance" -FunctionName Test-DbaMaxMemory -ModuleName "dbatools"
             $serverMemory = Get-DbaMaxMemory -SqlInstance $server
             try {
                 if ($isLinux -or $isMacOS) {
-                    Write-Message -Level Warning -Target $instance -Message "Can't determine instance count from Linux or Mac. Defaulting to 1." -FunctionName Test-DbaMaxMemory
+                    Write-Message -Level Warning -Target $instance -Message "Can't determine instance count from Linux or Mac. Defaulting to 1." -FunctionName Test-DbaMaxMemory -ModuleName "dbatools"
                     $instanceCount = 1
                 } else {
-                    Write-Message -Level Verbose -Target $instance -Message "Retrieving number of instances from $($instance.ComputerName)" -FunctionName Test-DbaMaxMemory
+                    Write-Message -Level Verbose -Target $instance -Message "Retrieving number of instances from $($instance.ComputerName)" -FunctionName Test-DbaMaxMemory -ModuleName "dbatools"
                     if ($Credential) {
                         $serverService = Get-DbaService -ComputerName $instance -Credential $Credential -EnableException
                     } else {
@@ -124,19 +124,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $instanceCount = ($serverService | Where-Object State -Like Running | Where-Object InstanceName | Where-Object ServiceType -eq 'Engine' | Group-Object InstanceName | Measure-Object Count).Count
 
                     if ($instanceCount -eq 0) {
-                        Write-Message -Level Warning -Message "Couldn't get accurate SQL Server instance count on $instance. Defaulting to 1." -FunctionName Test-DbaMaxMemory
+                        Write-Message -Level Warning -Message "Couldn't get accurate SQL Server instance count on $instance. Defaulting to 1." -FunctionName Test-DbaMaxMemory -ModuleName "dbatools"
                         $instanceCount = 1
                     }
 
                     $otherConsumers = $serverService | Where-Object ServiceType -in ('SSAS', 'SSRS', 'SSIS')
                     if ($null -ne $otherConsumers) {
-                        Write-Message -Level Warning -Message "The memory calculation may be inaccurate as the following SQL components have also been detected: $($otherConsumers.ServiceType -join(','))" -FunctionName Test-DbaMaxMemory
+                        Write-Message -Level Warning -Message "The memory calculation may be inaccurate as the following SQL components have also been detected: $($otherConsumers.ServiceType -join(','))" -FunctionName Test-DbaMaxMemory -ModuleName "dbatools"
                     }
 
 
                 }
             } catch {
-                Write-Message -Level Warning -Message "Couldn't get accurate SQL Server instance count on $instance. Defaulting to 1." -Target $instance -ErrorRecord $_ -FunctionName Test-DbaMaxMemory
+                Write-Message -Level Warning -Message "Couldn't get accurate SQL Server instance count on $instance. Defaulting to 1." -Target $instance -ErrorRecord $_ -FunctionName Test-DbaMaxMemory -ModuleName "dbatools"
                 $instanceCount = 1
             }
 

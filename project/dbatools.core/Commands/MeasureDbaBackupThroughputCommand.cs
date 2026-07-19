@@ -151,7 +151,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         foreach ($db in $DatabaseCollection) {
-            Write-Message -Level VeryVerbose -Message "Retrieving history for $db." -FunctionName Measure-DbaBackupThroughput
+            Write-Message -Level VeryVerbose -Message "Retrieving history for $db." -FunctionName Measure-DbaBackupThroughput -ModuleName "dbatools"
             $allHistory = @()
 
             # Splatting didn't work
@@ -175,7 +175,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $allHistory += $history | Select-Object ComputerName, InstanceName, SqlInstance, Database, MBps, TotalSize, Start, End
             }
 
-            Write-Message -Level VeryVerbose -Message "Calculating averages for $db." -FunctionName Measure-DbaBackupThroughput
+            Write-Message -Level VeryVerbose -Message "Calculating averages for $db." -FunctionName Measure-DbaBackupThroughput -ModuleName "dbatools"
             foreach ($db in ($allHistory | Sort-Object Database | Group-Object Database)) {
 
                 $measureMb = $db.Group.MBps | Measure-Object -Average -Minimum -Maximum

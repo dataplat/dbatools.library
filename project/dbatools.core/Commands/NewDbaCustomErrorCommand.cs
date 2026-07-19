@@ -160,7 +160,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $langId = $languageDetails.msglangid
 
         if ($__realCmdlet.ShouldProcess($instance, "Creating new server message with id $MessageID on $instance")) {
-            Write-Message -Level Verbose -Message "Creating new server message with id $MessageID on $instance" -FunctionName New-DbaCustomError
+            Write-Message -Level Verbose -Message "Creating new server message with id $MessageID on $instance" -FunctionName New-DbaCustomError -ModuleName "dbatools"
             try {
                 $userDefinedMessage = New-Object -TypeName Microsoft.SqlServer.Management.Smo.UserDefinedMessage
                 $userDefinedMessage.Parent = $server
