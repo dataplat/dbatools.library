@@ -88,9 +88,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
     {
         if (Interrupted) { return; }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            _effectiveInputObject, SkipReconfigure.ToBool(), EnableException.ToBool(),
-            this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -101,7 +99,9 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, EndScript,
+            _effectiveInputObject, SkipReconfigure.ToBool(), EnableException.ToBool(),
+            this, BoundVerbose());
     }
 
     private const string CarrierMarker = "__dbatoolsW1117Carrier";
