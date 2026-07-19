@@ -130,6 +130,9 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
 
     /// <summary>The process block's cross-record state (DEF-014 streaming carry).</summary>
     private Hashtable? _carryState;
+
+    /// <summary>$InputObject as the body left it, applied only in the by-name case (see ProcessRecord).</summary>
+    private object? _inputObjectState;
     private bool _processInterrupted;
 
     /// <summary>Whether -InputObject was bound by name (captured before any pipeline record arrives).</summary>
@@ -179,7 +182,7 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
 
         // Bimodal binding, unchanged: InputObject bound BY NAME stands for the whole run; otherwise every
         // pipeline record rebinds it.
-        object? effectiveInputObject = _inputObjectByName ? _byNameInputObject : InputObject;
+        object? effectiveInputObject = _inputObjectByName ? (_inputObjectState ?? _byNameInputObject) : InputObject;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
@@ -192,6 +195,13 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
                 item.Properties["__StartDbaDbEncryptionProcessComplete"]?.Value))
             {
                 _carryState = UnwrapHopValue(item.Properties["State"]?.Value) as Hashtable;
+                // InputObject is ValueFromPipeline, so it must NOT ride the bag: the bag is restored
+                // inside the hop AFTER this record's parameter was bound, so restoring it would clobber
+                // the fresh binding with the previous record's accumulated value. It rides its own carry
+                // and is applied ONLY in the by-name case, where the script binds once and the body's
+                // += genuinely persists. EncryptorName stays in the bag - it is NOT pipeline-bound, so
+                // its mutation persisting is exactly the source behaviour this row needed shared scope for.
+                _inputObjectState = UnwrapHopValue(item.Properties["MutInputObject"]?.Value);
                 _processInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
             }
             else if (item is not null)
@@ -718,7 +728,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         . Start-DbaDbEncryption
     } finally {
-    [pscustomobject]@{ __StartDbaDbEncryptionProcessComplete = $true; Interrupted = (Test-FunctionInterrupt); State = @{ databases = $databases; db = $db; dbatools = $dbatools; dbmasterkeytest = $dbmasterkeytest; encryptionScript = $encryptionScript; EncryptorName = $EncryptorName; encryptorNameToUse = $encryptorNameToUse; handle = $handle; initialSessionState = $initialSessionState; instanceGroups = $instanceGroups; masterasym = $masterasym; mastercert = $mastercert; mastercerttest = $mastercerttest; masterkey = $masterkey; param = $param; params = $params; result = $result; runspacePool = $runspacePool; server = $server; servername = $servername; splatAsymmetricKey = $splatAsymmetricKey; splatBackupCertificate = $splatBackupCertificate; splatBackupMasterKey = $splatBackupMasterKey; splatCertificate = $splatCertificate; splatConnection = $splatConnection; splatMasterKey = $splatMasterKey; splatRunspace = $splatRunspace; stepCounter = $stepCounter; thread = $thread; threads = $threads; totalRetrievedThreads = $totalRetrievedThreads; totalThreads = $totalThreads; InputObject = $InputObject } }
+    [pscustomobject]@{ __StartDbaDbEncryptionProcessComplete = $true; Interrupted = (Test-FunctionInterrupt); MutInputObject = $InputObject; State = @{ databases = $databases; db = $db; dbatools = $dbatools; dbmasterkeytest = $dbmasterkeytest; encryptionScript = $encryptionScript; EncryptorName = $EncryptorName; encryptorNameToUse = $encryptorNameToUse; handle = $handle; initialSessionState = $initialSessionState; instanceGroups = $instanceGroups; masterasym = $masterasym; mastercert = $mastercert; mastercerttest = $mastercerttest; masterkey = $masterkey; param = $param; params = $params; result = $result; runspacePool = $runspacePool; server = $server; servername = $servername; splatAsymmetricKey = $splatAsymmetricKey; splatBackupCertificate = $splatBackupCertificate; splatBackupMasterKey = $splatBackupMasterKey; splatCertificate = $splatCertificate; splatConnection = $splatConnection; splatMasterKey = $splatMasterKey; splatRunspace = $splatRunspace; stepCounter = $stepCounter; thread = $thread; threads = $threads; totalRetrievedThreads = $totalRetrievedThreads; totalThreads = $totalThreads } }
     }
 } $InputObject $SqlInstance $SqlCredential $EncryptorName $EncryptorType $Database $ExcludeDatabase $BackupPath $MasterKeySecurePassword $CertificateSubject $CertificateStartDate $CertificateExpirationDate $CertificateActiveForServiceBrokerDialog $BackupSecurePassword $AllUserDatabases $Force $Parallel $EnableException $__carryState $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
