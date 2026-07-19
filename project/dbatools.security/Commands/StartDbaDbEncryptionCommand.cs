@@ -24,10 +24,10 @@ namespace Dataplat.Dbatools.Commands;
 /// loop (falling back to the discovered master certificate or asymmetric key name), so with piped input the
 /// value discovered on one record steers the next record's branch. It also appends instance-resolved databases
 /// to $InputObject within an invocation while the parameter rebinds on each pipeline record. A per-record hop
-/// would lose the EncryptorName carry, so the port is COLLECT-THEN-ENDPROCESSING in one scope (the same shape
-/// as SetDbaLoginCommand): BeginProcessing snapshots the by-name InputObject, ProcessRecord collects one
-/// batch per record, and EndProcessing runs ONE hop that replays the process body per batch, dot-sourced so
-/// each record's early validation returns stay local to that batch. InputObject is the only pipeline-bound
+/// would lose the EncryptorName carry. DEF-014: the source is PROCESS-ONLY, so it STREAMS - this port now
+/// runs the process body per record and emits immediately, and the EncryptorName carry (with the rest of
+/// the process scope) rides a state bag restored at hop entry and captured in finally, so an early
+/// validation return cannot skip the handoff. InputObject is the only pipeline-bound
 /// parameter, so every pipeline record is a rebind (the engine reassigns the parameter before each process
 /// invocation even for a repeated array instance, discarding the += mutation like the function world); only
 /// a by-name InputObject persists across the run. $InputObject is a typed local ([Smo.Database[]]) so the
@@ -128,8 +128,9 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    /// <summary>One batch per pipeline record: { inputRebound, InputObject }.</summary>
-    private readonly List<object?[]?> _batches = new List<object?[]?>();
+    /// <summary>The process block's cross-record state (DEF-014 streaming carry).</summary>
+    private Hashtable? _carryState;
+    private bool _processInterrupted;
 
     /// <summary>Whether -InputObject was bound by name (captured before any pipeline record arrives).</summary>
     private bool _inputObjectByName;
@@ -161,20 +162,24 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
         _byNameInputObject = InputObject;
     }
 
-    /// <summary>Records each pipeline record's input as a batch; the work runs once in EndProcessing.</summary>
+    /// <summary>
+    /// Runs the process body for THIS record and emits immediately.
+    /// </summary>
+    /// <remarks>
+    /// DEF-014 (this is the canonical row): the source is PROCESS-ONLY, so it streams every record. This
+    /// port buffered all records and did the work in EndProcessing, which PowerShell never calls when the
+    /// upstream producer terminates - so a throwing producer silently discarded everything the source would
+    /// already have encrypted and emitted. The shared scope buffering provided, notably the mutated
+    /// $EncryptorName whose discovered value steers the NEXT record, is reconstructed via a carried state bag.
+    /// </remarks>
     protected override void ProcessRecord()
     {
-        if (Interrupted)
+        if (_processInterrupted || Interrupted)
             return;
 
-        _batches.Add(new object?[] { !_inputObjectByName, InputObject });
-    }
-
-    /// <summary>Replays the process body per batch in one shared scope.</summary>
-    protected override void EndProcessing()
-    {
-        if (Interrupted)
-            return;
+        // Bimodal binding, unchanged: InputObject bound BY NAME stands for the whole run; otherwise every
+        // pipeline record rebinds it.
+        object? effectiveInputObject = _inputObjectByName ? _byNameInputObject : InputObject;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
@@ -183,17 +188,39 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
-            else
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
+                item.Properties["__StartDbaDbEncryptionProcessComplete"]?.Value))
+            {
+                _carryState = UnwrapHopValue(item.Properties["State"]?.Value) as Hashtable;
+                _processInterrupted = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
+            }
+            else if (item is not null)
             {
                 WriteObject(item);
             }
         }, ProcessScript,
-            _batches.ToArray(), _byNameInputObject, SqlInstance, SqlCredential, EncryptorName, EncryptorType, Database, ExcludeDatabase,
+            effectiveInputObject, SqlInstance, SqlCredential, EncryptorName, EncryptorType, Database, ExcludeDatabase,
             BackupPath, MasterKeySecurePassword, CertificateSubject,
             _resolvedStartDate, _resolvedExpirationDate,
             CertificateActiveForServiceBrokerDialog.ToBool(), BackupSecurePassword, AllUserDatabases.ToBool(), Force.ToBool(), Parallel.ToBool(), EnableException.ToBool(),
+            _carryState,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+    }
+
+    /// <summary>Unwraps a value the hop carried out through its sentinel.</summary>
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        foreach (PSMemberInfo member in wrapper.Members)
+        {
+            if (member is PSNoteProperty)
+                return wrapper;
+        }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -227,8 +254,9 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
     // -FunctionName on the 12 DIRECT Stop-Function calls; -FunctionName + -ModuleName "dbatools" on the 24
     // DIRECT Write-Message calls. No ShouldProcess redirect (no direct gate in the body). The datetime
     // parameters always arrive resolved (bound value, or the bind-time default from BeginProcessing).
+    // PS: the process body VERBATIM inside the named-wrapper shim, STREAMED per record (DEF-014).
     private const string ProcessScript = """
-param($__batches, $__byNameInputObject, $SqlInstance, $SqlCredential, $EncryptorName, $EncryptorType, $Database, $ExcludeDatabase, $BackupPath, $MasterKeySecurePassword, $CertificateSubject, $CertificateStartDate, $CertificateExpirationDate, $CertificateActiveForServiceBrokerDialog, $BackupSecurePassword, $AllUserDatabases, $Force, $Parallel, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($InputObject, $SqlInstance, $SqlCredential, $EncryptorName, $EncryptorType, $Database, $ExcludeDatabase, $BackupPath, $MasterKeySecurePassword, $CertificateSubject, $CertificateStartDate, $CertificateExpirationDate, $CertificateActiveForServiceBrokerDialog, $BackupSecurePassword, $AllUserDatabases, $Force, $Parallel, $EnableException, $__carryState, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -237,11 +265,16 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param($__batches, $__byNameInputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string]$EncryptorName, [string]$EncryptorType, [string[]]$Database, [string[]]$ExcludeDatabase, [string]$BackupPath, [System.Security.SecureString]$MasterKeySecurePassword, [string]$CertificateSubject, $CertificateStartDate, $CertificateExpirationDate, $CertificateActiveForServiceBrokerDialog, [System.Security.SecureString]$BackupSecurePassword, $AllUserDatabases, $Force, $Parallel, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string]$EncryptorName, [string]$EncryptorType, [string[]]$Database, [string[]]$ExcludeDatabase, [string]$BackupPath, [System.Security.SecureString]$MasterKeySecurePassword, [string]$CertificateSubject, $CertificateStartDate, $CertificateExpirationDate, $CertificateActiveForServiceBrokerDialog, [System.Security.SecureString]$BackupSecurePassword, $AllUserDatabases, $Force, $Parallel, $EnableException, $__carryState, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject = $__byNameInputObject
-
+    # DEF-014: the source is PROCESS-ONLY, so it streams every record. This port previously buffered all
+    # records and did the work in EndProcessing, which PowerShell never calls when the upstream producer
+    # terminates. The shared scope that buffering provided - notably the mutated $EncryptorName, whose
+    # discovered value steers the NEXT record - is reconstructed by carrying process state, captured in
+    # finally so an early return cannot skip the handoff.
+    if ($__carryState) { foreach ($__k in $__carryState.Keys) { Set-Variable -Name $__k -Value $__carryState[$__k] } }
+    try {
         # Named-wrapper shim: the process body runs inside a function carrying the command's name,
         # so call-stack-deriving helpers see Start-DbaDbEncryption exactly as in the function world.
         # Write-ProgressHelper reads (Get-PSCallStack)[1].Command to build BOTH its Activity string
@@ -683,11 +716,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
         }
-        foreach ($__batch in $__batches) {
-            if ($__batch[0]) { $InputObject = $__batch[1] }
-            . Start-DbaDbEncryption
-        }
-} $__batches $__byNameInputObject $SqlInstance $SqlCredential $EncryptorName $EncryptorType $Database $ExcludeDatabase $BackupPath $MasterKeySecurePassword $CertificateSubject $CertificateStartDate $CertificateExpirationDate $CertificateActiveForServiceBrokerDialog $BackupSecurePassword $AllUserDatabases $Force $Parallel $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
-
+        . Start-DbaDbEncryption
+    } finally {
+    [pscustomobject]@{ __StartDbaDbEncryptionProcessComplete = $true; Interrupted = (Test-FunctionInterrupt); State = @{ databases = $databases; db = $db; dbatools = $dbatools; dbmasterkeytest = $dbmasterkeytest; encryptionScript = $encryptionScript; EncryptorName = $EncryptorName; encryptorNameToUse = $encryptorNameToUse; handle = $handle; initialSessionState = $initialSessionState; instanceGroups = $instanceGroups; masterasym = $masterasym; mastercert = $mastercert; mastercerttest = $mastercerttest; masterkey = $masterkey; param = $param; params = $params; result = $result; runspacePool = $runspacePool; server = $server; servername = $servername; splatAsymmetricKey = $splatAsymmetricKey; splatBackupCertificate = $splatBackupCertificate; splatBackupMasterKey = $splatBackupMasterKey; splatCertificate = $splatCertificate; splatConnection = $splatConnection; splatMasterKey = $splatMasterKey; splatRunspace = $splatRunspace; stepCounter = $stepCounter; thread = $thread; threads = $threads; totalRetrievedThreads = $totalRetrievedThreads; totalThreads = $totalThreads; InputObject = $InputObject } }
+    }
+} $InputObject $SqlInstance $SqlCredential $EncryptorName $EncryptorType $Database $ExcludeDatabase $BackupPath $MasterKeySecurePassword $CertificateSubject $CertificateStartDate $CertificateExpirationDate $CertificateActiveForServiceBrokerDialog $BackupSecurePassword $AllUserDatabases $Force $Parallel $EnableException $__carryState $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
