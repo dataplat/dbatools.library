@@ -93,7 +93,7 @@ public sealed class GetDbaExtendedPropertyCommand : DbaBaseCmdlet
             // Best-effort bookkeeping only.
         }
     }
-    // PS: the process block VERBATIM. Edit: -FunctionName Get-DbaExtendedProperty on the one Write-Message. The
+    // PS: the process block VERBATIM. Edit: -FunctionName Get-DbaExtendedProperty on the one Write-Message. The -ModuleName "dbatools"
     // if ($SqlInstance) check is truthiness (no Test-Bound); the one continue is inside foreach ($object) - loop-bound.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $Name, $InputObject, $EnableException, $__boundVerbose, $__boundDebug)
@@ -114,7 +114,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $props = $object.ExtendedProperties
 
             if ($null -eq $props) {
-                Write-Message -Message "No extended properties exist in the $object on $instance" -Target $object -Level Verbose -FunctionName Get-DbaExtendedProperty
+                Write-Message -Message "No extended properties exist in the $object on $instance" -Target $object -Level Verbose -FunctionName Get-DbaExtendedProperty -ModuleName "dbatools"
                 continue
             }
 

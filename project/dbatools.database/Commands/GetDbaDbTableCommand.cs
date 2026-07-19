@@ -160,7 +160,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $fqTn = Get-ObjectNameParts -ObjectName $t
 
                 if (-not $fqTn.Parsed) {
-                    Write-Message -Level Warning -Message "Please check you are using proper three-part names. If your search value contains special characters you must use [ ] to wrap the name. The value $t could not be parsed as a valid name." -FunctionName Get-DbaDbTable
+                    Write-Message -Level Warning -Message "Please check you are using proper three-part names. If your search value contains special characters you must use [ ] to wrap the name. The value $t could not be parsed as a valid name." -FunctionName Get-DbaDbTable -ModuleName "dbatools"
                     Continue
                 }
 
@@ -182,7 +182,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $Table $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
-    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbTable on the four Write-Message. $fqTns arrives
+    // PS: the process block VERBATIM. Edits: -FunctionName Get-DbaDbTable on the four Write-Message. $fqTns arrives -ModuleName "dbatools"
     // carried from begin. The opening if (Test-FunctionInterrupt) { return } is inert here (fresh scope) - the real
     // begin-interrupt gate is the C# _beginInterrupted check above. The two continues are loop-bound.
     private const string ProcessScript = """
@@ -204,7 +204,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             $server = $db.Parent
-            Write-Message -Level Verbose -Message "Processing $db" -FunctionName Get-DbaDbTable
+            Write-Message -Level Verbose -Message "Processing $db" -FunctionName Get-DbaDbTable -ModuleName "dbatools"
 
             # Let the SMO read all properties referenced in this command for all tables in the database in one query.
             # Downside: If some other properties were already read outside of this command in the used SMO, they are cleared.
@@ -309,7 +309,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # e.g., "[@Schema='dispo' and @Name='t_auftraege']"
                     # See: https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.management.smo.smocollectionbase.clearandinitialize
                     $urnFilter = "[$($filterConditions -join ' and ')]"
-                    Write-Message -Level Verbose -Message "Using URN filter: $urnFilter" -FunctionName Get-DbaDbTable
+                    Write-Message -Level Verbose -Message "Using URN filter: $urnFilter" -FunctionName Get-DbaDbTable -ModuleName "dbatools"
                 }
             }
 
@@ -317,7 +317,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     $db.Tables.ClearAndInitialize($urnFilter, [string[]]$properties)
                 } catch {
-                    Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbTable
+                    Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbTable -ModuleName "dbatools"
                 }
             }
 
@@ -335,7 +335,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $tbl = $db.tables | Where-Object { $_.Name -in $fqTn.Table -and $fqTn.Schema -in ($_.Schema, $null) -and $fqTn.Database -in ($_.Parent.Name, $null) }
 
                     if (-not $tbl) {
-                        Write-Message -Level Verbose -Message "Could not find table $($fqTn.Table) in $db on $server" -FunctionName Get-DbaDbTable
+                        Write-Message -Level Verbose -Message "Could not find table $($fqTn.Table) in $db on $server" -FunctionName Get-DbaDbTable -ModuleName "dbatools"
                     }
                     $tables += $tbl
                 }

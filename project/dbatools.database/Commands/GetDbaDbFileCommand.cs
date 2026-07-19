@@ -232,7 +232,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         foreach ($db in $InputObject) {
             $server = $db.Parent
 
-            Write-Message -Level Verbose -Message "Querying database $db" -FunctionName Get-DbaDbFile
+            Write-Message -Level Verbose -Message "Querying database $db" -FunctionName Get-DbaDbFile -ModuleName "dbatools"
 
             try {
                 $version = $server.Query("SELECT compatibility_level FROM sys.databases WHERE name = '$($db.Name)'")
@@ -249,7 +249,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $query = $sql2000
             }
 
-            Write-Message -Level Debug -Message "SQL Statement: $query" -FunctionName Get-DbaDbFile
+            Write-Message -Level Debug -Message "SQL Statement: $query" -FunctionName Get-DbaDbFile -ModuleName "dbatools"
 
             try {
                 $results = $server.Query($query, $db.Name)
@@ -258,7 +258,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($__boundFileGroup) {
-                Write-Message -Message "Results will be filtered to FileGroup specified" -Level Verbose -FunctionName Get-DbaDbFile
+                Write-Message -Message "Results will be filtered to FileGroup specified" -Level Verbose -FunctionName Get-DbaDbFile -ModuleName "dbatools"
                 $results = $results | Where-Object { $_.FileGroupName -eq $FileGroup }
             }
 

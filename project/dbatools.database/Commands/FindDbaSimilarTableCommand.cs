@@ -293,7 +293,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         $sql = "$sqlSelect $sqlWhere $sqlGroupBy $sqlHaving $sqlOrderBy"
 
-        Write-Message -Level Debug -Message $sql -FunctionName Find-DbaSimilarTable
+        Write-Message -Level Debug -Message $sql -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
 
 
     @{ __findDbaSimilarTableBegin = @{ Sql = $sql; EveryServerVwCount = $everyServerVwCount; VwCount = $null } }
@@ -346,7 +346,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dbCount = $dbs.count
             foreach ($db in $dbs) {
 
-                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaSimilarTable
+                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
                 $rows = $db.Query($sql)
 
                 foreach ($row in $rows) {
@@ -377,10 +377,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $totalCount = $totalCount + $rows.Count
                 $everyServerVwCount = $everyServerVwCount + $rows.Count
 
-                Write-Message -Level Verbose -Message "Found $vwCount tables/views in $db" -FunctionName Find-DbaSimilarTable
+                Write-Message -Level Verbose -Message "Found $vwCount tables/views in $db" -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
             }
 
-            Write-Message -Level Verbose -Message "Found $totalCount total tables/views in $dbCount databases" -FunctionName Find-DbaSimilarTable
+            Write-Message -Level Verbose -Message "Found $totalCount total tables/views in $dbCount databases" -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
         }
 
     $__state.EveryServerVwCount = $everyServerVwCount
@@ -388,7 +388,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     @{ __findDbaSimilarTableProcess = @{ State = $__state } }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $IncludeSystemDatabases $EnableException $__state $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
-    // PS: the end block VERBATIM. Edit: -FunctionName on the Write-Message. $everyServerVwCount is
+    // PS: the end block VERBATIM. Edit: -FunctionName on the Write-Message. $everyServerVwCount is -ModuleName "dbatools"
     // restored from the carried state so the grand total reflects all records.
     private const string EndScript ="""
 param($__state, $EnableException, $__boundVerbose, $__boundDebug)
@@ -403,7 +403,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $everyServerVwCount = $__state.EveryServerVwCount
 
-        Write-Message -Level Verbose -Message "Found $everyServerVwCount total tables/views" -FunctionName Find-DbaSimilarTable
+        Write-Message -Level Verbose -Message "Found $everyServerVwCount total tables/views" -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

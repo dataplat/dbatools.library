@@ -349,10 +349,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             $instance = $db.Parent
 
-            Write-Message -Level Verbose -Message "Processing $db on $instance" -FunctionName Invoke-DbaDbShrink
+            Write-Message -Level Verbose -Message "Processing $db on $instance" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
 
             if ($db.IsDatabaseSnapshot) {
-                Write-Message -Level Warning -Message "The database $db on server $instance is a snapshot and cannot be shrunk. Skipping database." -FunctionName Invoke-DbaDbShrink
+                Write-Message -Level Warning -Message "The database $db on server $instance is a snapshot and cannot be shrunk. Skipping database." -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                 continue
             }
 
@@ -377,21 +377,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 [dbasize]$desiredSpaceAvailableKB = [math]::ceiling((($PercentFreeSpace / 100)) * $spaceUsedKB)
                 [dbasize]$desiredFileSizeKB = $spaceUsedKB + $desiredSpaceAvailableKB
 
-                Write-Message -Level Verbose -Message "File: $($file.Name)" -FunctionName Invoke-DbaDbShrink
-                Write-Message -Level Verbose -Message "Initial Size: $($startingSizeKB)" -FunctionName Invoke-DbaDbShrink
-                Write-Message -Level Verbose -Message "Space Used: $($spaceUsedKB)" -FunctionName Invoke-DbaDbShrink
-                Write-Message -Level Verbose -Message "Initial Freespace: $($spaceAvailableKB)" -FunctionName Invoke-DbaDbShrink
-                Write-Message -Level Verbose -Message "Target Freespace: $($desiredSpaceAvailableKB)" -FunctionName Invoke-DbaDbShrink
-                Write-Message -Level Verbose -Message "Target FileSize: $($desiredFileSizeKB)" -FunctionName Invoke-DbaDbShrink
+                Write-Message -Level Verbose -Message "File: $($file.Name)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
+                Write-Message -Level Verbose -Message "Initial Size: $($startingSizeKB)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
+                Write-Message -Level Verbose -Message "Space Used: $($spaceUsedKB)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
+                Write-Message -Level Verbose -Message "Initial Freespace: $($spaceAvailableKB)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
+                Write-Message -Level Verbose -Message "Target Freespace: $($desiredSpaceAvailableKB)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
+                Write-Message -Level Verbose -Message "Target FileSize: $($desiredFileSizeKB)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
 
                 $escapedFileName = $file.Name.Replace("'", "''")
 
                 if ($spaceAvailableKB -le $desiredSpaceAvailableKB) {
-                    Write-Message -Level Warning -Message "File size of ($startingSizeKB) is less than or equal to the desired outcome ($desiredFileSizeKB) for $($file.Name)" -FunctionName Invoke-DbaDbShrink
+                    Write-Message -Level Warning -Message "File size of ($startingSizeKB) is less than or equal to the desired outcome ($desiredFileSizeKB) for $($file.Name)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                 } else {
                     if ($__realCmdlet.ShouldProcess("$db on $instance, file $($file.Name)", "Shrinking from $($startingSizeKB) to $($desiredFileSizeKB)")) {
                         if ($server.VersionMajor -gt 8 -and $ExcludeIndexStats -eq $false) {
-                            Write-Message -Level Verbose -Message 'Getting starting average fragmentation' -FunctionName Invoke-DbaDbShrink
+                            Write-Message -Level Verbose -Message 'Getting starting average fragmentation' -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                             $dataRow = $server.Query($sql, $db.name)
                             $startingFrag = $dataRow.avg_fragmentation_in_percent
                             $startingTopFrag = $dataRow.max_fragmentation_in_percent
@@ -404,22 +404,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $previousStatementTimeout = $instance.ConnectionContext.StatementTimeout
                         $errorDetails = $null
                         try {
-                            Write-Message -Level Verbose -Message 'Beginning shrink of files' -FunctionName Invoke-DbaDbShrink
+                            Write-Message -Level Verbose -Message 'Beginning shrink of files' -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                             $instance.ConnectionContext.StatementTimeout = $StatementTimeoutSeconds
-                            Write-Message -Level Debug -Message "Connection timeout set to $StatementTimeout" -FunctionName Invoke-DbaDbShrink
+                            Write-Message -Level Debug -Message "Connection timeout set to $StatementTimeout" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                             [dbasize]$shrinkGapKB = ($startingSizeKB - $desiredFileSizeKB)
-                            Write-Message -Level Verbose -Message "ShrinkGap: $($shrinkGapKB)" -FunctionName Invoke-DbaDbShrink
-                            Write-Message -Level Verbose -Message "Step Size: $($stepSizeKB) KB" -FunctionName Invoke-DbaDbShrink
+                            Write-Message -Level Verbose -Message "ShrinkGap: $($shrinkGapKB)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
+                            Write-Message -Level Verbose -Message "Step Size: $($stepSizeKB) KB" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
 
                             if ($stepSizeKB -and ($shrinkGapKB.Kilobyte -ge $stepSizeKB)) {
                                 $numberIterations = [math]::ceiling($((($shrinkGapKB.Kilobyte) / $stepSizeKB)))
                                 for ($i = 1; $i -le $numberIterations; $i++) {
-                                    Write-Message -Level Verbose -Message "Step: $i of $numberIterations" -FunctionName Invoke-DbaDbShrink
+                                    Write-Message -Level Verbose -Message "Step: $i of $numberIterations" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                                     [dbasize]$shrinkSizeKB = ($startingSizeKB.Kilobyte - ($stepSizeKB * $i)) * 1024
                                     if ($shrinkSizeKB -lt $desiredFileSizeKB) {
                                         $shrinkSizeKB = $desiredFileSizeKB
                                     }
-                                    Write-Message -Level Verbose -Message ('Shrinking {0} to {1}' -f $file.Name, $shrinkSizeKB) -FunctionName Invoke-DbaDbShrink
+                                    Write-Message -Level Verbose -Message ('Shrinking {0} to {1}' -f $file.Name, $shrinkSizeKB) -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                                     $targetMB = [int]$shrinkSizeKB.Megabyte
                                     $shrinkSqlArgs = switch ($ShrinkMethod) {
                                         'EmptyFile' { "N'$escapedFileName', EMPTYFILE" }
@@ -431,7 +431,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     $file.Refresh()
 
                                     if ($startingSizeKB -eq ($file.Size * 1024)) {
-                                        Write-Message -Level Verbose -Message ('Unable to shrink further') -FunctionName Invoke-DbaDbShrink
+                                        Write-Message -Level Verbose -Message ('Unable to shrink further') -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                                         break
                                     }
                                 }
@@ -454,7 +454,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             if ($EnableException) {
                                 Stop-Function -Message $failureMessage -EnableException $EnableException -ErrorRecord $_ -FunctionName Invoke-DbaDbShrink
                             } else {
-                                Write-Message -Level Warning -Message $failureMessage -ErrorRecord $_ -FunctionName Invoke-DbaDbShrink
+                                Write-Message -Level Warning -Message $failureMessage -ErrorRecord $_ -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                             }
                         } finally {
                             $instance.ConnectionContext.StatementTimeout = $previousStatementTimeout
@@ -462,19 +462,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $end = Get-Date
                         [dbasize]$finalFileSizeKB = $file.Size * 1024
                         [dbasize]$finalSpaceAvailableKB = ($finalFileSizeKB - ($file.UsedSpace * 1024))
-                        Write-Message -Level Verbose -Message "Final file size: $($finalFileSizeKB)" -FunctionName Invoke-DbaDbShrink
-                        Write-Message -Level Verbose -Message "Final file space available: $($finalSpaceAvailableKB)" -FunctionName Invoke-DbaDbShrink
+                        Write-Message -Level Verbose -Message "Final file size: $($finalFileSizeKB)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
+                        Write-Message -Level Verbose -Message "Final file space available: $($finalSpaceAvailableKB)" -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
 
                         # Check if shrink didn't achieve target and provide feedback
                         if ($success -and $finalFileSizeKB -gt $desiredFileSizeKB) {
                             $shrinkShortfall = $finalFileSizeKB - $desiredFileSizeKB
                             $partialShrinkMessage = "File only shrunk to $finalFileSizeKB (target was $desiredFileSizeKB). Shortfall: $shrinkShortfall. This may be due to active transactions, data distribution, or minimum file size constraints."
-                            Write-Message -Level Warning -Message $partialShrinkMessage -FunctionName Invoke-DbaDbShrink
+                            Write-Message -Level Warning -Message $partialShrinkMessage -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                             $errorDetails = $partialShrinkMessage
                         }
 
                         if ($server.VersionMajor -gt 8 -and $ExcludeIndexStats -eq $false -and $success -and $FileType -ne 'Log') {
-                            Write-Message -Level Verbose -Message 'Getting ending average fragmentation' -FunctionName Invoke-DbaDbShrink
+                            Write-Message -Level Verbose -Message 'Getting ending average fragmentation' -FunctionName Invoke-DbaDbShrink -ModuleName "dbatools"
                             $dataRow = $server.Query($sql, $db.name)
                             $endingDefrag = $dataRow.avg_fragmentation_in_percent
                             $endingTopDefrag = $dataRow.max_fragmentation_in_percent

@@ -255,7 +255,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.versionMajor -lt 9) {
-                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaObject
+                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaObject -ModuleName "dbatools"
                 Continue
             }
 
@@ -274,9 +274,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Searching object names in database $db on $instance" -FunctionName Find-DbaObject
+                Write-Message -Level Verbose -Message "Searching object names in database $db on $instance" -FunctionName Find-DbaObject -ModuleName "dbatools"
 
-                Write-Message -Level Debug -Message $sqlObjects -FunctionName Find-DbaObject
+                Write-Message -Level Debug -Message $sqlObjects -FunctionName Find-DbaObject -ModuleName "dbatools"
                 $objectRows = $db.ExecuteWithResults($sqlObjects).Tables.Rows
 
                 foreach ($row in $objectRows) {
@@ -297,9 +297,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ($IncludeColumns) {
-                    Write-Message -Level Verbose -Message "Searching column names in database $db on $instance" -FunctionName Find-DbaObject
+                    Write-Message -Level Verbose -Message "Searching column names in database $db on $instance" -FunctionName Find-DbaObject -ModuleName "dbatools"
 
-                    Write-Message -Level Debug -Message $sqlColumns -FunctionName Find-DbaObject
+                    Write-Message -Level Debug -Message $sqlColumns -FunctionName Find-DbaObject -ModuleName "dbatools"
                     $columnRows = $db.ExecuteWithResults($sqlColumns).Tables.Rows
 
                     foreach ($row in $columnRows) {

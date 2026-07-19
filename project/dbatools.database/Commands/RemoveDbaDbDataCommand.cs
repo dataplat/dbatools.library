@@ -280,15 +280,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $inputType = $input.GetType().FullName
         switch ($inputType) {
             'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbData
+                Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Remove-DbaDbData -ModuleName "dbatools"
                 $dbDatabases = Get-DbaDatabase -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -ExcludeSystem
             }
             'Microsoft.SqlServer.Management.Smo.Server' {
-                Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbData
+                Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Remove-DbaDbData -ModuleName "dbatools"
                 $dbDatabases = Get-DbaDatabase -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -ExcludeSystem
             }
             'Microsoft.SqlServer.Management.Smo.Database' {
-                Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbData
+                Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Remove-DbaDbData -ModuleName "dbatools"
                 $dbDatabases = $input | Where-Object { -not $_.IsSystemObject }
             }
             default {
@@ -300,7 +300,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         foreach ($db in $dbDatabases) {
             if ($__realCmdlet.ShouldProcess($db.Name, "Removing all data on $($db.Parent.Name)")) {
                 $server = $db.Parent
-                Write-Message -Level Verbose -Message "Truncating tables in $db on instance $server" -FunctionName Remove-DbaDbData
+                Write-Message -Level Verbose -Message "Truncating tables in $db on instance $server" -FunctionName Remove-DbaDbData -ModuleName "dbatools"
                 try {
 
                     # Collect up the objects we need to drop and recreate
@@ -335,14 +335,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         Invoke-DbaQuery -SqlInstance $server -Database $db.Name -File "$Path\$($db.Name)_Create.Sql"
                     }
                 } catch {
-                    Write-Message -Level warning -Message "Issue truncating tables in $db on instance $server" -FunctionName Remove-DbaDbData
+                    Write-Message -Level warning -Message "Issue truncating tables in $db on instance $server" -FunctionName Remove-DbaDbData -ModuleName "dbatools"
                     Invoke-DbaQuery -SqlInstance $server -Database $db.Name -File "$Path\$($db.Name)_Create.Sql"
                 }
                 if ($objects) {
                     try {
                         Remove-Item "$Path\$($db.Name)_Drop.Sql", "$Path\$($db.Name)_Create.Sql" -ErrorAction Stop
                     } catch {
-                        Write-Message -Level warning -Message "Unable to clear up output files for $db on $server" -FunctionName Remove-DbaDbData
+                        Write-Message -Level warning -Message "Unable to clear up output files for $db on $server" -FunctionName Remove-DbaDbData -ModuleName "dbatools"
                     }
                 }
             }

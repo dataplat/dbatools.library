@@ -97,7 +97,7 @@ public sealed class GetDbaDbFileGroupCommand : DbaBaseCmdlet
     }
     // PS: the process block VERBATIM. Edits: the four Test-Bound reads -> carried boundness flags
     // ($__boundSqlInstance/$__boundInputObject/$__boundDatabase/$__boundFilegroup, each keeping the if
-    // parentheses), and -FunctionName Get-DbaDbFileGroup on the four Write-Message. The neither-bound guard
+    // parentheses), and -FunctionName Get-DbaDbFileGroup on the four Write-Message. The neither-bound guard -ModuleName "dbatools"
     // returns to exit the hop scriptblock cleanly (not dot-sourced; no re-emit).
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $InputObject, $FileGroup, $EnableException, $__boundSqlInstance, $__boundInputObject, $__boundDatabase, $__boundFilegroup, $__boundVerbose, $__boundDebug)
@@ -111,7 +111,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
         if ((-not $__boundSqlInstance) -and (-not $__boundInputObject)) {
-            Write-Message -Level Warning -Message "You must specify either a SQL instance or supply an InputObject" -FunctionName Get-DbaDbFileGroup
+            Write-Message -Level Warning -Message "You must specify either a SQL instance or supply an InputObject" -FunctionName Get-DbaDbFileGroup -ModuleName "dbatools"
             return
         }
 
@@ -121,7 +121,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if ($db.IsAccessible) {
-                Write-Message -Level Verbose -Message "Processing database: $db" -FunctionName Get-DbaDbFileGroup
+                Write-Message -Level Verbose -Message "Processing database: $db" -FunctionName Get-DbaDbFileGroup -ModuleName "dbatools"
                 $server = $db.Parent
                 if ($__boundDatabase) {
                     $db = $db | Where-Object { $Database -contains $_.Name }
@@ -133,7 +133,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 foreach ($fg in $fileGroups) {
-                    Write-Message -Level Verbose -Message "Processing filegroup $($fg.Name)" -FunctionName Get-DbaDbFileGroup
+                    Write-Message -Level Verbose -Message "Processing filegroup $($fg.Name)" -FunctionName Get-DbaDbFileGroup -ModuleName "dbatools"
                     $fg | Add-Member -Force -MemberType NoteProperty -Name ComputerName -Value $server.ComputerName
                     $fg | Add-Member -Force -MemberType NoteProperty -Name InstanceName -Value $server.ServiceName
                     $fg | Add-Member -Force -MemberType NoteProperty -Name SqlInstance -Value $server.DomainInstanceName
@@ -143,7 +143,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Select-DefaultView -InputObject $fg -Property $defaultprops
                 }
             } else {
-                Write-Message -Level Verbose -Message "Skipping processing of database: $db as database is not accessible" -FunctionName Get-DbaDbFileGroup
+                Write-Message -Level Verbose -Message "Skipping processing of database: $db as database is not accessible" -FunctionName Get-DbaDbFileGroup -ModuleName "dbatools"
             }
         }
 } $SqlInstance $SqlCredential $Database $InputObject $FileGroup $EnableException $__boundSqlInstance $__boundInputObject $__boundDatabase $__boundFilegroup $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

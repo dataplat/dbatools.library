@@ -532,7 +532,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         "
         #endRegion SizesQuery
 
-        Write-Message -Level Debug -Message $SizesQuery -FunctionName Get-DbaHelpIndex
+        Write-Message -Level Debug -Message $SizesQuery -FunctionName Get-DbaHelpIndex -ModuleName "dbatools"
 
         foreach ($instance in $SqlInstance) {
             try {
@@ -551,7 +551,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "$db is not accessible. Skipping." -Continue -FunctionName Get-DbaHelpIndex
             }
 
-            Write-Message -Level Debug -Message "$SizesQuery" -FunctionName Get-DbaHelpIndex
+            Write-Message -Level Debug -Message "$SizesQuery" -FunctionName Get-DbaHelpIndex -ModuleName "dbatools"
             try {
                 $IndexDetails = $db.Query($SizesQuery)
 

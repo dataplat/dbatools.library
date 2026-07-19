@@ -125,7 +125,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($Force) { $ConfirmPreference = 'none' }
 
 
-        Write-Message -Message "Starting balancing out data files" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+        Write-Message -Message "Starting balancing out data files" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
 
         # Set the initial success flag
         [bool]$success = $true
@@ -154,7 +154,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # Check edition of the sql instance
             if ($RebuildOffline) {
-                Write-Message -Message "Continuing with offline rebuild." -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                Write-Message -Message "Continuing with offline rebuild." -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
             } elseif (-not $RebuildOffline -and ($serverVersion -lt 9 -or (([string]$Server.Edition -notmatch "Developer") -and ($Server.Edition -notmatch "Enterprise")))) {
                 # Set up the confirm part
                 $message = "The server does not support online rebuilds of indexes. `nDo you want to rebuild the indexes offline?"
@@ -168,7 +168,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # If yes
                     0 {
                         # Set the option to generate a full backup
-                        Write-Message -Message "Continuing with offline rebuild." -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                        Write-Message -Message "Continuing with offline rebuild." -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
 
                         [bool]$supportOnlineRebuild = $false
                     }
@@ -230,8 +230,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($success) {
 
                     # Get the database files before all the alterations
-                    Write-Message -Message "Retrieving data files before data move" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
-                    Write-Message -Message "Processing database $db" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                    Write-Message -Message "Retrieving data files before data move" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
+                    Write-Message -Message "Processing database $db" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
 
                     # Check the datafiles of the database
                     $dataFiles = Get-DbaDbFile -SqlInstance $server -Database $db | Where-Object { $_.TypeDescription -eq 'ROWS' }
@@ -275,7 +275,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     # Get the database file groups and check the aount of data files
-                    Write-Message -Message "Retrieving file groups" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                    Write-Message -Message "Retrieving file groups" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                     $fileGroups = $Server.Databases[$db.Name].FileGroups
 
                     # ARray to hold the file groups with properties
@@ -298,7 +298,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
 
                         # When a target filegroup is specified, all tables are eligible
-                        Write-Message -Message "Target filegroup '$TargetFileGroup' specified - all tables with clustered indexes are eligible" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                        Write-Message -Message "Target filegroup '$TargetFileGroup' specified - all tables with clustered indexes are eligible" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                         $balanceableTables = $db.Tables
                     } else {
                         # Loop through each of the file groups
@@ -320,7 +320,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         # Chck if the table balanceable
                         if ($tbl.Name -in $balanceableTables.Name) {
 
-                            Write-Message -Message "Processing table $tbl" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                            Write-Message -Message "Processing table $tbl" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
 
                             # Chck the tables and get the clustered indexes
                             if (@($tbl.Indexes).Count -lt 1) {
@@ -342,11 +342,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
 
                             # Loop through each of the clustered indexes and rebuild them
-                            Write-Message -Message "$($clusteredIndexes.Count) clustered index(es) found for table $tbl" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                            Write-Message -Message "$($clusteredIndexes.Count) clustered index(es) found for table $tbl" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                             if ($__realCmdlet.ShouldProcess("Rebuilding indexes to balance data")) {
                                 foreach ($ci in $clusteredIndexes) {
 
-                                    Write-Message -Message "Rebuilding index $($ci.Name)" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                                    Write-Message -Message "Rebuilding index $($ci.Name)" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
 
                                     # Get the original index operation
                                     [bool]$originalIndexOperation = $ci.OnlineIndexOperation
@@ -358,19 +358,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     if ($RebuildOffline) {
                                         $ci.OnlineIndexOperation = $false
                                     } elseif ($serverVersion -ge 9 -and $supportOnlineRebuild -and -not $RebuildOffline) {
-                                        Write-Message -Message "Setting the index operation for index $($ci.Name) to online" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                                        Write-Message -Message "Setting the index operation for index $($ci.Name) to online" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                                         $ci.OnlineIndexOperation = $true
                                     }
 
                                     # Set the target filegroup if specified
                                     if ($TargetFileGroup) {
-                                        Write-Message -Message "Setting filegroup for index $($ci.Name) to $TargetFileGroup" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                                        Write-Message -Message "Setting filegroup for index $($ci.Name) to $TargetFileGroup" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                                         $ci.FileGroup = $TargetFileGroup
                                     }
 
                                     # Rebuild the index
                                     try {
-                                        Write-Message -Message "Rebuilding index $($ci.Name)" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                                        Write-Message -Message "Rebuilding index $($ci.Name)" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                                         $ci.Rebuild()
 
                                         # Set the success flag
@@ -391,7 +391,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     }
 
                                     # Set the original index operation back for the index
-                                    Write-Message -Message "Setting the index operation for index $($ci.Name) back to the original value" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                                    Write-Message -Message "Setting the index operation for index $($ci.Name) back to the original value" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                                     $ci.OnlineIndexOperation = $originalIndexOperation
 
                                 } # foreach index
@@ -406,7 +406,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             # Set the success flag
                             $success = $false
 
-                            Write-Message -Message "Table $tbl cannot be balanced out" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                            Write-Message -Message "Table $tbl cannot be balanced out" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                         }
 
                     } #foreach table
@@ -421,7 +421,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $elapsed = "{0:HH:mm:ss}" -f ([datetime]$ts.Ticks)
 
                 # Get the database files after all the alterations
-                Write-Message -Message "Retrieving data files after data move" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles
+                Write-Message -Message "Retrieving data files after data move" -Level Verbose -FunctionName Invoke-DbaBalanceDataFiles -ModuleName "dbatools"
                 $dataFilesEnding = Get-DbaDbFile -SqlInstance $server -Database $db.Name | Where-Object { $_.TypeDescription -eq 'ROWS' } | Select-Object ID, LogicalName, PhysicalName, Size, UsedSpace, AvailableSpace | Sort-Object ID
 
                 [PSCustomObject]@{

@@ -136,7 +136,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 continue
             }
             $server = $db.Parent
-            Write-Message -Level 'Verbose' -Message "Getting Database Synonyms for $db on $server" -FunctionName Get-DbaDbSynonym
+            Write-Message -Level 'Verbose' -Message "Getting Database Synonyms for $db on $server" -FunctionName Get-DbaDbSynonym -ModuleName "dbatools"
 
             $dbSynonyms = $db.Synonyms
 

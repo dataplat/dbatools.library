@@ -205,7 +205,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.versionMajor -lt 9) {
-                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaView
+                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaView -ModuleName "dbatools"
                 Continue
             }
 
@@ -226,13 +226,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $totalcount = 0
             $dbcount = $dbs.count
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaView
+                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaView -ModuleName "dbatools"
 
                 # If system objects aren't needed, find view text using SQL
                 # This prevents SMO from having to enumerate
 
                 if (!$IncludeSystemObjects) {
-                    Write-Message -Level Debug -Message $sql -FunctionName Find-DbaView
+                    Write-Message -Level Debug -Message $sql -FunctionName Find-DbaView -ModuleName "dbatools"
                     $rows = $db.ExecuteWithResults($sql).Tables.Rows
                     $vwcount = 0
 
@@ -242,7 +242,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $viewSchema = $row.ViewSchema
                         $view = $row.name
 
-                        Write-Message -Level Verbose -Message "Looking in View: $viewSchema.$view TextBody for $pattern" -FunctionName Find-DbaView
+                        Write-Message -Level Verbose -Message "Looking in View: $viewSchema.$view TextBody for $pattern" -FunctionName Find-DbaView -ModuleName "dbatools"
                         if ($row.TextBody -match $Pattern) {
                             $vw = $db.Views | Where-Object { $_.Schema -eq $viewSchema -and $_.Name -eq $view }
 
@@ -275,7 +275,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $viewSchema = $row.ViewSchema
                         $view = $vw.Name
 
-                        Write-Message -Level Verbose -Message "Looking in View: $viewSchema.$view TextBody for $pattern" -FunctionName Find-DbaView
+                        Write-Message -Level Verbose -Message "Looking in View: $viewSchema.$view TextBody for $pattern" -FunctionName Find-DbaView -ModuleName "dbatools"
                         if ($vw.TextBody -match $Pattern) {
 
                             $viewText = $vw.TextBody.split($eol)
@@ -299,16 +299,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
                     }
                 }
-                Write-Message -Level Verbose -Message "Evaluated $vwcount views in $db" -FunctionName Find-DbaView
+                Write-Message -Level Verbose -Message "Evaluated $vwcount views in $db" -FunctionName Find-DbaView -ModuleName "dbatools"
             }
-            Write-Message -Level Verbose -Message "Evaluated $totalcount total views in $dbcount databases" -FunctionName Find-DbaView
+            Write-Message -Level Verbose -Message "Evaluated $totalcount total views in $dbcount databases" -FunctionName Find-DbaView -ModuleName "dbatools"
         }
 
     $__state.EveryServerVwCount = $everyservervwcount
     @{ __findDbaViewProcess = @{ State = $__state } }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $Pattern $IncludeSystemDatabases $EnableException $__state $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
-    // PS: the end block VERBATIM. Edit: -FunctionName on the Write-Message. $everyservervwcount is
+    // PS: the end block VERBATIM. Edit: -FunctionName on the Write-Message. $everyservervwcount is -ModuleName "dbatools"
     // restored from the carried state so the grand total reflects all records.
     private const string EndScript = """
 param($__state, $EnableException, $__boundVerbose, $__boundDebug)
@@ -323,7 +323,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $everyservervwcount = $__state.EveryServerVwCount
 
-        Write-Message -Level Verbose -Message "Evaluated $everyservervwcount total views" -FunctionName Find-DbaView
+        Write-Message -Level Verbose -Message "Evaluated $everyservervwcount total views" -FunctionName Find-DbaView -ModuleName "dbatools"
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

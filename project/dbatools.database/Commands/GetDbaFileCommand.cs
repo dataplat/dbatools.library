@@ -203,14 +203,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $separator = "\"
             }
 
-            Write-Message -Level Verbose -Message "Adding paths" -FunctionName Get-DbaFile
+            Write-Message -Level Verbose -Message "Adding paths" -FunctionName Get-DbaFile -ModuleName "dbatools"
             $sql = Get-SQLDirTreeQuery $Path
-            Write-Message -Level Debug -Message $sql -FunctionName Get-DbaFile
+            Write-Message -Level Debug -Message $sql -FunctionName Get-DbaFile -ModuleName "dbatools"
 
             # This should remain as not .Query() to be compat with a PSProvider Chrissy was working on
             $datatable = $server.ConnectionContext.ExecuteWithResults($sql).Tables.Rows
 
-            Write-Message -Level Verbose -Message "$($datatable.Rows.Count) files found." -FunctionName Get-DbaFile
+            Write-Message -Level Verbose -Message "$($datatable.Rows.Count) files found." -FunctionName Get-DbaFile -ModuleName "dbatools"
             if ($FileTypeComparison) {
                 foreach ($row in $datatable) {
                     foreach ($type in $FileTypeComparison) {

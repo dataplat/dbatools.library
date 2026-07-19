@@ -144,14 +144,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     $db.UserDefinedFunctions.ClearAndInitialize('', [string[]]('Schema', 'Name', 'CreateDate', 'DateLastModified', 'DataType', 'IsSystemObject'))
                 } catch {
-                    Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbUdf
+                    Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbUdf -ModuleName "dbatools"
                 }
 
                 # UserDefinedAggregates don't have IsSystemObject property, so initialize separately
                 try {
                     $db.UserDefinedAggregates.ClearAndInitialize('', [string[]]('Schema', 'Name', 'CreateDate', 'DateLastModified', 'DataType'))
                 } catch {
-                    Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbUdf
+                    Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbUdf -ModuleName "dbatools"
                 }
 
                 $userDefinedFunctions = $db.UserDefinedFunctions
@@ -165,7 +165,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $userDefinedFunctions = @($userDefinedFunctions) + @($db.UserDefinedAggregates)
 
                 if (!$userDefinedFunctions -or $userDefinedFunctions.Count -eq 0) {
-                    Write-Message -Message "No User Defined Functions or Aggregates exist in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbUdf
+                    Write-Message -Message "No User Defined Functions or Aggregates exist in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbUdf -ModuleName "dbatools"
                     continue
                 }
 

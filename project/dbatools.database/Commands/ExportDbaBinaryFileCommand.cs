@@ -203,7 +203,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         if ($Path) {
             if (-not (Test-Path -Path $Path -PathType Container)) {
-                Write-Message -Level Verbose -Message "Creating path $Path" -FunctionName Export-DbaBinaryFile
+                Write-Message -Level Verbose -Message "Creating path $Path" -FunctionName Export-DbaBinaryFile -ModuleName "dbatools"
                 $null = New-Item -Path $Path -ItemType Directory -Force
             }
         }
@@ -240,7 +240,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-        Write-Message -Level Verbose -Message "Found $($InputObject.count) tables" -FunctionName Export-DbaBinaryFile
+        Write-Message -Level Verbose -Message "Found $($InputObject.count) tables" -FunctionName Export-DbaBinaryFile -ModuleName "dbatools"
         foreach ($tbl in $InputObject) {
             # auto detect column that is binary
             # if none or multiple, make them specify the binary column
@@ -281,7 +281,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 SELECT 'BackupCert.cer', * FROM OPENROWSET(BULK N'C:\temp\BackupCert.cer', SINGLE_BLOB) rs
             #>
             try {
-                Write-Message -Level Verbose -Message "Query: $Query" -FunctionName Export-DbaBinaryFile
+                Write-Message -Level Verbose -Message "Query: $Query" -FunctionName Export-DbaBinaryFile -ModuleName "dbatools"
                 $reader = $server.ConnectionContext.ExecuteReader($Query)
 
                 # Create a byte array for the stream.

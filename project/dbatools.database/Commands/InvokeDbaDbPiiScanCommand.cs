@@ -306,7 +306,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ($tables.Count -eq 0) {
-                    Write-Message -Level Verbose -Message "No tables to scan in database $dbName" -FunctionName Invoke-DbaDbPiiScan
+                    Write-Message -Level Verbose -Message "No tables to scan in database $dbName" -FunctionName Invoke-DbaDbPiiScan -ModuleName "dbatools"
                     continue
                 }
 
@@ -317,7 +317,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 # Loop through the tables
                 foreach ($tableobject in $tables) {
-                    Write-Message -Level Verbose -Message "Scanning table [$($tableobject.Schema)].[$($tableobject.Name)]" -FunctionName Invoke-DbaDbPiiScan
+                    Write-Message -Level Verbose -Message "Scanning table [$($tableobject.Schema)].[$($tableobject.Name)]" -FunctionName Invoke-DbaDbPiiScan -ModuleName "dbatools"
 
                     $progressTask = "Scanning columns and data"
                     Write-Progress -Id $progressId -Activity $progressActivity -Status (& $progressStatusBlock) -CurrentOperation $progressTask -PercentComplete ($tableNumber / $($tables.Count) * 100)
@@ -394,12 +394,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     }
                                 }
                             } else {
-                                Write-Message -Level Verbose -Message "No known names found to perform check on" -FunctionName Invoke-DbaDbPiiScan
+                                Write-Message -Level Verbose -Message "No known names found to perform check on" -FunctionName Invoke-DbaDbPiiScan -ModuleName "dbatools"
                             }
 
                             if ($patterns.Count -ge 1) {
 
-                                Write-Message -Level Verbose -Message "Scanning the top $SampleCount values for [$($columnobject.Name)] from [$($tableobject.Schema)].[$($tableobject.Name)]" -FunctionName Invoke-DbaDbPiiScan
+                                Write-Message -Level Verbose -Message "Scanning the top $SampleCount values for [$($columnobject.Name)] from [$($tableobject.Schema)].[$($tableobject.Name)]" -FunctionName Invoke-DbaDbPiiScan -ModuleName "dbatools"
 
                                 # Set the text data types
                                 $textDataTypes = 'char', 'varchar', 'nchar', 'nvarchar'
@@ -466,10 +466,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                         }
                                     }
                                 } else {
-                                    Write-Message -Message "Table $($tableobject.Name) does not contain any rows" -Level Verbose -FunctionName Invoke-DbaDbPiiScan
+                                    Write-Message -Message "Table $($tableobject.Name) does not contain any rows" -Level Verbose -FunctionName Invoke-DbaDbPiiScan -ModuleName "dbatools"
                                 }
                             } else {
-                                Write-Message -Level Verbose -Message "No patterns found to perform check on" -FunctionName Invoke-DbaDbPiiScan
+                                Write-Message -Level Verbose -Message "No patterns found to perform check on" -FunctionName Invoke-DbaDbPiiScan -ModuleName "dbatools"
                             }
                         }
                     }

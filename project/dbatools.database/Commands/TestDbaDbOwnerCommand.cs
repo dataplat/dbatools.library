@@ -150,10 +150,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         #Validate login
         if (($server.Logins.Name) -notmatch [Regex]::Escape($TargetLogin)) {
-            Write-Message -Level Verbose -Message "$TargetLogin is not a login on $instance" -Target $instance -FunctionName Test-DbaDbOwner
+            Write-Message -Level Verbose -Message "$TargetLogin is not a login on $instance" -Target $instance -FunctionName Test-DbaDbOwner -ModuleName "dbatools"
         }
 
-        Write-Message -Level Verbose -Message "Checking $db" -FunctionName Test-DbaDbOwner
+        Write-Message -Level Verbose -Message "Checking $db" -FunctionName Test-DbaDbOwner -ModuleName "dbatools"
         [PSCustomObject]@{
             ComputerName = $server.ComputerName
             InstanceName = $server.ServiceName

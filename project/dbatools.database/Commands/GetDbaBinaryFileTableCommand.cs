@@ -141,16 +141,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-        Write-Message -Level Verbose -Message "Found $($InputObject.count) tables" -FunctionName Get-DbaBinaryFileTable
+        Write-Message -Level Verbose -Message "Found $($InputObject.count) tables" -FunctionName Get-DbaBinaryFileTable -ModuleName "dbatools"
         foreach ($tbl in $InputObject) {
             $server = $tbl.Parent.Parent
             $BinaryColumn = ($tbl.Columns | Where-Object { $PSItem.DataType.Name -match "binary" -or $PSItem.DataType.Name -eq "image" }).Name
             $FileNameColumn = ($tbl.Columns | Where-Object Name -Match Name).Name
             if ($FileNameColumn.Count -gt 1) {
-                Write-Message -Level Verbose -Message "Multiple column names match the phrase 'name' in $($tbl.Name) in $($tbl.Parent.Name) on $($server.Name). Please specify the column to use with -FileNameColumn" -FunctionName Get-DbaBinaryFileTable
+                Write-Message -Level Verbose -Message "Multiple column names match the phrase 'name' in $($tbl.Name) in $($tbl.Parent.Name) on $($server.Name). Please specify the column to use with -FileNameColumn" -FunctionName Get-DbaBinaryFileTable -ModuleName "dbatools"
             }
             if ($BinaryColumn.Count -gt 1) {
-                Write-Message -Level Verbose -Message "Multiple columns have a binary datatype in $($tbl.Name) in $($tbl.Parent.Name) on $($server.Name)." -FunctionName Get-DbaBinaryFileTable
+                Write-Message -Level Verbose -Message "Multiple columns have a binary datatype in $($tbl.Name) in $($tbl.Parent.Name) on $($server.Name)." -FunctionName Get-DbaBinaryFileTable -ModuleName "dbatools"
             }
             if ($BinaryColumn) {
                 $tbl | Add-Member -NotePropertyName BinaryColumn -NotePropertyValue $BinaryColumn

@@ -366,19 +366,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $inputType = $input.GetType().FullName
             switch ($inputType) {
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Export-DbaDbRole
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Export-DbaDbRole -ModuleName "dbatools"
                     $databaseRoles = Get-DbaDbRole -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -Role $Role -ExcludeRole $ExcludeRole -ExcludeFixedRole:$ExcludeFixedRole
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaDbRole
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaDbRole -ModuleName "dbatools"
                     $databaseRoles = Get-DbaDbRole -SqlInstance $input -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -Role $Role -ExcludeRole $ExcludeRole -ExcludeFixedRole:$ExcludeFixedRole
                 }
                 'Microsoft.SqlServer.Management.Smo.Database' {
-                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Export-DbaDbRole
+                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Export-DbaDbRole -ModuleName "dbatools"
                     $databaseRoles = $input | Get-DbaDbRole -ExcludeDatabase $ExcludeDatabase -Role $Role -ExcludeRole $ExcludeRole -ExcludeFixedRole:$ExcludeFixedRole
                 }
                 'Microsoft.SqlServer.Management.Smo.DatabaseRole' {
-                    Write-Message -Level Verbose -Message "Processing DatabaseRole through InputObject" -FunctionName Export-DbaDbRole
+                    Write-Message -Level Verbose -Message "Processing DatabaseRole through InputObject" -FunctionName Export-DbaDbRole -ModuleName "dbatools"
                     $databaseRoles = $input
                 }
                 default {
@@ -523,7 +523,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             } elseif ($Path -Or $FilePath) {
                 if ($outputFileArray -notcontains $outputFileName) {
                     $scriptPath = Export-DbaDbRole -Path $__boundPathValue -FilePath $__boundFilePathValue -Type sql -ServerName $outputFileName
-                    Write-Message -Level Verbose -Message "New File $scriptPath" -FunctionName Export-DbaDbRole
+                    Write-Message -Level Verbose -Message "New File $scriptPath" -FunctionName Export-DbaDbRole -ModuleName "dbatools"
                     if ($null -ne $prefix) {
                         $sql = "$prefix$eol$sql"
                     }
@@ -531,7 +531,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $outputFileArray += $outputFileName
                     Get-ChildItem $scriptPath
                 } else {
-                    Write-Message -Level Verbose -Message "Adding to $scriptPath" -FunctionName Export-DbaDbRole
+                    Write-Message -Level Verbose -Message "Adding to $scriptPath" -FunctionName Export-DbaDbRole -ModuleName "dbatools"
                     $sql | Out-File -Encoding $Encoding -LiteralPath $scriptPath -Append
                 }
             } else {

@@ -166,7 +166,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 # SMO gave me some weird errors so I'm just gonna go with T-SQL
                 try {
                     $sql = "ALTER DATABASE $db MODIFY FILE ( NAME = N'$($file.Name)', FILEGROWTH = $($Growth)$($GrowthType) )"
-                    Write-Message -Level Verbose -Message $sql -FunctionName Set-DbaDbFileGrowth
+                    Write-Message -Level Verbose -Message $sql -FunctionName Set-DbaDbFileGrowth -ModuleName "dbatools"
                     $db.Query($sql)
                     $db.Refresh()
                     $db.Parent.Refresh()

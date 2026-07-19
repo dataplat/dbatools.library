@@ -131,7 +131,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $users = $db.users
 
                 if (!$users) {
-                    Write-Message -Message "No users exist in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbUser
+                    Write-Message -Message "No users exist in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbUser -ModuleName "dbatools"
                     continue
                 }
                 if ($ExcludeSystemUser) {

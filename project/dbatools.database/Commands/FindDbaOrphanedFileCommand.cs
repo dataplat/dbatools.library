@@ -424,7 +424,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             # Include the default data and log directories from the instance
-            Write-Message -Level Debug -Message "Adding paths" -FunctionName Find-DbaOrphanedFile
+            Write-Message -Level Debug -Message "Adding paths" -FunctionName Find-DbaOrphanedFile -ModuleName "dbatools"
             $sqlpaths += "$($server.RootDirectory)\DATA"
             $sqlpaths += Get-SqlDefaultPaths $server data
             $sqlpaths += Get-SqlDefaultPaths $server log
@@ -506,7 +506,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     @{ __findDbaOrphanedFileProcess = @{ State = $__state } }
 } $SqlInstance $SqlCredential $Path $Recurse $LocalOnly $RemoteOnly $EnableException $__state $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
-    // PS: the end block. Edit: -FunctionName on the Write-Message. $result is restored from the carried
+    // PS: the end block. Edit: -FunctionName on the Write-Message. $result is restored from the carried -ModuleName "dbatools"
     // state so its cross-record value drives the "no orphaned files" message exactly as the source scope.
     private const string EndScript = """
 param($__state, $EnableException, $__boundVerbose, $__boundDebug)
@@ -522,7 +522,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $result = $__state.Result
 
         if ($result.count -eq 0) {
-            Write-Message -Level Verbose -Message "No orphaned files found" -FunctionName Find-DbaOrphanedFile
+            Write-Message -Level Verbose -Message "No orphaned files found" -FunctionName Find-DbaOrphanedFile -ModuleName "dbatools"
         }
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;

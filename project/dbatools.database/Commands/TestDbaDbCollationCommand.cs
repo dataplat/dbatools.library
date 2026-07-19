@@ -131,7 +131,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         foreach ($db in $dbs) {
-            Write-Message -Level Verbose -Message "Processing $($db.name) on $servername." -FunctionName Test-DbaDbCollation
+            Write-Message -Level Verbose -Message "Processing $($db.name) on $servername." -FunctionName Test-DbaDbCollation -ModuleName "dbatools"
             [PSCustomObject]@{
                 ComputerName      = $server.ComputerName
                 InstanceName      = $server.ServiceName

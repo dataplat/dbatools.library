@@ -217,12 +217,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 'bigint' {
                     if (-not $Min -or $Min -lt -9223372036854775808) {
                         $Min = -9223372036854775808
-                        Write-Message -Level Verbose -Message "Min value for data type is empty or too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue
+                        Write-Message -Level Verbose -Message "Min value for data type is empty or too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                     }
 
                     if (-not $Max -or $Max -gt 9223372036854775807) {
                         $Max = 9223372036854775807
-                        Write-Message -Level Verbose -Message "Max value for data type is empty or too big. Reset to $Max" -FunctionName Get-DbaRandomizedValue
+                        Write-Message -Level Verbose -Message "Max value for data type is empty or too big. Reset to $Max" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                     }
 
                     $script:faker.Random.Long($Min, $Max)
@@ -262,12 +262,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 'int' {
                     if (-not $Min -or $Min -lt -2147483648) {
                         $Min = -2147483648
-                        Write-Message -Level Verbose -Message "Min value for data type is empty or too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue
+                        Write-Message -Level Verbose -Message "Min value for data type is empty or too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                     }
 
                     if (-not $Max -or $Max -gt 2147483647 -or $Max -lt $Min) {
                         $Max = 2147483647
-                        Write-Message -Level Verbose -Message "Max value for data type is empty or too big. Reset to $Max" -FunctionName Get-DbaRandomizedValue
+                        Write-Message -Level Verbose -Message "Max value for data type is empty or too big. Reset to $Max" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                     }
 
                     $script:faker.Random.Int($Min, $Max)
@@ -283,12 +283,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 'smallint' {
                     if (-not $Min -or $Min -lt -32768) {
                         $Min = 32768
-                        Write-Message -Level Verbose -Message "Min value for data type is empty or too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue
+                        Write-Message -Level Verbose -Message "Min value for data type is empty or too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                     }
 
                     if (-not $Max -or $Max -gt 32767 -or $Max -lt $Min) {
                         $Max = 32767
-                        Write-Message -Level Verbose -Message "Max value for data type is empty or too big. Reset to $Max" -FunctionName Get-DbaRandomizedValue
+                        Write-Message -Level Verbose -Message "Max value for data type is empty or too big. Reset to $Max" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                     }
 
                     $script:faker.Random.Int($Min, $Max)
@@ -299,12 +299,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 'tinyint' {
                     if (-not $Min -or $Min -lt 0) {
                         $Min = 0
-                        Write-Message -Level Verbose -Message "Min value for data type is empty or too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue
+                        Write-Message -Level Verbose -Message "Min value for data type is empty or too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                     }
 
                     if (-not $Max -or $Max -gt 255 -or $Max -lt $Min) {
                         $Max = 255
-                        Write-Message -Level Verbose -Message "Max value for data type is empty or too big. Reset to $Max" -FunctionName Get-DbaRandomizedValue
+                        Write-Message -Level Verbose -Message "Max value for data type is empty or too big. Reset to $Max" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                     }
 
                     $script:faker.Random.Int($Min, $Max)
@@ -486,7 +486,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($randSubType -eq 'paragraph') {
                         if ($Min -lt 1) {
                             $Min = 1
-                            Write-Message -Level Verbose -Message "Min value for sub type is too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue
+                            Write-Message -Level Verbose -Message "Min value for sub type is too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                         }
 
                         $script:faker.Lorem.Paragraph($Min)
@@ -494,7 +494,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     } elseif ($randSubType -eq 'paragraphs') {
                         if ($Min -lt 1) {
                             $Min = 1
-                            Write-Message -Level Verbose -Message "Min value for sub type is too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue
+                            Write-Message -Level Verbose -Message "Min value for sub type is too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                         }
 
                         $script:faker.Lorem.Paragraphs($Min)
@@ -506,7 +506,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     } elseif ($randSubType -eq 'sentence') {
                         if ($Min -lt 1) {
                             $Min = 1
-                            Write-Message -Level Verbose -Message "Min value for sub type is too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue
+                            Write-Message -Level Verbose -Message "Min value for sub type is too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                         }
 
                         $script:faker.Lorem.Sentence($Min, $Max)
@@ -514,7 +514,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     } elseif ($randSubType -eq 'sentences') {
                         if ($Min -lt 1) {
                             $Min = 1
-                            Write-Message -Level Verbose -Message "Min value for sub type is too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue
+                            Write-Message -Level Verbose -Message "Min value for sub type is too small. Reset to $Min" -FunctionName Get-DbaRandomizedValue -ModuleName "dbatools"
                         }
 
                         $script:faker.Lorem.Sentences($Min, $Max)

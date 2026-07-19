@@ -308,10 +308,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $dacConnected = $instance.Type -eq "Server" -and $instance.InputObject.ConnectionContext.ServerInstance -match "^ADMIN:"
                 $dacOpened = $false
                 if ($dacConnected) {
-                    Write-Message -Level Verbose -Message "Reusing dedicated admin connection." -FunctionName Invoke-DbaDbDecryptObject
+                    Write-Message -Level Verbose -Message "Reusing dedicated admin connection." -FunctionName Invoke-DbaDbDecryptObject -ModuleName "dbatools"
                     $server = $instance.InputObject
                 } else {
-                    Write-Message -Level Verbose -Message "Opening dedicated admin connection." -FunctionName Invoke-DbaDbDecryptObject
+                    Write-Message -Level Verbose -Message "Opening dedicated admin connection." -FunctionName Invoke-DbaDbDecryptObject -ModuleName "dbatools"
                     $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential -DedicatedAdminConnection -WarningAction SilentlyContinue
                     $dacOpened = $true
                 }
@@ -495,7 +495,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     @{ __invokeDbaDbDecryptObjectProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value); State = @{ ObjectCollection = $objectCollection } } }
 } $SqlInstance $SqlCredential $Database $ObjectName $EncodingType $ExportDestination $EnableException $__state $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
-    // PS: the end block VERBATIM. Edit: -FunctionName on the one Write-Message.
+    // PS: the end block VERBATIM. Edit: -FunctionName on the one Write-Message. -ModuleName "dbatools"
     private const string EndScript = """
 param($__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -506,7 +506,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding()]
     param($__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-            Write-Message -Message "Finished decrypting data" -Level Verbose -FunctionName Invoke-DbaDbDecryptObject
+            Write-Message -Message "Finished decrypting data" -Level Verbose -FunctionName Invoke-DbaDbDecryptObject -ModuleName "dbatools"
 } $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

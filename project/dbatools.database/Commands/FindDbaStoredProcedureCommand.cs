@@ -207,7 +207,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.versionMajor -lt 9) {
-                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaStoredProcedure
+                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
                 Continue
             }
 
@@ -228,9 +228,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $totalcount = 0
             $dbcount = $dbs.count
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaStoredProcedure
+                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
 
-                Write-Message -Level Debug -Message $sql -FunctionName Find-DbaStoredProcedure
+                Write-Message -Level Debug -Message $sql -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
                 $rows = $db.ExecuteWithResults($sql).Tables.Rows
                 $sproccount = 0
 
@@ -240,7 +240,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $procSchema = $row.ProcSchema
                     $proc = $row.Name
 
-                    Write-Message -Level Verbose -Message "Looking in stored procedure: $procSchema.$proc textBody for $pattern" -FunctionName Find-DbaStoredProcedure
+                    Write-Message -Level Verbose -Message "Looking in stored procedure: $procSchema.$proc textBody for $pattern" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
                     if ($row.TextBody -match $Pattern) {
                         $sp = $db.StoredProcedures | Where-Object { $_.Schema -eq $procSchema -and $_.Name -eq $proc }
 
@@ -267,16 +267,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
 
-                Write-Message -Level Verbose -Message "Evaluated $sproccount stored procedures in $db" -FunctionName Find-DbaStoredProcedure
+                Write-Message -Level Verbose -Message "Evaluated $sproccount stored procedures in $db" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
             }
-            Write-Message -Level Verbose -Message "Evaluated $totalcount total stored procedures in $dbcount databases" -FunctionName Find-DbaStoredProcedure
+            Write-Message -Level Verbose -Message "Evaluated $totalcount total stored procedures in $dbcount databases" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
         }
 
     $__state.EveryServerSpCount = $everyserverspcount
     @{ __findDbaStoredProcedureProcess = @{ State = $__state } }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $Pattern $IncludeSystemDatabases $EnableException $__state $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
-    // PS: the end block VERBATIM. Edit: -FunctionName on the Write-Message. $everyserverspcount is
+    // PS: the end block VERBATIM. Edit: -FunctionName on the Write-Message. $everyserverspcount is -ModuleName "dbatools"
     // restored from the carried state so the grand total reflects all records.
     private const string EndScript = """
 param($__state, $EnableException, $__boundVerbose, $__boundDebug)
@@ -291,7 +291,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $everyserverspcount = $__state.EveryServerSpCount
 
-        Write-Message -Level Verbose -Message "Evaluated $everyserverspcount total stored procedures" -FunctionName Find-DbaStoredProcedure
+        Write-Message -Level Verbose -Message "Evaluated $everyserverspcount total stored procedures" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
