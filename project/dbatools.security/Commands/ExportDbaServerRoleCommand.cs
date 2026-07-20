@@ -125,23 +125,27 @@ public sealed class ExportDbaServerRoleCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, _batches.ToArray(), ScriptingOptionsObject, ServerRole, ExcludeServerRole,
             Path, FilePath, BatchSeparator, Encoding,
             ExcludeFixedRole.ToBool(), IncludeRoleMember.ToBool(), Passthru.ToBool(), NoClobber.ToBool(),
             Append.ToBool(), NoPrefix.ToBool(), EnableException.ToBool(),
             TestBound(nameof(Path)), TestBound(nameof(BatchSeparator)), TestBound(nameof(ScriptingOptionsObject)),
             BoundValue("Path"), BoundValue("FilePath"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundValue(string name)
@@ -289,15 +293,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $inputType = $input.GetType().FullName
             switch ($inputType) {
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     $serverRoles = Get-DbaServerRole -SqlInstance $input -SqlCredential $SqlCredential  -ServerRole $ServerRole -ExcludeServerRole $ExcludeServerRole -ExcludeFixedRole:$ExcludeFixedRole
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     $serverRoles = Get-DbaServerRole -SqlInstance $input -SqlCredential $SqlCredential -ServerRole $ServerRole -ExcludeServerRole $ExcludeServerRole -ExcludeFixedRole:$ExcludeFixedRole
                 }
                 'Microsoft.SqlServer.Management.Smo.ServerRole' {
-                    Write-Message -Level Verbose -Message "Processing ServerRole through InputObject" -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "Processing ServerRole through InputObject" -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     $serverRoles = $input
                 }
                 default {
@@ -361,6 +365,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         }
     }
+        # Named-wrapper shim (W2-208): the END/emit phase runs inside a function carrying the command's
+        # name so Get-ExportFilePath's (Get-PSCallStack)[1].Command default-filename resolves to
+        # Export-DbaServerRole, not <ScriptBlock> (which produced invalid -<scriptblock>.sql names).
+        function Export-DbaServerRole {
         if (Test-FunctionInterrupt) { return }
 
         $eol = [System.Environment]::NewLine
@@ -391,7 +399,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             } elseif ($Path -Or $FilePath) {
                 $outputFileName = $instanceName.Replace('\', '$')
                 if ($outputFileArray -notcontains $outputFileName) {
-                    Write-Message -Level Verbose -Message "New File $outputFileName " -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "New File $outputFileName " -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     if ($null -ne $prefix) {
                         $sql = "$prefix$eol$sql"
                     }
@@ -400,13 +408,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $outputFileArray += $outputFileName
                     Get-ChildItem $scriptPath
                 } else {
-                    Write-Message -Level Verbose -Message "Adding to $outputFileName " -FunctionName Export-DbaServerRole
+                    Write-Message -Level Verbose -Message "Adding to $outputFileName " -FunctionName Export-DbaServerRole -ModuleName "dbatools"
                     $sql | Out-File -Encoding $Encoding -LiteralPath $scriptPath -Append
                 }
             } else {
                 $sql
             }
         }
+        }
+        . Export-DbaServerRole
 } $SqlInstance $SqlCredential $__batches $ScriptingOptionsObject $ServerRole $ExcludeServerRole $Path $FilePath $BatchSeparator $Encoding $ExcludeFixedRole $IncludeRoleMember $Passthru $NoClobber $Append $NoPrefix $EnableException $__pathBound $__batchSepBound $__scriptingBound $__boundPathValue $__boundFilePathValue $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
