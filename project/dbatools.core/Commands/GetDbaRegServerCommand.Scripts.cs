@@ -93,6 +93,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__state -and $__state.AzureidsAssigned) { $azureids = $__state.Azureids }
 
     . {
+        # W3-047 fix: this `. { }` dot-source runs as its own scriptblock invocation, so the
+        # automatic $PSBoundParameters is RE-INITIALISED to empty here (measured 2026-07-20:
+        # -Group read as empty inside this block). The source reads $PSBoundParameters directly in
+        # process{} (populated); re-assert the caller's table INSIDE the block so the value reads
+        # below (-SqlInstance/-IncludeLocal local-store gate at :~131, -Group/-ExcludeGroup filter
+        # at :~277) see it - same dot-source-scope class as W2-151 New-DbaDbTable.
+        $PSBoundParameters = $__boundParameters
         if (-not $PSBoundParameters.SqlInstance -and -not ($IsLinux -or $IsMacOs)) {
             $null = Get-ChildItem -Recurse "$(Get-DbatoolsPath -Name appdata)\Microsoft\*sql*" -Filter RegSrvr*.xml | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         }
