@@ -113,6 +113,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
     if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    #Variable marked as unused by PSScriptAnalyzer
+    #$sets = @()
     $setscript = {
         $setname = $args[0]; $wait = $args[1]
         $collectorset = New-Object -ComObject Pla.DataCollectorSet
