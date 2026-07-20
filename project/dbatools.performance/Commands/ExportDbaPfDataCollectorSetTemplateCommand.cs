@@ -32,7 +32,7 @@ namespace Dataplat.Dbatools.Commands;
 /// Surface pinned by migration/baselines/Export-DbaPfDataCollectorSetTemplate.json.
 /// </summary>
 [Cmdlet(VerbsData.Export, "DbaPfDataCollectorSetTemplate")]
-public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
+public sealed partial class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
 {
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
@@ -357,7 +357,7 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
         return null;
     }
 
-    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    /// <summary>A bound -Debug carrier for the hop scopes (W1-044 convention).</summary>
     private object? BoundDebug()
     {
         object? debug;
@@ -366,6 +366,7 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
         return null;
     }
 
+    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
     private object? BoundVerbose()
     {
         object? verbose;
@@ -373,36 +374,4 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
             return LanguagePrimitives.IsTrue(verbose);
         return null;
     }
-
-    private const string SetContentScript = """
-param($__params)
-& Set-Content @__params 3>&1 2>&1
-""";
-
-    private const string GetChildItemScript = """
-param($__params)
-& Get-ChildItem @__params 3>&1 2>&1
-""";
-
-    private const string TestExportDirectoryScript = """
-param($__path, $EnableException, $__boundVerbose, $__boundDebug)
-$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
-& $__dbatoolsModule {
-    param($__path, $EnableException, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-    $null = Test-ExportDirectory -Path $__path
-} $__path $EnableException $__boundVerbose $__boundDebug 3>&1
-""";
-
-    private const string RemoveInvalidFileNameCharsScript = """
-param($__name, $EnableException, $__boundVerbose, $__boundDebug)
-$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
-& $__dbatoolsModule {
-    param($__name, $EnableException, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
-    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
-    Remove-InvalidFileNameChars -Name $__name
-} $__name $EnableException $__boundVerbose $__boundDebug 3>&1
-""";
 }

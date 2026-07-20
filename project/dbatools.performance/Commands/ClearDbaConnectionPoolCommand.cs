@@ -114,8 +114,8 @@ public sealed class ClearDbaConnectionPoolCommand : DbaBaseCmdlet
         return PSObject.AsPSObject(value).ToString();
     }
 
-    /// <summary>A bound -Verbose reached the function's module-scoped nested calls through
-    /// the function-LOCAL $VerbosePreference; the hop script re-establishes it from this
+    /// <summary>A bound -Debug reached the function's module-scoped nested calls through
+    /// the function-LOCAL $DebugPreference; the hop script re-establishes it from this
     /// carrier (null = not bound - the ambient chain already matches).</summary>
     private object? BoundDebug()
     {
@@ -125,6 +125,9 @@ public sealed class ClearDbaConnectionPoolCommand : DbaBaseCmdlet
         return null;
     }
 
+    /// <summary>A bound -Verbose reached the function's module-scoped nested calls through
+    /// the function-LOCAL $VerbosePreference; the hop script re-establishes it from this
+    /// carrier (null = not bound - the ambient chain already matches).</summary>
     private object? BoundVerbose()
     {
         object? verbose;

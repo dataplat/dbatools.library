@@ -221,7 +221,7 @@ public sealed class GetDbaPfDataCollectorCommand : DbaBaseCmdlet
         return collected.ToArray();
     }
 
-    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    /// <summary>A bound -Debug carrier for the hop scopes (W1-044 convention).</summary>
     private object? BoundDebug()
     {
         object? debug;
@@ -230,6 +230,7 @@ public sealed class GetDbaPfDataCollectorCommand : DbaBaseCmdlet
         return null;
     }
 
+    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
     private object? BoundVerbose()
     {
         object? verbose;

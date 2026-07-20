@@ -67,7 +67,7 @@ public sealed class RemoveDbaPfDataCollectorSetCommand : DbaBaseCmdlet
             TestBound("ComputerName"), EnableException.ToBool(), this, BoundVerbose(), BoundDebug());
     }
 
-    /// <summary>A bound -Verbose carrier for the module-scoped process body.</summary>
+    /// <summary>A bound -Debug carrier for the module-scoped process body.</summary>
     private object? BoundDebug()
     {
         if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
@@ -75,6 +75,7 @@ public sealed class RemoveDbaPfDataCollectorSetCommand : DbaBaseCmdlet
         return null;
     }
 
+    /// <summary>A bound -Verbose carrier for the module-scoped process body.</summary>
     private object? BoundVerbose()
     {
         if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))

@@ -166,7 +166,7 @@ public sealed class InvokeDbaDiagnosticQueryCommand : DbaInstanceCmdlet
         NestedCommand.InvokeScoped(this, EndScript, _beginBag is not null ? _beginBag["ProgressId"] : null);
     }
 
-    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    /// <summary>A bound -Debug carrier for the hop scopes (W1-044 convention).</summary>
     private object? BoundDebug()
     {
         object? debug;
@@ -175,6 +175,7 @@ public sealed class InvokeDbaDiagnosticQueryCommand : DbaInstanceCmdlet
         return null;
     }
 
+    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
     private object? BoundVerbose()
     {
         object? verbose;

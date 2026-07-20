@@ -482,8 +482,8 @@ public sealed class AddDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             parameters["ErrorAction"] = errorAction;
     }
 
-    /// <summary>A bound -Verbose reached the function's module-scoped nested calls through
-    /// the function-LOCAL $VerbosePreference; the hop scripts re-establish it from this
+    /// <summary>A bound -Debug reached the function's module-scoped nested calls through
+    /// the function-LOCAL $DebugPreference; the hop scripts re-establish it from this
     /// carrier (null = not bound - the ambient chain already matches).</summary>
     private object? BoundDebug()
     {
@@ -493,6 +493,9 @@ public sealed class AddDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
         return null;
     }
 
+    /// <summary>A bound -Verbose reached the function's module-scoped nested calls through
+    /// the function-LOCAL $VerbosePreference; the hop scripts re-establish it from this
+    /// carrier (null = not bound - the ambient chain already matches).</summary>
     private object? BoundVerbose()
     {
         object? verbose;

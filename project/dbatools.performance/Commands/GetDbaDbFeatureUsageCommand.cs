@@ -121,7 +121,7 @@ public sealed class GetDbaDbFeatureUsageCommand : DbaInstanceCmdlet
         return (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
     }
 
-    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    /// <summary>A bound -Debug carrier for the hop scopes (W1-044 convention).</summary>
     private object? BoundDebug()
     {
         object? debug;
@@ -130,6 +130,7 @@ public sealed class GetDbaDbFeatureUsageCommand : DbaInstanceCmdlet
         return null;
     }
 
+    /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
     private object? BoundVerbose()
     {
         object? verbose;
