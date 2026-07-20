@@ -130,7 +130,7 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
             boundParameters.ContainsKey("SqlInstance"),
             boundParameters.ContainsKey("Database"),
             boundParameters.ContainsKey("Name"),
-            SchemaBound,
+            boundParameters.ContainsKey("Schema"),
             this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
@@ -164,22 +164,16 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
     // on this class and are handled separately via BoundCommonParameter / the $__realCmdlet gate route.
     private Hashtable BuildCallerBoundParameters()
     {
+        // Real boundness: _bound holds exactly the parameters the binder supplied (recorded by their
+        // setters). This projects an explicit value even when it equals a default (-Schema dbo,
+        // -MaximumDegreeOfParallelism 0) and an explicit -Switch:$false - none of which value inference
+        // against a fresh instance could distinguish from "not supplied".
         Hashtable result = new Hashtable(StringComparer.OrdinalIgnoreCase);
-        NewDbaDbTableCommand defaults = new NewDbaDbTableCommand();
-        foreach (System.Reflection.PropertyInfo prop in GetType().GetProperties())
+        foreach (string name in _bound)
         {
-            if (!prop.CanRead || !Attribute.IsDefined(prop, typeof(ParameterAttribute)))
-                continue;
-            object? value = prop.GetValue(this);
-            if (value is SwitchParameter sw)
-            {
-                if (sw.IsPresent)
-                    result[prop.Name] = sw;
-            }
-            else if (!object.Equals(value, prop.GetValue(defaults)))
-            {
-                result[prop.Name] = value;
-            }
+            System.Reflection.PropertyInfo? prop = GetType().GetProperty(name);
+            if (prop != null && prop.CanRead)
+                result[name] = prop.GetValue(this);
         }
         return result;
     }
