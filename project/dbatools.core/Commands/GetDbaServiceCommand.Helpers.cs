@@ -248,13 +248,20 @@ public sealed partial class GetDbaServiceCommand
 
             WriteMessage(MessageLevel.Verbose, $"Getting version from the namespace {nsName} on {computer}.", target: computer);
 
-            ManagementObject? versionObj;
+            // PS: $namespaceVersion = Get-DbaCmObject ... "SELECT Name FROM __NAMESPACE" returns ALL
+            // version namespaces, and the services path interpolates "$($namespaceVersion.Name)" -
+            // PS array-member enumeration space-joins ($OFS) every Name. With >1 version that yields a
+            // GARBAGE path whose services query fails (Stop-Function -Continue). FirstOrDefault would
+            // pick a valid FIRST version and SILENTLY FIX that source bug (W4-055 doctrine: a hop's
+            // safer divergence violates parity and hides the bug). Reproduce PS's space-join; the real
+            // source bug is U-listed (TB-031 residual (c), CD-0720-13: revert the silent fix + U-list).
+            List<ManagementObject> versionObjs;
             try
             {
                 var vScope = new ManagementScope($@"\\{computer}\root\Microsoft\SQLServer\ReportServer\{nsName}", _wmiOptions);
                 vScope.Connect();
                 using var vSearcher = new ManagementObjectSearcher(vScope, new ObjectQuery("SELECT Name FROM __NAMESPACE"));
-                versionObj = vSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
+                versionObjs = vSearcher.Get().Cast<ManagementObject>().ToList();
             }
             catch (Exception ex)
             {
@@ -262,9 +269,9 @@ public sealed partial class GetDbaServiceCommand
                 StopFunction($"No version Namespace on {computer}. Please note that this function is available from SQL 2005 up.", exception: ex, continueLoop: true);
                 continue;
             }
-            if (versionObj == null) continue;
-            string? versionName = versionObj["Name"] as string;
-            if (versionName == null) continue;
+            // "$($namespaceVersion.Name)": empty -> "" (still built into the path, which then fails);
+            // one version -> its Name; many -> space-joined garbage. A null Name member joins as "".
+            string versionName = string.Join(" ", versionObjs.Select(v => (v["Name"] as string) ?? string.Empty));
 
             IEnumerable<ManagementObject> services;
             try
@@ -290,12 +297,25 @@ public sealed partial class GetDbaServiceCommand
                 string? svcInstanceName = svc["InstanceName"] as string;
                 if (instanceFilter != null && instanceFilter.Length > 0 &&
                     !instanceFilter.Contains(svcInstanceName ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+                {
+                    // PS: `$serviceArray += $service.ServiceName` (source :162) sits INSIDE the
+                    // not-seen block but OUTSIDE the instance-filter block, so an instance-FILTERED
+                    // service is still marked seen. Without this, a cross-namespace duplicate whose
+                    // second occurrence passes the filter EMITS here but is SUPPRESSED in PS - an
+                    // output-SET divergence (TB-031 residual (a), CD-0720-13: fix to match PS).
+                    serviceArray.Add(svcServiceName);
                     continue;
+                }
 
                 string reportServiceType = string.Equals(nsName, "RS_PBIRS", StringComparison.OrdinalIgnoreCase) ? "PowerBI" : "SSRS";
 
-                // Query Win32_Service for current state, startup mode, and display name
-                string svcState = string.Empty, svcStartMode = string.Empty, svcDisplayName = string.Empty, svcComputerName = computer;
+                // Query Win32_Service for current state, startup mode, and display name.
+                // PS: these four notes come from $service32 (Win32_Service). When the query returns
+                // nothing, $service32 is $null and `$service32.SystemName`/.State/.DisplayName/
+                // .StartMode are all $null - the emitted notes are NULL, ComputerName included.
+                // Defaulting to the computer string / empties is a divergence (TB-031 residual (b),
+                // CD-0720-13: reproduce PS's nulls - uglier but faithful).
+                string? svcState = null, svcStartMode = null, svcDisplayName = null, svcComputerName = null;
                 try
                 {
                     var cimScope = new ManagementScope($@"\\{computer}\root\cimv2", _wmiOptions);
@@ -305,12 +325,14 @@ public sealed partial class GetDbaServiceCommand
                     ManagementObject? svc32 = cimSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
                     if (svc32 != null)
                     {
-                        svcComputerName = svc32["SystemName"] as string ?? computer;
-                        svcState        = svc32["State"]     as string ?? string.Empty;
-                        svcDisplayName  = svc32["DisplayName"] as string ?? string.Empty;
+                        svcComputerName = svc32["SystemName"] as string;
+                        svcState        = svc32["State"]     as string;
+                        svcDisplayName  = svc32["DisplayName"] as string;
                         string? sm      = svc32["StartMode"] as string;
-                        // Auto { 'Automatic' } — Replacing for consistency to match other SQL Services
-                        svcStartMode    = string.Equals(sm, "Auto", StringComparison.OrdinalIgnoreCase) ? "Automatic" : (sm ?? string.Empty);
+                        // Auto { 'Automatic' } — Replacing for consistency to match other SQL Services;
+                        // PS `switch ($service32.StartMode)` yields $null when StartMode is $null
+                        // (no branch matches, default -> $_ = $null).
+                        svcStartMode    = sm == null ? null : (string.Equals(sm, "Auto", StringComparison.OrdinalIgnoreCase) ? "Automatic" : sm);
                     }
                 }
                 catch (Exception ex)
