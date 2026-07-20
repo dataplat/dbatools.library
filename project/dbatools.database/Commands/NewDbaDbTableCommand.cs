@@ -99,14 +99,14 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // The CALLER's real bound parameters. The body projects these onto the SMO Table, so it must
-        // see what the user typed - not the hop scriptblock's own bindings. Copied into a plain
-        // Hashtable so the hop indexes it exactly like the automatic variable it replaces.
-        Hashtable boundParameters = new Hashtable(StringComparer.OrdinalIgnoreCase);
-        foreach (System.Collections.Generic.KeyValuePair<string, object> kv in MyInvocation.BoundParameters)
-        {
-            boundParameters[kv.Key] = kv.Value;
-        }
+        // The CALLER's real bound parameters. The body projects these onto the SMO Table
+        // (foreach ($param in $PSBoundParameters.Keys) { $object.$param = ... }), so it must see what the
+        // user typed - not the hop scriptblock's own bindings.
+        // MyInvocation.BoundParameters is EMPTY in this cmdlet's ProcessRecord (measured, W2-151 /
+        // CD-0720-42: -IsNode supplied yet keys=[]), which silently starved the projection so IsNode/IsEdge
+        // and every other projected property were skipped. Reconstruct the supplied-parameter set from the
+        // cmdlet's own parameter properties instead - see BuildCallerBoundParameters.
+        Hashtable boundParameters = BuildCallerBoundParameters();
 
         // Streaming, not buffered (DEF-001): tables are created per database and -Passthru emits
         // each one, so a buffered hop would drop the audit trail of tables already created.
@@ -127,10 +127,10 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, Name, Schema, ColumnMap, ColumnObject,
             Passthru, InputObject, EnableException, boundParameters, _state,
-            MyInvocation.BoundParameters.ContainsKey("SqlInstance"),
-            MyInvocation.BoundParameters.ContainsKey("Database"),
-            MyInvocation.BoundParameters.ContainsKey("Name"),
-            MyInvocation.BoundParameters.ContainsKey("Schema"),
+            boundParameters.ContainsKey("SqlInstance"),
+            boundParameters.ContainsKey("Database"),
+            boundParameters.ContainsKey("Name"),
+            boundParameters.ContainsKey("Schema"),
             this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
@@ -141,6 +141,36 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
         return null;
+    }
+
+    // Reconstructs the caller's supplied-parameter set without MyInvocation.BoundParameters, which is empty
+    // in this cmdlet's ProcessRecord (measured, W2-151 / CD-0720-42). A SwitchParameter is "supplied" iff
+    // IsPresent; any other parameter is "supplied" iff its value differs from a freshly constructed
+    // instance's default. This reproduces exactly what $PSBoundParameters gave the source function: the keys
+    // drive the SMO-Table property projection, and ContainsKey(...) drives the default-replication gates.
+    // A value explicitly set to its own default reads as "not supplied", but re-projecting that default is a
+    // no-op, so behaviour is unchanged. Common parameters (WhatIf/Confirm/Verbose/Debug) are not properties
+    // on this class and are handled separately via BoundCommonParameter / the $__realCmdlet gate route.
+    private Hashtable BuildCallerBoundParameters()
+    {
+        Hashtable result = new Hashtable(StringComparer.OrdinalIgnoreCase);
+        NewDbaDbTableCommand defaults = new NewDbaDbTableCommand();
+        foreach (System.Reflection.PropertyInfo prop in GetType().GetProperties())
+        {
+            if (!prop.CanRead || !Attribute.IsDefined(prop, typeof(ParameterAttribute)))
+                continue;
+            object? value = prop.GetValue(this);
+            if (value is SwitchParameter sw)
+            {
+                if (sw.IsPresent)
+                    result[prop.Name] = sw;
+            }
+            else if (!object.Equals(value, prop.GetValue(defaults)))
+            {
+                result[prop.Name] = value;
+            }
+        }
+        return result;
     }
 
     private void RemoveHopErrorBookkeeping(ErrorRecord record)
