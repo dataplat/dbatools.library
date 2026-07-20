@@ -15,9 +15,9 @@ namespace Dataplat.Dbatools.Commands;
 /// validations, all consumed within the same single invocation, so begin folds into the process
 /// script (splitting would strand the nested function). The begin Path-not-found Stop-Function sets
 /// the interrupt that the process's Test-FunctionInterrupt then honors - order preserved by inlining
-/// begin ahead of that check. DEF-001 is not in play: the emit is a single streaming Get-ChildItem
-/// pipeline with no reachable throw after it; the hop still runs through InvokeScopedStreaming for
-/// uniformity. Positions match the retired function (Path=0, BackupFileExtension=1, RetentionPeriod=2;
+/// begin ahead of that check. DEF-001 IS reachable here (codex): the post-emit warning path can
+/// TERMINATE under -WarningAction Stop after files have already streamed - a buffered hop would
+/// lose them, so InvokeScopedStreaming is REQUIRED, not merely uniform. Positions match the retired function (Path=0, BackupFileExtension=1, RetentionPeriod=2;
 /// CheckArchiveBit/EnableException=switch/null) and the Path alias (BackupFolder) is preserved.
 /// Substitution only: explicit -FunctionName Find-DbaBackup on Stop-Function (W1-090); the body is
 /// otherwise verbatim. Surface pinned by migration/baselines/Find-DbaBackup.json.

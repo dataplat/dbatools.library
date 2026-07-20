@@ -15,8 +15,8 @@ namespace Dataplat.Dbatools.Commands;
 /// outer catch, so the hop STREAMS via InvokeScopedStreaming. Cross-record-state check: $where and
 /// $wherearray are re-initialized each record, and the filter set-condition ($ExcludeDatabase/$Database/
 /// $Since/$Last) is call-constant across pipeline records - so $where is deterministic per record, not a
-/// stale carry. The [datetime]$Since parameter is nullable (DateTime?) so an unbound value stays $null
-/// (matching PowerShell's unbound value-type semantics), and $Since is left UNTYPED in the hop param to
+/// stale carry. $Since is plain DateTime on the cmdlet (surface parity with the function's type);
+/// the C# passes null into the hop when Since was never bound, and $Since is left UNTYPED in the hop param to
 /// avoid a null-to-MinValue coercion. No ShouldProcess. Positions match the retired function
 /// (SqlInstance=0, SqlCredential=1, Database=2, ExcludeDatabase=3, Since=4, RestoreType=5; Force/Last/
 /// EnableException=switch/null) and RestoreType's ValidateSet is preserved. Substitution only: explicit
@@ -44,7 +44,7 @@ public sealed class GetDbaDbRestoreHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Only restores since this date/time.</summary>
     [Parameter(Position = 4)]
-    public DateTime? Since { get; set; }
+    public DateTime Since { get; set; }
 
     /// <summary>Returns all columns (raw) instead of the curated projection.</summary>
     [Parameter]
@@ -56,6 +56,7 @@ public sealed class GetDbaDbRestoreHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Filters to a specific restore type.</summary>
     [Parameter]
+    [Parameter(Position = 5)]
     [PsStringCast]
     [ValidateSet("Database", "File", "Filegroup", "Differential", "Log", "Verifyonly", "Revert")]
     public string? RestoreType { get; set; }
@@ -77,7 +78,12 @@ public sealed class GetDbaDbRestoreHistoryCommand : DbaBaseCmdlet
             }
             WriteObject(item);
         }, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Since, Force.ToBool(), Last.ToBool(), RestoreType, EnableException.ToBool(),
+            SqlInstance, SqlCredential, Database, ExcludeDatabase,
+            // Surface parity pins Since to plain DateTime (the function's type); unbound-vs-bound
+            // is preserved by passing null into the untyped hop param when the caller never bound
+            // it (a nullable property would change the public ParameterType).
+            MyInvocation.BoundParameters.ContainsKey("Since") ? (object)Since : null,
+            Force.ToBool(), Last.ToBool(), RestoreType, EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
