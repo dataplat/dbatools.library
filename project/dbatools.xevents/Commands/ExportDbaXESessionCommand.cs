@@ -67,6 +67,7 @@ public sealed class ExportDbaXESessionCommand : DbaBaseCmdlet
 
     /// <summary>The file encoding for the exported script.</summary>
     [Parameter(Position = 6)]
+    [PsStringCast]
     [ValidateSet("ASCII", "BigEndianUnicode", "Byte", "String", "Unicode", "UTF7", "UTF8", "Unknown")]
     public string Encoding { get; set; } = "UTF8";
 

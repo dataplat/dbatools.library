@@ -40,6 +40,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
 
     /// <summary>Internal or External resource pool.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("Internal", "External")]
     public string ResourcePoolType { get; set; } = "Internal";
 

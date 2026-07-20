@@ -48,6 +48,7 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
     public string? AccessToken { get; set; }
 
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("ReadOnly", "ReadWrite")]
     public string? ApplicationIntent { get; set; }
 
@@ -88,6 +89,7 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
     public SwitchParameter MultiSubnetFailover { get; set; }
 
     [Parameter(Position = 12)]
+    [PsStringCast]
     [ValidateSet("TcpIp", "NamedPipes", "Multiprotocol", "AppleTalk", "BanyanVines", "Via", "SharedMemory", "NWLinkIpxSpx")]
     public string? NetworkProtocol { get; set; }
 
@@ -101,6 +103,7 @@ public sealed class NewDbaConnectionStringCommand : DbaBaseCmdlet
     public int PooledConnectionLifetime { get; set; }
 
     [Parameter(Position = 15)]
+    [PsStringCast]
     [ValidateSet("CaptureSql", "ExecuteAndCaptureSql", "ExecuteSql")]
     public string? SqlExecutionModes { get; set; }
 

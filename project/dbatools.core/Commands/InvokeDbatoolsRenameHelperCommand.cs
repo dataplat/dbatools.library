@@ -28,6 +28,7 @@ public sealed class InvokeDbatoolsRenameHelperCommand : DbaBaseCmdlet
 
     /// <summary>The output file encoding (default UTF8).</summary>
     [Parameter(Position = 1)]
+    [PsStringCast]
     [ValidateSet("ASCII", "BigEndianUnicode", "Byte", "String", "Unicode", "UTF7", "UTF8", "Unknown")]
     public string Encoding { get; set; } = "UTF8";
 

@@ -36,6 +36,7 @@ public sealed class SetDbaRgResourcePoolCommand : DbaBaseCmdlet
 
     /// <summary>Internal or External resource pool.</summary>
     [Parameter]
+    [PsStringCast]
     [ValidateSet("Internal", "External")]
     public string Type { get; set; } = "Internal";
 

@@ -47,11 +47,13 @@ public sealed class FindDbaDbGrowthEventCommand : DbaInstanceCmdlet
 
     /// <summary>Growth or Shrink.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("Growth", "Shrink")]
     public string? EventType { get; set; }
 
     /// <summary>Data or Log.</summary>
     [Parameter(Position = 5)]
+    [PsStringCast]
     [ValidateSet("Data", "Log")]
     public string? FileType { get; set; }
 

@@ -56,6 +56,7 @@ public sealed class NewDbaConnectionStringBuilderCommand : DbaBaseCmdlet
 
     [Parameter(Position = 7)]
     [Alias("AlwaysEncrypted")]
+    [PsStringCast]
     [ValidateSet("Enabled")]
     public string? ColumnEncryptionSetting { get; set; }
 

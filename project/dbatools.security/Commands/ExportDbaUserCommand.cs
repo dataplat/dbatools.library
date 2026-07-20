@@ -75,6 +75,7 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
 
     /// <summary>The destination SQL Server version to target the generated script at.</summary>
     [Parameter(Position = 6)]
+    [PsStringCast]
     [ValidateSet("SQLServer2000", "SQLServer2005", "SQLServer2008/2008R2", "SQLServer2012", "SQLServer2014", "SQLServer2016", "SQLServer2017", "SQLServer2019", "SQLServer2022")]
     public string? DestinationVersion { get; set; }
 
@@ -89,6 +90,7 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
 
     /// <summary>The file encoding of the exported script.</summary>
     [Parameter(Position = 9)]
+    [PsStringCast]
     [ValidateSet("ASCII", "BigEndianUnicode", "Byte", "String", "Unicode", "UTF7", "UTF8", "Unknown")]
     public string Encoding { get; set; } = "UTF8";
 

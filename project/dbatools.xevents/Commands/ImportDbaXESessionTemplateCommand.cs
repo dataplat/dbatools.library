@@ -70,6 +70,7 @@ public sealed class ImportDbaXESessionTemplateCommand : DbaBaseCmdlet
 
     /// <summary>Whether the imported session should start automatically.</summary>
     [Parameter(Position = 7)]
+    [PsStringCast]
     [ValidateSet("On", "Off")]
     public string StartUpState { get; set; } = "Off";
 

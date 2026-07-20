@@ -51,11 +51,13 @@ public sealed class TestDbaDbCompressionCommand : DbaInstanceCmdlet
 
     /// <summary>Ranking measure for ResultSize.</summary>
     [Parameter(Position = 7)]
+    [PsStringCast]
     [ValidateSet("TotalPages", "UsedPages", "TotalRows")]
     public string Rank { get; set; } = "TotalPages";
 
     /// <summary>Granularity of ResultSize filtering.</summary>
     [Parameter(Position = 8)]
+    [PsStringCast]
     [ValidateSet("Partition", "Index", "Table")]
     public string FilterBy { get; set; } = "Partition";
 

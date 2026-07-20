@@ -38,11 +38,13 @@ public sealed class SetDbaRgWorkloadGroupCommand : DbaBaseCmdlet
 
     /// <summary>Internal or External resource pool.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("Internal", "External")]
     public string? ResourcePoolType { get; set; }
 
     /// <summary>Relative scheduling importance.</summary>
     [Parameter(Position = 5)]
+    [PsStringCast]
     [ValidateSet("LOW", "MEDIUM", "HIGH")]
     public string? Importance { get; set; }
 

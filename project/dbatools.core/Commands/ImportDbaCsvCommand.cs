@@ -141,6 +141,7 @@ public sealed partial class ImportDbaCsvCommand : DbaInstanceCmdlet
 
     /// <summary>Controls automatic whitespace removal from field values.</summary>
     [Parameter(Position = 14)]
+    [PsStringCast]
     [ValidateSet("All", "None", "UnquotedOnly", "QuotedOnly")]
     public string TrimmingOption { get; set; } = "None";
 
@@ -150,11 +151,13 @@ public sealed partial class ImportDbaCsvCommand : DbaInstanceCmdlet
 
     /// <summary>How malformed rows are handled during import.</summary>
     [Parameter(Position = 16)]
+    [PsStringCast]
     [ValidateSet("AdvanceToNextLine", "ThrowException")]
     public string ParseErrorAction { get; set; } = "ThrowException";
 
     /// <summary>The text encoding of the CSV file.</summary>
     [Parameter(Position = 17)]
+    [PsStringCast]
     [ValidateSet("ASCII", "BigEndianUnicode", "Byte", "String", "Unicode", "UTF7", "UTF8", "Unknown")]
     public string Encoding { get; set; } = "UTF8";
 
@@ -192,16 +195,19 @@ public sealed partial class ImportDbaCsvCommand : DbaInstanceCmdlet
 
     /// <summary>How quoted fields are parsed (Strict RFC 4180 or Lenient).</summary>
     [Parameter(Position = 22)]
+    [PsStringCast]
     [ValidateSet("Strict", "Lenient")]
     public string QuoteMode { get; set; } = "Strict";
 
     /// <summary>How duplicate column headers are handled.</summary>
     [Parameter(Position = 23)]
+    [PsStringCast]
     [ValidateSet("ThrowException", "Rename", "UseFirstOccurrence", "UseLastOccurrence")]
     public string DuplicateHeaderBehavior { get; set; } = "ThrowException";
 
     /// <summary>What happens when a row has more or fewer fields than expected.</summary>
     [Parameter(Position = 24)]
+    [PsStringCast]
     [ValidateSet("ThrowException", "PadWithNulls", "TruncateExtra", "PadOrTruncate")]
     public string MismatchedFieldAction { get; set; } = "ThrowException";
 

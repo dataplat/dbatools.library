@@ -38,6 +38,7 @@ public sealed class NewDbaDiagnosticAdsNotebookCommand : DbaBaseCmdlet
 
     /// <summary>The SQL Server version to generate diagnostic queries for.</summary>
     [Parameter(Position = 2)]
+    [PsStringCast]
     [ValidateSet("2005", "2008", "2008R2", "2012", "2014", "2016", "2016SP2", "2017", "2019", "2022", "AzureSQLDatabase")]
     public string? TargetVersion { get; set; }
 

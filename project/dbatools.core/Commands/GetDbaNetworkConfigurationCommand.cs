@@ -31,6 +31,7 @@ public sealed partial class GetDbaNetworkConfigurationCommand : DbaBaseCmdlet
 
     /// <summary>Controls which network configuration details are returned from SQL Server Configuration Manager.</summary>
     [Parameter(Position = 2)]
+    [PsStringCast]
     [ValidateSet("Full", "ServerProtocols", "TcpIpProperties", "TcpIpAddresses", "Certificate")]
     public string OutputType { get; set; } = "Full";
 

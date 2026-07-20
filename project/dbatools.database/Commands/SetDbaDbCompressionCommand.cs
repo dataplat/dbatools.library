@@ -116,6 +116,7 @@ public sealed class SetDbaDbCompressionCommand : DbaBaseCmdlet
 
     /// <summary>Compression type to apply, or Recommended to use Test-DbaDbCompression results.</summary>
     [Parameter(Position = 5)]
+    [PsStringCast]
     [ValidateSet("Recommended", "Page", "Row", "None")]
     public string CompressionType { get; set; } = "Recommended";
 

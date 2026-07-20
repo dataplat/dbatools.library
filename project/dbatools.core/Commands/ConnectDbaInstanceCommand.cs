@@ -32,6 +32,7 @@ public sealed partial class ConnectDbaInstanceCommand : DbaInstanceCmdlet
 
     /// <summary>Declares the application workload type when connecting to an Always On Availability Group.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("ReadOnly", "ReadWrite")]
     public string? ApplicationIntent { get; set; }
 
@@ -85,6 +86,7 @@ public sealed partial class ConnectDbaInstanceCommand : DbaInstanceCmdlet
 
     /// <summary>Specifies the network protocol for connecting to SQL Server.</summary>
     [Parameter(Position = 12)]
+    [PsStringCast]
     [ValidateSet("TcpIp", "NamedPipes", "Multiprotocol", "AppleTalk", "BanyanVines", "Via", "SharedMemory", "NWLinkIpxSpx")]
     public string? NetworkProtocol { get; set; }
 
@@ -102,6 +104,7 @@ public sealed partial class ConnectDbaInstanceCommand : DbaInstanceCmdlet
 
     /// <summary>Controls how SQL commands are processed by the connection.</summary>
     [Parameter(Position = 15)]
+    [PsStringCast]
     [ValidateSet("CaptureSql", "ExecuteAndCaptureSql", "ExecuteSql")]
     public string? SqlExecutionModes { get; set; }
 
@@ -147,6 +150,7 @@ public sealed partial class ConnectDbaInstanceCommand : DbaInstanceCmdlet
 
     /// <summary>Specifies the authentication method for connecting to Azure SQL or Entra ID-protected SQL Server instances.</summary>
     [Parameter(Position = 22)]
+    [PsStringCast]
     [ValidateSet("ActiveDirectoryIntegrated", "ActiveDirectoryInteractive", "ActiveDirectoryPassword", "ActiveDirectoryServicePrincipal", "ActiveDirectoryManagedIdentity", "ActiveDirectoryDeviceCodeFlow")]
     public string? AuthenticationType { get; set; }
 

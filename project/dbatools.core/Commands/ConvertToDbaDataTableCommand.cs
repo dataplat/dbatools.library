@@ -26,12 +26,14 @@ public sealed class ConvertToDbaDataTableCommand : DbaBaseCmdlet
 
     /// <summary>Controls how TimeSpan and DbaTimeSpan objects are converted for database storage.</summary>
     [Parameter]
+    [PsStringCast]
     [ValidateSet("Ticks", "TotalDays", "TotalHours", "TotalMinutes", "TotalSeconds", "TotalMilliseconds", "String")]
     [ValidateNotNullOrEmpty]
     public string TimeSpanType { get; set; } = "TotalMilliseconds";
 
     /// <summary>Controls how DbaSize objects (file sizes, database sizes) are converted for database storage.</summary>
     [Parameter]
+    [PsStringCast]
     [ValidateSet("Int64", "Int32", "String")]
     public string SizeType { get; set; } = "Int64";
 

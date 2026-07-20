@@ -60,6 +60,7 @@ public sealed partial class InvokeDbaQueryCommand : DbaInstanceCmdlet
 
     /// <summary>Output shape.</summary>
     [Parameter]
+    [PsStringCast]
     [ValidateSet("DataSet", "DataTable", "DataRow", "PSObject", "PSObjectArray", "SingleValue")]
     public string As { get; set; } = "DataRow";
 

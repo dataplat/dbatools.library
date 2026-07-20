@@ -37,6 +37,7 @@ public sealed class InvokeDbaPfRelogCommand : DbaBaseCmdlet
 
     /// <summary>Output type.</summary>
     [Parameter(Position = 2)]
+    [PsStringCast]
     [ValidateSet("tsv", "csv", "bin", "sql")]
     public string Type { get; set; } = "tsv";
 

@@ -89,6 +89,7 @@ public sealed class SetDbaAgentServerCommand : DbaBaseCmdlet
 
     /// <summary>Enables or disables CPU idle condition monitoring.</summary>
     [Parameter(Position = 10)]
+    [PsStringCast]
     [ValidateSet("Enabled", "Disabled")]
     public string? CpuPolling { get; set; }
 
@@ -115,16 +116,19 @@ public sealed class SetDbaAgentServerCommand : DbaBaseCmdlet
 
     /// <summary>Whether SQL Server Agent replaces tokens in alert messages.</summary>
     [Parameter(Position = 16)]
+    [PsStringCast]
     [ValidateSet("Enabled", "Disabled")]
     public string? ReplaceAlertTokens { get; set; }
 
     /// <summary>Whether copies of agent notification emails are saved to sent items.</summary>
     [Parameter(Position = 17)]
+    [PsStringCast]
     [ValidateSet("Enabled", "Disabled")]
     public string? SaveInSentFolder { get; set; }
 
     /// <summary>Whether SQL Server Agent starts automatically when SQL Server starts.</summary>
     [Parameter(Position = 18)]
+    [PsStringCast]
     [ValidateSet("Enabled", "Disabled")]
     public string? SqlAgentAutoStart { get; set; }
 
@@ -134,16 +138,19 @@ public sealed class SetDbaAgentServerCommand : DbaBaseCmdlet
 
     /// <summary>Whether SQL Server Agent automatically restarts if it stops unexpectedly.</summary>
     [Parameter(Position = 20)]
+    [PsStringCast]
     [ValidateSet("Enabled", "Disabled")]
     public string? SqlAgentRestart { get; set; }
 
     /// <summary>Whether SQL Server Agent can restart the SQL Server service.</summary>
     [Parameter(Position = 21)]
+    [PsStringCast]
     [ValidateSet("Enabled", "Disabled")]
     public string? SqlServerRestart { get; set; }
 
     /// <summary>Whether SQL Server Agent writes errors to the Windows Application Event Log.</summary>
     [Parameter(Position = 22)]
+    [PsStringCast]
     [ValidateSet("Enabled", "Disabled")]
     public string? WriteOemErrorLog { get; set; }
 

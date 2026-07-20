@@ -43,6 +43,7 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
 
     /// <summary>The output encoding for Out-File.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("ASCII", "BigEndianUnicode", "Byte", "String", "Unicode", "UTF7", "UTF8", "Unknown")]
     public string Encoding { get; set; } = "UTF8";
 

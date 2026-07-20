@@ -30,6 +30,7 @@ public sealed class GetDbaAgentJobCategoryCommand : DbaBaseCmdlet
 
     /// <summary>Filters job categories by deployment type.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("LocalJob", "MultiServerJob", "None")]
     public string? CategoryType { get; set; }
 

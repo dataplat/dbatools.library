@@ -30,14 +30,17 @@ public sealed class NewDbaSqlParameterCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     [Parameter(Position = 0)]
+    [PsStringCast]
     [ValidateSet("None", "IgnoreCase", "IgnoreNonSpace", "IgnoreKanaType", "IgnoreWidth", "BinarySort2", "BinarySort")]
     public string? CompareInfo { get; set; }
 
     [Parameter(Position = 1)]
+    [PsStringCast]
     [ValidateSet("AnsiString", "Binary", "Byte", "Boolean", "Currency", "Date", "DateTime", "Decimal", "Double", "Guid", "Int16", "Int32", "Int64", "Object", "SByte", "Single", "String", "Time", "UInt16", "UInt32", "UInt64", "VarNumeric", "AnsiStringFixedLength", "StringFixedLength", "Xml", "DateTime2", "DateTimeOffset")]
     public string? DbType { get; set; }
 
     [Parameter(Position = 2)]
+    [PsStringCast]
     [ValidateSet("Input", "Output", "InputOutput", "ReturnValue")]
     public string? Direction { get; set; }
 
@@ -73,10 +76,12 @@ public sealed class NewDbaSqlParameterCommand : DbaBaseCmdlet
     public SwitchParameter SourceColumnNullMapping { get; set; }
 
     [Parameter(Position = 10)]
+    [PsStringCast]
     [ValidateSet("Original", "Current", "Proposed", "Default")]
     public string? SourceVersion { get; set; }
 
     [Parameter(Position = 11)]
+    [PsStringCast]
     [ValidateSet("BigInt", "Binary", "Bit", "Char", "DateTime", "Decimal", "Float", "Image", "Int", "Money", "NChar", "NText", "NVarChar", "Real", "UniqueIdentifier", "SmallDateTime", "SmallInt", "SmallMoney", "Text", "Timestamp", "TinyInt", "VarBinary", "VarChar", "Variant", "Xml", "Udt", "Structured", "Date", "Time", "DateTime2", "DateTimeOffset")]
     public string? SqlDbType { get; set; }
 

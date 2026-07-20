@@ -60,6 +60,7 @@ public sealed class SetDbaAgentJobStepCommand : DbaBaseCmdlet
 
     /// <summary>The subsystem used by the job step.</summary>
     [Parameter(Position = 5)]
+    [PsStringCast]
     [ValidateSet("ActiveScripting", "AnalysisCommand", "AnalysisQuery", "CmdExec", "Distribution", "LogReader", "Merge", "PowerShell", "QueueReader", "Snapshot", "Ssis", "TransactSql")]
     public string? Subsystem { get; set; }
 
@@ -77,6 +78,7 @@ public sealed class SetDbaAgentJobStepCommand : DbaBaseCmdlet
 
     /// <summary>The action to take on success.</summary>
     [Parameter(Position = 9)]
+    [PsStringCast]
     [ValidateSet("QuitWithSuccess", "QuitWithFailure", "GoToNextStep", "GoToStep")]
     public string? OnSuccessAction { get; set; }
 
@@ -86,6 +88,7 @@ public sealed class SetDbaAgentJobStepCommand : DbaBaseCmdlet
 
     /// <summary>The action to take on failure.</summary>
     [Parameter(Position = 11)]
+    [PsStringCast]
     [ValidateSet("QuitWithSuccess", "QuitWithFailure", "GoToNextStep", "GoToStep")]
     public string? OnFailAction { get; set; }
 

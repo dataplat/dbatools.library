@@ -38,6 +38,7 @@ public sealed class TestDbaDiskSpeedCommand : DbaInstanceCmdlet
 
     /// <summary>Aggregate I/O statistics by database, disk, or file.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("Database", "Disk", "File")]
     public string AggregateBy { get; set; } = "File";
 

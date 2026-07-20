@@ -51,6 +51,7 @@ public sealed class NewDbaAgentJobCategoryCommand : DbaBaseCmdlet
 
     /// <summary>The scope of the job category: LocalJob, MultiServerJob, or None. Defaults to LocalJob.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("LocalJob", "MultiServerJob", "None")]
     public string? CategoryType { get; set; }
 

@@ -94,6 +94,7 @@ public sealed class InstallDbaAgentAdminAlertCommand : DbaBaseCmdlet
 
     /// <summary>How the operator is notified.</summary>
     [Parameter(Position = 13)]
+    [PsStringCast]
     [ValidateSet("None", "NotifyEmail", "Pager", "NetSend", "NotifyAll")]
     public string NotifyMethod { get; set; } = "NotifyAll";
 

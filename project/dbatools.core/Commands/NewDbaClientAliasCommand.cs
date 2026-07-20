@@ -42,6 +42,7 @@ public sealed class NewDbaClientAliasCommand : DbaBaseCmdlet
     public string Alias { get; set; } = null!;
 
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("TCPIP", "NamedPipes")]
     public string Protocol { get; set; } = "TCPIP";
 

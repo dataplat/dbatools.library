@@ -36,6 +36,7 @@ public sealed class RemoveDbaRgResourcePoolCommand : DbaBaseCmdlet
 
     /// <summary>Internal or External resource pool.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("Internal", "External")]
     public string Type { get; set; } = "Internal";
 

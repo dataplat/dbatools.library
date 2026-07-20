@@ -70,11 +70,13 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
 
     /// <summary>How fields are quoted.</summary>
     [Parameter(Position = 9)]
+    [PsStringCast]
     [ValidateSet("AsNeeded", "Always", "Never", "NonNumeric")]
     public string QuotingBehavior { get; set; } = "AsNeeded";
 
     /// <summary>The output text encoding.</summary>
     [Parameter(Position = 10)]
+    [PsStringCast]
     [ValidateSet("ASCII", "BigEndianUnicode", "Unicode", "UTF7", "UTF8", "UTF32")]
     public string Encoding { get; set; } = "UTF8";
 
@@ -92,11 +94,13 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
 
     /// <summary>The compression applied to the output file.</summary>
     [Parameter(Position = 13)]
+    [PsStringCast]
     [ValidateSet("None", "GZip", "Deflate", "Brotli", "ZLib")]
     public string CompressionType { get; set; } = "None";
 
     /// <summary>The compression level.</summary>
     [Parameter(Position = 14)]
+    [PsStringCast]
     [ValidateSet("Fastest", "Optimal", "SmallestSize", "NoCompression")]
     public string CompressionLevel { get; set; } = "Optimal";
 

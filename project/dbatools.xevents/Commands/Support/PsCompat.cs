@@ -6,6 +6,16 @@ using System.Management.Automation;
 
 namespace Dataplat.Dbatools.Commands;
 
+/// <summary>The scalar sibling of PsStringArrayCast: PS [string] converts at BIND time, so
+/// an explicit null argument becomes "" before mandatory/validation runs (W1-032 class).</summary>
+internal sealed class PsStringCastAttribute : ArgumentTransformationAttribute
+{
+    public override object? Transform(EngineIntrinsics engineIntrinsics, object? inputData)
+    {
+        return LanguagePrimitives.ConvertTo(inputData, typeof(string), CultureInfo.InvariantCulture);
+    }
+}
+
 /// <summary>PS [datetime] bind-time cast: script functions convert string arguments with the
 /// INVARIANT culture, while the compiled binder uses the CURRENT culture - under de-DE,
 /// "01.02.2020" binds Feb 1 compiled vs Jan 2 in the function (lab-proven divergence,

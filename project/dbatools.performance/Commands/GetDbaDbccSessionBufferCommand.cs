@@ -42,6 +42,7 @@ public sealed class GetDbaDbccSessionBufferCommand : DbaInstanceCmdlet
 
     /// <summary>Which DBCC operation to execute.</summary>
     [Parameter(Position = 2)]
+    [PsStringCast]
     [ValidateSet("InputBuffer", "OutputBuffer")]
     public string Operation { get; set; } = "InputBuffer";
 

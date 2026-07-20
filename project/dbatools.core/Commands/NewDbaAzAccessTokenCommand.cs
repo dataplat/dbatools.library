@@ -32,11 +32,13 @@ public sealed class NewDbaAzAccessTokenCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     [Parameter(Mandatory = true, Position = 0)]
+    [PsStringCast]
     [ValidateSet("ManagedIdentity", "ServicePrincipal", "RenewableServicePrincipal")]
     public string Type { get; set; } = null!;
 
     // The duplicate ResourceManager entry is preserved from the PS ValidateSet.
     [Parameter(Position = 1)]
+    [PsStringCast]
     [ValidateSet("AzureSqlDb", "ResourceManager", "DataLake", "EventHubs", "KeyVault", "ResourceManager", "ServiceBus", "Storage")]
     public string Subtype { get; set; } = "AzureSqlDb";
 
@@ -53,6 +55,7 @@ public sealed class NewDbaAzAccessTokenCommand : DbaBaseCmdlet
     public string? Thumbprint { get; set; }
 
     [Parameter(Position = 6)]
+    [PsStringCast]
     [ValidateSet("CurrentUser", "LocalMachine")]
     public string? Store { get; set; }
 

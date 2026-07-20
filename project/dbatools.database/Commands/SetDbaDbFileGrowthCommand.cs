@@ -57,6 +57,7 @@ public sealed class SetDbaDbFileGrowthCommand : DbaBaseCmdlet
 
     /// <summary>The unit the growth value is expressed in.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("KB", "MB", "GB", "TB")]
     public string GrowthType { get; set; } = "MB";
 
@@ -66,6 +67,7 @@ public sealed class SetDbaDbFileGrowthCommand : DbaBaseCmdlet
 
     /// <summary>Which files to modify.</summary>
     [Parameter(Position = 5)]
+    [PsStringCast]
     [ValidateSet("All", "Data", "Log")]
     public string FileType { get; set; } = "All";
 

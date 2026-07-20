@@ -68,6 +68,7 @@ public sealed class NewDbaAgentOperatorCommand : DbaBaseCmdlet
 
     /// <summary>Which days pager notifications are active.</summary>
     [Parameter(Position = 6)]
+    [PsStringCast]
     [ValidateSet("EveryDay", "Weekdays", "Weekend", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")]
     public string? PagerDay { get; set; }
 

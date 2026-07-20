@@ -32,6 +32,7 @@ public sealed class ExportDbaDiagnosticQueryCommand : DbaBaseCmdlet
     public object[] InputObject { get; set; } = null!;
 
     [Parameter]
+    [PsStringCast]
     [ValidateSet("Excel", "Csv")]
     public string ConvertTo { get; set; } = "Csv";
 
