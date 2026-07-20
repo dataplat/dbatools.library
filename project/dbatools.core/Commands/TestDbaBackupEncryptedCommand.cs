@@ -9,13 +9,14 @@ namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
 /// Analyzes backup files to determine encryption status (backup encryption or TDE). Port of
-/// public/Test-DbaBackupEncrypted.ps1 (W3-105). The function is process-only with no begin/end
-/// and no cross-record state, so each pipeline record rides ONE VERBATIM module hop in
-/// ProcessRecord (GetDbaExtendedProtection precedent): connect, then the per-$FilePath loop
-/// running RESTORE HEADERONLY / FILELISTONLY and emitting one PSCustomObject per file, all
-/// decided by the engine exactly as the function decided them (Convert-ByteToHexString,
-/// [dbnull] comparisons, the thumbprint-exception branch). No $PSBoundParameters reads, so no
-/// carriers. Surface pinned by migration/baselines/Test-DbaBackupEncrypted.json (SqlInstance
+/// public/Test-DbaBackupEncrypted.ps1 (W3-105). The function is process-only with no begin/end;
+/// each pipeline record rides ONE module hop in ProcessRecord (GetDbaExtendedProtection
+/// precedent): connect, then the per-$FilePath loop running RESTORE HEADERONLY / FILELISTONLY
+/// and emitting one PSCustomObject per file (Convert-ByteToHexString, [dbnull] comparisons, the
+/// thumbprint-exception branch). ONE piece of cross-record state (codex): the conditionally
+/// assigned $results persists across records in the function world, so the hop seeds/harvests it
+/// through the __dbatoolsTbeResultsCarrier sentinel with an assigned flag; the hop body is
+/// otherwise verbatim, and there are no $PSBoundParameters reads. Surface pinned by migration/baselines/Test-DbaBackupEncrypted.json (SqlInstance
 /// pos0 VFPBPN; SqlCredential pos1; FilePath pos2 mandatory VFPBPN alias FullName/Path; no SSP;
 /// no OutputType).
 ///
@@ -120,6 +121,7 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
+    [CmdletBinding()]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$FilePath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedResults, $__carriedResultsAssigned)
     # DEF-011/012 (codex): $results is conditionally assigned and the function world's process
     # scope carries the prior record's value; seed ONLY when the carrier says it was assigned
