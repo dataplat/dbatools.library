@@ -59,38 +59,48 @@ public sealed partial class InvokeDbaQueryCommand
             DataSet ds = new();
             SqlDataAdapter da = new(cmd);
 
-            if (MessagesToOutput.IsPresent)
+            // Register the in-flight command so StopProcessing (Ctrl-C) can Cancel() it; cleared
+            // in finally once execution returns (DbaBaseCmdlet.SetActiveCommand/StopProcessing seam).
+            SetActiveCommand(cmd);
+            try
             {
-                FillStreamingMessages(conn, da, ds);
-            }
-            else
-            {
-                //Following EventHandler is used for PRINT and RAISERROR T-SQL statements. Executed when -Verbose parameter specified by caller and no -MessageToOutput
-                SqlInfoMessageEventHandler? handler = null;
-                if (_verboseRequested)
+                if (MessagesToOutput.IsPresent)
                 {
-                    conn.FireInfoMessageEventOnUserErrors = false;
-                    handler = (sender, e) => WriteVerbose(e.ToString());
-                    conn.InfoMessage += handler;
+                    FillStreamingMessages(conn, da, ds);
                 }
-                Exception? err = null;
-                try
+                else
                 {
-                    da.Fill(ds);
-                }
-                catch (Exception ex)
-                {
-                    // PS: [void]$da.fill($ds) is a METHOD invocation - the caught $_ carries
-                    // a MethodInvocationException wrapping the provider exception, so
-                    // Resolve-SqlError's SqlException branch never matches (codex r2 F2).
-                    err = WrapAsMethodInvocation(ex, "Fill", 1);
-                }
-                finally
-                {
+                    //Following EventHandler is used for PRINT and RAISERROR T-SQL statements. Executed when -Verbose parameter specified by caller and no -MessageToOutput
+                    SqlInfoMessageEventHandler? handler = null;
                     if (_verboseRequested)
-                        conn.InfoMessage -= handler;
+                    {
+                        conn.FireInfoMessageEventOnUserErrors = false;
+                        handler = (sender, e) => WriteVerbose(e.ToString());
+                        conn.InfoMessage += handler;
+                    }
+                    Exception? err = null;
+                    try
+                    {
+                        da.Fill(ds);
+                    }
+                    catch (Exception ex)
+                    {
+                        // PS: [void]$da.fill($ds) is a METHOD invocation - the caught $_ carries
+                        // a MethodInvocationException wrapping the provider exception, so
+                        // Resolve-SqlError's SqlException branch never matches (codex r2 F2).
+                        err = WrapAsMethodInvocation(ex, "Fill", 1);
+                    }
+                    finally
+                    {
+                        if (_verboseRequested)
+                            conn.InfoMessage -= handler;
+                    }
+                    ResolveSqlError(err);
                 }
-                ResolveSqlError(err);
+            }
+            finally
+            {
+                SetActiveCommand(null);
             }
 
             if (AppendServerInstance.IsPresent)
