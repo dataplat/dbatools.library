@@ -10,10 +10,10 @@ public sealed partial class AddDbaAgDatabaseCommand
     // function-scope persistence of that parameter mutation.
     private const string ProcessScriptTail = """
                                 if ($replicaServerSMO[$replicaName].Logins[$db.Owner]) {
-                                    Write-Message -Level Verbose -Message "Source database owner is found on replica, so using ExecuteAs with Restore-DbaDatabase to set correct owner." -FunctionName Add-DbaAgDatabase
+                                    Write-Message -Level Verbose -Message "Source database owner is found on replica, so using ExecuteAs with Restore-DbaDatabase to set correct owner." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                                     $restoreParams['ExecuteAs'] = $db.Owner
                                 } else {
-                                    Write-Message -Level Verbose -Message "Source database owner is not found on replica, so there is nothing we can do." -FunctionName Add-DbaAgDatabase
+                                    Write-Message -Level Verbose -Message "Source database owner is not found on replica, so there is nothing we can do." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                                 }
                             }
                             $null = $backups | Restore-DbaDatabase @restoreParams
@@ -29,26 +29,26 @@ public sealed partial class AddDbaAgDatabaseCommand
             }
 
             $progress['Status'] = "Step 3/5: Add the database to the Availability Group on the primary replica"
-            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase
+            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
 
             if ($__realCmdlet.ShouldProcess($server, "Add database $($db.Name) to Availability Group $AvailabilityGroup on the primary replica")) {
                 try {
                     $progress['CurrentOperation'] = "State of AvailabilityDatabase for $($db.Name) on is not yet known"
-                    Write-Message -Level Verbose -Message "Object of type AvailabilityDatabase for $($db.Name) will be created. $($progress['CurrentOperation'])" -FunctionName Add-DbaAgDatabase
+                    Write-Message -Level Verbose -Message "Object of type AvailabilityDatabase for $($db.Name) will be created. $($progress['CurrentOperation'])" -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                     Write-Progress @progress
 
                     if ($ag.AvailabilityDatabases.Name -contains $db.Name) {
-                        Write-Message -Level Verbose -Message "Database $($db.Name) is already joined to Availability Group $AvailabilityGroup. No action will be taken on the primary replica." -FunctionName Add-DbaAgDatabase
+                        Write-Message -Level Verbose -Message "Database $($db.Name) is already joined to Availability Group $AvailabilityGroup. No action will be taken on the primary replica." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                     } else {
                         $agDb = Get-DbaAgDatabase -SqlInstance $server -AvailabilityGroup $ag.Name -Database $db.Name
                         $agDb = New-Object Microsoft.SqlServer.Management.Smo.AvailabilityDatabase($ag, $db.Name)
                         $progress['CurrentOperation'] = "State of AvailabilityDatabase for $($db.Name) is $($agDb.State)"
-                        Write-Message -Level Verbose -Message "Object of type AvailabilityDatabase for $($db.Name) is created. $($progress['CurrentOperation'])" -FunctionName Add-DbaAgDatabase
+                        Write-Message -Level Verbose -Message "Object of type AvailabilityDatabase for $($db.Name) is created. $($progress['CurrentOperation'])" -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                         Write-Progress @progress
 
                         $agDb.Create()
                         $progress['CurrentOperation'] = "State of AvailabilityDatabase for $($db.Name) is $($agDb.State)"
-                        Write-Message -Level Verbose -Message "Method Create of AvailabilityDatabase for $($db.Name) is executed. $($progress['CurrentOperation'])" -FunctionName Add-DbaAgDatabase
+                        Write-Message -Level Verbose -Message "Method Create of AvailabilityDatabase for $($db.Name) is executed. $($progress['CurrentOperation'])" -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                         Write-Progress @progress
 
                         # Wait for state to become Existing
@@ -56,7 +56,7 @@ public sealed partial class AddDbaAgDatabaseCommand
                         $timeout = (Get-Date).AddSeconds($timeoutExisting)
                         while ($agDb.State -ne 'Existing') {
                             $progress['CurrentOperation'] = "State of AvailabilityDatabase for $($db.Name) is $($agDb.State), waiting for Existing"
-                            Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase
+                            Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                             Write-Progress @progress
 
                             if ((Get-Date) -gt $timeout) {
@@ -75,13 +75,13 @@ public sealed partial class AddDbaAgDatabaseCommand
             }
 
             $progress['Status'] = "Step 4/5: Add the database to the Availability Group on the secondary replicas"
-            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase
+            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
 
             $failure = $false
             foreach ($replicaName in $replicaServerSMO.Keys) {
                 if ($__realCmdlet.ShouldProcess($replicaServerSMO[$replicaName], "Add database $($db.Name) to Availability Group $AvailabilityGroup on replica $replicaName")) {
                     $progress['CurrentOperation'] = "State of AvailabilityDatabase for $($db.Name) on replica $replicaName is not yet known"
-                    Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase
+                    Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                     Write-Progress @progress
 
                     try {
@@ -92,7 +92,7 @@ public sealed partial class AddDbaAgDatabaseCommand
                     }
 
                     if ($replicaAgDb.IsJoined) {
-                        Write-Message -Level Verbose -Message "Database $($db.Name) is already joined to Availability Group $AvailabilityGroup. No action will be taken on the replica $replicaName." -FunctionName Add-DbaAgDatabase
+                        Write-Message -Level Verbose -Message "Database $($db.Name) is already joined to Availability Group $AvailabilityGroup. No action will be taken on the replica $replicaName." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                         $replicaAgDbSMO[$replicaName] = $replicaAgDb
                     } else {
                         # Save SMO in array for the output
@@ -113,14 +113,14 @@ public sealed partial class AddDbaAgDatabaseCommand
                         }
 
                         $progress['CurrentOperation'] = "State of AvailabilityDatabase for $($db.Name) on replica $replicaName is $($replicaAgDb.State)"
-                        Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase
+                        Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                         Write-Progress @progress
 
                         # https://docs.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.management.smo.sqlsmostate
                         $timeout = (Get-Date).AddSeconds($timeoutExisting)
                         while ($replicaAgDb.State -ne 'Existing') {
                             $progress['CurrentOperation'] = "State of AvailabilityDatabase for $($db.Name) on replica $replicaName is $($replicaAgDb.State), waiting for Existing."
-                            Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase
+                            Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                             Write-Progress @progress
 
                             if ((Get-Date) -gt $timeout) {
@@ -134,7 +134,7 @@ public sealed partial class AddDbaAgDatabaseCommand
                         if ($ag.AvailabilityReplicas[$replicaName].SeedingMode -ne 'Automatic') {
                             try {
                                 $progress['CurrentOperation'] = "Joining database $($db.Name) on replica $replicaName"
-                                Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase
+                                Write-Message -Level Verbose -Message $progress['CurrentOperation'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                                 Write-Progress @progress
 
                                 # DO NOT fix the typo in "JoinAvailablityGroup()" as it is a typo the SMO.
@@ -155,11 +155,11 @@ public sealed partial class AddDbaAgDatabaseCommand
 
             $progress['Status'] = "Step 5/5: Wait for the database to finish joining the Availability Group on the secondary replicas"
             $progress['CurrentOperation'] = ''
-            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase
+            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
             Write-Progress @progress
 
             if ($NoWait) {
-                Write-Message -Level Verbose -Message "NoWait parameter specified. Skipping wait for database $($db.Name) to finish joining the Availability Group $AvailabilityGroup on the secondary replicas. Synchronization will continue in the background." -FunctionName Add-DbaAgDatabase
+                Write-Message -Level Verbose -Message "NoWait parameter specified. Skipping wait for database $($db.Name) to finish joining the Availability Group $AvailabilityGroup on the secondary replicas. Synchronization will continue in the background." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
             } elseif ($__realCmdlet.ShouldProcess($server, "Wait for the database $($db.Name) to finish joining the Availability Group $AvailabilityGroup on the secondary replicas.")) {
                 # We need to setup a progress bar for every replica to display them all at once.
                 $syncProgressId = @{ }
@@ -174,7 +174,7 @@ public sealed partial class AddDbaAgDatabaseCommand
                     $failure = $false
                     foreach ($replicaName in $replicaServerSMO.Keys) {
                         if (-not $targetSynchronizationState[$replicaName]) {
-                            Write-Message -Level Verbose -Message "Database $($db.Name) is already joined to Availability Group $AvailabilityGroup. No action will be taken on the replica $replicaName." -FunctionName Add-DbaAgDatabase
+                            Write-Message -Level Verbose -Message "Database $($db.Name) is already joined to Availability Group $AvailabilityGroup. No action will be taken on the replica $replicaName." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                             continue
                         }
 
@@ -204,13 +204,13 @@ public sealed partial class AddDbaAgDatabaseCommand
                                 $syncProgress['CurrentOperation'] = "Seeding state: $($physicalSeedingStats.internal_state_desc), $([int]($physicalSeedingStats.transferred_size_bytes/1024/1024)) out of $([int]($physicalSeedingStats.database_size_bytes/1024/1024)) MB transferred"
                             }
                             $automaticSeeding = $server.Query("SELECT TOP 1 * FROM sys.dm_hadr_automatic_seeding WHERE ag_id = '$($ag.UniqueId.Guid.ToUpper())' AND ag_db_id = '$($ag.AvailabilityDatabases[$db.Name].UniqueId.Guid.ToUpper())' AND ag_remote_replica_id = '$($ag.AvailabilityReplicas[$replicaName].UniqueId.Guid.ToUpper())' ORDER BY start_time DESC")
-                            Write-Message -Level Verbose -Message "Current automatic seeding state: $($automaticSeeding.current_state)" -FunctionName Add-DbaAgDatabase
+                            Write-Message -Level Verbose -Message "Current automatic seeding state: $($automaticSeeding.current_state)" -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                             if ($automaticSeeding.current_state -eq 'FAILED') {
                                 $failure = $true
                                 Stop-Function -Message "Failed while seeding database $($db.Name) to $replicaName. failure_message: $($automaticSeeding.failure_state_desc)." -Continue -FunctionName Add-DbaAgDatabase
                             }
                         }
-                        Write-Message -Level Verbose -Message ($syncProgress['Status'] + $syncProgress['CurrentOperation']) -FunctionName Add-DbaAgDatabase
+                        Write-Message -Level Verbose -Message ($syncProgress['Status'] + $syncProgress['CurrentOperation']) -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                         Write-Progress @syncProgress
                     }
                     if ($failure) {

@@ -14,28 +14,28 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                         if ($RestoreDataFolder) {
                             $DatabaseRestoreDataFolder = $RestoreDataFolder
                         } else {
-                            Write-Message -Message "Restore data folder is not set. Using server default." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Restore data folder is not set. Using server default." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             $DatabaseRestoreDataFolder = $DestinationServer.DefaultFile
                         }
-                        Write-Message -Message "Restore data folder is set to $DatabaseRestoreDataFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                        Write-Message -Message "Restore data folder is set to $DatabaseRestoreDataFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                         if ($RestoreLogFolder) {
                             $DatabaseRestoreLogFolder = $RestoreLogFolder
                         } else {
-                            Write-Message -Message "Restore log folder is not set. Using server default." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Restore log folder is not set. Using server default." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             $DatabaseRestoreLogFolder = $DestinationServer.DefaultLog
                         }
-                        Write-Message -Message "Restore log folder is set to $DatabaseRestoreLogFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                        Write-Message -Message "Restore log folder is set to $DatabaseRestoreLogFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                         # Check if the restore data folder exists (skip for Azure SQL as it manages storage)
                         if (-not $DestinationServer.IsAzure) {
-                            Write-Message -Message "Testing database restore data path $DatabaseRestoreDataFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Testing database restore data path $DatabaseRestoreDataFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             if ((Test-DbaPath  -Path $DatabaseRestoreDataFolder -SqlInstance $destInstance -SqlCredential $DestinationSqlCredential) -ne $true) {
                                 if ($PSCmdlet.ShouldProcess($DestinationServerName, "Creating database restore data folder $DatabaseRestoreDataFolder on $DestinationServerName")) {
                                     # Try creating the data folder
                                     try {
                                         Invoke-Command2 -Credential $DestinationCredential -ScriptBlock {
-                                            Write-Message -Message "Creating data folder $DatabaseRestoreDataFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                            Write-Message -Message "Creating data folder $DatabaseRestoreDataFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                             $null = New-Item -Path $DatabaseRestoreDataFolder -ItemType Directory -Force:$Force
                                         }
                                     } catch {
@@ -49,15 +49,15 @@ public sealed partial class InvokeDbaDbLogShippingCommand
 
                         # Check if the restore log folder exists (skip for Azure SQL as it manages storage)
                         if (-not $DestinationServer.IsAzure) {
-                            Write-Message -Message "Testing database restore log path $DatabaseRestoreLogFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Testing database restore log path $DatabaseRestoreLogFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             if ((Test-DbaPath  -Path $DatabaseRestoreLogFolder -SqlInstance $destInstance -SqlCredential $DestinationSqlCredential) -ne $true) {
                                 if ($PSCmdlet.ShouldProcess($DestinationServerName, "Creating database restore log folder $DatabaseRestoreLogFolder on $DestinationServerName")) {
                                     # Try creating the log folder
                                     try {
-                                        Write-Message -Message "Restore log folder $DatabaseRestoreLogFolder not found. Trying to create it.." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                        Write-Message -Message "Restore log folder $DatabaseRestoreLogFolder not found. Trying to create it.." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                                         Invoke-Command2 -Credential $DestinationCredential -ScriptBlock {
-                                            Write-Message -Message "Restore log folder $DatabaseRestoreLogFolder not found. Trying to create it.." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                            Write-Message -Message "Restore log folder $DatabaseRestoreLogFolder not found. Trying to create it.." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                             $null = New-Item -Path $DatabaseRestoreLogFolder -ItemType Directory -Force:$Force
                                         }
                                     } catch {
@@ -75,7 +75,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                         if ($FullBackupPath) {
                             # Skip path validation for Azure blob URLs
                             if (-not $UseAzure) {
-                                Write-Message -Message "Testing full backup path $FullBackupPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Testing full backup path $FullBackupPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 if ((Test-DbaPath -Path $FullBackupPath -SqlInstance $destInstance -SqlCredential $DestinationSqlCredential) -ne $true) {
                                     $setupResult = "Failed"
                                     $comment = "The path to the full backup could not be reached"
@@ -87,7 +87,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                         } elseif ($UseBackupFolder.Length -ge 1) {
                             # Skip path validation for Azure blob URLs
                             if (-not $UseAzure) {
-                                Write-Message -Message "Testing backup folder $UseBackupFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Testing backup folder $UseBackupFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 if ((Test-DbaPath -Path $UseBackupFolder -SqlInstance $destInstance -SqlCredential $DestinationSqlCredential) -ne $true) {
                                     $setupResult = "Failed"
                                     $comment = "The path to the backup folder could not be reached"
@@ -97,7 +97,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
 
                             $BackupPath = $UseBackupFolder
                         } elseif ($UseExistingFullBackup) {
-                            Write-Message -Message "No path to the full backup is set. Trying to retrieve the last full backup for $db from $SourceSqlInstance" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "No path to the full backup is set. Trying to retrieve the last full backup for $db from $SourceSqlInstance" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             # Get the last full backup
                             $LastBackup = Get-DbaDbBackupHistory -SqlInstance $SourceSqlInstance -Database $($db.Name) -LastFull -SqlCredential $SourceSqlCredential
@@ -107,7 +107,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                                 # Skip path validation for Azure blob URLs
                                 if (-not $UseAzure) {
                                     # Test the path to the backup
-                                    Write-Message -Message "Testing last backup path $(($LastBackup[-1]).Path[-1])" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                    Write-Message -Message "Testing last backup path $(($LastBackup[-1]).Path[-1])" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                     if ((Test-DbaPath -Path ($LastBackup[-1]).Path[-1] -SqlInstance $SourceSqlInstance -SqlCredential $SourceSqlCredential) -ne $true) {
                                         $setupResult = "Failed"
                                         $comment = "The full backup could not be found"
@@ -124,10 +124,10 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                                 if ($setupResult -ne 'Failed') {
                                     #$FullBackupPath = $LastBackup.Path
                                     $BackupPath = $LastBackup.Path
-                                    Write-Message -Message "Full backup found for $db. Path $BackupPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                    Write-Message -Message "Full backup found for $db. Path $BackupPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 }
                             } else {
-                                Write-Message -Message "No Full backup found for $db." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "No Full backup found for $db." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             }
                         }
                     }
@@ -137,14 +137,14 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                 if ($UseAzure) {
                     # For Azure, append database name to URL path
                     $DatabaseCopyDestinationFolder = "$CopyDestinationFolder/$($db.Name)"
-                    Write-Message -Message "Copy destination URL set to $DatabaseCopyDestinationFolder (Azure - no local copy)." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Copy destination URL set to $DatabaseCopyDestinationFolder (Azure - no local copy)." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 } else {
                     if ($CopyDestinationFolder.EndsWith("\")) {
                         $DatabaseCopyDestinationFolder = "$CopyDestinationFolder$($db.Name)"
                     } else {
                         $DatabaseCopyDestinationFolder = "$CopyDestinationFolder\$($db.Name)"
                     }
-                    Write-Message -Message "Copy destination folder set to $DatabaseCopyDestinationFolder." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Copy destination folder set to $DatabaseCopyDestinationFolder." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 }
 
                 # Check if the copy job name is set
@@ -156,9 +156,9 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                     $DatabaseCopyJob = "LSCopy_$($SourceServerName)_$($db.Name)"
                 }
                 if ($UseAzure) {
-                    Write-Message -Message "Copy job name set to $DatabaseCopyJob (will be removed - not needed for Azure)" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Copy job name set to $DatabaseCopyJob (will be removed - not needed for Azure)" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 } else {
-                    Write-Message -Message "Copy job name set to $DatabaseCopyJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Copy job name set to $DatabaseCopyJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 }
 
                 # Check if the copy job schedule name is set
@@ -166,35 +166,35 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                     $DatabaseCopySchedule = "$($CopySchedule)$($db.Name)"
                 } else {
                     $DatabaseCopySchedule = "LSCopySchedule_$($SourceServerName)_$($db.Name)"
-                    Write-Message -Message "Copy job schedule name set to $DatabaseCopySchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Copy job schedule name set to $DatabaseCopySchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 }
 
                 # Check if the copy destination folder exists (skip for Azure blob storage and Azure SQL)
                 if ($setupResult -ne 'Failed' -and -not $UseAzure -and -not $DestinationServer.IsAzure) {
-                    Write-Message -Message "Testing database copy destination path $DatabaseCopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Testing database copy destination path $DatabaseCopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                     if ((Test-DbaPath -Path $DatabaseCopyDestinationFolder -SqlInstance $destInstance -SqlCredential $DestinationSqlCredential) -ne $true) {
                         if ($PSCmdlet.ShouldProcess($DestinationServerName, "Creating copy destination folder on $DestinationServerName")) {
                             try {
                                 # If the destination server is remote and the credential is set
                                 if (-not $IsDestinationLocal -and $DestinationCredential) {
                                     Invoke-Command2 -ComputerName $DestinationServerName -Credential $DestinationCredential -ScriptBlock {
-                                        Write-Message -Message "Copy destination folder $DatabaseCopyDestinationFolder not found. Trying to create it.. ." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                        Write-Message -Message "Copy destination folder $DatabaseCopyDestinationFolder not found. Trying to create it.. ." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                         $null = New-Item -Path $DatabaseCopyDestinationFolder -ItemType Directory -Force:$Force
                                     }
                                 }
                                 # If the server is local and the credential is set
                                 elseif ($DestinationCredential) {
                                     Invoke-Command2 -Credential $DestinationCredential -ScriptBlock {
-                                        Write-Message -Message "Copy destination folder $DatabaseCopyDestinationFolder not found. Trying to create it.. ." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                        Write-Message -Message "Copy destination folder $DatabaseCopyDestinationFolder not found. Trying to create it.. ." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                         $null = New-Item -Path $DatabaseCopyDestinationFolder -ItemType Directory -Force:$Force
                                     }
                                 }
                                 # If the server is local and the credential is not set
                                 else {
-                                    Write-Message -Message "Copy destination folder $DatabaseCopyDestinationFolder not found. Trying to create it.. ." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                    Write-Message -Message "Copy destination folder $DatabaseCopyDestinationFolder not found. Trying to create it.. ." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                     $null = New-Item -Path $DatabaseCopyDestinationFolder -ItemType Directory -Force:$Force
                                 }
-                                Write-Message -Message "Database copy destination folder $DatabaseCopyDestinationFolder created." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Database copy destination folder $DatabaseCopyDestinationFolder created." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             } catch {
                                 $setupResult = "Failed"
                                 $comment = "Something went wrong creating the database copy destination folder"
@@ -210,7 +210,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                 } else {
                     $DatabaseRestoreJob = "LSRestore_$($SourceServerName)_$($db.Name)"
                 }
-                Write-Message -Message "Restore job name set to $DatabaseRestoreJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Restore job name set to $DatabaseRestoreJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                 # Check if the restore job schedule name is set
                 if ($RestoreSchedule) {
@@ -218,15 +218,15 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                 } else {
                     $DatabaseRestoreSchedule = "LSRestoreSchedule_$($SourceServerName)_$($db.Name)"
                 }
-                Write-Message -Message "Restore job schedule name set to $DatabaseRestoreSchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Restore job schedule name set to $DatabaseRestoreSchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                 # If the database needs to be backed up first
                 if ($setupResult -ne 'Failed') {
                     if ($GenerateFullBackup) {
                         if ($PSCmdlet.ShouldProcess($SourceSqlInstance, "Backing up database $db")) {
 
-                            Write-Message -Message "Generating full backup." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
-                            Write-Message -Message "Backing up database $db to $DatabaseSharedPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Generating full backup." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
+                            Write-Message -Message "Backing up database $db to $DatabaseSharedPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             try {
                                 $Timestamp = Get-Date -format "yyyyMMddHHmmss"
@@ -266,13 +266,13 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                                     $LastBackup = Backup-DbaDatabase @splatBackup
                                 }
 
-                                Write-Message -Message "Backup completed." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Backup completed." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                                 # Get the last full backup path
                                 #$FullBackupPath = $LastBackup.BackupPath
                                 $BackupPath = $LastBackup.BackupPath
 
-                                Write-Message -Message "Backup is located at $BackupPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Backup is located at $BackupPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             } catch {
                                 $setupResult = "Failed"
                                 $comment = "Something went wrong generating the full backup"

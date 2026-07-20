@@ -40,7 +40,7 @@ public sealed partial class RenameDbaDatabaseCommand
                         try {
                             $dirfiles = Get-DbaFile -SqlInstance $server -Path $dirname -EnableException
                         } catch {
-                            Write-Message -Level Warning -Message "Failed to enumerate existing files at $dirname, move could go wrong" -FunctionName Rename-DbaDatabase
+                            Write-Message -Level Warning -Message "Failed to enumerate existing files at $dirname, move could go wrong" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                         }
                         foreach ($f in $dirfiles) {
                             $InstanceFiles[$Server_Id][$dirname][$f.Filename] = 1
@@ -90,7 +90,7 @@ public sealed partial class RenameDbaDatabaseCommand
                             }
                         }
                         if ($logical.FileName -eq $FinalFNName) {
-                            Write-Message -Level VeryVerbose -Message "No rename necessary (on FileGroup $($fg.Name) (on $db))" -FunctionName Rename-DbaDatabase
+                            Write-Message -Level VeryVerbose -Message "No rename necessary (on FileGroup $($fg.Name) (on $db))" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                             continue
                         }
                         if ($PSCmdlet.ShouldProcess($db, "Renaming FileName $($logical.FileName) to $FinalFNName (on FileGroup $($fg.Name))")) {
@@ -148,7 +148,7 @@ public sealed partial class RenameDbaDatabaseCommand
                                 }
                             }
                             if ($logical.FileName -eq $FinalFNName) {
-                                Write-Message -Level VeryVerbose -Message "No rename necessary for $($logical.FileName) (LOG on (on $db))" -FunctionName Rename-DbaDatabase
+                                Write-Message -Level VeryVerbose -Message "No rename necessary for $($logical.FileName) (LOG on (on $db))" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                                 continue
                             }
 
@@ -244,14 +244,14 @@ public sealed partial class RenameDbaDatabaseCommand
                 $Status = 'FULL'
                 if (!$failed -and ($SetOffline -or $Move) -and $Final_Renames) {
                     if (!$Move) {
-                        Write-Message -Level VeryVerbose -Message "Setting the database offline. You are in charge of moving the files to the new location" -FunctionName Rename-DbaDatabase
+                        Write-Message -Level VeryVerbose -Message "Setting the database offline. You are in charge of moving the files to the new location" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                         # because renames still need to be dealt with
                         $Status = 'PARTIAL'
                     } else {
                         if ($PSCmdlet.ShouldProcess($db, "File Rename required, setting db offline")) {
                             $SetState = Set-DbaDbState -SqlInstance $server -Database $db.Name -Offline -Force
                             if ($SetState.Status -ne 'OFFLINE') {
-                                Write-Message -Level Warning -Message "Setting db offline failed, You are in charge of moving the files to the new location" -FunctionName Rename-DbaDatabase
+                                Write-Message -Level Warning -Message "Setting db offline failed, You are in charge of moving the files to the new location" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                                 # because it was impossible to set the database offline
                                 $Status = 'PARTIAL'
                             } else {
@@ -261,7 +261,7 @@ public sealed partial class RenameDbaDatabaseCommand
                                         if ($null -eq $op.ComputerName) {
                                             Stop-Function -Message "No access to physical files for renames" -FunctionName Rename-DbaDatabase
                                         } else {
-                                            Write-Message -Level VeryVerbose -Message "Moving file $($op.Source) to $($op.Destination)" -FunctionName Rename-DbaDatabase
+                                            Write-Message -Level VeryVerbose -Message "Moving file $($op.Source) to $($op.Destination)" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                                             if (!$Preview) {
                                                 $scriptBlock = {
                                                     $op = $args[0]
@@ -282,7 +282,7 @@ public sealed partial class RenameDbaDatabaseCommand
                                     if ($PSCmdlet.ShouldProcess($db, "Setting database online")) {
                                         $SetState = Set-DbaDbState -SqlInstance $server -Database $db.Name -Online -Force
                                         if ($SetState.Status -ne 'ONLINE') {
-                                            Write-Message -Level Warning -Message "Setting db online failed" -FunctionName Rename-DbaDatabase
+                                            Write-Message -Level Warning -Message "Setting db online failed" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                                             # because renames were done, but the database didn't wake up
                                             $Status = 'PARTIAL'
                                         } else {

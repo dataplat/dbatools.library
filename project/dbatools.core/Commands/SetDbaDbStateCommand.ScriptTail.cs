@@ -17,12 +17,12 @@ public sealed partial class SetDbaDbStateCommand
                 $snaps = $server.Databases | Where-Object { $_.DatabaseSnapshotBaseName.Length -gt 0 }
                 $snaps = $snaps.DatabaseSnapshotBaseName | Get-Unique
                 if ($db.Name -in $snaps) {
-                    Write-Message -Level Warning -Message "Database $db has snapshots, you need to drop them before detaching, skipping..." -FunctionName Set-DbaDbState
+                    Write-Message -Level Warning -Message "Database $db has snapshots, you need to drop them before detaching, skipping..." -FunctionName Set-DbaDbState -ModuleName "dbatools"
                     Continue
                 }
                 if ($db.IsMirroringEnabled -eq $true -or $db.AvailabilityGroupName.Length -gt 0) {
                     if ($Force -eq $false) {
-                        Write-Message -Level Warning -Message "Needs -Force to detach $db, skipping" -FunctionName Set-DbaDbState
+                        Write-Message -Level Warning -Message "Needs -Force to detach $db, skipping" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         Continue
                     }
                 }
@@ -33,7 +33,7 @@ public sealed partial class SetDbaDbStateCommand
                             $db.ChangeMirroringState([Microsoft.SqlServer.Management.Smo.MirroringOption]::Off)
                             $db.Alter()
                             $db.Refresh()
-                            Write-Message -Level VeryVerbose -Message "Broke mirroring for $db" -FunctionName Set-DbaDbState
+                            Write-Message -Level VeryVerbose -Message "Broke mirroring for $db" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         } catch {
                             Stop-Function -Message "Could not break mirror for $db. Skipping." -ErrorRecord $_ -Target $server -Continue -FunctionName Set-DbaDbState
                         }
@@ -45,7 +45,7 @@ public sealed partial class SetDbaDbStateCommand
                     if ($Pscmdlet.ShouldProcess($server, "Removing $db from AG [$agname]")) {
                         try {
                             $server.AvailabilityGroups[$db.AvailabilityGroupName].AvailabilityDatabases[$db.Name].Drop()
-                            Write-Message -Level VeryVerbose -Message "Successfully removed $db from AG [$agname] on $server" -FunctionName Set-DbaDbState
+                            Write-Message -Level VeryVerbose -Message "Successfully removed $db from AG [$agname] on $server" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         } catch {
                             Stop-Function -Message "Could not remove $db from AG [$agname] on $server" -ErrorRecord $_ -Target $server -Continue -FunctionName Set-DbaDbState
                         }
@@ -60,7 +60,7 @@ public sealed partial class SetDbaDbStateCommand
                     }
                     try {
                         $sql = "EXEC master.dbo.sp_detach_db N'$($db.Name)'"
-                        Write-Message -Level System -Message $sql -FunctionName Set-DbaDbState
+                        Write-Message -Level System -Message $sql -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $null = $server.Query($sql)
                         $db_status.Status = 'DETACHED'
                     } catch {

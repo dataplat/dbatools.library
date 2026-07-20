@@ -61,19 +61,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 # We try to get the certificate, but don't fail in case we are not able to.
                                 $certificate = Get-DbaNetworkConfiguration -SqlInstance $sqlInstance -Credential $Credential -OutputType Certificate
                                 if ($certificate.Thumbprint) {
-                                    Write-Message -Level Verbose -Message "Removing certificate from service $($svc.ServiceName) on $($svc.ComputerName)" -FunctionName Update-DbaServiceAccount
+                                    Write-Message -Level Verbose -Message "Removing certificate from service $($svc.ServiceName) on $($svc.ComputerName)" -FunctionName Update-DbaServiceAccount -ModuleName "dbatools"
                                     $null = Remove-DbaNetworkCertificate -SqlInstance $sqlInstance -Credential $Credential -EnableException
                                 }
                             }
-                            Write-Message -Level Verbose -Message "Attempting an account change for service $($svc.ServiceName) on $($svc.ComputerName)" -FunctionName Update-DbaServiceAccount
+                            Write-Message -Level Verbose -Message "Attempting an account change for service $($svc.ServiceName) on $($svc.ComputerName)" -FunctionName Update-DbaServiceAccount -ModuleName "dbatools"
                             $null = Invoke-ManagedComputerCommand -ComputerName $svc.ComputerName -Credential $Credential -ScriptBlock $scriptAccountChange -ArgumentList @($svc.ServiceName, $currentCredential.UserName, $currentCredential.GetNetworkCredential().Password) -EnableException:$EnableException
                             $outMessage = "The login account for the service has been successfully set."
                             if ($certificate.Thumbprint) {
-                                Write-Message -Level Verbose -Message "Setting certificate for service $($svc.ServiceName) on $($svc.ComputerName)" -FunctionName Update-DbaServiceAccount
+                                Write-Message -Level Verbose -Message "Setting certificate for service $($svc.ServiceName) on $($svc.ComputerName)" -FunctionName Update-DbaServiceAccount -ModuleName "dbatools"
                                 $null = Set-DbaNetworkCertificate -SqlInstance $sqlInstance -Credential $Credential -Thumbprint $certificate.Thumbprint -EnableException
                             }
                         } elseif ($actionType -eq 'Password') {
-                            Write-Message -Level Verbose -Message "Attempting a password change for service $($svc.ServiceName) on $($svc.ComputerName)" -FunctionName Update-DbaServiceAccount
+                            Write-Message -Level Verbose -Message "Attempting a password change for service $($svc.ServiceName) on $($svc.ComputerName)" -FunctionName Update-DbaServiceAccount -ModuleName "dbatools"
                             $null = Invoke-ManagedComputerCommand -ComputerName $svc.ComputerName -Credential $Credential -ScriptBlock $scriptPasswordChange -ArgumentList @($svc.ServiceName, (New-Object System.Management.Automation.PSCredential ("user", $PreviousPassword)).GetNetworkCredential().Password, (New-Object System.Management.Automation.PSCredential ("user", $currentPassword)).GetNetworkCredential().Password) -EnableException:$EnableException
                             $outMessage = "The password has been successfully changed."
                         }
@@ -96,12 +96,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($__realCmdlet.ShouldProcess($serviceObject, "Starting SQL Agent after Engine account change on $($svc.ComputerName)")) {
                         $res = Start-DbaService -ComputerName $svc.ComputerName -Type Agent -InstanceName $serviceObject.InstanceName
                         if ($res.Status -ne 'Successful') {
-                            Write-Message -Level Warning -Message "Failed to restart SQL Agent after changing credentials. $($res.Message)" -FunctionName Update-DbaServiceAccount
+                            Write-Message -Level Warning -Message "Failed to restart SQL Agent after changing credentials. $($res.Message)" -FunctionName Update-DbaServiceAccount -ModuleName "dbatools"
                         }
                     }
                 }
                 if ($NoRestart) {
-                    Write-Message -Level Warning -Message "Changes will not go into effect until you restart. Please restart the services manually during your designated outage window." -FunctionName Update-DbaServiceAccount
+                    Write-Message -Level Warning -Message "Changes will not go into effect until you restart. Please restart the services manually during your designated outage window." -FunctionName Update-DbaServiceAccount -ModuleName "dbatools"
                 }
                 $serviceObject = Get-DbaService -ComputerName $svc.ComputerName -ServiceName $svc.ServiceName -Credential $Credential -EnableException:$EnableException
                 Add-Member -Force -InputObject $serviceObject -NotePropertyName Message -NotePropertyValue $outMessage

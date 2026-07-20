@@ -25,7 +25,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         #region Configuration Values
         $disable_cache = [Dataplat.Dbatools.Connection.ConnectionHost]::DisableCache
 
-        Write-Message -Level Verbose -Message "Configuration loaded | Cache disabled: $disable_cache" -FunctionName Get-DbaCmObject
+        Write-Message -Level Verbose -Message "Configuration loaded | Cache disabled: $disable_cache" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
         #endregion Configuration Values
 
         #region Utility Functions

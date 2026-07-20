@@ -83,7 +83,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-        Write-Message -Level Verbose -Message "Test for prerequisites returned $($testResult.Count) databases that will be joined to the Availability Group $AvailabilityGroup." -FunctionName Add-DbaAgDatabase
+        Write-Message -Level Verbose -Message "Test for prerequisites returned $($testResult.Count) databases that will be joined to the Availability Group $AvailabilityGroup." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
 
         foreach ($result in $testResult) {
             $server = $result.PrimaryServerSMO
@@ -99,22 +99,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $progress['Activity'] = "Adding database $($db.Name) to Availability Group $AvailabilityGroup"
 
             $progress['Status'] = "Step 1/5: Setting seeding mode if needed"
-            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase
+            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
             Write-Progress @progress
 
             if ($SeedingMode) {
-                Write-Message -Level Verbose -Message "Setting seeding mode to $SeedingMode." -FunctionName Add-DbaAgDatabase
+                Write-Message -Level Verbose -Message "Setting seeding mode to $SeedingMode." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                 $failure = $false
                 foreach ($replicaName in $replicaServerSMO.Keys) {
                     $replica = $ag.AvailabilityReplicas[$replicaName]
                     if ($replica.SeedingMode -ne $SeedingMode) {
                         if ($__realCmdlet.ShouldProcess($server, "Setting seeding mode for replica $replica to $SeedingMode")) {
                             try {
-                                Write-Message -Level Verbose -Message "Setting seeding mode for replica $replica to $SeedingMode." -FunctionName Add-DbaAgDatabase
+                                Write-Message -Level Verbose -Message "Setting seeding mode for replica $replica to $SeedingMode." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                                 $replica.SeedingMode = $SeedingMode
                                 $replica.Alter()
                                 if ($SeedingMode -eq 'Automatic') {
-                                    Write-Message -Level Verbose -Message "Setting GrantAvailabilityGroupCreateDatabasePrivilege on server $($replicaServerSMO[$replicaName]) for Availability Group $AvailabilityGroup." -FunctionName Add-DbaAgDatabase
+                                    Write-Message -Level Verbose -Message "Setting GrantAvailabilityGroupCreateDatabasePrivilege on server $($replicaServerSMO[$replicaName]) for Availability Group $AvailabilityGroup." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                                     $null = Grant-DbaAgPermission -SqlInstance $replicaServerSMO[$replicaName] -Type AvailabilityGroup -AvailabilityGroup $AvailabilityGroup -Permission CreateAnyDatabase
                                 }
                             } catch {
@@ -133,7 +133,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # before a backup can be restored or automatic seeding can succeed.
             if ($db.EncryptionEnabled -and $db.HasDatabaseEncryptionKey -and $db.DatabaseEncryptionKey.EncryptorType -eq "ServerCertificate") {
                 $encryptorName = $db.DatabaseEncryptionKey.EncryptorName
-                Write-Message -Level Verbose -Message "Database $($db.Name) is TDE-encrypted using certificate '$encryptorName'. Checking secondary replicas." -FunctionName Add-DbaAgDatabase
+                Write-Message -Level Verbose -Message "Database $($db.Name) is TDE-encrypted using certificate '$encryptorName'. Checking secondary replicas." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
 
                 try {
                     $sourceTdeCert = Get-DbaDbCertificate -SqlInstance $server -Database "master" -Certificate $encryptorName -EnableException | Select-Object -First 1
@@ -167,7 +167,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                         if ($__realCmdlet.ShouldProcess($replicaServer, "Copy TDE certificate '$encryptorName' from primary to replica $replicaName")) {
                             try {
-                                Write-Message -Level Verbose -Message "TDE certificate '$encryptorName' not found on $replicaName. Copying from primary." -FunctionName Add-DbaAgDatabase
+                                Write-Message -Level Verbose -Message "TDE certificate '$encryptorName' not found on $replicaName. Copying from primary." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                                 $splatTdeCert = @{
                                     Source          = $server
                                     Destination     = $replicaServer
@@ -198,7 +198,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         Stop-Function -Message "TDE certificate '$encryptorName' on replica $replicaName does not match the primary certificate on $($server.Name)." -Continue -FunctionName Add-DbaAgDatabase
                     }
 
-                    Write-Message -Level Verbose -Message "TDE certificate '$encryptorName' already exists on replica $replicaName and matches the primary certificate." -FunctionName Add-DbaAgDatabase
+                    Write-Message -Level Verbose -Message "TDE certificate '$encryptorName' already exists on replica $replicaName and matches the primary certificate." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                 }
 
                 if ($failure) {
@@ -207,14 +207,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             $progress['Status'] = "Step 2/5: Running backup and restore if needed"
-            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase
+            Write-Message -Level Verbose -Message $progress['Status'] -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
             Write-Progress @progress
 
             if ($restoreNeeded.Count -gt 0) {
                 if (-not $backups) {
                     if ($__realCmdlet.ShouldProcess($server, "Taking full and log backup of database $($db.Name)")) {
                         try {
-                            Write-Message -Level Verbose -Message "Taking full and log backup of database $($db.Name)." -FunctionName Add-DbaAgDatabase
+                            Write-Message -Level Verbose -Message "Taking full and log backup of database $($db.Name)." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                             if ($AdvancedBackupParams) {
                                 $fullbackup = $db | Backup-DbaDatabase -BackupDirectory $SharedPath -Type Full -EnableException @AdvancedBackupParams
                                 $logbackup = $db | Backup-DbaDatabase -BackupDirectory $SharedPath -Type Log -EnableException @AdvancedBackupParams
@@ -232,7 +232,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 foreach ($replicaName in $restoreNeeded.Keys) {
                     if ($__realCmdlet.ShouldProcess($replicaServerSMO[$replicaName], "Restore database $($db.Name) to replica $replicaName")) {
                         try {
-                            Write-Message -Level Verbose -Message "Restore database $($db.Name) to replica $replicaName." -FunctionName Add-DbaAgDatabase
+                            Write-Message -Level Verbose -Message "Restore database $($db.Name) to replica $replicaName." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                             $restoreParams = @{
                                 SqlInstance          = $replicaServerSMO[$replicaName]
                                 NoRecovery           = $true
@@ -246,22 +246,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $primaryPlatform = $server.HostPlatform
                                 $replicaPlatform = $replicaServerSMO[$replicaName].HostPlatform
                                 if ($primaryPlatform -ne $replicaPlatform) {
-                                    Write-Message -Level Verbose -Message "Primary platform ($primaryPlatform) does not match replica platform ($replicaPlatform). Setting SkipReuseSourceFolderStructure." -FunctionName Add-DbaAgDatabase
+                                    Write-Message -Level Verbose -Message "Primary platform ($primaryPlatform) does not match replica platform ($replicaPlatform). Setting SkipReuseSourceFolderStructure." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                                     $SkipReuseSourceFolderStructure = $true
                                 }
                             }
 
                             # Only use ReuseSourceFolderStructure if not skipped
                             if (-not $SkipReuseSourceFolderStructure) {
-                                Write-Message -Level Verbose -Message "Using ReuseSourceFolderStructure to maintain consistent folder layout." -FunctionName Add-DbaAgDatabase
+                                Write-Message -Level Verbose -Message "Using ReuseSourceFolderStructure to maintain consistent folder layout." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                                 $restoreParams['ReuseSourceFolderStructure'] = $true
                             } else {
-                                Write-Message -Level Verbose -Message "Using replica's default paths for database files." -FunctionName Add-DbaAgDatabase
+                                Write-Message -Level Verbose -Message "Using replica's default paths for database files." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
                             }
 
                             $sourceOwner = $db.Owner
                             $replicaOwner = $replicaServerSMO[$replicaName].ConnectedAs
                             if ($sourceOwner -ne $replicaOwner) {
-                                Write-Message -Level Verbose -Message "Source database owner is $sourceOwner, replica database owner would be $replicaOwner." -FunctionName Add-DbaAgDatabase
+                                Write-Message -Level Verbose -Message "Source database owner is $sourceOwner, replica database owner would be $replicaOwner." -FunctionName Add-DbaAgDatabase -ModuleName "dbatools"
 """;
 }

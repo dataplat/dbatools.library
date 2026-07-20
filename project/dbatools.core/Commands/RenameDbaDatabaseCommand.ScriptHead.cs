@@ -125,15 +125,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             $server = $db.Parent
             if ($db.Name -in @('master', 'model', 'msdb', 'tempdb', 'distribution')) {
-                Write-Message -Level Warning -Message "Database $($db.Name) is a system one, skipping..." -FunctionName Rename-DbaDatabase
+                Write-Message -Level Warning -Message "Database $($db.Name) is a system one, skipping..." -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                 continue
             }
             if (!$db.IsAccessible) {
-                Write-Message -Level Warning -Message "Database $($db.Name) is not accessible, skipping..." -FunctionName Rename-DbaDatabase
+                Write-Message -Level Warning -Message "Database $($db.Name) is not accessible, skipping..." -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                 continue
             }
             if ($db.IsMirroringEnabled -eq $true -or $db.AvailabilityGroupName.Length -gt 0) {
-                Write-Message -Level Warning -Message "Database $($db.Name) is either mirrored or in an AG, skipping..." -FunctionName Rename-DbaDatabase
+                Write-Message -Level Warning -Message "Database $($db.Name) is either mirrored or in an AG, skipping..." -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                 continue
             }
             $Server_Id = $server.DomainInstanceName
@@ -155,10 +155,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 # fixed replacements
                 $NewDBName = $DatabaseName.Replace('<DBN>', $Orig_DBName).Replace('<DATE>', $CurrentDate)
                 if ($Orig_DBName -eq $NewDBName) {
-                    Write-Message -Level VeryVerbose -Message "Database name unchanged, skipping" -FunctionName Rename-DbaDatabase
+                    Write-Message -Level VeryVerbose -Message "Database name unchanged, skipping" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                 } else {
                     if ($InstanceDbs[$Server_Id].ContainsKey($NewDBName)) {
-                        Write-Message -Level Warning -Message "Database $NewDBName exists already, skipping this rename" -FunctionName Rename-DbaDatabase
+                        Write-Message -Level Warning -Message "Database $NewDBName exists already, skipping this rename" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                         $failed = $true
                     } else {
                         if ($PSCmdlet.ShouldProcess($db, "Renaming Database $db to $NewDBName")) {
@@ -217,7 +217,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
                     }
                     if ($fg.Name -eq $FinalFGName) {
-                        Write-Message -Level VeryVerbose -Message "No rename necessary for FileGroup $($fg.Name) (on $db)" -FunctionName Rename-DbaDatabase
+                        Write-Message -Level VeryVerbose -Message "No rename necessary for FileGroup $($fg.Name) (on $db)" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                         continue
                     }
                     if ($PSCmdlet.ShouldProcess($db, "Renaming FileGroup $($fg.Name) to $FinalFGName")) {
@@ -293,7 +293,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         }
                         if ($logical.Name -eq $FinalLGName) {
-                            Write-Message -Level VeryVerbose -Message "No rename necessary for LogicalFile $($logical.Name) (on FileGroup $($fg.Name) (on $db))" -FunctionName Rename-DbaDatabase
+                            Write-Message -Level VeryVerbose -Message "No rename necessary for LogicalFile $($logical.Name) (on FileGroup $($fg.Name) (on $db))" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                             continue
                         }
                         if ($PSCmdlet.ShouldProcess($db, "Renaming LogicalFile $($logical.Name) to $FinalLGName (on FileGroup $($fg.Name))")) {
@@ -347,7 +347,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         }
                         if ($logicallog.Name -eq $FinalLGName) {
-                            Write-Message -Level VeryVerbose -Message "No Rename necessary for LogicalFile log $($logicallog.Name) (LOG on (on $db))" -FunctionName Rename-DbaDatabase
+                            Write-Message -Level VeryVerbose -Message "No Rename necessary for LogicalFile log $($logicallog.Name) (LOG on (on $db))" -FunctionName Rename-DbaDatabase -ModuleName "dbatools"
                             continue
                         }
                         if ($PSCmdlet.ShouldProcess($db, "Renaming LogicalFile log $($logicallog.Name) to $FinalLGName (LOG)")) {

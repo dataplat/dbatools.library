@@ -152,7 +152,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if ($SharedPath) {
-                        Write-Message -Level Verbose -Message "Backups still exist on $SharedPath" -FunctionName Invoke-DbaDbMirroring
+                        Write-Message -Level Verbose -Message "Backups still exist on $SharedPath" -FunctionName Invoke-DbaDbMirroring -ModuleName "dbatools"
                     }
                 }
 

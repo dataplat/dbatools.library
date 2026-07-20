@@ -32,13 +32,13 @@ public sealed partial class SetDbaNetworkConfigurationCommand
                 $null = Set-DbaNetworkConfiguration -__splat @{ ComputerName = $computerName; EnableException = $true }
                 $result = Invoke-Command2 -ScriptBlock $wmiScriptBlock -ArgumentList $netConf -ComputerName $computerName -Credential $Credential -ErrorAction Stop
                 foreach ($verbose in $result.Verbose) {
-                    Write-Message -Level Verbose -Message $verbose -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message $verbose -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 }
                 $output.Changes = $result.Changes
                 if ($result.Exception) {
                     # The new code pattern for WMI calls is used where all exceptions are catched and return as part of an object.
                     $output.Exception = $result.Exception
-                    Write-Message -Level Verbose -Message "Execution against $computerName failed with: $($result.Exception)" -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Execution against $computerName failed with: $($result.Exception)" -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     Stop-Function -Message "Setting network configuration for instance $($netConf.InstanceName) on $($netConf.ComputerName) failed with: $($result.Exception)" -Target $netConf.ComputerName -ErrorRecord $result.Exception -Continue -FunctionName Set-DbaNetworkConfiguration
                 }
             }
@@ -51,11 +51,11 @@ public sealed partial class SetDbaNetworkConfigurationCommand
                             $null = Restart-DbaService -ComputerName $netConf.ComputerName -InstanceName $netConf.InstanceName -Credential $Credential -Type Engine -Force -EnableException -Confirm:$false
                             $output.Restarted = $true
                         } catch {
-                            Write-Message -Level Warning -Message "A restart of the service for instance $($netConf.InstanceName) on $($netConf.ComputerName) failed ($_). Restart of instance is necessary for the new settings to take effect." -FunctionName Set-DbaNetworkConfiguration
+                            Write-Message -Level Warning -Message "A restart of the service for instance $($netConf.InstanceName) on $($netConf.ComputerName) failed ($_). Restart of instance is necessary for the new settings to take effect." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                         }
                     }
                 } else {
-                    Write-Message -Level Warning -Message "A restart of the service for instance $($netConf.InstanceName) on $($netConf.ComputerName) is needed for the changes to take effect." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Warning -Message "A restart of the service for instance $($netConf.InstanceName) on $($netConf.ComputerName) is needed for the changes to take effect." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 }
             }
 

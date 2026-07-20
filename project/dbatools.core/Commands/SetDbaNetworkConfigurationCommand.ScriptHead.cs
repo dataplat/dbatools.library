@@ -218,7 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($instance in $SqlInstance) {
             try {
-                Write-Message -Level Verbose -Message "Get network configuration from $($instance.ComputerName) for instance $($instance.InstanceName)." -FunctionName Set-DbaNetworkConfiguration
+                Write-Message -Level Verbose -Message "Get network configuration from $($instance.ComputerName) for instance $($instance.InstanceName)." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 $netConf = Get-DbaNetworkConfiguration -SqlInstance $instance -Credential $Credential -EnableException
             } catch {
                 Stop-Function -Message "Failed to collect network configuration from $($instance.ComputerName) for instance $($instance.InstanceName)." -Target $instance -ErrorRecord $_ -Continue -FunctionName Set-DbaNetworkConfiguration
@@ -226,9 +226,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($EnableProtocol) {
                 if ($netConf."${EnableProtocol}Enabled") {
-                    Write-Message -Level Verbose -Message "Protocol $EnableProtocol is already enabled on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Protocol $EnableProtocol is already enabled on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 } else {
-                    Write-Message -Level Verbose -Message "Will enable protocol $EnableProtocol on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will enable protocol $EnableProtocol on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf."${EnableProtocol}Enabled" = $true
                     if ($EnableProtocol -eq 'TcpIp') {
                         $netConf.TcpIpProperties.Enabled = $true
@@ -238,68 +238,68 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($DisableProtocol) {
                 if ($netConf."${DisableProtocol}Enabled") {
-                    Write-Message -Level Verbose -Message "Will disable protocol $EnableProtocol on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will disable protocol $EnableProtocol on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf."${DisableProtocol}Enabled" = $false
                     if ($DisableProtocol -eq 'TcpIp') {
                         $netConf.TcpIpProperties.Enabled = $false
                     }
                 } else {
-                    Write-Message -Level Verbose -Message "Protocol $EnableProtocol is already disabled on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Protocol $EnableProtocol is already disabled on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 }
             }
 
             if ($DynamicPortForIPAll) {
                 if (-not $netConf.TcpIpEnabled) {
-                    Write-Message -Level Verbose -Message "Will enable protocol TcpIp on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will enable protocol TcpIp on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpEnabled = $true
                 }
                 if (-not $netConf.TcpIpProperties.Enabled) {
-                    Write-Message -Level Verbose -Message "Will set property Enabled of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will set property Enabled of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpProperties.Enabled = $true
                 }
                 if (-not $netConf.TcpIpProperties.ListenAll) {
-                    Write-Message -Level Verbose -Message "Will set property ListenAll of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will set property ListenAll of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpProperties.ListenAll = $true
                 }
                 $ipAll = $netConf.TcpIpAddresses | Where-Object { $_.Name -eq 'IPAll' }
-                Write-Message -Level Verbose -Message "Will set property TcpDynamicPorts of IPAll to '0' on $instance." -FunctionName Set-DbaNetworkConfiguration
+                Write-Message -Level Verbose -Message "Will set property TcpDynamicPorts of IPAll to '0' on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 $ipAll.TcpDynamicPorts = '0'
-                Write-Message -Level Verbose -Message "Will set property TcpPort of IPAll to '' on $instance." -FunctionName Set-DbaNetworkConfiguration
+                Write-Message -Level Verbose -Message "Will set property TcpPort of IPAll to '' on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 $ipAll.TcpPort = ''
             }
 
             if ($StaticPortForIPAll) {
                 if (-not $netConf.TcpIpEnabled) {
-                    Write-Message -Level Verbose -Message "Will enable protocol TcpIp on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will enable protocol TcpIp on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpEnabled = $true
                 }
                 if (-not $netConf.TcpIpProperties.Enabled) {
-                    Write-Message -Level Verbose -Message "Will set property Enabled of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will set property Enabled of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpProperties.Enabled = $true
                 }
                 if (-not $netConf.TcpIpProperties.ListenAll) {
-                    Write-Message -Level Verbose -Message "Will set property ListenAll of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will set property ListenAll of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpProperties.ListenAll = $true
                 }
                 $ipAll = $netConf.TcpIpAddresses | Where-Object { $_.Name -eq 'IPAll' }
-                Write-Message -Level Verbose -Message "Will set property TcpDynamicPorts of IPAll to '' on $instance." -FunctionName Set-DbaNetworkConfiguration
+                Write-Message -Level Verbose -Message "Will set property TcpDynamicPorts of IPAll to '' on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 $ipAll.TcpDynamicPorts = ''
                 $port = $StaticPortForIPAll -join ','
-                Write-Message -Level Verbose -Message "Will set property TcpPort of IPAll to '$port' on $instance." -FunctionName Set-DbaNetworkConfiguration
+                Write-Message -Level Verbose -Message "Will set property TcpPort of IPAll to '$port' on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                 $ipAll.TcpPort = $port
             }
 
             if ($IpAddress) {
                 if (-not $netConf.TcpIpEnabled) {
-                    Write-Message -Level Verbose -Message "Will enable protocol TcpIp on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will enable protocol TcpIp on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpEnabled = $true
                 }
                 if (-not $netConf.TcpIpProperties.Enabled) {
-                    Write-Message -Level Verbose -Message "Will set property Enabled of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will set property Enabled of protocol TcpIp to True on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpProperties.Enabled = $true
                 }
                 if ($netConf.TcpIpProperties.ListenAll) {
-                    Write-Message -Level Verbose -Message "Will set property ListenAll of protocol TcpIp to False on $instance." -FunctionName Set-DbaNetworkConfiguration
+                    Write-Message -Level Verbose -Message "Will set property ListenAll of protocol TcpIp to False on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                     $netConf.TcpIpProperties.ListenAll = $false
                 }
                 foreach ($ip in ($netConf.TcpIpAddresses | Where-Object { $_.Name -ne 'IPAll' })) {
@@ -322,7 +322,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $listenAddress = $Matches.1
                             $listenPort = $Matches.2
                         } else {
-                            Write-Message -Level Verbose -Message "$listenIP is not a valid IP address. Skipping." -FunctionName Set-DbaNetworkConfiguration
+                            Write-Message -Level Verbose -Message "$listenIP is not a valid IP address. Skipping." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                             continue
                         }
                         if ($listenAddress -eq $address) {
@@ -332,33 +332,33 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                     if ($isTarget) {
                         if (-not $ip.Enabled) {
-                            Write-Message -Level Verbose -Message "Will set property Enabled of IP address $($ip.IpAddress) to True on $instance." -FunctionName Set-DbaNetworkConfiguration
+                            Write-Message -Level Verbose -Message "Will set property Enabled of IP address $($ip.IpAddress) to True on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                             $ip.Enabled = $true
                         }
                         if ($listenPort) {
                             # configure for static port
                             if ($ip.TcpDynamicPorts -ne '') {
-                                Write-Message -Level Verbose -Message "Will set property TcpDynamicPorts of IP address $($ip.IpAddress) to '' on $instance." -FunctionName Set-DbaNetworkConfiguration
+                                Write-Message -Level Verbose -Message "Will set property TcpDynamicPorts of IP address $($ip.IpAddress) to '' on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                                 $ip.TcpDynamicPorts = ''
                             }
                             if ($ip.TcpPort -ne $listenPort) {
-                                Write-Message -Level Verbose -Message "Will set property TcpPort of IP address $($ip.IpAddress) to '$listenPort' on $instance." -FunctionName Set-DbaNetworkConfiguration
+                                Write-Message -Level Verbose -Message "Will set property TcpPort of IP address $($ip.IpAddress) to '$listenPort' on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                                 $ip.TcpPort = $listenPort
                             }
                         } else {
                             # configure for dynamic port
                             if ($ip.TcpDynamicPorts -ne '0') {
-                                Write-Message -Level Verbose -Message "Will set property TcpDynamicPorts of IP address $($ip.IpAddress) to '0' on $instance." -FunctionName Set-DbaNetworkConfiguration
+                                Write-Message -Level Verbose -Message "Will set property TcpDynamicPorts of IP address $($ip.IpAddress) to '0' on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                                 $ip.TcpDynamicPorts = '0'
                             }
                             if ($ip.TcpPort -ne '') {
-                                Write-Message -Level Verbose -Message "Will set property TcpPort of IP address $($ip.IpAddress) to '' on $instance." -FunctionName Set-DbaNetworkConfiguration
+                                Write-Message -Level Verbose -Message "Will set property TcpPort of IP address $($ip.IpAddress) to '' on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                                 $ip.TcpPort = ''
                             }
                         }
                     } else {
                         if ($ip.Enabled) {
-                            Write-Message -Level Verbose -Message "Will set property Enabled of IP address $($ip.IpAddress) to False on $instance." -FunctionName Set-DbaNetworkConfiguration
+                            Write-Message -Level Verbose -Message "Will set property Enabled of IP address $($ip.IpAddress) to False on $instance." -FunctionName Set-DbaNetworkConfiguration -ModuleName "dbatools"
                             $ip.Enabled = $false
                         }
                     }

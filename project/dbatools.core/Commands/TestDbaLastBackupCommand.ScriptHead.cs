@@ -85,7 +85,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $effectiveLogDirectory = Get-SqlDefaultPaths -SqlInstance $destserver -FileType ldf
             }
 
-            Write-Message -Level Verbose -Message "Getting backup information from path(s): $($Path -join ', ')." -FunctionName Test-DbaLastBackup
+            Write-Message -Level Verbose -Message "Getting backup information from path(s): $($Path -join ', ')." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
 
             $splatGetBackupInfo = @{
                 SqlInstance      = $destserver
@@ -160,7 +160,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $lastbackup = $pathDbGroup.Group
 
                 if (-not ($lastbackup | Where-Object { $_.Type -eq "Full" -or $_.Type -eq "Database" })) {
-                    Write-Message -Level Verbose -Message "No full backup found for $dbName in the specified path(s)." -FunctionName Test-DbaLastBackup
+                    Write-Message -Level Verbose -Message "No full backup found for $dbName in the specified path(s)." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                     [PSCustomObject]@{
                         SourceServer   = $sourceIdentity
                         TestServer     = $Destination
@@ -325,10 +325,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Cannot use CopyFile with cloud storage backups (Azure/S3)." -Continue -FunctionName Test-DbaLastBackup
             }
 
-            Write-Message -Level Verbose -Message "Getting recent backup history for $dbName on $instance." -FunctionName Test-DbaLastBackup
+            Write-Message -Level Verbose -Message "Getting recent backup history for $dbName on $instance." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
 
             if ($__boundIgnoreLogBackup) {
-                Write-Message -Level Verbose -Message "Skipping Log backups as requested." -FunctionName Test-DbaLastBackup
+                Write-Message -Level Verbose -Message "Skipping Log backups as requested." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 $lastbackup = @()
                 $lastbackup += $full = Get-DbaDbBackupHistory -SqlInstance $sourceserver -Database $dbName -IncludeCopyOnly:$IncludeCopyOnly -LastFull -DeviceType $DeviceType -WarningAction SilentlyContinue
                 if (-not ($__boundIgnoreDiffBackup)) {
@@ -342,7 +342,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if (-not $lastbackup) {
-                Write-Message -Level Verbose -Message "No backups exist for this database." -FunctionName Test-DbaLastBackup
+                Write-Message -Level Verbose -Message "No backups exist for this database." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 # This code should never be executed as there is already a test for databases without backup in line 241.
                 continue
             }

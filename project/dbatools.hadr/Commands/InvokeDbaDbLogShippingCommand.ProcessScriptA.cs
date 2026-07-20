@@ -71,7 +71,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($DestinationServer.ConnectionContext.StatementTimeout -ne 0) {
                 $DestinationServer.ConnectionContext.StatementTimeout = 0
-                Write-Message -Message "Connection timeout of $DestinationServer is set to 0" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Connection timeout of $DestinationServer is set to 0" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
             }
 
             # Check the copy destination
@@ -79,15 +79,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($UseAzure) {
                     # For Azure, use the same URL as source (no actual copy needed)
                     $CopyDestinationFolder = $AzureBaseUrl
-                    Write-Message -Message "Using Azure blob storage URL for copy destination (no local copy): $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Using Azure blob storage URL for copy destination (no local copy): $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 } else {
                     # Make a default copy destination by retrieving the backup folder and adding a directory
                     $CopyDestinationFolder = "$($DestinationServer.Settings.BackupDirectory)\Logshipping"
 
                     # Check to see if the path already exists
-                    Write-Message -Message "Testing copy destination path $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Testing copy destination path $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                     if (Test-DbaPath -Path $CopyDestinationFolder -SqlInstance $destInstance -SqlCredential $DestinationSqlCredential) {
-                        Write-Message -Message "Copy destination $CopyDestinationFolder already exists" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                        Write-Message -Message "Copy destination $CopyDestinationFolder already exists" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                     } else {
                         # Check if force is being used
                         if (-not $Force) {
@@ -107,23 +107,23 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                         # If the destination server is remote and the credential is set
                                         if (-not $IsDestinationLocal -and $DestinationCredential) {
                                             Invoke-Command2 -ComputerName $DestinationServerName -Credential $DestinationCredential -ScriptBlock {
-                                                Write-Message -Message "Creating copy destination folder $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                                Write-Message -Message "Creating copy destination folder $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                                 $null = New-Item -Path $CopyDestinationFolder -ItemType Directory -Force:$Force
                                             }
                                         }
                                         # If the server is local and the credential is set
                                         elseif ($DestinationCredential) {
                                             Invoke-Command2 -Credential $DestinationCredential -ScriptBlock {
-                                                Write-Message -Message "Creating copy destination folder $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                                Write-Message -Message "Creating copy destination folder $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                                 $null = New-Item -Path $CopyDestinationFolder -ItemType Directory -Force:$Force
                                             }
                                         }
                                         # If the server is local and the credential is not set
                                         else {
-                                            Write-Message -Message "Creating copy destination folder $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                            Write-Message -Message "Creating copy destination folder $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                             $null = New-Item -Path $CopyDestinationFolder -ItemType Directory -Force:$Force
                                         }
-                                        Write-Message -Message "Copy destination $CopyDestinationFolder created." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                        Write-Message -Message "Copy destination $CopyDestinationFolder created." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                     } catch {
                                         $setupResult = "Failed"
                                         $comment = "Something went wrong creating the copy destination folder"
@@ -142,9 +142,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         else {
                             # Try to create the copy destination on the local server
                             try {
-                                Write-Message -Message "Creating copy destination folder $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Creating copy destination folder $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 $null = New-Item -Path $CopyDestinationFolder -ItemType Directory -Force:$Force
-                                Write-Message -Message "Copy destination $CopyDestinationFolder created." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Copy destination $CopyDestinationFolder created." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             } catch {
                                 $setupResult = "Failed"
                                 $comment = "Something went wrong creating the copy destination folder"
@@ -158,7 +158,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # Validate copy destination (skip for Azure since it's a URL)
             if (-not $UseAzure) {
-                Write-Message -Message "Testing copy destination path $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Testing copy destination path $CopyDestinationFolder" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 if ((Test-DbaPath -Path $CopyDestinationFolder -SqlInstance $destInstance -SqlCredential $DestinationSqlCredential) -ne $true) {
                     $setupResult = "Failed"
                     $comment = "Copy destination folder $CopyDestinationFolder is not valid or can't be reached"
@@ -198,7 +198,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 } elseif (-not $StandbyDirectory -and $Force) {
                     $StandbyDirectory = $destInstance.BackupDirectory
-                    Write-Message -Message "Stand-by directory was not set. Setting it to $StandbyDirectory" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Stand-by directory was not set. Setting it to $StandbyDirectory" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 } else {
                     $setupResult = "Failed"
                     $comment = "Please set the parameter -StandbyDirectory when using -Standby"
@@ -255,34 +255,34 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $DatabaseLocalPath = "$LocalPath\$($db.Name)"
                     }
                 }
-                Write-Message -Message "Backup local path set to $DatabaseLocalPath." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Backup local path set to $DatabaseLocalPath." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                 # Setting the backup network path for the database
                 if ($UseAzure) {
                     # For Azure, append database name to URL path
                     $DatabaseSharedPath = "$SharedPath/$($db.Name)"
                     $DatabaseLocalPath = $DatabaseSharedPath
-                    Write-Message -Message "Azure backup URL set to $DatabaseSharedPath." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Azure backup URL set to $DatabaseSharedPath." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 } else {
                     if ($SharedPath.EndsWith("\")) {
                         $DatabaseSharedPath = "$SharedPath$($db.Name)"
                     } else {
                         $DatabaseSharedPath = "$SharedPath\$($db.Name)"
                     }
-                    Write-Message -Message "Backup network path set to $DatabaseSharedPath." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Backup network path set to $DatabaseSharedPath." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 }
 
 
                 # Checking if the database network path exists (skip for Azure)
                 if ($setupResult -ne 'Failed' -and -not $UseAzure) {
-                    Write-Message -Message "Testing database backup network path $DatabaseSharedPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                    Write-Message -Message "Testing database backup network path $DatabaseSharedPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                     if ((Test-DbaPath -Path $DatabaseSharedPath -SqlInstance $SourceSqlInstance -SqlCredential $SourceSqlCredential) -ne $true) {
                         # To to create the backup directory for the database
                         try {
-                            Write-Message -Message "Database backup network path $DatabaseSharedPath not found. Trying to create it.." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Database backup network path $DatabaseSharedPath not found. Trying to create it.." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             Invoke-Command2 -Credential $SourceCredential -ScriptBlock {
-                                Write-Message -Message "Creating backup folder $DatabaseSharedPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Creating backup folder $DatabaseSharedPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 $null = New-Item -Path $DatabaseSharedPath -ItemType Directory -Force:$Force
                             }
                         } catch {
@@ -300,7 +300,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } else {
                     $DatabaseBackupJob = "LSBackup_$($db.Name)"
                 }
-                Write-Message -Message "Backup job name set to $DatabaseBackupJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Backup job name set to $DatabaseBackupJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                 # Check if the backup job schedule name is set
                 if ($BackupSchedule) {
@@ -308,7 +308,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } else {
                     $DatabaseBackupSchedule = "LSBackupSchedule_$($db.Name)"
                 }
-                Write-Message -Message "Backup job schedule name set to $DatabaseBackupSchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Backup job schedule name set to $DatabaseBackupSchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                 # Check if secondary database is present on secondary instance
                 if (-not $Force -and -not $NoInitialization -and ($DestinationServer.Databases[$SecondaryDatabase].Status -ne 'Restoring') -and ($DestinationServer.Databases.Name -contains $SecondaryDatabase)) {
@@ -326,7 +326,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             # Check if force is being used and no option to generate the full backup is set
                             if ($Force -and -not ($GenerateFullBackup -or $UseExistingFullBackup)) {
                                 # Set the option to generate a full backup
-                                Write-Message -Message "Set option to initialize secondary database with full backup" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Set option to initialize secondary database with full backup" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 $GenerateFullBackup = $true
                             } elseif (-not $Force -and -not $GenerateFullBackup -and -not $UseExistingFullBackup -and -not $UseBackupFolder) {
                                 # Set up the confirm part
@@ -341,7 +341,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     # If yes
                                     0 {
                                         # Set the option to generate a full backup
-                                        Write-Message -Message "Set option to initialize secondary database with full backup." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                        Write-Message -Message "Set option to initialize secondary database with full backup." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                         $GenerateFullBackup = $true
                                     }
                                     1 {

@@ -17,7 +17,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                     if ($PSCmdlet.ShouldProcess($destInstance, "Restoring database $db to $SecondaryDatabase on $destInstance")) {
                         if ($GenerateFullBackup -or $UseExistingFullBackup -or $UseBackupFolder) {
                             try {
-                                Write-Message -Message "Start database restore" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Start database restore" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 if ($NoRecovery -or (-not $Standby)) {
                                     if ($Force) {
                                         $splatRestore = @{
@@ -92,7 +92,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                                 Stop-Function -Message "Something went wrong restoring the secondary database" -ErrorRecord $_ -Target $SourceSqlInstance -Continue -FunctionName Invoke-DbaDbLogShipping
                             }
 
-                            Write-Message -Message "Restore completed." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Restore completed." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                         }
                     }
                 }
@@ -103,7 +103,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                     if ($PSCmdlet.ShouldProcess($SourceSqlInstance, "Configuring logshipping for primary database $db on $SourceSqlInstance")) {
                         try {
 
-                            Write-Message -Message "Configuring logshipping for primary database" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Configuring logshipping for primary database" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             $splatPrimary = @{
                                 SqlInstance               = $SourceSqlInstance
@@ -132,13 +132,13 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                             # Check if the backup job needs to be enabled or disabled
                             if ($BackupScheduleDisabled) {
                                 $null = Set-DbaAgentJob -SqlInstance $SourceSqlInstance -SqlCredential $SourceSqlCredential -Job $DatabaseBackupJob -Disabled
-                                Write-Message -Message "Disabling backup job $DatabaseBackupJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Disabling backup job $DatabaseBackupJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             } else {
                                 $null = Set-DbaAgentJob -SqlInstance $SourceSqlInstance -SqlCredential $SourceSqlCredential -Job $DatabaseBackupJob -Enabled
-                                Write-Message -Message "Enabling backup job $DatabaseBackupJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Enabling backup job $DatabaseBackupJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                             }
 
-                            Write-Message -Message "Create backup job schedule $DatabaseBackupSchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Create backup job schedule $DatabaseBackupSchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             #Variable $BackupJobSchedule marked as unused by PSScriptAnalyzer replaced with $null for catching output
                             $splatBackupSchedule = @{
@@ -160,7 +160,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                             }
                             $null = New-DbaAgentSchedule @splatBackupSchedule
 
-                            Write-Message -Message "Configuring logshipping from primary to secondary database." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Configuring logshipping from primary to secondary database." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             $splatPrimarySecondary = @{
                                 SqlInstance            = $SourceSqlInstance
@@ -186,7 +186,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                     if ($PSCmdlet.ShouldProcess($destInstance, "Configuring logshipping for secondary database $SecondaryDatabase on $destInstance")) {
                         try {
 
-                            Write-Message -Message "Configuring logshipping from secondary database $SecondaryDatabase to primary database $db." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Configuring logshipping from secondary database $SecondaryDatabase to primary database $db." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             $splatSecondaryPrimary = @{
                                 SqlInstance                = $destInstance
@@ -214,13 +214,13 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                             # For Azure: Remove the copy job created by sp_add_log_shipping_secondary_primary
                             # Azure backups go directly to blob storage, so no copy is needed
                             if ($UseAzure) {
-                                Write-Message -Message "Removing unnecessary copy job for Azure: $DatabaseCopyJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Removing unnecessary copy job for Azure: $DatabaseCopyJob" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 $null = Remove-DbaAgentJob -SqlInstance $destInstance -SqlCredential $DestinationSqlCredential -Job $DatabaseCopyJob -Confirm:$false
                             }
 
                             # Skip copy job schedule for Azure (backups are already in the cloud)
                             if (-not $UseAzure) {
-                                Write-Message -Message "Create copy job schedule $DatabaseCopySchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                                Write-Message -Message "Create copy job schedule $DatabaseCopySchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                                 #Variable $CopyJobSchedule marked as unused by PSScriptAnalyzer replaced with $null for catching output
                                 $splatCopySchedule = @{
                                     SqlInstance               = $destInstance
@@ -242,7 +242,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                                 $null = New-DbaAgentSchedule @splatCopySchedule
                             }
 
-                            Write-Message -Message "Create restore job schedule $DatabaseRestoreSchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Create restore job schedule $DatabaseRestoreSchedule" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             #Variable $RestoreJobSchedule marked as unused by PSScriptAnalyzer replaced with $null for catching output
                             $splatRestoreSchedule = @{
@@ -264,7 +264,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                             }
                             $null = New-DbaAgentSchedule @splatRestoreSchedule
 
-                            Write-Message -Message "Configuring logshipping for secondary database." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                            Write-Message -Message "Configuring logshipping for secondary database." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                             $splatSecondaryDatabase = @{
                                 SqlInstance               = $destInstance
@@ -311,7 +311,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand
                 }
                 #endregion Set up log shipping on the secondary instance
 
-                Write-Message -Message "Completed configuring log shipping for database $db" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Completed configuring log shipping for database $db" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
                 [PSCustomObject]@{
                     PrimaryInstance   = $SourceServer.DomainInstanceName

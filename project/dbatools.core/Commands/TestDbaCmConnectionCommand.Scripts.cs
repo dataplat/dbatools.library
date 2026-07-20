@@ -196,7 +196,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if (-not $ConnectionObject.Success) { Stop-Function -Message "Failed to interpret input: $($ConnectionObject.Input)" -Category InvalidArgument -Target $ConnectionObject.Input -Continue -FunctionName Test-DbaCmConnection }
 
             $Computer = $ConnectionObject.Connection.ComputerName.ToLowerInvariant()
-            Write-Message -Level VeryVerbose -Message "[$Computer] Testing management connection" -FunctionName Test-DbaCmConnection
+            Write-Message -Level VeryVerbose -Message "[$Computer] Testing management connection" -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
 
             #region Setup connection object
             $con = $ConnectionObject.Connection
@@ -226,14 +226,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 switch ($ConnectionType) {
                     #region CimRM
                     "CimRM" {
-                        Write-Message -Level Verbose -Message "[$Computer] Testing management access using CIM over WinRM" -FunctionName Test-DbaCmConnection
+                        Write-Message -Level Verbose -Message "[$Computer] Testing management access using CIM over WinRM" -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
                         $res = Test-ConnectionCimRM -ComputerName $con -Credential $Credential
                         $con.LastCimRM = $res.Timestamp
                         $con.CimRM = $res.Success
-                        Write-Message -Level VeryVerbose -Message "[$Computer] CIM over WinRM Results | Success: $($res.Success), Authentication: $($res.Authenticated)" -FunctionName Test-DbaCmConnection
+                        Write-Message -Level VeryVerbose -Message "[$Computer] CIM over WinRM Results | Success: $($res.Success), Authentication: $($res.Authenticated)" -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
 
                         if (-not $res.Authenticated) {
-                            Write-Message -Level Important -Message "[$Computer] The credentials supplied proved to be invalid. Skipping further tests" -FunctionName Test-DbaCmConnection
+                            Write-Message -Level Important -Message "[$Computer] The credentials supplied proved to be invalid. Skipping further tests" -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
                             $con.AddBadCredential($Credential)
                             break types
                         }
@@ -242,14 +242,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     #region CimDCOM
                     "CimDCOM" {
-                        Write-Message -Level Verbose -Message "[$Computer] Testing management access using CIM over DCOM." -FunctionName Test-DbaCmConnection
+                        Write-Message -Level Verbose -Message "[$Computer] Testing management access using CIM over DCOM." -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
                         $res = Test-ConnectionCimDCOM -ComputerName $con -Credential $Credential
                         $con.LastCimDCOM = $res.Timestamp
                         $con.CimDCOM = $res.Success
-                        Write-Message -Level VeryVerbose -Message "[$Computer] CIM over DCOM Results | Success: $($res.Success), Authentication: $($res.Authenticated)" -FunctionName Test-DbaCmConnection
+                        Write-Message -Level VeryVerbose -Message "[$Computer] CIM over DCOM Results | Success: $($res.Success), Authentication: $($res.Authenticated)" -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
 
                         if (-not $res.Authenticated) {
-                            Write-Message -Level Important -Message "[$Computer] The credentials supplied proved to be invalid. Skipping further tests." -FunctionName Test-DbaCmConnection
+                            Write-Message -Level Important -Message "[$Computer] The credentials supplied proved to be invalid. Skipping further tests." -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
                             $con.AddBadCredential($Credential)
                             break types
                         }
@@ -258,14 +258,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     #region Wmi
                     "Wmi" {
-                        Write-Message -Level Verbose -Message "[$Computer] Testing management access using WMI." -FunctionName Test-DbaCmConnection
+                        Write-Message -Level Verbose -Message "[$Computer] Testing management access using WMI." -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
                         $res = Test-ConnectionWmi -ComputerName $Computer -Credential $Credential
                         $con.LastWmi = $res.Timestamp
                         $con.Wmi = $res.Success
-                        Write-Message -Level VeryVerbose -Message "[$Computer] WMI Results | Success: $($res.Success), Authentication: $($res.Authenticated)" -FunctionName Test-DbaCmConnection
+                        Write-Message -Level VeryVerbose -Message "[$Computer] WMI Results | Success: $($res.Success), Authentication: $($res.Authenticated)" -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
 
                         if (-not $res.Authenticated) {
-                            Write-Message -Level Important -Message "[$Computer] The credentials supplied proved to be invalid. Skipping further tests" -FunctionName Test-DbaCmConnection
+                            Write-Message -Level Important -Message "[$Computer] The credentials supplied proved to be invalid. Skipping further tests" -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
                             $con.AddBadCredential($Credential)
                             break types
                         }
@@ -274,11 +274,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     #region PowerShell Remoting
                     "PowerShellRemoting" {
-                        Write-Message -Level Verbose -Message "[$Computer] Testing management access using PowerShell Remoting." -FunctionName Test-DbaCmConnection
+                        Write-Message -Level Verbose -Message "[$Computer] Testing management access using PowerShell Remoting." -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
                         $res = Test-ConnectionPowerShellRemoting -ComputerName $Computer -Credential $Credential
                         $con.LastPowerShellRemoting = $res.Timestamp
                         $con.PowerShellRemoting = $res.Success
-                        Write-Message -Level VeryVerbose -Message "[$Computer] PowerShell Remoting Results | Success: $($res.Success)" -FunctionName Test-DbaCmConnection
+                        Write-Message -Level VeryVerbose -Message "[$Computer] PowerShell Remoting Results | Success: $($res.Success)" -FunctionName Test-DbaCmConnection -ModuleName "dbatools"
                     }
                     #endregion PowerShell Remoting
                 }

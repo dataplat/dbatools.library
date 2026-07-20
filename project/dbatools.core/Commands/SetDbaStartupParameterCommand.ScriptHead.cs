@@ -40,12 +40,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
                 } catch {
-                    Write-Message -Level Warning -Message "Failed to connect to $instance, will try to work with just WMI. Path options will be ignored unless Force was indicated" -FunctionName Set-DbaStartupParameter
+                    Write-Message -Level Warning -Message "Failed to connect to $instance, will try to work with just WMI. Path options will be ignored unless Force was indicated" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
                     $server = $instance
                     $Offline = $true
                 }
             } else {
-                Write-Message -Level Verbose -Message "Offline switch set, proceeding with just WMI" -FunctionName Set-DbaStartupParameter
+                Write-Message -Level Verbose -Message "Offline switch set, proceeding with just WMI" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
                 $server = $instance
             }
 
@@ -59,14 +59,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $originalParamString = $currentStartup.ParameterString
             $parameterString = $null
 
-            Write-Message -Level Verbose -Message "Original startup parameter string: $originalParamString" -FunctionName Set-DbaStartupParameter
+            Write-Message -Level Verbose -Message "Original startup parameter string: $originalParamString" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
 
             if ('StartupConfig' -in $__boundParams.Keys) {
-                Write-Message -Level VeryVerbose -Message "startupObject passed in" -FunctionName Set-DbaStartupParameter
+                Write-Message -Level VeryVerbose -Message "startupObject passed in" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
                 $newStartup = $StartupConfig
                 $TraceFlagOverride = $true
             } else {
-                Write-Message -Level VeryVerbose -Message "Parameters passed in" -FunctionName Set-DbaStartupParameter
+                Write-Message -Level VeryVerbose -Message "Parameters passed in" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
                 $newStartup = $currentStartup.PSObject.Copy()
                 foreach ($param in ($__boundParams.Keys | Where-Object { $_ -in ($newStartup.PSObject.Properties.Name) })) {
                     if ($__boundParams.Item($param) -ne $newStartup.$param) {
@@ -79,7 +79,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 if ($newStartup.MasterData.Length -gt 0) {
                     if ($Offline -and -not $Force) {
-                        Write-Message -Level Warning -Message "Working offline, skipping untested MasterData path" -FunctionName Set-DbaStartupParameter
+                        Write-Message -Level Warning -Message "Working offline, skipping untested MasterData path" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
                         $parameterString += "-d$($currentStartup.MasterData);"
 
                     } else {
@@ -99,7 +99,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 if ($newStartup.ErrorLog.Length -gt 0) {
                     if ($Offline -and -not $Force) {
-                        Write-Message -Level Warning -Message "Working offline, skipping untested ErrorLog path" -FunctionName Set-DbaStartupParameter
+                        Write-Message -Level Warning -Message "Working offline, skipping untested ErrorLog path" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
                         $parameterString += "-e$($currentStartup.ErrorLog);"
                     } else {
                         if ($Force) {
@@ -118,7 +118,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 if ($newStartup.MasterLog.Length -gt 0) {
                     if ($Offline -and -not $Force) {
-                        Write-Message -Level Warning -Message "Working offline, skipping untested MasterLog path" -FunctionName Set-DbaStartupParameter
+                        Write-Message -Level Warning -Message "Working offline, skipping untested MasterLog path" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
                         $parameterString += "-l$($currentStartup.MasterLog);"
                     } else {
                         if ($Force) {
@@ -136,7 +136,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             } else {
 
-                Write-Message -Level Verbose -Message "Instance is presently configured for single user, skipping path validation" -FunctionName Set-DbaStartupParameter
+                Write-Message -Level Verbose -Message "Instance is presently configured for single user, skipping path validation" -FunctionName Set-DbaStartupParameter -ModuleName "dbatools"
                 if ($newStartup.MasterData.Length -gt 0) {
                     $parameterString += "-d$($newStartup.MasterData);"
                 } else {

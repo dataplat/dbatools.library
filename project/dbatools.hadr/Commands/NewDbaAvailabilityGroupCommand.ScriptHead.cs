@@ -116,7 +116,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if (-not $server.IsHadrEnabled) {
             $requirementsFailed = $true
-            Write-Message -Level Warning -Message "Availability Group (HADR) is not configured for the instance: $Primary. Use Enable-DbaAgHadr to configure the instance." -FunctionName New-DbaAvailabilityGroup
+            Write-Message -Level Warning -Message "Availability Group (HADR) is not configured for the instance: $Primary. Use Enable-DbaAgHadr to configure the instance." -FunctionName New-DbaAvailabilityGroup -ModuleName "dbatools"
         }
 
         if ($Secondary) {
@@ -135,16 +135,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 if (-not $second.IsHadrEnabled) {
                     $requirementsFailed = $true
-                    Write-Message -Level Warning -Message "Availability Group (HADR) is not configured for the instance: $instance. Use Enable-DbaAgHadr to configure the instance." -FunctionName New-DbaAvailabilityGroup
+                    Write-Message -Level Warning -Message "Availability Group (HADR) is not configured for the instance: $instance. Use Enable-DbaAgHadr to configure the instance." -FunctionName New-DbaAvailabilityGroup -ModuleName "dbatools"
                 }
 
                 if ($SeedingMode -eq "Automatic") {
                     $secondarypath = Get-DbaDefaultPath -SqlInstance $second
                     if ($primarypath.Data -ne $secondarypath.Data) {
-                        Write-Message -Level Warning -Message "Primary and secondary ($instance) default data paths do not match. Trying anyway." -FunctionName New-DbaAvailabilityGroup
+                        Write-Message -Level Warning -Message "Primary and secondary ($instance) default data paths do not match. Trying anyway." -FunctionName New-DbaAvailabilityGroup -ModuleName "dbatools"
                     }
                     if ($primarypath.Log -ne $secondarypath.Log) {
-                        Write-Message -Level Warning -Message "Primary and secondary ($instance) default log paths do not match. Trying anyway." -FunctionName New-DbaAvailabilityGroup
+                        Write-Message -Level Warning -Message "Primary and secondary ($instance) default log paths do not match. Trying anyway." -FunctionName New-DbaAvailabilityGroup -ModuleName "dbatools"
                     }
                 }
             }
@@ -212,7 +212,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $instances = @($server) + $secondaries
             foreach ($instance in $instances) {
                 if ($instance.EngineEdition -eq "Standard") {
-                    Write-Message -Level Warning -Message "ConnectionModeInSecondaryRole is not supported on Standard Edition. The setting will be ignored on $($instance.Name). Consider using Enterprise or Developer Edition for read-only secondary replicas." -FunctionName New-DbaAvailabilityGroup
+                    Write-Message -Level Warning -Message "ConnectionModeInSecondaryRole is not supported on Standard Edition. The setting will be ignored on $($instance.Name). Consider using Enterprise or Developer Edition for read-only secondary replicas." -FunctionName New-DbaAvailabilityGroup -ModuleName "dbatools"
                 }
             }
         }

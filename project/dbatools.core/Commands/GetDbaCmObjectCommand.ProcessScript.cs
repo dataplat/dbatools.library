@@ -165,7 +165,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Since all connection caching runs using lower-case strings, making it lowercase here simplifies things.
             $computer = $connectionObject.Connection.ComputerName.ToLowerInvariant()
 
-            Write-Message -Message "[$computer] Retrieving Management Information" -Level VeryVerbose -Target $computer -FunctionName Get-DbaCmObject
+            Write-Message -Message "[$computer] Retrieving Management Information" -Level VeryVerbose -Target $computer -FunctionName Get-DbaCmObject -ModuleName "dbatools"
 
             $connection = $connectionObject.Connection
 
@@ -213,18 +213,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 switch ($conType.ToString()) {
                     #region CimRM
                     "CimRM" {
-                        Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over WinRM" -FunctionName Get-DbaCmObject
+                        Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over WinRM" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                         try {
                             if ($ParSet -eq "Class") { $connection.GetCimRMInstance($cred, $ClassName, $Namespace) }
                             else { $connection.QueryCimRMInstance($cred, $Query, "WQL", $Namespace) }
 
-                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over WinRM - Success" -FunctionName Get-DbaCmObject
+                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over WinRM - Success" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                             $connection.ReportSuccess('CimRM')
                             $connection.AddGoodCredential($cred)
                             if (-not $disable_cache) { [Dataplat.Dbatools.Connection.ConnectionHost]::Connections[$computer] = $connection }
                             continue main
                         } catch {
-                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over WinRM - Failed" -FunctionName Get-DbaCmObject
+                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over WinRM - Failed" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                             $errorDetails = Resolve-CimError -ErrorRecord $_ -ComputerName $computer -ClassName $ClassName -Namespace $Namespace -Query $Query
 
                             if ($errorDetails.BadCredentials) {
@@ -244,18 +244,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     #region CimDCOM
                     "CimDCOM" {
-                        Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over DCOM" -FunctionName Get-DbaCmObject
+                        Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over DCOM" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                         try {
                             if ($ParSet -eq "Class") { $connection.GetCimDCOMInstance($cred, $ClassName, $Namespace) }
                             else { $connection.QueryCimDCOMInstance($cred, $Query, "WQL", $Namespace) }
 
-                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over DCOM - Success" -FunctionName Get-DbaCmObject
+                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over DCOM - Success" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                             $connection.ReportSuccess('CimDCOM')
                             $connection.AddGoodCredential($cred)
                             if (-not $disable_cache) { [Dataplat.Dbatools.Connection.ConnectionHost]::Connections[$computer] = $connection }
                             continue main
                         } catch {
-                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over DCOM - Failed" -FunctionName Get-DbaCmObject
+                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using Cim over DCOM - Failed" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                             $errorDetails = Resolve-CimError -ErrorRecord $_ -ComputerName $computer -ClassName $ClassName -Namespace $Namespace -Query $Query
 
                             if ($errorDetails.BadCredentials) {
@@ -275,7 +275,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     #region Wmi
                     "Wmi" {
-                        Write-Message -Level Verbose -Message "[$computer] Accessing computer using WMI" -FunctionName Get-DbaCmObject
+                        Write-Message -Level Verbose -Message "[$computer] Accessing computer using WMI" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                         try {
                             switch ($ParSet) {
                                 "Class" {
@@ -301,13 +301,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                             Get-WmiObject @parameters
 
-                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using WMI - Success" -FunctionName Get-DbaCmObject
+                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using WMI - Success" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                             $connection.ReportSuccess('Wmi')
                             $connection.AddGoodCredential($cred)
                             if (-not $disable_cache) { [Dataplat.Dbatools.Connection.ConnectionHost]::Connections[$computer] = $connection }
                             continue main
                         } catch {
-                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using WMI - Failed" -ErrorRecord $_ -FunctionName Get-DbaCmObject
+                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using WMI - Failed" -ErrorRecord $_ -FunctionName Get-DbaCmObject -ModuleName "dbatools"
 
                             if ($_.CategoryInfo.Reason -eq "UnauthorizedAccessException") {
                                 # Ignore the global setting for bad credential cache disabling, since the connection object is aware of that state and will ignore input if it should.
@@ -331,7 +331,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     #region PowerShell Remoting
                     "PowerShellRemoting" {
                         try {
-                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using PowerShell Remoting" -FunctionName Get-DbaCmObject
+                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using PowerShell Remoting" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                             $scp_string = "Get-WmiObject -Class $ClassName -ErrorAction Stop"
                             if ($__boundNamespace) { $scp_string += " -Namespace $Namespace" }
 
@@ -343,7 +343,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             if ($Credential) { $parameters["Credential"] = $Credential }
                             Invoke-Command2 @parameters
 
-                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using PowerShell Remoting - Success" -FunctionName Get-DbaCmObject
+                            Write-Message -Level Verbose -Message "[$computer] Accessing computer using PowerShell Remoting - Success" -FunctionName Get-DbaCmObject -ModuleName "dbatools"
                             $connection.ReportSuccess('PowerShellRemoting')
                             $connection.AddGoodCredential($cred)
                             if (-not $disable_cache) { [Dataplat.Dbatools.Connection.ConnectionHost]::Connections[$computer] = $connection }

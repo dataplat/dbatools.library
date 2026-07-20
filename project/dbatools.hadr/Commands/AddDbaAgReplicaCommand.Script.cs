@@ -141,7 +141,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($SessionTimeout) {
                         if ($SessionTimeout -lt 10) {
                             $Message = "We recommend that you keep the time-out period at 10 seconds or greater. Setting the value to less than 10 seconds creates the possibility of a heavily loaded system missing pings and falsely declaring failure. Please see sqlps.io/agrec for more information."
-                            Write-Message -Level Warning -Message $Message -FunctionName Add-DbaAgReplica
+                            Write-Message -Level Warning -Message $Message -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                         }
                         $replica.SessionTimeout = $SessionTimeout
                     }
@@ -149,13 +149,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # Add cluster permissions
                     if ($ClusterType -eq 'Wsfc') {
                         if ($__realCmdlet.ShouldProcess($server.Name, "Adding cluster permissions for availability group named $($InputObject.Name)")) {
-                            Write-Message -Level Verbose -Message "WSFC Cluster requires granting [NT AUTHORITY\SYSTEM] a few things. Setting now." -FunctionName Add-DbaAgReplica
+                            Write-Message -Level Verbose -Message "WSFC Cluster requires granting [NT AUTHORITY\SYSTEM] a few things. Setting now." -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                             # To support non-english systems, get the name of SYSTEM login by the sid
                             # See SECURITY_LOCAL_SYSTEM_RID on https://docs.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
                             $systemLoginSidString = '1-1-0-0-0-0-0-5-18-0-0-0'
                             $systemLoginName = ($server.Logins | Where-Object { ($_.Sid -join '-') -eq $systemLoginSidString }).Name
                             if (-not $systemLoginName) {
-                                Write-Message -Level Verbose -Message "SYSTEM login not found, so we hope system language is english and create login [NT AUTHORITY\SYSTEM]" -FunctionName Add-DbaAgReplica
+                                Write-Message -Level Verbose -Message "SYSTEM login not found, so we hope system language is english and create login [NT AUTHORITY\SYSTEM]" -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                                 try {
                                     $null = New-DbaLogin -SqlInstance $server -Login 'NT AUTHORITY\SYSTEM'
                                     $systemLoginName = 'NT AUTHORITY\SYSTEM'
@@ -178,24 +178,24 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     if ($ConfigureXESession) {
                         try {
-                            Write-Message -Level Debug -Message "Getting session 'AlwaysOn_health' on $instance." -FunctionName Add-DbaAgReplica
+                            Write-Message -Level Debug -Message "Getting session 'AlwaysOn_health' on $instance." -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                             $xeSession = Get-DbaXESession -SqlInstance $server -Session AlwaysOn_health -EnableException
                             if ($xeSession) {
                                 if (-not $xeSession.AutoStart) {
-                                    Write-Message -Level Debug -Message "Setting autostart for session 'AlwaysOn_health' on $instance." -FunctionName Add-DbaAgReplica
+                                    Write-Message -Level Debug -Message "Setting autostart for session 'AlwaysOn_health' on $instance." -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                                     $xeSession.AutoStart = $true
                                     $xeSession.Alter()
                                 }
                                 if (-not $xeSession.IsRunning) {
-                                    Write-Message -Level Debug -Message "Starting session 'AlwaysOn_health' on $instance." -FunctionName Add-DbaAgReplica
+                                    Write-Message -Level Debug -Message "Starting session 'AlwaysOn_health' on $instance." -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                                     $null = $xeSession | Start-DbaXESession -EnableException
                                 }
-                                Write-Message -Level Verbose -Message "ConfigureXESession was set, session 'AlwaysOn_health' is now configured and running on $instance." -FunctionName Add-DbaAgReplica
+                                Write-Message -Level Verbose -Message "ConfigureXESession was set, session 'AlwaysOn_health' is now configured and running on $instance." -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                             } else {
-                                Write-Message -Level Warning -Message "ConfigureXESession was set, but no session named 'AlwaysOn_health' was found on $instance." -FunctionName Add-DbaAgReplica
+                                Write-Message -Level Warning -Message "ConfigureXESession was set, but no session named 'AlwaysOn_health' was found on $instance." -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                             }
                         } catch {
-                            Write-Message -Level Warning -Message "ConfigureXESession was set, but configuration failed on $instance with this error: $_" -FunctionName Add-DbaAgReplica
+                            Write-Message -Level Warning -Message "ConfigureXESession was set, but configuration failed on $instance with this error: $_" -FunctionName Add-DbaAgReplica -ModuleName "dbatools"
                         }
 
                     }

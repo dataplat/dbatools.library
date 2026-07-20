@@ -181,7 +181,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # I've seen this only once and can not reproduce:
                     # The following exception occurred while trying to enumerate the collection: "Failed to connect to server XXXXX.database.windows.net.".
                     # So we implement the fallback that was used before #8333.
-                    Write-Message -Level Verbose -Message "Failure: $_" -FunctionName Get-DbaDatabase
+                    Write-Message -Level Verbose -Message "Failure: $_" -FunctionName Get-DbaDatabase -ModuleName "dbatools"
                     $inputObject += $server.Databases[$dt.name]
                 }
             }
@@ -291,7 +291,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $server.Query($querySizes)
                     }
                 } catch {
-                    Write-Message -Level Warning -Message "Could not retrieve database sizes via T-SQL: $_" -FunctionName Get-DbaDatabase
+                    Write-Message -Level Warning -Message "Could not retrieve database sizes via T-SQL: $_" -FunctionName Get-DbaDatabase -ModuleName "dbatools"
                     $null
                 }
             }

@@ -124,7 +124,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # need to pick up here
         foreach ($db in $dbs) {
             if ($db.Name -in @('master', 'model', 'msdb', 'tempdb', 'distribution')) {
-                Write-Message -Level Warning -Message "Database $db is a system one, skipping" -FunctionName Set-DbaDbState
+                Write-Message -Level Warning -Message "Database $db is a system one, skipping" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 Continue
             }
             $dbStatuses = @{ }
@@ -140,16 +140,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $warn = @()
 
             if ($db.DatabaseSnapshotBaseName.Length -gt 0) {
-                Write-Message -Level Warning -Message "Database $db is a snapshot, skipping" -FunctionName Set-DbaDbState
+                Write-Message -Level Warning -Message "Database $db is a snapshot, skipping" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 Continue
             }
 
             if ($ReadOnly -eq $true) {
                 if ($db_status.RW -eq 'READ_ONLY') {
-                    Write-Message -Level VeryVerbose -Message "Database $db is already READ_ONLY" -FunctionName Set-DbaDbState
+                    Write-Message -Level VeryVerbose -Message "Database $db is already READ_ONLY" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 } else {
                     if ($Pscmdlet.ShouldProcess($server, "Set $db to READ_ONLY")) {
-                        Write-Message -Level VeryVerbose -Message "Setting database $db to READ_ONLY" -FunctionName Set-DbaDbState
+                        Write-Message -Level VeryVerbose -Message "Setting database $db to READ_ONLY" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $partial = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "READ_ONLY" -immediate $Force
                         $warn += $partial
                         if (!$partial) {
@@ -161,10 +161,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($ReadWrite -eq $true) {
                 if ($db_status.RW -eq 'READ_WRITE') {
-                    Write-Message -Level VeryVerbose -Message "Database $db is already READ_WRITE" -FunctionName Set-DbaDbState
+                    Write-Message -Level VeryVerbose -Message "Database $db is already READ_WRITE" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 } else {
                     if ($Pscmdlet.ShouldProcess($server, "Set $db to READ_WRITE")) {
-                        Write-Message -Level VeryVerbose -Message "Setting database $db to READ_WRITE" -FunctionName Set-DbaDbState
+                        Write-Message -Level VeryVerbose -Message "Setting database $db to READ_WRITE" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $partial = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "READ_WRITE" -immediate $Force
                         $warn += $partial
                         if (!$partial) {
@@ -176,10 +176,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($Online -eq $true) {
                 if ($db_status.Status -eq 'ONLINE') {
-                    Write-Message -Level VeryVerbose -Message "Database $db is already ONLINE" -FunctionName Set-DbaDbState
+                    Write-Message -Level VeryVerbose -Message "Database $db is already ONLINE" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 } else {
                     if ($Pscmdlet.ShouldProcess($server, "Set $db to ONLINE")) {
-                        Write-Message -Level VeryVerbose -Message "Setting database $db to ONLINE" -FunctionName Set-DbaDbState
+                        Write-Message -Level VeryVerbose -Message "Setting database $db to ONLINE" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $partial = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "ONLINE" -immediate $Force
                         $warn += $partial
                         if (!$partial) {
@@ -191,10 +191,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($Offline -eq $true) {
                 if ($db_status.Status -eq 'OFFLINE') {
-                    Write-Message -Level VeryVerbose -Message "Database $db is already OFFLINE" -FunctionName Set-DbaDbState
+                    Write-Message -Level VeryVerbose -Message "Database $db is already OFFLINE" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 } else {
                     if ($Pscmdlet.ShouldProcess($server, "Set $db to OFFLINE")) {
-                        Write-Message -Level VeryVerbose -Message "Setting database $db to OFFLINE" -FunctionName Set-DbaDbState
+                        Write-Message -Level VeryVerbose -Message "Setting database $db to OFFLINE" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $partial = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "OFFLINE" -immediate $Force
                         $warn += $partial
                         if (!$partial) {
@@ -206,10 +206,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($Emergency -eq $true) {
                 if ($db_status.Status -eq 'EMERGENCY') {
-                    Write-Message -Level VeryVerbose -Message "Database $db is already EMERGENCY" -FunctionName Set-DbaDbState
+                    Write-Message -Level VeryVerbose -Message "Database $db is already EMERGENCY" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 } else {
                     if ($Pscmdlet.ShouldProcess($server, "Set $db to EMERGENCY")) {
-                        Write-Message -Level VeryVerbose -Message "Setting database $db to EMERGENCY" -FunctionName Set-DbaDbState
+                        Write-Message -Level VeryVerbose -Message "Setting database $db to EMERGENCY" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $partial = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "EMERGENCY" -immediate $Force
                         if (!$partial) {
                             $db_status.Status = 'EMERGENCY'
@@ -220,10 +220,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($SingleUser -eq $true) {
                 if ($db_status.Access -eq 'SINGLE_USER') {
-                    Write-Message -Level VeryVerbose -Message "Database $db is already SINGLE_USER" -FunctionName Set-DbaDbState
+                    Write-Message -Level VeryVerbose -Message "Database $db is already SINGLE_USER" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 } else {
                     if ($Pscmdlet.ShouldProcess($server, "Set $db to SINGLE_USER")) {
-                        Write-Message -Level VeryVerbose -Message "Setting $db to SINGLE_USER" -FunctionName Set-DbaDbState
+                        Write-Message -Level VeryVerbose -Message "Setting $db to SINGLE_USER" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $partial = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "SINGLE_USER" -immediate $Force
                         if (!$partial) {
                             $db_status.Access = 'SINGLE_USER'
@@ -234,10 +234,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($RestrictedUser -eq $true) {
                 if ($db_status.Access -eq 'RESTRICTED_USER') {
-                    Write-Message -Level VeryVerbose -Message "Database $db is already RESTRICTED_USER" -FunctionName Set-DbaDbState
+                    Write-Message -Level VeryVerbose -Message "Database $db is already RESTRICTED_USER" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 } else {
                     if ($Pscmdlet.ShouldProcess($server, "Set $db to RESTRICTED_USER")) {
-                        Write-Message -Level VeryVerbose -Message "Setting $db to RESTRICTED_USER" -FunctionName Set-DbaDbState
+                        Write-Message -Level VeryVerbose -Message "Setting $db to RESTRICTED_USER" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $partial = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "RESTRICTED_USER" -immediate $Force
                         if (!$partial) {
                             $db_status.Access = 'RESTRICTED_USER'
@@ -248,10 +248,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($MultiUser -eq $true) {
                 if ($db_status.Access -eq 'MULTI_USER') {
-                    Write-Message -Level VeryVerbose -Message "Database $db is already MULTI_USER" -FunctionName Set-DbaDbState
+                    Write-Message -Level VeryVerbose -Message "Database $db is already MULTI_USER" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                 } else {
                     if ($Pscmdlet.ShouldProcess($server, "Set $db to MULTI_USER")) {
-                        Write-Message -Level VeryVerbose -Message "Setting $db to MULTI_USER" -FunctionName Set-DbaDbState
+                        Write-Message -Level VeryVerbose -Message "Setting $db to MULTI_USER" -FunctionName Set-DbaDbState -ModuleName "dbatools"
                         $partial = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "MULTI_USER" -immediate $Force
                         if (!$partial) {
                             $db_status.Access = 'MULTI_USER'

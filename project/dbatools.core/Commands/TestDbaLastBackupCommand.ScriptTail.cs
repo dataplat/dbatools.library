@@ -12,13 +12,13 @@ public sealed partial class TestDbaLastBackupCommand
             $removearray = @()
             if ($CopyFile) {
                 try {
-                    Write-Message -Level Verbose -Message "Gathering information for file copy." -FunctionName Test-DbaLastBackup
+                    Write-Message -Level Verbose -Message "Gathering information for file copy." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                     $removearray = @()
 
                     foreach ($backup in $lastbackup) {
                         foreach ($file in $backup.Path) {
                             $filename = Split-Path -Path $file -Leaf
-                            Write-Message -Level Verbose -Message "Processing $filename." -FunctionName Test-DbaLastBackup
+                            Write-Message -Level Verbose -Message "Processing $filename." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
 
                             $sourcefile = Join-AdminUnc -servername $instance.ComputerName -filepath $file
 
@@ -30,11 +30,11 @@ public sealed partial class TestDbaLastBackupCommand
 
                             $remotedestfile = "$remotedestdirectory\$filename"
                             $localdestfile = "$copyPath\$filename"
-                            Write-Message -Level Verbose -Message "Destination directory is $destdirectory." -FunctionName Test-DbaLastBackup
-                            Write-Message -Level Verbose -Message "Destination filename is $remotedestfile." -FunctionName Test-DbaLastBackup
+                            Write-Message -Level Verbose -Message "Destination directory is $destdirectory." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
+                            Write-Message -Level Verbose -Message "Destination filename is $remotedestfile." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
 
                             try {
-                                Write-Message -Level Verbose -Message "Copying $sourcefile to $remotedestfile." -FunctionName Test-DbaLastBackup
+                                Write-Message -Level Verbose -Message "Copying $sourcefile to $remotedestfile." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                                 Copy-Item -Path $sourcefile -Destination $remotedestfile -ErrorAction Stop
                                 $backup.Path = $backup.Path.Replace($file, $localdestfile)
                                 $backup.FullName = $backup.Path.Replace($file, $localdestfile)
@@ -47,7 +47,7 @@ public sealed partial class TestDbaLastBackupCommand
                     }
                     $copysuccess = $true
                 } catch {
-                    Write-Message -Level Warning -Message "Failed to copy backups for $dbName on $instance - $_." -FunctionName Test-DbaLastBackup
+                    Write-Message -Level Warning -Message "Failed to copy backups for $dbName on $instance - $_." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                     $copysuccess = $false
                 }
             }
@@ -57,7 +57,7 @@ public sealed partial class TestDbaLastBackupCommand
             $skipDbccResult = $null
 
             if (-not $copysuccess) {
-                Write-Message -Level Verbose -Message "Failed to copy backups." -FunctionName Test-DbaLastBackup
+                Write-Message -Level Verbose -Message "Failed to copy backups." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 $lastbackup = @{
                     Path = "Failed to copy backups"
                 }
@@ -65,7 +65,7 @@ public sealed partial class TestDbaLastBackupCommand
                 $skipRestoreResult = "Skipped"
                 $skipDbccResult = "Skipped"
             } elseif (-not ($lastbackup | Where-Object { $_.type -eq "Full" })) {
-                Write-Message -Level Verbose -Message "No full backup returned from lastbackup." -FunctionName Test-DbaLastBackup
+                Write-Message -Level Verbose -Message "No full backup returned from lastbackup." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 $lastbackup = @{
                     Path = "Not found"
                 }
@@ -73,19 +73,19 @@ public sealed partial class TestDbaLastBackupCommand
                 $skipRestoreResult = "Skipped"
                 $skipDbccResult = "Skipped"
             } elseif ($source -ne $destination -and $lastbackup[0].Path.StartsWith("\\") -eq $false -and $lastbackup[0].Path -notlike "http*" -and $lastbackup[0].Path -notlike "s3*" -and -not $CopyFile) {
-                Write-Message -Level Verbose -Message "Path not UNC or cloud storage and source does not match destination. Use -CopyFile to move the backup file." -FunctionName Test-DbaLastBackup
+                Write-Message -Level Verbose -Message "Path not UNC or cloud storage and source does not match destination. Use -CopyFile to move the backup file." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 $fileexists = "Skipped"
                 $skipRestoreResult = "Restore not located on shared location"
                 $skipDbccResult = "Skipped"
             } elseif (($lastbackup[0].Path | ForEach-Object { Test-DbaPath -SqlInstance $destserver -Path $_ }) -eq $false) {
-                Write-Message -Level Verbose -Message "SQL Server cannot find backup." -FunctionName Test-DbaLastBackup
+                Write-Message -Level Verbose -Message "SQL Server cannot find backup." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 $fileexists = $false
                 $skipRestoreResult = "Skipped"
                 $skipDbccResult = "Skipped"
             }
 
             if (-not $skipRestoreResult -and ($lastbackup[0].Path -like "http*" -or $lastbackup[0].Path -like "s3*")) {
-                Write-Message -Level Verbose -Message "Looking good." -FunctionName Test-DbaLastBackup
+                Write-Message -Level Verbose -Message "Looking good." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 $fileexists = $true
             }
 
@@ -135,7 +135,7 @@ public sealed partial class TestDbaLastBackupCommand
                 }
 
                 if ($__realCmdlet.ShouldProcess($destinationName, "Restoring $ogdbname as $prefixedDbName.")) {
-                    Write-Message -Level Verbose -Message "Performing restore." -FunctionName Test-DbaLastBackup
+                    Write-Message -Level Verbose -Message "Performing restore." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                     $startRestore = Get-Date
                     try {
                         if ($ReuseSourceFolderStructure) {
@@ -184,7 +184,7 @@ public sealed partial class TestDbaLastBackupCommand
                             $restoreresult = $lastbackup | Restore-DbaDatabase @restoreSplat -VerifyOnly
                         } else {
                             $restoreresult = $lastbackup | Restore-DbaDatabase @restoreSplat
-                            Write-Message -Level Verbose -Message " Restore-DbaDatabase -SqlInstance $destserver -RestoredDatabaseNamePrefix $prefix -DestinationFilePrefix $Prefix -DestinationDataDirectory $($workItem.EffectiveDataDirectory) -DestinationLogDirectory $($workItem.EffectiveLogDirectory) -IgnoreLogBackup:$IgnoreLogBackup -StorageCredential $StorageCredential -TrustDbBackupHistory:$($workItem.TrustDbBackupHistory)" -FunctionName Test-DbaLastBackup
+                            Write-Message -Level Verbose -Message " Restore-DbaDatabase -SqlInstance $destserver -RestoredDatabaseNamePrefix $prefix -DestinationFilePrefix $Prefix -DestinationDataDirectory $($workItem.EffectiveDataDirectory) -DestinationLogDirectory $($workItem.EffectiveLogDirectory) -IgnoreLogBackup:$IgnoreLogBackup -StorageCredential $StorageCredential -TrustDbBackupHistory:$($workItem.TrustDbBackupHistory)" -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                         }
                     } catch {
                         $errormsg = Get-ErrorMessage -Record $_
@@ -212,7 +212,7 @@ public sealed partial class TestDbaLastBackupCommand
                         $dbccresult = "DBCC CHECKDB skipped for restored master ($prefixedDbName) database. The master database cannot be copied off of a server and have a successful DBCC CHECKDB. See https://www.itprotoday.com/my-master-database-really-corrupt for more information."
                     } else {
                         if ($success -eq "Success") {
-                            Write-Message -Level Verbose -Message "Starting DBCC." -FunctionName Test-DbaLastBackup
+                            Write-Message -Level Verbose -Message "Starting DBCC." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
 
                             $startDbcc = Get-Date
                             $dbccCheckResult = Start-DbccCheck -Server $destserver -DbName $prefixedDbName -MaxDop $MaxDop -DetailedOutput 3>$null
@@ -235,17 +235,17 @@ public sealed partial class TestDbaLastBackupCommand
 
                 if (-not $NoDrop -and $null -ne $destserver.Databases[$prefixedDbName]) {
                     if ($__realCmdlet.ShouldProcess($prefixedDbName, "Dropping Database $prefixedDbName on $destinationName")) {
-                        Write-Message -Level Verbose -Message "Dropping database." -FunctionName Test-DbaLastBackup
+                        Write-Message -Level Verbose -Message "Dropping database." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
 
                         ## Drop the database
                         try {
                             #Variable $removeresult marked as unused by PSScriptAnalyzer replace with $null to catch output
                             $null = Remove-DbaDatabase -SqlInstance $destserver -Database $prefixedDbName -Confirm:$false
-                            Write-Message -Level Verbose -Message "Dropped $prefixedDbName Database on $destinationName." -FunctionName Test-DbaLastBackup
+                            Write-Message -Level Verbose -Message "Dropped $prefixedDbName Database on $destinationName." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                         } catch {
                             $destserver.Databases.Refresh()
                             if ($destserver.Databases[$prefixedDbName]) {
-                                Write-Message -Level Warning -Message "Failed to Drop database $prefixedDbName on $destinationName." -FunctionName Test-DbaLastBackup
+                                Write-Message -Level Warning -Message "Failed to Drop database $prefixedDbName on $destinationName." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                             }
                         }
                     }
@@ -255,15 +255,15 @@ public sealed partial class TestDbaLastBackupCommand
 
                 $destserver.Databases.Refresh()
                 if ($destserver.Databases[$prefixedDbName] -and -not $NoDrop) {
-                    Write-Message -Level Warning -Message "$prefixedDbName was not dropped." -FunctionName Test-DbaLastBackup
+                    Write-Message -Level Warning -Message "$prefixedDbName was not dropped." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 }
 
                 if ($workItem.RemoveArray) {
-                    Write-Message -Level Verbose -Message "Removing copied backup file from $destinationName." -FunctionName Test-DbaLastBackup
+                    Write-Message -Level Verbose -Message "Removing copied backup file from $destinationName." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                     try {
                         $workItem.RemoveArray | Remove-Item -ErrorAction Stop
                     } catch {
-                        Write-Message -Level Warning -Message $_ -ErrorRecord $_ -Target $workItem.Source -FunctionName Test-DbaLastBackup
+                        Write-Message -Level Warning -Message $_ -ErrorRecord $_ -Target $workItem.Source -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                     }
                 }
             }
@@ -291,7 +291,7 @@ public sealed partial class TestDbaLastBackupCommand
             }
 
             if ($Wait) {
-                Write-Message -Level Verbose -Message "Waiting $Wait seconds before processing next database." -FunctionName Test-DbaLastBackup
+                Write-Message -Level Verbose -Message "Waiting $Wait seconds before processing next database." -FunctionName Test-DbaLastBackup -ModuleName "dbatools"
                 Start-Sleep -Seconds $Wait
             }
         }

@@ -33,7 +33,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         . {
         if ($Force) { $ConfirmPreference = 'none' }
 
-        Write-Message -Message "Started log shipping for $SourceSqlInstance to $DestinationSqlInstance" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+        Write-Message -Message "Started log shipping for $SourceSqlInstance to $DestinationSqlInstance" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
         # Try connecting to the instance
         try {
@@ -66,7 +66,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Check the connection timeout
         if ($SourceServer.ConnectionContext.StatementTimeout -ne 0) {
             $SourceServer.ConnectionContext.StatementTimeout = 0
-            Write-Message -Message "Connection timeout of $SourceServer is set to 0" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Connection timeout of $SourceServer is set to 0" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
 
         # Check if using Azure blob storage or traditional file share
@@ -74,7 +74,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if ($UseAzure) {
             # Validate Azure URL format
-            Write-Message -Message "Using Azure blob storage: $AzureBaseUrl" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Using Azure blob storage: $AzureBaseUrl" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 
             # Trim trailing slashes
             $AzureBaseUrl = $AzureBaseUrl.TrimEnd("/")
@@ -96,13 +96,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } else {
             if (-not $IgnoreFileChecks) {
                 # Check the backup network path
-                Write-Message -Message "Testing backup network path $SharedPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Testing backup network path $SharedPath" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 if ((Test-DbaPath -Path $SharedPath -SqlInstance $SourceSqlInstance -SqlCredential $SourceSqlCredential) -ne $true) {
                     Stop-Function -Message "Backup network path $SharedPath is not valid or can't be reached." -Target $SourceSqlInstance -FunctionName Invoke-DbaDbLogShipping
                     return
                 }
             } else {
-                Write-Message -Message "Skipping backup network path validation for $SharedPath because -IgnoreFileChecks was specified." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Skipping backup network path validation for $SharedPath because -IgnoreFileChecks was specified." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
             }
 
             if ($SharedPath -notmatch $RegexUnc) {
@@ -114,15 +114,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Check the backup compression
         if ($SourceServer.Version.Major -gt 9) {
             if ($CompressBackup) {
-                Write-Message -Message "Setting backup compression to 1." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Setting backup compression to 1." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 [bool]$BackupCompression = 1
             } else {
                 $backupServerSetting = (Get-DbaSpConfigure -SqlInstance $SourceSqlInstance -SqlCredential $SourceSqlCredential -ConfigName DefaultBackupCompression).ConfiguredValue
-                Write-Message -Message "Setting backup compression to default server setting $backupServerSetting." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+                Write-Message -Message "Setting backup compression to default server setting $backupServerSetting." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
                 [bool]$BackupCompression = $backupServerSetting
             }
         } else {
-            Write-Message -Message "Source server $SourceServer does not support backup compression" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Source server $SourceServer does not support backup compression" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
 
         # Check the database parameter
@@ -141,84 +141,84 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Set the database mode
         if ($Standby) {
             $DatabaseStatus = 1
-            Write-Message -Message "Destination database status set to STANDBY" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Destination database status set to STANDBY" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         } else {
             $DatabaseStatus = 0
-            Write-Message -Message "Destination database status set to NO RECOVERY" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Destination database status set to NO RECOVERY" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
 
         # Setting defaults
         if (-not $BackupRetention) {
             $BackupRetention = 4320
-            Write-Message -Message "Backup retention set to $BackupRetention" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Backup retention set to $BackupRetention" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $BackupThreshold) {
             $BackupThreshold = 60
-            Write-Message -Message "Backup Threshold set to $BackupThreshold" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Backup Threshold set to $BackupThreshold" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $CopyRetention) {
             $CopyRetention = 4320
-            Write-Message -Message "Copy retention set to $CopyRetention" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Copy retention set to $CopyRetention" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $HistoryRetention) {
             $HistoryRetention = 14420
-            Write-Message -Message "History retention set to $HistoryRetention" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "History retention set to $HistoryRetention" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $RestoreAlertThreshold) {
             $RestoreAlertThreshold = 45
-            Write-Message -Message "Restore alert Threshold set to $RestoreAlertThreshold" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Restore alert Threshold set to $RestoreAlertThreshold" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $RestoreDelay) {
             $RestoreDelay = 0
-            Write-Message -Message "Restore delay set to $RestoreDelay" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Restore delay set to $RestoreDelay" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $RestoreRetention) {
             $RestoreRetention = 4320
-            Write-Message -Message "Restore retention set to $RestoreRetention" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Restore retention set to $RestoreRetention" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $RestoreThreshold) {
             $RestoreThreshold = 45
-            Write-Message -Message "Restore Threshold set to $RestoreThreshold" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Restore Threshold set to $RestoreThreshold" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $PrimaryMonitorServerSecurityMode) {
             $PrimaryMonitorServerSecurityMode = 1
-            Write-Message -Message "Primary monitor server security mode set to $PrimaryMonitorServerSecurityMode" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Primary monitor server security mode set to $PrimaryMonitorServerSecurityMode" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $SecondaryMonitorServerSecurityMode) {
             $SecondaryMonitorServerSecurityMode = 1
-            Write-Message -Message "Secondary monitor server security mode set to $SecondaryMonitorServerSecurityMode" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Secondary monitor server security mode set to $SecondaryMonitorServerSecurityMode" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $BackupScheduleFrequencyType) {
             $BackupScheduleFrequencyType = "Daily"
-            Write-Message -Message "Backup frequency type set to $BackupScheduleFrequencyType" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Backup frequency type set to $BackupScheduleFrequencyType" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $BackupScheduleFrequencyInterval) {
             $BackupScheduleFrequencyInterval = "EveryDay"
-            Write-Message -Message "Backup frequency interval set to $BackupScheduleFrequencyInterval" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Backup frequency interval set to $BackupScheduleFrequencyInterval" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $BackupScheduleFrequencySubdayType) {
             $BackupScheduleFrequencySubdayType = "Minutes"
-            Write-Message -Message "Backup frequency subday type set to $BackupScheduleFrequencySubdayType" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Backup frequency subday type set to $BackupScheduleFrequencySubdayType" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $BackupScheduleFrequencySubdayInterval) {
             $BackupScheduleFrequencySubdayInterval = 15
-            Write-Message -Message "Backup frequency subday interval set to $BackupScheduleFrequencySubdayInterval" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Backup frequency subday interval set to $BackupScheduleFrequencySubdayInterval" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $BackupScheduleFrequencyRelativeInterval) {
             $BackupScheduleFrequencyRelativeInterval = "Unused"
-            Write-Message -Message "Backup frequency relative interval set to $BackupScheduleFrequencyRelativeInterval" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Backup frequency relative interval set to $BackupScheduleFrequencyRelativeInterval" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $BackupScheduleFrequencyRecurrenceFactor) {
             $BackupScheduleFrequencyRecurrenceFactor = 0
-            Write-Message -Message "Backup frequency recurrence factor set to $BackupScheduleFrequencyRecurrenceFactor" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Backup frequency recurrence factor set to $BackupScheduleFrequencyRecurrenceFactor" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $CopyScheduleFrequencyType) {
             $CopyScheduleFrequencyType = "Daily"
-            Write-Message -Message "Copy frequency type set to $CopyScheduleFrequencyType" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Copy frequency type set to $CopyScheduleFrequencyType" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
         if (-not $CopyScheduleFrequencyInterval) {
             $CopyScheduleFrequencyInterval = "EveryDay"
-            Write-Message -Message "Copy frequency interval set to $CopyScheduleFrequencyInterval" -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+            Write-Message -Message "Copy frequency interval set to $CopyScheduleFrequencyInterval" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
         }
 """;
 }
