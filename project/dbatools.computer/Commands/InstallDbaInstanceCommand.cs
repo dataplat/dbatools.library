@@ -32,6 +32,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
     /// <summary>The SQL Server major version to install.</summary>
     [Parameter(Mandatory = true, Position = 1)]
     [ValidateNotNullOrEmpty]
+    [PsStringCast]
     [ValidateSet("2008", "2008R2", "2012", "2014", "2016", "2017", "2019", "2022", "2025")]
     public string? Version { get; set; }
 
@@ -49,6 +50,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
 
     /// <summary>The WinRM authentication protocol.</summary>
     [Parameter(Position = 5)]
+    [PsStringCast]
     [ValidateSet("Default", "Basic", "Negotiate", "NegotiateWithImplicitCredential", "Credssp", "Digest", "Kerberos")]
     public string? Authentication { get; set; }
 
@@ -74,6 +76,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
 
     /// <summary>Windows or Mixed authentication mode.</summary>
     [Parameter(Position = 10)]
+    [PsStringCast]
     [ValidateSet("Windows", "Mixed")]
     public string AuthenticationMode { get; set; } = "Windows";
 

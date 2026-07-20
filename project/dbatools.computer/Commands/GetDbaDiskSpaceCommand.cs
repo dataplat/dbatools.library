@@ -30,6 +30,7 @@ public sealed class GetDbaDiskSpaceCommand : DbaBaseCmdlet
 
     /// <summary>Display unit (legacy; the DiskSpace object exposes all unit conversions).</summary>
     [Parameter(Position = 2)]
+    [PsStringCast]
     [ValidateSet("Bytes", "KB", "MB", "GB", "TB", "PB")]
     public string Unit { get; set; } = "GB";
 

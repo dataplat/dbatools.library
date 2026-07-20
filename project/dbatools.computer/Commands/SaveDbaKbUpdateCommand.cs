@@ -31,6 +31,7 @@ public sealed class SaveDbaKbUpdateCommand : DbaBaseCmdlet
 
     /// <summary>The CPU architecture of the files to download.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("x64", "x86", "ia64", "All")]
     public string Architecture { get; set; } = "x64";
 

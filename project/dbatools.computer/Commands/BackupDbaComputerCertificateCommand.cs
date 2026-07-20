@@ -38,6 +38,7 @@ public sealed class BackupDbaComputerCertificateCommand : DbaBaseCmdlet
 
     /// <summary>The certificate export content type.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("Authenticode", "Cert", "Pfx", "Pkcs12", "Pkcs7", "SerializedCert")]
     public string Type { get; set; } = "Cert";
 

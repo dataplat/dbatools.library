@@ -64,6 +64,7 @@ public sealed class UpdateDbaInstanceCommand : DbaBaseCmdlet
     public int Throttle { get; set; } = 50;
 
     [Parameter]
+    [PsStringCast]
     [ValidateSet("Default", "Basic", "Negotiate", "NegotiateWithImplicitCredential", "Credssp", "Digest", "Kerberos")]
     public string? Authentication { get; set; }
 

@@ -37,6 +37,7 @@ public sealed class NewDbaFirewallRuleCommand : DbaBaseCmdlet
 
     /// <summary>Program (default, targets the executable) or Port (targets TCP/UDP ports).</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("Program", "Port")]
     public string RuleType { get; set; } = "Program";
 

@@ -45,6 +45,7 @@ public sealed class EnableDbaFilestreamCommand : DbaBaseCmdlet
 
     /// <summary>The FileStream access level to enable (name or numeric 1/2/3).</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("TSql", "TSqlIoStreaming", "TSqlIoStreamingRemoteClient", "1", "2", "3")]
     public string FileStreamLevel { get; set; } = "1";
 

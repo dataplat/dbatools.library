@@ -91,6 +91,7 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
 
     /// <summary>The signature hash algorithm.</summary>
     [Parameter(Position = 13)]
+    [PsStringCast]
     [ValidateSet("Sha256", "sha384", "sha512")]
     public string HashAlgorithm { get; set; } = "Sha256";
 

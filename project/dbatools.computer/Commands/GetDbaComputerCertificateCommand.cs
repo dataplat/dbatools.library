@@ -36,6 +36,7 @@ public sealed class GetDbaComputerCertificateCommand : DbaBaseCmdlet
 
     /// <summary>Service returns only Server Authentication candidates; All returns everything.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("All", "Service")]
     public string Type { get; set; } = "Service";
 

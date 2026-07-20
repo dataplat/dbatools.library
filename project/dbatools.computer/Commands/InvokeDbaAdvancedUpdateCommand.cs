@@ -37,6 +37,7 @@ public sealed class InvokeDbaAdvancedUpdateCommand : DbaBaseCmdlet
 
     /// <summary>The WinRM authentication protocol for remote connections.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     [ValidateSet("Default", "Basic", "Negotiate", "NegotiateWithImplicitCredential", "Credssp", "Digest", "Kerberos")]
     public string Authentication { get; set; } = "Credssp";
 

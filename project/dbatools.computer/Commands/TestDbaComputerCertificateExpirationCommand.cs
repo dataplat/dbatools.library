@@ -38,6 +38,7 @@ public sealed class TestDbaComputerCertificateExpirationCommand : DbaBaseCmdlet
 
     /// <summary>Service and All check computer certificates; SQL Server checks the instance's network certificate.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("All", "Service", "SQL Server")]
     public string Type { get; set; } = "Service";
 
