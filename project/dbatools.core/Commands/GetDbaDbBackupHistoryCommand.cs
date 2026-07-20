@@ -33,7 +33,10 @@ namespace Dataplat.Dbatools.Commands;
 /// (Get-PSCallStack)[1].Command guards diverge ONLY for absurd callers - a function literally named
 /// "{ScriptBlock}" (curly) or one whose name begins with a leading space - which no realistic code emits,
 /// and the recursion indirection means even a caller carrier could not fix the recursive leg. Same
-/// disclosed-bound class as the accepted W2-206 alias-precedence P2.
+/// disclosed-bound class as the accepted W2-206 alias-precedence P2. codex r2: #1 (AgCheck vs overflowing
+/// TimeSpan ordering) FIXED (guard the C# conversion with !AgCheck); #2 (in-hop Write-Message reports
+/// FunctionName=&lt;ScriptBlock&gt;) is the DEF-006 -FunctionName class - the certified sibling
+/// GetDbaDbRestoreHistory leaves Write-Message verbatim too; routed to the DEF-006 batch pass, DISCLOSED.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaDbBackupHistory", DefaultParameterSetName = "Default")]
 public sealed class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
@@ -156,7 +159,11 @@ public sealed class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
             object raw = MyInvocation.BoundParameters.ContainsKey("Since")
                 ? (Since is null ? null! : Since.BaseObject)
                 : DateTime.ParseExact("1970-01-01", "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            if (raw is TimeSpan ts)
+            // codex r2 #1: the source checks -AgCheck (Stop-Function + return, L299) BEFORE the Since
+            // TimeSpan conversion (L305), so an overflowing TimeSpan never converts under -AgCheck.
+            // Guard the C# conversion the same way (AgCheck set -> pass raw TimeSpan; the hop's AgCheck
+            // return fires first, exactly as the function - no premature ArgumentOutOfRangeException).
+            if (!AgCheck.ToBool() && raw is TimeSpan ts)
                 raw = DateTime.Now.Add(ts);
             _resolvedSince = raw;
             _sinceResolved = true;
