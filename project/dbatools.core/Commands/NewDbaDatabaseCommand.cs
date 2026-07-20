@@ -33,96 +33,96 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class NewDbaDatabaseCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
     public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
 
     /// <summary>Alternative credential for the target instances.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>The database name(s); a random name is generated when omitted.</summary>
-    [Parameter]
+    [Parameter(Position = 2)]
     [Alias("Database")]
     public string[]? Name { get; set; }
 
     /// <summary>The collation for the new database; instance default when omitted.</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     public string? Collation { get; set; }
 
     /// <summary>The recovery model; model-database default when omitted.</summary>
-    [Parameter]
+    [Parameter(Position = 4)]
     [PsStringCast]
     [ValidateSet("Simple", "Full", "BulkLogged")]
     public string? RecoveryModel { get; set; }
 
     /// <summary>The database owner login set after creation.</summary>
-    [Parameter]
+    [Parameter(Position = 5)]
     public string? Owner { get; set; }
 
     /// <summary>Data file directory (or Azure URL); instance default data path when omitted.</summary>
-    [Parameter]
+    [Parameter(Position = 6)]
     public string? DataFilePath { get; set; }
 
     /// <summary>Log file directory (or Azure URL); instance default log path when omitted.</summary>
-    [Parameter]
+    [Parameter(Position = 7)]
     public string? LogFilePath { get; set; }
 
     /// <summary>Primary file size in MB; model-derived when omitted.</summary>
-    [Parameter]
+    [Parameter(Position = 8)]
     public int PrimaryFilesize { get; set; }
 
     /// <summary>Primary file growth in MB.</summary>
-    [Parameter]
+    [Parameter(Position = 9)]
     public int PrimaryFileGrowth { get; set; }
 
     /// <summary>Primary file max size in MB.</summary>
-    [Parameter]
+    [Parameter(Position = 10)]
     public int PrimaryFileMaxSize { get; set; }
 
     /// <summary>Log file size in MB.</summary>
-    [Parameter]
+    [Parameter(Position = 11)]
     public int LogSize { get; set; }
 
     /// <summary>Log file growth in MB.</summary>
-    [Parameter]
+    [Parameter(Position = 12)]
     public int LogGrowth { get; set; }
 
     /// <summary>Log file max size in MB.</summary>
-    [Parameter]
+    [Parameter(Position = 13)]
     public int LogMaxSize { get; set; }
 
     /// <summary>Secondary file size in MB.</summary>
-    [Parameter]
+    [Parameter(Position = 14)]
     public int SecondaryFilesize { get; set; }
 
     /// <summary>Secondary file growth in MB.</summary>
-    [Parameter]
+    [Parameter(Position = 15)]
     public int SecondaryFileGrowth { get; set; }
 
     /// <summary>Secondary file max size in MB.</summary>
-    [Parameter]
+    [Parameter(Position = 16)]
     public int SecondaryFileMaxSize { get; set; }
 
     /// <summary>Number of secondary data files.</summary>
-    [Parameter]
+    [Parameter(Position = 17)]
     public int SecondaryFileCount { get; set; }
 
     /// <summary>Which filegroup becomes the default (Primary or Secondary).</summary>
-    [Parameter]
+    [Parameter(Position = 18)]
     [PsStringCast]
     [ValidateSet("Primary", "Secondary")]
     public string? DefaultFileGroup { get; set; }
 
     /// <summary>Suffix appended to the primary data file name.</summary>
-    [Parameter]
+    [Parameter(Position = 19)]
     public string? DataFileSuffix { get; set; }
 
     /// <summary>Suffix appended to the log file name; defaults to _log.</summary>
-    [Parameter]
+    [Parameter(Position = 20)]
     public string LogFileSuffix { get; set; } = "_log";
 
     /// <summary>Suffix appended to the secondary filegroup and file names.</summary>
-    [Parameter]
+    [Parameter(Position = 21)]
     public string? SecondaryDataFileSuffix { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
