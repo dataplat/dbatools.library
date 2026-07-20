@@ -11,8 +11,10 @@ namespace Dataplat.Dbatools.Commands;
 /// Disables SQL Server startup stored procedures. Port of
 /// public/Disable-DbaStartupProcedure.ps1 (W3-008). The begin block only sets the $action
 /// ('Disable') and $startup ($false) constants consumed inside the same process body, so there
-/// is NO cross-record accumulator and NO end hop - the begin constants inline into the process
-/// script. DEF-001 cond1+cond2: the process body EMITS (Select-DefaultView) per record AND has
+/// is NO end hop - the begin constants inline into the process script. DEF-012: the emit block
+/// (Add-Member + Select-DefaultView) sits OUTSIDE the inner foreach, so $sp/$db/$server/$status/
+/// $note DO persist across records in the function world and are carried (trailer packet
+/// __dbatoolsDspCarrier -> the _carried* fields). DEF-001 cond1+cond2: the process body EMITS (Select-DefaultView) per record AND has
 /// reachable Stop-Function -Continue at Connect-DbaInstance / the procedure-parse checks, so the
 /// hop STREAMS via InvokeScopedStreaming - a buffered hop would lose an earlier record's emit
 /// when a later record throws under -EnableException. The source's Test-Bound guards
@@ -57,13 +59,33 @@ public sealed class DisableDbaStartupProcedureCommand : DbaBaseCmdlet
                 WriteError(nestedError);
                 return;
             }
+            if (item?.Properties["__dbatoolsDspCarrier"] is not null &&
+                LanguagePrimitives.IsTrue(item.Properties["__dbatoolsDspCarrier"].Value))
+            {
+                // DEF-012: the source's $sp / $db / $server / $status / $note persist across
+                // pipeline records (see the ProcessScript note) - park them for the next record.
+                _carriedSp = item.Properties["Sp"]?.Value;
+                _carriedDb = item.Properties["Db"]?.Value;
+                _carriedServer = item.Properties["Server"]?.Value;
+                _carriedStatus = item.Properties["Status"]?.Value;
+                _carriedNote = item.Properties["Note"]?.Value;
+                return;
+            }
             WriteObject(item);
         }, ProcessScript,
             SqlInstance, SqlCredential, StartupProcedure, InputObject, EnableException.ToBool(), this,
             TestBound(nameof(InputObject)), TestBound(nameof(SqlInstance)), TestBound(nameof(StartupProcedure)),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            _carriedSp, _carriedDb, _carriedServer, _carriedStatus, _carriedNote);
     }
+
+    // DEF-012 cross-record carriers - see the ProcessScript note.
+    private object? _carriedSp;
+    private object? _carriedDb;
+    private object? _carriedServer;
+    private object? _carriedStatus;
+    private object? _carriedNote;
 
     private object? BoundCommonParameter(string name)
     {
@@ -96,7 +118,7 @@ public sealed class DisableDbaStartupProcedureCommand : DbaBaseCmdlet
     // VERBATIM per record. Substitutions only: Test-Bound -> carried $__bound* flags, $Pscmdlet
     // -> $__realCmdlet, explicit -FunctionName Disable-DbaStartupProcedure on Stop-Function (W1-090).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $StartupProcedure, $InputObject, $EnableException, $__realCmdlet, $__boundInputObject, $__boundSqlInstance, $__boundStartupProcedure, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $StartupProcedure, $InputObject, $EnableException, $__realCmdlet, $__boundInputObject, $__boundSqlInstance, $__boundStartupProcedure, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedSp, $__carriedDb, $__carriedServer, $__carriedStatus, $__carriedNote)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -105,7 +127,18 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$StartupProcedure, [object[]]$InputObject, $EnableException, $__realCmdlet, $__boundInputObject, $__boundSqlInstance, $__boundStartupProcedure, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$StartupProcedure, [object[]]$InputObject, $EnableException, $__realCmdlet, $__boundInputObject, $__boundSqlInstance, $__boundStartupProcedure, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedSp, $__carriedDb, $__carriedServer, $__carriedStatus, $__carriedNote)
+    # DEF-012 (codex, return-sweep): the emit block below sits OUTSIDE the inner foreach, so in the
+    # function world it runs once per RECORD with the LAST iteration's $sp/$db/$server/$status/$note
+    # - and on a record whose $InputObject is empty (pipe $null, or -StartupProcedure resolves
+    # nothing so every Stop-Function -Continue fires) those variables RETAIN the prior record's
+    # values and the function re-emits the stale $sp. A fresh hop scope would see $null. Seed all
+    # five from the carrier; the trailer packet at the bottom parks their post-record values.
+    if ($null -ne $__carriedSp) { $sp = $__carriedSp }
+    if ($null -ne $__carriedDb) { $db = $__carriedDb }
+    if ($null -ne $__carriedServer) { $server = $__carriedServer }
+    if ($null -ne $__carriedStatus) { $status = $__carriedStatus }
+    if ($null -ne $__carriedNote) { $note = $__carriedNote }
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $action = 'Disable'
@@ -185,6 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $defaults = 'ComputerName', 'InstanceName', 'SqlInstance', 'Database', 'Schema', 'Name', 'Startup', 'Action', 'Status', 'Note'
     Select-DefaultView -InputObject $sp -Property $defaults
-} $SqlInstance $SqlCredential $StartupProcedure $InputObject $EnableException $__realCmdlet $__boundInputObject $__boundSqlInstance $__boundStartupProcedure $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    [pscustomobject]@{ __dbatoolsDspCarrier = $true; Sp = $sp; Db = $db; Server = $server; Status = $status; Note = $note }
+} $SqlInstance $SqlCredential $StartupProcedure $InputObject $EnableException $__realCmdlet $__boundInputObject $__boundSqlInstance $__boundStartupProcedure $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedSp $__carriedDb $__carriedServer $__carriedStatus $__carriedNote @__commonParameters 3>&1 2>&1
 """;
 }
