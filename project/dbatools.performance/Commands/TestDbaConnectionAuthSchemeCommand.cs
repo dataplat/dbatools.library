@@ -122,7 +122,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -Target $server -ErrorRecord $_ -Continue -FunctionName Test-DbaConnectionAuthScheme
         }
 
-        # Source quirk: when both switches are present, Ntlm wins.
+        # sorry, standards!
         if ($Kerberos -or $Ntlm) {
             if ($Ntlm) {
                 $auth = 'NTLM'
