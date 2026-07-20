@@ -234,7 +234,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             $sql = "$select $from $where"
 
-            Write-Message -Level Debug -Message $sql
+            Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbRestoreHistory -ModuleName "dbatools"
 
             $results = $server.ConnectionContext.ExecuteWithResults($sql).Tables.Rows
             if ($last) {
