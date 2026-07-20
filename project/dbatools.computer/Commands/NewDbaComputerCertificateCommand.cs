@@ -106,6 +106,26 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
     private string[]? _dnsEffective;
     private string _tempDir = "";
 
+    // DEF-008 (B's sweep true-positive, source-confirmed by A 2026-07-21). The source keeps
+    // $secondaryNode / $certdata / $certDir / $storedCert on the FUNCTION scope: none is ever
+    // initialised, all are assigned inside process{}, so they survive BOTH the foreach over
+    // ComputerName AND - since ComputerName is ValueFromPipeline - the pipeline records.
+    //
+    // What that buys, and what the port was losing: for a FAILOVER CLUSTER
+    // (New-DbaComputerCertificate -ComputerName sqla,sqlb -ClusterInstanceName sqlcluster) the
+    // source creates the CN=cluster certificate ONCE on the first node, exports it to $certdata,
+    // latches $secondaryNode, and every later node SKIPS creation and imports THAT SAME
+    // certificate. All nodes must share one identical cert or TLS breaks the moment the cluster
+    // fails over to a node holding a different key. The port had no latch and no carry: it
+    // created a fresh cert per node, so N nodes got N different certs with the same CN.
+    //
+    // These are C# instance fields precisely because the cmdlet instance is what persists across
+    // ProcessRecord calls - the same scope the source's function-scope variables have.
+    private bool _secondaryNode;
+    private object? _certData;
+    private string? _certDir;
+    private PSObject? _storedCert;
+
     protected override void BeginProcessing()
     {
         // PS: DocumentEncryptionCert requires -SelfSigned or explicit -CertificateTemplate.
@@ -167,163 +187,178 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
                 continue;
             }
 
-            string fqdn;
-            if (!string.IsNullOrEmpty(ClusterInstanceName))
+            // PS :356 `if (-not $secondaryNode) {` - the ENTIRE creation block (fqdn resolution,
+            // request.inf, certreq, storedCert lookup, the localhost display) is gated. On a
+            // cluster's second and later nodes none of it runs; the carried state below is what
+            // the import then uses.
+            if (!_secondaryNode)
             {
-                fqdn = ClusterInstanceName!.Contains(".") ? ClusterInstanceName! : $"{ClusterInstanceName}.{Environment.GetEnvironmentVariable("USERDNSDOMAIN")}";
-            }
-            else
-            {
-                NetworkResolutionService.NetworkResolutionResult? resolved = null;
-                try { resolved = NetworkResolutionService.Resolve(new DbaInstanceParameter(computer.ComputerName), Credential, turbo: false); }
+                string fqdn;
+                if (!string.IsNullOrEmpty(ClusterInstanceName))
+                {
+                    fqdn = ClusterInstanceName!.Contains(".") ? ClusterInstanceName! : $"{ClusterInstanceName}.{Environment.GetEnvironmentVariable("USERDNSDOMAIN")}";
+                }
+                else
+                {
+                    NetworkResolutionService.NetworkResolutionResult? resolved = null;
+                    try { resolved = NetworkResolutionService.Resolve(new DbaInstanceParameter(computer.ComputerName), Credential, turbo: false); }
+                    catch (PipelineStoppedException) { throw; }
+                    catch { resolved = null; }
+                    if (resolved is null)
+                    {
+                        fqdn = $"{computer.ComputerName}.{Environment.GetEnvironmentVariable("USERDNSDOMAIN")}";
+                        WriteMessage(MessageLevel.Warning, $"Server name cannot be resolved. Guessing it's {fqdn}");
+                    }
+                    else
+                    {
+                        fqdn = resolved.FQDN;
+                    }
+                }
+
+                string certDir = $"{_tempDir}\\{fqdn}";
+                _certDir = certDir;
+                string certCfg = $"{certDir}\\request.inf";
+                string certCsr = $"{certDir}\\{fqdn}.csr";
+
+                try
+                {
+                    if (System.IO.Directory.Exists(certDir))
+                    {
+                        foreach (string f in System.IO.Directory.GetFiles(certDir)) { System.IO.File.Delete(f); }
+                    }
+                    else
+                    {
+                        System.IO.Directory.CreateDirectory(certDir);
+                    }
+                }
                 catch (PipelineStoppedException) { throw; }
-                catch { resolved = null; }
-                if (resolved is null)
+                catch (Exception ex)
                 {
-                    fqdn = $"{computer.ComputerName}.{Environment.GetEnvironmentVariable("USERDNSDOMAIN")}";
-                    WriteMessage(MessageLevel.Warning, $"Server name cannot be resolved. Guessing it's {fqdn}");
+                    WriteError(new ErrorRecord(ex, "dbatools_New-DbaComputerCertificate", ErrorCategory.WriteError, certDir));
+                    continue;
+                }
+
+                string shortName = fqdn.Split('.')[0];
+                if (_dnsEffective is null || _dnsEffective.Length == 0)
+                {
+                    _dnsEffective = new[] { shortName, fqdn };
+                }
+                List<string> san = CertificateSanEncoder.GetSanExt(_dnsEffective);
+
+                // Build request.inf verbatim.
+                StringBuilder cfg = new();
+                cfg.Append("[Version]\r\n");
+                cfg.Append("Signature=\"$Windows NT$\"\r\n");
+                cfg.Append("[NewRequest]\r\n");
+                cfg.Append($"Subject = \"CN={fqdn}\"\r\n");
+                cfg.Append("KeySpec = 1\r\n");
+                cfg.Append($"KeyLength = {KeyLength}\r\n");
+                bool nonExportableLocal = ContainsIgnoreCase(Flag, "NonExportable") && string.IsNullOrEmpty(ClusterInstanceName) && computer.IsLocalHost;
+                cfg.Append(nonExportableLocal ? "Exportable = FALSE\r\n" : "Exportable = TRUE\r\n");
+                cfg.Append("MachineKeySet = TRUE\r\n");
+                cfg.Append($"FriendlyName=\"{FriendlyName}\"\r\n");
+                cfg.Append("SMIME = False\r\n");
+                cfg.Append("PrivateKeyArchive = FALSE\r\n");
+                cfg.Append("UserProtected = FALSE\r\n");
+                cfg.Append("UseExistingKeySet = FALSE\r\n");
+                cfg.Append("ProviderName = \"Microsoft RSA SChannel Cryptographic Provider\"\r\n");
+                cfg.Append("ProviderType = 12\r\n");
+                if (SelfSigned.IsPresent)
+                {
+                    cfg.Append("RequestType = Cert\r\n");
+                    cfg.Append($"NotBefore = {DateTime.Now.ToShortDateString()}\r\n");
+                    cfg.Append($"NotAfter = {DateTime.Now.AddMonths(MonthsValid).ToShortDateString()}\r\n");
                 }
                 else
                 {
-                    fqdn = resolved.FQDN;
+                    cfg.Append("RequestType = PKCS10\r\n");
                 }
-            }
-
-            string certDir = $"{_tempDir}\\{fqdn}";
-            string certCfg = $"{certDir}\\request.inf";
-            string certCsr = $"{certDir}\\{fqdn}.csr";
-
-            try
-            {
-                if (System.IO.Directory.Exists(certDir))
+                cfg.Append($"HashAlgorithm = {HashAlgorithm}\r\n");
+                if (DocumentEncryptionCert.IsPresent)
                 {
-                    foreach (string f in System.IO.Directory.GetFiles(certDir)) { System.IO.File.Delete(f); }
+                    cfg.Append("KeyUsage = 0x20\r\n");
+                    cfg.Append("[EnhancedKeyUsageExtension]\r\n");
+                    cfg.Append("OID=1.3.6.1.5.5.8.2.2\r\n");
+                    cfg.Append("OID=1.3.6.1.4.1.311.10.3.11\r\n");
                 }
                 else
                 {
-                    System.IO.Directory.CreateDirectory(certDir);
+                    cfg.Append("KeyUsage = 0xa0\r\n");
+                    cfg.Append("[EnhancedKeyUsageExtension]\r\n");
+                    cfg.Append("OID=1.3.6.1.5.5.7.3.1\r\n");
                 }
-            }
-            catch (PipelineStoppedException) { throw; }
-            catch (Exception ex)
-            {
-                WriteError(new ErrorRecord(ex, "dbatools_New-DbaComputerCertificate", ErrorCategory.WriteError, certDir));
-                continue;
-            }
+                cfg.Append("[Extensions]\r\n");
+                foreach (string line in san) { cfg.Append(line).Append("\r\n"); }
+                cfg.Append("Critical=2.5.29.17\r\n");
 
-            string shortName = fqdn.Split('.')[0];
-            if (_dnsEffective is null || _dnsEffective.Length == 0)
-            {
-                _dnsEffective = new[] { shortName, fqdn };
-            }
-            List<string> san = CertificateSanEncoder.GetSanExt(_dnsEffective);
-
-            // Build request.inf verbatim.
-            StringBuilder cfg = new();
-            cfg.Append("[Version]\r\n");
-            cfg.Append("Signature=\"$Windows NT$\"\r\n");
-            cfg.Append("[NewRequest]\r\n");
-            cfg.Append($"Subject = \"CN={fqdn}\"\r\n");
-            cfg.Append("KeySpec = 1\r\n");
-            cfg.Append($"KeyLength = {KeyLength}\r\n");
-            bool nonExportableLocal = ContainsIgnoreCase(Flag, "NonExportable") && string.IsNullOrEmpty(ClusterInstanceName) && computer.IsLocalHost;
-            cfg.Append(nonExportableLocal ? "Exportable = FALSE\r\n" : "Exportable = TRUE\r\n");
-            cfg.Append("MachineKeySet = TRUE\r\n");
-            cfg.Append($"FriendlyName=\"{FriendlyName}\"\r\n");
-            cfg.Append("SMIME = False\r\n");
-            cfg.Append("PrivateKeyArchive = FALSE\r\n");
-            cfg.Append("UserProtected = FALSE\r\n");
-            cfg.Append("UseExistingKeySet = FALSE\r\n");
-            cfg.Append("ProviderName = \"Microsoft RSA SChannel Cryptographic Provider\"\r\n");
-            cfg.Append("ProviderType = 12\r\n");
-            if (SelfSigned.IsPresent)
-            {
-                cfg.Append("RequestType = Cert\r\n");
-                cfg.Append($"NotBefore = {DateTime.Now.ToShortDateString()}\r\n");
-                cfg.Append($"NotAfter = {DateTime.Now.AddMonths(MonthsValid).ToShortDateString()}\r\n");
-            }
-            else
-            {
-                cfg.Append("RequestType = PKCS10\r\n");
-            }
-            cfg.Append($"HashAlgorithm = {HashAlgorithm}\r\n");
-            if (DocumentEncryptionCert.IsPresent)
-            {
-                cfg.Append("KeyUsage = 0x20\r\n");
-                cfg.Append("[EnhancedKeyUsageExtension]\r\n");
-                cfg.Append("OID=1.3.6.1.5.5.8.2.2\r\n");
-                cfg.Append("OID=1.3.6.1.4.1.311.10.3.11\r\n");
-            }
-            else
-            {
-                cfg.Append("KeyUsage = 0xa0\r\n");
-                cfg.Append("[EnhancedKeyUsageExtension]\r\n");
-                cfg.Append("OID=1.3.6.1.5.5.7.3.1\r\n");
-            }
-            cfg.Append("[Extensions]\r\n");
-            foreach (string line in san) { cfg.Append(line).Append("\r\n"); }
-            cfg.Append("Critical=2.5.29.17\r\n");
-
-            try { System.IO.File.WriteAllText(certCfg, cfg.ToString()); }
-            catch (PipelineStoppedException) { throw; }
-            catch (Exception ex)
-            {
-                WriteError(new ErrorRecord(ex, "dbatools_New-DbaComputerCertificate", ErrorCategory.WriteError, certCfg));
-                continue;
-            }
-
-            string createOut = "";
-            if (ShouldProcess("local", $"Creating certificate for {computer}"))
-            {
-                createOut = RunCertReq($"-new \"{certCfg}\" \"{certCsr}\"");
-            }
-
-            PSObject? storedCert = null;
-            if (SelfSigned.IsPresent)
-            {
-                // PS: $serial = (($create -Split "Serial Number:" -Split "Subject")[2]).Trim()
-                string serial = ParseSerial(createOut);
-                storedCert = FindStoredCertBySerial(serial);
-                if (computer.IsLocalHost && storedCert is not null)
+                try { System.IO.File.WriteAllText(certCfg, cfg.ToString()); }
+                catch (PipelineStoppedException) { throw; }
+                catch (Exception ex)
                 {
-                    WriteObject(ProjectForDisplay(storedCert));
+                    WriteError(new ErrorRecord(ex, "dbatools_New-DbaComputerCertificate", ErrorCategory.WriteError, certCfg));
+                    continue;
                 }
-            }
-            else
-            {
-                // CA path - unreachable on this lab (no enterprise CA); preserved best-effort.
-                if (ShouldProcess("local", $"Submitting certificate request for {computer} to {CaServer}\\{CaName}"))
+
+                string createOut = "";
+                if (ShouldProcess("local", $"Creating certificate for {computer}"))
                 {
-                    string certCrt = $"{certDir}\\{fqdn}.crt";
-                    string certPfx = $"{certDir}\\{fqdn}.pfx";
-                    string certTemplate = $"CertificateTemplate:{CertificateTemplate}";
-                    string submit = RunCertReq($"-submit -config \"{CaServer}\\{CaName}\" -attrib {certTemplate} \"{certCsr}\" \"{certCrt}\" \"{certPfx}\"");
-                    if (submit.IndexOf("ssued", StringComparison.Ordinal) >= 0)
+                    createOut = RunCertReq($"-new \"{certCfg}\" \"{certCsr}\"");
+                }
+
+                PSObject? storedCert = null;
+                if (SelfSigned.IsPresent)
+                {
+                    // PS: $serial = (($create -Split "Serial Number:" -Split "Subject")[2]).Trim()
+                    string serial = ParseSerial(createOut);
+                    storedCert = FindStoredCertBySerial(serial);
+                    if (computer.IsLocalHost && storedCert is not null)
                     {
-                        RunCertReq($"-accept -machine \"{certCrt}\"");
-                    }
-                    else if (!string.IsNullOrEmpty(submit))
-                    {
-                        WriteMessage(MessageLevel.Warning, "Something went wrong");
-                        WriteMessage(MessageLevel.Warning, createOut);
-                        WriteMessage(MessageLevel.Warning, submit);
-                        StopFunction($"Failure when attempting to create the cert on {computer}. Exception: ", target: computer, continueLoop: true);
-                        continue;
+                        WriteObject(ProjectForDisplay(storedCert));
                     }
                 }
-            }
+                else
+                {
+                    // CA path - unreachable on this lab (no enterprise CA); preserved best-effort.
+                    if (ShouldProcess("local", $"Submitting certificate request for {computer} to {CaServer}\\{CaName}"))
+                    {
+                        string certCrt = $"{certDir}\\{fqdn}.crt";
+                        string certPfx = $"{certDir}\\{fqdn}.pfx";
+                        string certTemplate = $"CertificateTemplate:{CertificateTemplate}";
+                        string submit = RunCertReq($"-submit -config \"{CaServer}\\{CaName}\" -attrib {certTemplate} \"{certCsr}\" \"{certCrt}\" \"{certPfx}\"");
+                        if (submit.IndexOf("ssued", StringComparison.Ordinal) >= 0)
+                        {
+                            RunCertReq($"-accept -machine \"{certCrt}\"");
+                        }
+                        else if (!string.IsNullOrEmpty(submit))
+                        {
+                            WriteMessage(MessageLevel.Warning, "Something went wrong");
+                            WriteMessage(MessageLevel.Warning, createOut);
+                            WriteMessage(MessageLevel.Warning, submit);
+                            StopFunction($"Failure when attempting to create the cert on {computer}. Exception: ", target: computer, continueLoop: true);
+                            continue;
+                        }
+                    }
+                }
+
+                _storedCert = storedCert;
+            } // PS :475 - end of the `-not $secondaryNode` creation block
 
             // The remote-import path (non-localhost) exports the pfx, removes the local copy and
             // re-imports on the target. Unreachable in the localhost self-signed test; translated
             // faithfully but exercised only when a remote ComputerName is supplied.
-            if (!computer.IsLocalHost && storedCert is not null)
+            // DEF-008: reads the CARRIED cert - on a cluster's later nodes this is the first
+            // node's certificate, which is the whole point of the source's $secondaryNode latch.
+            if (!computer.IsLocalHost && _storedCert is not null)
             {
-                RemoteImport(computer, storedCert);
+                RemoteImport(computer);
             }
 
-            if (ShouldProcess("local", $"Removing all files from {certDir}"))
+            // PS :522 - the cleanup sits OUTSIDE the creation guard, so on a cluster's later nodes
+            // the source re-cleans the FIRST node's $certDir (function-scope, never reassigned).
+            // Reproduced deliberately via the carried _certDir rather than "fixed".
+            if (!string.IsNullOrEmpty(_certDir) && ShouldProcess("local", $"Removing all files from {_certDir}"))
             {
-                try { System.IO.Directory.Delete(certDir, recursive: true); }
+                try { System.IO.Directory.Delete(_certDir!, recursive: true); }
                 catch { /* PS: Stop-Function best-effort on cleanup */ }
             }
         }
@@ -382,7 +417,7 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
         return result;
     }
 
-    private void RemoteImport(DbaInstanceParameter computer, PSObject storedCert)
+    private void RemoteImport(DbaInstanceParameter computer)
     {
         // Export PFX, remove local, import remotely, then Get-DbaComputerCertificate.
         if (ContainsIgnoreCase(Flag, "UserProtected"))
@@ -390,12 +425,52 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
             StopFunction($"UserProtected flag is only valid for localhost because it causes a prompt, skipping for {computer}", continueLoop: true);
             return;
         }
-        // Delegated to the engine to keep the export/import and Get-DbaComputerCertificate surface
+
+        // PS :479 `if (-not $secondaryNode) {` - the EXPORT and the local removal are gated, the
+        // IMPORT below is not. DEF-008: this split is the fix. Previously export+remove+import
+        // rode one scriptblock per node, so every cluster node exported ITS OWN freshly created
+        // certificate; now the first node's PFX bytes are carried in _certData and every later
+        // node imports exactly those, which is what makes all nodes share one certificate.
+        if (!_secondaryNode)
+        {
+            Hashtable exportSplat = new()
+            {
+                { "Cert", _storedCert },
+                { "Password", SecurePassword }
+            };
+            Collection<PSObject> exported = InvokeCommand.InvokeScript(
+                false,
+                ScriptBlock.Create(@"param($p)
+                $m = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1
+                & $m {
+                    param($p)
+                    $data = $p.Cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::PFX, $p.Password)
+                    $p.Cert | Remove-Item -ErrorAction SilentlyContinue
+                    , $data
+                } $p 3>&1"),
+                null,
+                exportSplat);
+            foreach (PSObject item in exported)
+            {
+                if (item?.BaseObject is WarningRecord w) { WriteWarning(w.Message); }
+                else if (item is not null) { _certData = item.BaseObject; }
+            }
+
+            // PS :489 `if ($ClusterInstanceName) { $secondaryNode = $true }` - the latch is set
+            // ONLY for a cluster. Without -ClusterInstanceName every node legitimately gets its
+            // own certificate, so the latch must stay false and creation must keep running.
+            if (!string.IsNullOrEmpty(ClusterInstanceName))
+            {
+                _secondaryNode = true;
+            }
+        }
+
+        // Delegated to the engine to keep the import and Get-DbaComputerCertificate surface
         // faithful; unreachable in the localhost test path.
         Hashtable splat = new()
         {
             { "Computer", computer.ComputerName },
-            { "Cert", storedCert },
+            { "Data", _certData },
             { "Password", SecurePassword },
             { "Store", Store },
             { "Folder", Folder },
@@ -407,8 +482,6 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
                 $m = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1
                 & $m {
                     param($p)
-                    $data = $p.Cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::PFX, $p.Password)
-                    $p.Cert | Remove-Item -ErrorAction SilentlyContinue
                     $sb = {
                         param($CertificateData, [SecureString]$SecurePassword, $Store, $Folder, $flags)
                         $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($CertificateData, $SecurePassword, $flags)
@@ -416,7 +489,7 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
                         $certstore.Open('ReadWrite'); $certstore.Add($cert); $certstore.Close()
                         Get-ChildItem ""Cert:\$($Store)\$($Folder)"" -Recurse | Where-Object { $_.Thumbprint -eq $cert.Thumbprint }
                     }
-                    $tp = (Invoke-Command2 -ComputerName $p.Computer -ArgumentList $data, $p.Password, $p.Store, $p.Folder, $p.Flags -ScriptBlock $sb -ErrorAction Stop).Thumbprint
+                    $tp = (Invoke-Command2 -ComputerName $p.Computer -ArgumentList $p.Data, $p.Password, $p.Store, $p.Folder, $p.Flags -ScriptBlock $sb -ErrorAction Stop).Thumbprint
                     Get-DbaComputerCertificate -ComputerName $p.Computer -Thumbprint $tp
                 } $p 3>&1"),
             null,
