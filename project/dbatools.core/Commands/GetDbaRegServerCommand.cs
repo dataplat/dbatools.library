@@ -29,7 +29,7 @@ namespace Dataplat.Dbatools.Commands;
 /// TWO DEF-007 CONFIG DEFAULTS resolved in the process hop:
 ///   -SqlInstance defaults to Get-DbatoolsConfigValue 'commands.get-dbaregserver.defaultcms'. Because
 ///     it is ValueFromPipeline, the piped/passed value wins per record and the CMS default applies
-///     only when nothing was supplied - reproduced by "if (-not $SqlInstance) { $SqlInstance = ... }".
+///     only when nothing was supplied - reproduced by "if (-not $PSBoundParameters.ContainsKey('SqlInstance')) { $SqlInstance = ... }".
 ///   -IncludeLocal (a switch) defaults to Get-DbatoolsConfigValue
 ///     'commands.get-dbaregserver.includelocal'; resolved when the caller did not pass it.
 ///
