@@ -134,7 +134,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($ExcludeReplica -and $server.IsHadrEnabled) {
-            Write-Message -Level Verbose -Message "Excluding non-preferred backup replicas for $instance"
+            Write-Message -Level Verbose -Message "Excluding non-preferred backup replicas for $instance" -FunctionName Get-DbaLastBackup -ModuleName "dbatools"
             $notPreferredQuery = "SELECT DB_NAME(database_id) AS DatabaseName FROM sys.databases WHERE sys.fn_hadr_backup_is_preferred_replica(DB_NAME(database_id)) = 0"
             $notPreferredDbs = ($server.Query($notPreferredQuery)).DatabaseName
             if ($notPreferredDbs) {
@@ -143,7 +143,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if (-not $dbs) {
-            Write-Message -Level Verbose -Message "No databases remain to process for $instance after filtering"
+            Write-Message -Level Verbose -Message "No databases remain to process for $instance after filtering" -FunctionName Get-DbaLastBackup -ModuleName "dbatools"
             continue
         }
 
@@ -152,7 +152,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $DiffHistory = Get-DbaDbBackupHistory -SqlInstance $server -Database $dbs.Name -LastDiff -IncludeCopyOnly -Raw
         $LogHistory = Get-DbaDbBackupHistory -SqlInstance $server -Database $dbs.Name -LastLog -IncludeCopyOnly -Raw
         foreach ($db in $dbs) {
-            Write-Message -Level Verbose -Message "Processing $db on $instance"
+            Write-Message -Level Verbose -Message "Processing $db on $instance" -FunctionName Get-DbaLastBackup -ModuleName "dbatools"
 
             $LastFullBackup = ($FullHistory | Where-Object Database -EQ $db.Name | Sort-Object -Property End -Descending | Select-Object -First 1).End
             if ($null -ne $LastFullBackup) {
