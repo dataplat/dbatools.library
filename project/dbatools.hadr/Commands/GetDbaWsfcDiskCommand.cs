@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Management.Automation;
 using Dataplat.Dbatools.Connection;
 using Dataplat.Dbatools.Message;
@@ -44,7 +45,7 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
         {
             // PS: $cluster = Get-DbaWsfcCluster -ComputerName $computer -Credential $Credential
             // EnableException is NEVER forwarded to the inner cluster lookup, so a CIM failure
-            // surfaces as a warning and the computer is skipped.
+            // surfaces as a warning and execution continues with null cluster metadata.
             string? clusterName = null;
             string? clusterFqdn = null;
             try
@@ -74,8 +75,11 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
             }
             catch (Exception ex)
             {
-                WriteMessage(MessageLevel.Warning, ex.Message, target: computer.ComputerName, exception: ex.InnerException ?? ex);
-                continue;
+                // PS: the inlined Get-DbaWsfcResource -> Get-DbaWsfcCluster lookup runs WITHOUT
+                // -EnableException, so a failure warns (never errors, even under the caller's
+                // -EnableException) and execution FALLS THROUGH with null cluster metadata - it
+                // does NOT skip the resource query.
+                NestedCommand.WarnUnforwarded(this, ex.Message, computer.ComputerName, ex.InnerException ?? ex);
             }
 
             // PS: $resources = Get-DbaWsfcResource -ComputerName $computer -Credential $Credential
@@ -104,7 +108,11 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
             }
             catch (Exception ex)
             {
-                WriteMessage(MessageLevel.Warning, ex.Message, target: computer.ComputerName, exception: ex.InnerException ?? ex);
+                // PS: the inlined Get-DbaCmObject MSCluster_Resource lookup (inside the unforwarded
+                // Get-DbaWsfcResource) runs WITHOUT -EnableException - warn only, never an error
+                // even under the caller's -EnableException; $resources is empty so the loop is a
+                // no-op for this computer.
+                NestedCommand.WarnUnforwarded(this, ex.Message, computer.ComputerName, ex.InnerException ?? ex);
                 continue;
             }
 
@@ -266,8 +274,28 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
         }
     }
 
+    private static readonly (int Value, string Name)[] ResourceStateLabels =
+    {
+        (-1, "Unknown"),
+        (0, "Inherited"),
+        (1, "Initializing"),
+        (2, "Online"),
+        (3, "Offline"),
+        (4, "Failed"),
+        (128, "Pending"),
+        (129, "Online Pending"),
+        (130, "Offline Pending")
+    };
+
     // Port of private/functions/Get-ResourceState.ps1: converts the numeric MSCluster_Resource
     // State property to the human-readable string the PS implementation attaches via Add-Member.
+    // The PS `switch ($state) { 2 { ... } }` compares each integer label against the raw value
+    // with PS -eq scalar semantics - NOT Convert.ToInt32. That distinction is observable: "2"
+    // and 2.0 and [decimal]2 MATCH (label 2 coerces to the value's type and compares equal), but
+    // "02", 2.4 and any [bool] do NOT (no branch, no default -> null). Convert.ToInt32 over-coerced
+    // all of those into false matches (cross-model return-sweep 2026-07-20). LanguagePrimitives.Equals
+    // reproduces the switch's per-label coercion; the [bool] guard reproduces the switch NOT
+    // numeric-coercing booleans. Verified 14/14 against a live PS switch.
     private static string? GetResourceState(object? state)
     {
         if (state is null)
@@ -275,29 +303,22 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
             return null;
         }
 
-        int stateValue;
-        try
-        {
-            stateValue = Convert.ToInt32(state);
-        }
-        catch
+        // PS `switch` does NOT numeric-coerce a [bool] to match an integer label (unlike -eq's
+        // [bool] cast), so $true/$false fall through to null.
+        if (state is bool)
         {
             return null;
         }
 
-        switch (stateValue)
+        foreach ((int value, string name) in ResourceStateLabels)
         {
-            case -1: return "Unknown";
-            case 0:  return "Inherited";
-            case 1:  return "Initializing";
-            case 2:  return "Online";
-            case 3:  return "Offline";
-            case 4:  return "Failed";
-            case 128: return "Pending";
-            case 129: return "Online Pending";
-            case 130: return "Offline Pending";
-            default: return null;
+            if (LanguagePrimitives.Equals(state, value, ignoreCase: true, CultureInfo.InvariantCulture))
+            {
+                return name;
+            }
         }
+
+        return null;
     }
 
     private static DbaInstanceParameter[]? DefaultComputerName()
