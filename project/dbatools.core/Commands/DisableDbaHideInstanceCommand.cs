@@ -202,6 +202,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # DEF-011/012: emit the final $instanceName so the C# host carries it into the next record's hop
     # (Enable-DbaHideInstance sibling parity). The sentinel is consumed by the streaming handler, never emitted.
     [pscustomobject]@{ __dbatoolsDhiNameCarrier = $true; InstanceName = $instanceName }
-} $SqlInstance $Credential $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $Credential $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedInstanceName @__commonParameters 3>&1 2>&1
 """;
 }
