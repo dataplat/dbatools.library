@@ -55,7 +55,14 @@ public sealed class SaveDbaDiagnosticQueryScriptCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }, BodyScript,
-            Path, EnableException.ToBool(), BoundVerbose());
+            Path, EnableException.ToBool(), BoundVerbose(), BoundDebug());
+    }
+
+    private object? BoundDebug()
+    {
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
     }
 
     private object? BoundVerbose()
@@ -86,11 +93,12 @@ public sealed class SaveDbaDiagnosticQueryScriptCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($Path, $EnableException, $__boundVerbose)
+param($Path, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Path, $EnableException, $__boundVerbose)
+    param($Path, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if (-not (Test-Path $Path)) {
         Stop-Function -Message "Path does not exist or access denied" -Target $path -FunctionName Save-DbaDiagnosticQueryScript
@@ -254,6 +262,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             return
         }
     }
-} $Path $EnableException $__boundVerbose 3>&1 2>&1
+} $Path $EnableException $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }
