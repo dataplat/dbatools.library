@@ -70,13 +70,16 @@ public sealed partial class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
     public PSObject? Since { get; set; }
 
     /// <summary>Restrict to a specific recovery fork GUID (or empty).</summary>
-    // r5 parity correction (supersedes the r3/r4 pattern debate): the SOURCE declares a plain
-    // [string]$RecoveryFork with NO validation - the GUID pattern was an invented constraint, and
-    // any added bind-time rejection is a surface divergence (legacy accepts arbitrary strings and
-    // simply matches nothing downstream). [PsStringCast] stays for the bound-$null -> "" cast the
-    // source's [string] performs.
+    // FINAL shape (5 codex rounds, cap): the source (line 236) validates via ValidateScript -
+    // GUID -match (whose trailing $ is newline-tolerant) OR exact '' -eq. This pattern reproduces
+    // both branches exactly: the GUID alternative keeps $ (same -match semantics), the empty
+    // alternative uses \z (exact empty, matching '' -eq which a bare ^$ would not - r4's catch).
+    // [PsStringCast] coerces bound $null to "" first, as the source's [string] cast does. On the
+    // record: r5 briefly removed the pattern on a misread of the source (grep window missed the
+    // attribute line above the param) - retracted after direct source verification.
     [Parameter]
     [PsStringCast]
+    [ValidatePattern(@"^(\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\}){0,1}$|^\z")]
     public string? RecoveryFork { get; set; }
 
     /// <summary>Return the last full recovery chain (full + diff + logs) per database.</summary>
