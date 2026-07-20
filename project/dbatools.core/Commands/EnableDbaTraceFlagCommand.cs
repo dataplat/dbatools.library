@@ -124,7 +124,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $TraceFlagInfo.Status = 'Skipped'
                 $TraceFlagInfo.Notes = "The Trace flag is already running."
                 $TraceFlagInfo
-                Write-Message -Level Warning -Message "The Trace flag [$tf] is already running globally."
+                Write-Message -Level Warning -Message "The Trace flag [$tf] is already running globally." -FunctionName Enable-DbaTraceFlag -ModuleName "dbatools"
                 continue
             }
             if ($__realCmdlet.ShouldProcess($instance, "Enabling flag '$tf'")) {

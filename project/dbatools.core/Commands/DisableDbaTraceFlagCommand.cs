@@ -123,7 +123,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $TraceFlagInfo.Status = 'Skipped'
                 $TraceFlagInfo.Notes = "Trace Flag is not running."
                 $TraceFlagInfo
-                Write-Message -Level Warning -Message "Trace Flag $tf is not currently running on $instance"
+                Write-Message -Level Warning -Message "Trace Flag $tf is not currently running on $instance" -FunctionName Disable-DbaTraceFlag -ModuleName "dbatools"
                 continue
             }
             if ($__realCmdlet.ShouldProcess($instance, "Disabling flag '$tf'")) {

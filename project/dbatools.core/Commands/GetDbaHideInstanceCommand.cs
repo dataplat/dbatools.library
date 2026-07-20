@@ -106,11 +106,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($instance in $SqlInstance) {
-        Write-Message -Level VeryVerbose -Message "Processing $instance" -Target $instance
+        Write-Message -Level VeryVerbose -Message "Processing $instance" -Target $instance -FunctionName Get-DbaHideInstance -ModuleName "dbatools"
         $null = Test-ElevationRequirement -ComputerName $instance -Continue
 
         try {
-            Write-Message -Level Verbose -Message "Resolving hostname."
+            Write-Message -Level Verbose -Message "Resolving hostname." -FunctionName Get-DbaHideInstance -ModuleName "dbatools"
             $resolved = $null
             $resolved = Resolve-DbaNetworkName -ComputerName $instance -Credential $Credential -EnableException
         } catch {
@@ -160,10 +160,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $vsname = $instance
         }
 
-        Write-Message -Level Verbose -Message "Regroot: $regRoot" -Target $instance
-        Write-Message -Level Verbose -Message "ServiceAcct: $serviceAccount" -Target $instance
-        Write-Message -Level Verbose -Message "InstanceName: $instanceName" -Target $instance
-        Write-Message -Level Verbose -Message "VSNAME: $vsname" -Target $instance
+        Write-Message -Level Verbose -Message "Regroot: $regRoot" -Target $instance -FunctionName Get-DbaHideInstance -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "ServiceAcct: $serviceAccount" -Target $instance -FunctionName Get-DbaHideInstance -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "InstanceName: $instanceName" -Target $instance -FunctionName Get-DbaHideInstance -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "VSNAME: $vsname" -Target $instance -FunctionName Get-DbaHideInstance -ModuleName "dbatools"
 
         $scriptBlock = {
             $regPath = "Registry::HKEY_LOCAL_MACHINE\$($args[0])\MSSQLServer\SuperSocketNetLib"
