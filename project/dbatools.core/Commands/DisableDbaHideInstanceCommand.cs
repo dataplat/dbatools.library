@@ -61,12 +61,23 @@ public sealed class DisableDbaHideInstanceCommand : DbaBaseCmdlet
                 WriteError(nestedError);
                 return;
             }
+            if (item?.Properties["__dbatoolsDhiNameCarrier"] is not null &&
+                LanguagePrimitives.IsTrue(item.Properties["__dbatoolsDhiNameCarrier"].Value))
+            {
+                // DEF-011/012: $instanceName's cross-record persistence (see ProcessScript note).
+                // Mirrors the Enable-DbaHideInstance sibling (codex return-sweep parity catch).
+                _carriedInstanceName = item.Properties["InstanceName"]?.Value;
+                return;
+            }
             WriteObject(item);
         }, ProcessScript,
             instances, Credential, EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            _carriedInstanceName);
     }
+
+    private object? _carriedInstanceName;
 
     private object? BoundCommonParameter(string name)
     {
@@ -99,7 +110,7 @@ public sealed class DisableDbaHideInstanceCommand : DbaBaseCmdlet
     // $PScmdlet -> $__realCmdlet, explicit -FunctionName Disable-DbaHideInstance on Stop-Function
     // (W1-090). SqlInstance arrives already defaulted to the computer name by ProcessRecord.
     private const string ProcessScript = """
-param($SqlInstance, $Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedInstanceName)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -108,7 +119,11 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedInstanceName)
+    # DEF-011/012 (codex return-sweep): the source's $instanceName persists across pipeline records -
+    # if a later record's .Replace() throws, the function world retains the PRIOR record's value while
+    # a fresh hop scope would use $null. Seed from the carrier; updated post-assignment (Enable sibling parity).
+    if ($null -ne $__carriedInstanceName) { $instanceName = $__carriedInstanceName }
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($instance in $SqlInstance) {
@@ -183,6 +198,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
+
+    # DEF-011/012: emit the final $instanceName so the C# host carries it into the next record's hop
+    # (Enable-DbaHideInstance sibling parity). The sentinel is consumed by the streaming handler, never emitted.
+    [pscustomobject]@{ __dbatoolsDhiNameCarrier = $true; InstanceName = $instanceName }
 } $SqlInstance $Credential $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
