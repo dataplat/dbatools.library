@@ -15,8 +15,8 @@ namespace Dataplat.Dbatools.Commands;
 /// RegisteredServersStore construction, so the hop STREAMS via InvokeScopedStreaming. After the
 /// foreach, a once-per-call block (guarded by "-not $PSBoundParameters.SqlInstance") initializes the
 /// LOCAL file store via NonPublic reflection (InitChildObjects) - that reflection is ordinary
-/// PowerShell running in module scope, so it is carried verbatim with no special C# handling; it
-/// emits nothing. The source's $PSBoundParameters.SqlInstance check is carried as its VALUE-TRUTHINESS proxy - $PSBoundParameters.SqlInstance returns the VALUE (falsy for -SqlInstance @()), NOT mere boundness (the
+/// PowerShell running in module scope, so it is carried verbatim with no special C# handling; the
+/// branch EMITS the local RegisteredServersStore object (the command's local-mode output). The source's $PSBoundParameters.SqlInstance check is carried as its VALUE-TRUTHINESS proxy - $PSBoundParameters.SqlInstance returns the VALUE (falsy for -SqlInstance @()), NOT mere boundness (the
 /// scriptblock cannot see the real cmdlet's $PSBoundParameters). Cross-record-state: $server and
 /// $store are FUNCTION-scoped (not per-iteration locals), and the local-store branch also runs for
 /// a bound-but-falsy SqlInstance (@()) under the value-truthiness proxy - the no-carry conclusion
