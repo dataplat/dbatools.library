@@ -62,11 +62,21 @@ public sealed class GetDbaLastBackupCommand : DbaBaseCmdlet
                 WriteError(nestedError);
                 return;
             }
+            if (item?.Properties["__dbatoolsGlbTimeCarrier"] is not null &&
+                LanguagePrimitives.IsTrue(item.Properties["__dbatoolsGlbTimeCarrier"].Value))
+            {
+                // Begin-once carry: see ProcessScript note.
+                _carriedStartOfTime = item.Properties["StartOfTime"]?.Value;
+                return;
+            }
             WriteObject(item);
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, ExcludeDatabase, ExcludeReplica.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            _carriedStartOfTime);
     }
+
+    private object? _carriedStartOfTime;
 
     private object? BoundCommonParameter(string name)
     {
@@ -99,14 +109,14 @@ public sealed class GetDbaLastBackupCommand : DbaBaseCmdlet
     // ahead of the process body, which runs per record. Intentional rewrites: -FunctionName on
     // Stop-Function (W1-090) and DEF-006 attribution on the three direct Write-Message calls.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $ExcludeReplica, $EnableException, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $ExcludeReplica, $EnableException, $__boundVerbose, $__boundDebug, $__carriedStartOfTime)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, $ExcludeReplica, $EnableException, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, $ExcludeReplica, $EnableException, $__boundVerbose, $__boundDebug, $__carriedStartOfTime)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     function Get-DbaDateOrNull ($TimeSpan) {
@@ -115,7 +125,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         return $TimeSpan
     }
-    $StartOfTime = [DbaTimeSpan](New-TimeSpan -Start ([datetime]0))
+    # Begin-once semantics (codex): the source computes $StartOfTime ONCE in begin -
+    # New-TimeSpan -Start implicitly ends at NOW, so recomputing per record drifts Since*
+    # values across a pipeline. First hop computes it and emits it via the sentinel; later
+    # hops seed the carried value.
+    if ($null -ne $__carriedStartOfTime) { $StartOfTime = [DbaTimeSpan]$__carriedStartOfTime }
+    else { $StartOfTime = [DbaTimeSpan](New-TimeSpan -Start ([datetime]0)) }
 
     foreach ($instance in $SqlInstance) {
         try {
@@ -219,6 +234,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Select-DefaultView -InputObject $result -Property ComputerName, InstanceName, SqlInstance, Database, LastFullBackup, LastDiffBackup, LastLogBackup
         }
     }
-} $SqlInstance $SqlCredential $Database $ExcludeDatabase $ExcludeReplica $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    [pscustomobject]@{ __dbatoolsGlbTimeCarrier = $true; StartOfTime = $StartOfTime }
+} $SqlInstance $SqlCredential $Database $ExcludeDatabase $ExcludeReplica $EnableException $__boundVerbose $__boundDebug $__carriedStartOfTime @__commonParameters 3>&1 2>&1
 """;
 }
