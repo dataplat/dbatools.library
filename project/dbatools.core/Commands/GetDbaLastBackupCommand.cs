@@ -15,8 +15,8 @@ namespace Dataplat.Dbatools.Commands;
 /// which is NOT deterministic per record: New-TimeSpan's implicit now-end means recomputation
 /// drifts across records, so the FIRST hop computes it and later hops seed the carried value via
 /// the __dbatoolsGlbTimeCarrier sentinel (an intentional rewrite; codex). Both inline into the
-/// process script
-/// (recomputed identically per pipeline record; no cross-record state, no sentinel). DEF-001
+/// process script - the nested function recomputed identically per record, $StartOfTime seeded
+/// from the carrier as above. DEF-001
 /// cond1+cond2: the process foreach EMITS a decorated result per database (Select-DefaultView) AND has
 /// a reachable Stop-Function -Continue at Connect-DbaInstance, so the hop STREAMS via
 /// InvokeScopedStreaming. Cross-record-state check: every per-db variable ($Last*/$Since*/$Status/
