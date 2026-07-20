@@ -104,19 +104,25 @@ public sealed class TestDbaWindowsLoginCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            _batches.ToArray(), SqlCredential, Login, ExcludeLogin, FilterBy, IgnoreDomains, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // DEF-001: STREAMING the end-hop. Collect-then-end is faithful (the source has an end block), but
+        // within that single end-hop the body emits one object per Windows login per INSTANCE in a loop,
+        // and a later instance's connection Stop-Function throws under -EnableException - discarding every
+        // earlier instance's already-emitted logins from a buffered call. Streaming delivers them first.
+        // (B's cond1 flag; coordinator 16:26 re-check - loop-iteration reachability confirmed.)
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
             }
-            if (item is not null)
+            else if (item is not null)
+            {
                 WriteObject(item);
-        }
+            }
+        }, ProcessScript,
+            _batches.ToArray(), SqlCredential, Login, ExcludeLogin, FilterBy, IgnoreDomains, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

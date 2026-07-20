@@ -78,21 +78,28 @@ public sealed class BackupDbaDbMasterKeyCommand : DbaBaseCmdlet
         // passed on as-is; it is not converted here.
         System.Security.SecureString? effectivePassword = Credential != null ? Credential.Password : SecurePassword;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Credential, Database, ExcludeDatabase, effectivePassword,
-            Path, FileBaseName, InputObject, EnableException.ToBool(), this,
-            TestBound(nameof(Path)),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // DEF-001: STREAMING, not buffered InvokeScoped. The body emits one master-key object per database
+        // in a loop and a LATER database can hit a hard Stop-Function (no -Continue: the "cannot access
+        // $actualPath" check) that throws under -EnableException. A buffered call discards every already-
+        // emitted earlier database when that throw terminates the nested script; streaming has already
+        // delivered them. (B's Find-BufferedPortHop cond1 flag; coordinator 16:26 re-check.)
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
             }
-            WriteObject(item);
-        }
+            else if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Credential, Database, ExcludeDatabase, effectivePassword,
+            Path, FileBaseName, InputObject, EnableException.ToBool(), this,
+            TestBound(nameof(Path)),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

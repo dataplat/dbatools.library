@@ -66,21 +66,27 @@ public sealed class BackupDbaServiceMasterKeyCommand : DbaBaseCmdlet
         // SecureString is passed on as-is; it is not converted here.
         System.Security.SecureString? effectivePassword = KeyCredential != null ? KeyCredential.Password : SecurePassword;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, KeyCredential, effectivePassword, Path, FileBaseName,
-            EnableException.ToBool(), this,
-            TestBound(nameof(Path)),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // DEF-001: STREAMING, not buffered InvokeScoped. The body emits one service-master-key object per
+        // instance in a loop and a later instance can hit a hard Stop-Function that throws under
+        // -EnableException; a buffered call discards earlier already-emitted results when that throw
+        // terminates the nested script. (B's cond1 flag; coordinator 16:26 re-check.)
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
             }
-            WriteObject(item);
-        }
+            else if (item is not null)
+            {
+                WriteObject(item);
+            }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, KeyCredential, effectivePassword, Path, FileBaseName,
+            EnableException.ToBool(), this,
+            TestBound(nameof(Path)),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
