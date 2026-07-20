@@ -58,6 +58,13 @@ public sealed class TestDbaBackupEncryptedCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
+            else if (item?.Properties["__dbatoolsTbeResultsCarrier"] is not null &&
+                     LanguagePrimitives.IsTrue(item.Properties["__dbatoolsTbeResultsCarrier"].Value))
+            {
+                // DEF-011/012: $results cross-record persistence (see ProcessScript note).
+                _carriedResults = item.Properties["Results"]?.Value;
+                _carriedResultsAssigned = item.Properties["ResultsAssigned"]?.Value;
+            }
             else
             {
                 WriteObject(item);
@@ -65,8 +72,12 @@ public sealed class TestDbaBackupEncryptedCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, FilePath, EnableException.ToBool(),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            _carriedResults, _carriedResultsAssigned);
     }
+
+    private object? _carriedResults;
+    private object? _carriedResultsAssigned;
 
     private object? BoundCommonParameter(string name)
     {
@@ -101,7 +112,7 @@ public sealed class TestDbaBackupEncryptedCommand : DbaBaseCmdlet
     // Substitutions only: hop-level Write-Message gain -FunctionName Test-DbaBackupEncrypted
     // -ModuleName "dbatools"; hop-level Stop-Function gain -FunctionName Test-DbaBackupEncrypted.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $FilePath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $FilePath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedResults, $__carriedResultsAssigned)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -109,7 +120,11 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$FilePath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$FilePath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedResults, $__carriedResultsAssigned)
+    # DEF-011/012 (codex): $results is conditionally assigned and the function world's process
+    # scope carries the prior record's value; seed ONLY when the carrier says it was assigned
+    # (restoring null unconditionally would break unassigned scope-walk semantics).
+    if ($null -ne $__carriedResultsAssigned -and [bool]$__carriedResultsAssigned) { $results = $__carriedResults }
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     try {
@@ -174,6 +189,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Compressed          = ($results | Select-Object -First 1).Compressed -eq $true
         }
     }
-} $SqlInstance $SqlCredential $FilePath $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    [pscustomobject]@{ __dbatoolsTbeResultsCarrier = $true; Results = $results; ResultsAssigned = (Test-Path variable:results) }
+} $SqlInstance $SqlCredential $FilePath $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedResults $__carriedResultsAssigned @__commonParameters 3>&1 2>&1
 """;
 }
