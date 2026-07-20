@@ -42,15 +42,18 @@ public sealed class ExportDbaCredentialCommand : DbaBaseCmdlet
 
     /// <summary>Directory for the exported script (defaults to the configured export path).</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     public string? Path { get; set; }
 
     /// <summary>Explicit output file path.</summary>
     [Parameter(Position = 4)]
     [Alias("OutFile", "FileName")]
+    [PsStringCast]
     public string? FilePath { get; set; }
 
     /// <summary>Credential identity/identities to include.</summary>
     [Parameter(Position = 5)]
+    [PsStringArrayCast]
     public string[]? Identity { get; set; }
 
     /// <summary>Exports with a placeholder password instead of the decrypted secret (no DAC needed).</summary>

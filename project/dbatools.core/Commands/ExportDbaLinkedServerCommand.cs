@@ -213,6 +213,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $rmtuser = $__carriedRmtuser
     $password = $__carriedPassword
 
+    try {
     foreach ($instance in $SqlInstance) {
         try {
             # Do we need a dedicated admin connection to the source for password retrieval?
@@ -302,8 +303,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $null = $server | Disconnect-DbaInstance -WhatIf:$false
         }
     }
-
-    @{ __exportLsCarry = @{ Rmtuser = $rmtuser; Password = $password } }
+    } finally {
+        @{ __exportLsCarry = @{ Rmtuser = $rmtuser; Password = $password } }
+    }
     }
     . Export-DbaLinkedServer
 } $SqlInstance $LinkedServer $SqlCredential $Credential $__pathBound $__filePathBound $ExcludePassword $Append $Passthru $InputObject $EnableException $__carriedRmtuser $__carriedPassword $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

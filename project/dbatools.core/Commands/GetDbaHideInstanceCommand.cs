@@ -105,9 +105,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$Credential, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    # ATTRIBUTION SHIM (the W3-084 Get-PSCallStack class): Test-ElevationRequirement stamps
+    # its Stop-Function with (Get-PSCallStack)[1].Command - the CALLER frame. Called bare
+    # from this hop that frame is the scriptblock => [<ScriptBlock>] attribution. The named
+    # wrapper restores the source's own frame; -Continue flow control unwinds through the
+    # wrapper to the foreach exactly as through the source frame.
+    function Get-DbaHideInstance {
+        param($__splat)
+        Test-ElevationRequirement @__splat
+    }
+
     foreach ($instance in $SqlInstance) {
         Write-Message -Level VeryVerbose -Message "Processing $instance" -Target $instance -FunctionName Get-DbaHideInstance -ModuleName "dbatools"
-        $null = Test-ElevationRequirement -ComputerName $instance -Continue
+        $null = Get-DbaHideInstance @{ ComputerName = $instance; Continue = $true }
 
         try {
             Write-Message -Level Verbose -Message "Resolving hostname." -FunctionName Get-DbaHideInstance -ModuleName "dbatools"
