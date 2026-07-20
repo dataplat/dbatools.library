@@ -285,6 +285,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
+        # uses cim commands
+
+
         foreach ($computer in $ComputerName) {
             $computer = $ogComputer = $computer.ComputerName
             Write-Message -Level VeryVerbose -Message "Processing: $computer." -FunctionName Test-DbaDiskAlignment -ModuleName "dbatools"
