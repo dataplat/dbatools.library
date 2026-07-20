@@ -98,6 +98,11 @@ public sealed class NewDbaDbCertificateCommand : DbaBaseCmdlet
     /// <summary>$smocert as the script holds it: assigned in one record and readable by the next.</summary>
     private object? _smocertState;
 
+    /// <summary>Whether the last record's hop scope actually ASSIGNED $smocert - distinguishes an
+    /// assigned $null (seed it: the source scope holds null and blocks any scope-walk) from
+    /// never-assigned (leave unset so the scope-walk the source would do still happens).</summary>
+    private bool _smocertAssigned;
+
     /// <summary>Resolves the computed date defaults before any pipeline record is processed.</summary>
     protected override void BeginProcessing()
     {
@@ -189,9 +194,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 // Get-Variable -Scope 0 cannot see an up-scope variable, so a never-assigned local stays
                 // unset and the script's scope-walk to a module/global of the same name still happens.
                 // Restoring a plain null instead would create a local and BLOCK that walk.
-                _smocertState = LanguagePrimitives.IsTrue(item.Properties["SmocertAssigned"]?.Value)
-                    ? UnwrapHopValue(item.Properties["Smocert"]?.Value)
-                    : null;
+                _smocertAssigned = LanguagePrimitives.IsTrue(item.Properties["SmocertAssigned"]?.Value);
+                _smocertState = _smocertAssigned ? UnwrapHopValue(item.Properties["Smocert"]?.Value) : null;
             }
             else if (item is not null)
             {
@@ -200,7 +204,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }, ProcessScript,
             SqlInstance, SqlCredential, Name, Database, Subject, _resolvedStartDate,
             _resolvedExpirationDate, ActiveForServiceBrokerDialog.ToBool(), SecurePassword, InputObject,
-            EnableException.ToBool(), this, _smocertState,
+            EnableException.ToBool(), this, _smocertState, _smocertAssigned,
             TestBound(nameof(Name)), TestBound(nameof(Subject)),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
@@ -266,7 +270,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // TargetObject and the dbatools log target. Measured: a process-block assignment does survive into the
     // next record of the same invocation, so the hop seeds $smocert in and emits it back out.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Name, $Database, $Subject, $StartDate, $ExpirationDate, $ActiveForServiceBrokerDialog, $SecurePassword, $InputObject, $EnableException, $__realCmdlet, $__smocertCarry, $__nameBound, $__subjectBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Name, $Database, $Subject, $StartDate, $ExpirationDate, $ActiveForServiceBrokerDialog, $SecurePassword, $InputObject, $EnableException, $__realCmdlet, $__smocertCarry, $__smocertCarryAssigned, $__nameBound, $__subjectBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -275,12 +279,12 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Name, [string[]]$Database, [string[]]$Subject, [datetime]$StartDate, [datetime]$ExpirationDate, $ActiveForServiceBrokerDialog, [System.Security.SecureString]$SecurePassword, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__realCmdlet, $__smocertCarry, $__nameBound, $__subjectBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Name, [string[]]$Database, [string[]]$Subject, [datetime]$StartDate, [datetime]$ExpirationDate, $ActiveForServiceBrokerDialog, [System.Security.SecureString]$SecurePassword, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__realCmdlet, $__smocertCarry, $__smocertCarryAssigned, $__nameBound, $__subjectBound, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # $smocert as the previous record left it: in the script one process scope spans every record, so a
     # record whose New-Object throws before assigning it reports the PREVIOUS record's certificate.
-    if ($null -ne $__smocertCarry) { $smocert = $__smocertCarry }
+    if ($null -ne $__smocertCarryAssigned -and [bool]$__smocertCarryAssigned) { $smocert = $__smocertCarry }
 
         if ($SqlInstance) {
             $InputObject += Get-DbaDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $Database
@@ -340,7 +344,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $__smocertAssigned = [bool](Get-Variable -Name smocert -Scope 0 -ErrorAction SilentlyContinue)
 
     [pscustomobject]@{ __NewDbaDbCertificateProcessComplete = $true; Smocert = $(if ($__smocertAssigned) { $smocert } else { $null }); SmocertAssigned = $__smocertAssigned }
-} $SqlInstance $SqlCredential $Name $Database $Subject $StartDate $ExpirationDate $ActiveForServiceBrokerDialog $SecurePassword $InputObject $EnableException $__realCmdlet $__smocertCarry $__nameBound $__subjectBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Name $Database $Subject $StartDate $ExpirationDate $ActiveForServiceBrokerDialog $SecurePassword $InputObject $EnableException $__realCmdlet $__smocertCarry $__smocertCarryAssigned $__nameBound $__subjectBound $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
 }

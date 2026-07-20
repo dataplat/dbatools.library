@@ -143,7 +143,10 @@ public sealed class NewDbaDbAsymmetricKeyCommand : DbaBaseCmdlet
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
             }
-            else if (item is not null && LanguagePrimitives.IsTrue(
+            // The sentinel is always a [pscustomobject]; a real payload never is. Without the
+            // BaseObject check an Update-TypeData-grafted property on an emitted AsymmetricKey
+            // would be swallowed as bookkeeping (sibling NewDbaDbCertificate convention).
+            else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__NewDbaDbAsymmetricKeyProcessComplete"]?.Value))
             {
                 _nameState = UnwrapHopValue(item.Properties["Name"]?.Value);
