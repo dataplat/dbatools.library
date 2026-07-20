@@ -205,7 +205,7 @@ internal static class RestoreUtility
     /// connected server, so the helper's Connect-DbaInstance is a pass-through. The SQL 2000
     /// branch is carried verbatim: it only creates a temp table and returns no rows.
     /// </summary>
-    internal static object GetRestoreContinuableDatabase(PSCmdlet host, Server server)
+    internal static object? GetRestoreContinuableDatabase(PSCmdlet host, Server server)
     {
         _ = host;
         string sql;
@@ -231,6 +231,15 @@ internal static class RestoreUtility
             foreach (System.Data.DataRow row in table.Rows)
                 rows.Add(row);
         }
+        // PowerShell pipeline-assignment shape: the source's `$continuePoints = Get-RestoreContinuableDatabase ...`
+        // yields $null for zero rows, the scalar for one, an array for many. The consumer
+        // (Select-DbaBackupInformation :124) gates continue mode on `$null -ne $ContinuePoints`,
+        // so a non-null EMPTY array would wrongly enter continue mode and LSN-filter every
+        // database away when nothing is continuable.
+        if (rows.Count == 0)
+            return null;
+        if (rows.Count == 1)
+            return rows[0];
         return rows.ToArray();
     }
 
