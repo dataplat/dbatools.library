@@ -91,7 +91,7 @@ public sealed class MeasureDbaDbVirtualLogFileCommand : DbaInstanceCmdlet
             {
                 try
                 {
-                    foreach (PSObject? item in NestedCommand.InvokeScoped(this, DatabaseScript, serverValue, db, BoundVerbose()))
+                    foreach (PSObject? item in NestedCommand.InvokeScoped(this, DatabaseScript, serverValue, db, BoundVerbose(), BoundDebug()))
                     {
                         if (item?.BaseObject is ErrorRecord nestedError)
                         {
@@ -145,6 +145,14 @@ public sealed class MeasureDbaDbVirtualLogFileCommand : DbaInstanceCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -180,11 +188,12 @@ public sealed class MeasureDbaDbVirtualLogFileCommand : DbaInstanceCmdlet
     // member-enumeration -joins, the [PSCustomObject] literal and the Select-DefaultView
     // emission all run on the engine exactly as the function ran them.
     private const string DatabaseScript = """
-param($server, $db, $__boundVerbose)
+param($server, $db, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $db, $__boundVerbose)
+    param($server, $db, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $data = Get-DbaDbVirtualLogFile -SqlInstance $server -Database $db.Name
     $logFile = Get-DbaDbFile -SqlInstance $server -Database $db.Name | Where-Object Type -eq 1
 
@@ -204,6 +213,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         LogFileGrowth     = $logFile.Growth -join ","
         LogFileGrowthType = $logFile.GrowthType -join ","
     } | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, Database, Total
-} $server $db $__boundVerbose 3>&1 2>&1
+} $server $db $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

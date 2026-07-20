@@ -198,11 +198,19 @@ public sealed class GetDbaQueryExecutionTimeCommand : DbaInstanceCmdlet
             Server server = connection.Server!;
 
             NestedCommand.InvokeScopedStreaming(this, item => WriteObject(item), InstanceProjectionScript,
-                server, instance, _sql, Database, ExcludeDatabase, ExcludeSystem.ToBool(), EnableException.ToBool(), BoundVerbose());
+                server, instance, _sql, Database, ExcludeDatabase, ExcludeSystem.ToBool(), EnableException.ToBool(), BoundVerbose(), BoundDebug());
         }
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -215,11 +223,12 @@ public sealed class GetDbaQueryExecutionTimeCommand : DbaInstanceCmdlet
     // per-db verbose/IsAccessible pair with its contained continue, and the
     // ExecuteWithResults projection under Stop-Function -Continue).
     private const string InstanceProjectionScript = """
-param($server, $instance, $sql, $Database, $ExcludeDatabase, $ExcludeSystem, $EnableException, $__boundVerbose)
+param($server, $instance, $sql, $Database, $ExcludeDatabase, $ExcludeSystem, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $instance, $sql, $Database, $ExcludeDatabase, $ExcludeSystem, $EnableException, $__boundVerbose)
+    param($server, $instance, $sql, $Database, $ExcludeDatabase, $ExcludeSystem, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $dbs = $server.Databases
     if ($Database) {
         $dbs = $dbs | Where-Object Name -In $Database
@@ -266,6 +275,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Could not process $db on $instance" -Target $db -ErrorRecord $_ -Continue -FunctionName Get-DbaQueryExecutionTime
         }
     }
-} $server $instance $sql $Database $ExcludeDatabase $ExcludeSystem $EnableException $__boundVerbose 3>&1
+} $server $instance $sql $Database $ExcludeDatabase $ExcludeSystem $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 }

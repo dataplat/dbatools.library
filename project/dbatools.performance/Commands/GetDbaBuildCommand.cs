@@ -155,7 +155,7 @@ public sealed class GetDbaBuildCommand : DbaBaseCmdlet
         try
         {
             using EngineTryScope tryScope = EngineTryScope.Enter(this);
-            Collection<PSObject> data = NestedCommand.InvokeScoped(this, IndexScript, moduleDirectory, Update.ToBool(), EnableException.ToBool(), BoundVerbose());
+            Collection<PSObject> data = NestedCommand.InvokeScoped(this, IndexScript, moduleDirectory, Update.ToBool(), EnableException.ToBool(), BoundVerbose(), BoundDebug());
             object[] bags = new object[data.Count];
             for (int i = 0; i < data.Count; i++)
                 bags[i] = data[i];
@@ -234,11 +234,12 @@ public sealed class GetDbaBuildCommand : DbaBaseCmdlet
     /// branch's exact PSCustomObject/Select-DefaultView literal.</summary>
     private void RunBranch(string script, params object?[] extraArguments)
     {
-        object?[] arguments = new object?[3 + extraArguments.Length];
+        object?[] arguments = new object?[4 + extraArguments.Length];
         arguments[0] = _idxRef;
         arguments[1] = EnableException.ToBool();
         arguments[2] = BoundVerbose();
-        Array.Copy(extraArguments, 0, arguments, 3, extraArguments.Length);
+        arguments[3] = BoundDebug();
+        Array.Copy(extraArguments, 0, arguments, 4, extraArguments.Length);
         try
         {
             foreach (PSObject? item in NestedCommand.InvokeScoped(this, script, arguments))
@@ -276,6 +277,14 @@ public sealed class GetDbaBuildCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -285,11 +294,12 @@ public sealed class GetDbaBuildCommand : DbaBaseCmdlet
     }
 
     private const string IndexScript = """
-param($__moduledir, $__update, $EnableException, $__boundVerbose)
+param($__moduledir, $__update, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__moduledir, $__update, $EnableException, $__boundVerbose)
+    param($__moduledir, $__update, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
         function Get-DbaBuildReferenceIndex {
             [CmdletBinding()]
             param (
@@ -363,15 +373,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $result.Data | Select-Object @{ Name = "VersionObject"; Expression = { [version]$_.Version } }, *
         }
     Get-DbaBuildReferenceIndex -Moduledirectory $__moduledir -Update $__update -EnableException $EnableException
-} $__moduledir $__update $EnableException $__boundVerbose 3>&1
+} $__moduledir $__update $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 
     private const string InstanceBranchScript = """
-param($Data, $EnableException, $__boundVerbose, $server)
+param($Data, $EnableException, $__boundVerbose, $__boundDebug, $server)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Data, $EnableException, $__boundVerbose, $server)
+    param($Data, $EnableException, $__boundVerbose, $__boundDebug, $server)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
         function Resolve-DbaBuild {
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseShouldProcessForStateChangingFunctions", "")]
             [CmdletBinding()]
@@ -496,15 +507,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         MatchType      = $Detected.MatchType
         Warning        = $Detected.Warning
     }
-} $Data $EnableException $__boundVerbose $server 3>&1
+} $Data $EnableException $__boundVerbose $__boundDebug $server 3>&1
 """;
 
     private const string BuildBranchScript = """
-param($Data, $EnableException, $__boundVerbose, $buildstr)
+param($Data, $EnableException, $__boundVerbose, $__boundDebug, $buildstr)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Data, $EnableException, $__boundVerbose, $buildstr)
+    param($Data, $EnableException, $__boundVerbose, $__boundDebug, $buildstr)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
         function Resolve-DbaBuild {
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseShouldProcessForStateChangingFunctions", "")]
             [CmdletBinding()]
@@ -629,15 +641,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         MatchType      = $Detected.MatchType
         Warning        = $Detected.Warning
     } | Select-DefaultView -ExcludeProperty SqlInstance
-} $Data $EnableException $__boundVerbose $buildstr 3>&1
+} $Data $EnableException $__boundVerbose $__boundDebug $buildstr 3>&1
 """;
 
     private const string KbBranchScript = """
-param($Data, $EnableException, $__boundVerbose, $kbItem)
+param($Data, $EnableException, $__boundVerbose, $__boundDebug, $kbItem)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Data, $EnableException, $__boundVerbose, $kbItem)
+    param($Data, $EnableException, $__boundVerbose, $__boundDebug, $kbItem)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
         function Resolve-DbaBuild {
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseShouldProcessForStateChangingFunctions", "")]
             [CmdletBinding()]
@@ -762,15 +775,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         MatchType      = $Detected.MatchType
         Warning        = $Detected.Warning
     } | Select-DefaultView -ExcludeProperty SqlInstance
-} $Data $EnableException $__boundVerbose $kbItem 3>&1
+} $Data $EnableException $__boundVerbose $__boundDebug $kbItem 3>&1
 """;
 
     private const string MajorBranchScript = """
-param($Data, $EnableException, $__boundVerbose, $MajorVersion, $ServicePack, $CumulativeUpdate)
+param($Data, $EnableException, $__boundVerbose, $__boundDebug, $MajorVersion, $ServicePack, $CumulativeUpdate)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Data, $EnableException, $__boundVerbose, $MajorVersion, $ServicePack, $CumulativeUpdate)
+    param($Data, $EnableException, $__boundVerbose, $__boundDebug, $MajorVersion, $ServicePack, $CumulativeUpdate)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
         function Resolve-DbaBuild {
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseShouldProcessForStateChangingFunctions", "")]
             [CmdletBinding()]
@@ -895,7 +909,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         MatchType      = $Detected.MatchType
         Warning        = $Detected.Warning
     } | Select-DefaultView -ExcludeProperty SqlInstance
-} $Data $EnableException $__boundVerbose $MajorVersion $ServicePack $CumulativeUpdate 3>&1
+} $Data $EnableException $__boundVerbose $__boundDebug $MajorVersion $ServicePack $CumulativeUpdate 3>&1
 """;
 
 }

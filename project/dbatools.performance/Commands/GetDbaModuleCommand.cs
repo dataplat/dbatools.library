@@ -140,7 +140,7 @@ public sealed class GetDbaModuleCommand : DbaBaseCmdlet
             WriteMessage(MessageLevel.Verbose, "Creating InputObject from " + PsJoinSpace(SqlInstance!));
             try
             {
-                foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetDatabaseScript, BoundOrNull("SqlInstance"), BoundOrNull("SqlCredential"), BoundOrNull("Database"), BoundOrNull("ExcludeDatabase"), LanguagePrimitives.IsTrue(BoundOrNull("ExcludeSystemDatabases")), BoundVerbose()))
+                foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetDatabaseScript, BoundOrNull("SqlInstance"), BoundOrNull("SqlCredential"), BoundOrNull("Database"), BoundOrNull("ExcludeDatabase"), LanguagePrimitives.IsTrue(BoundOrNull("ExcludeSystemDatabases")), BoundVerbose(), BoundDebug()))
                     _accumulated.Add(fetched);
             }
             catch (PipelineStoppedException) { throw; }
@@ -289,6 +289,14 @@ public sealed class GetDbaModuleCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -299,13 +307,14 @@ public sealed class GetDbaModuleCommand : DbaBaseCmdlet
 
     // PS: Get-DbaDatabase driven by $PSBoundParameters reads (null when unbound).
     private const string GetDatabaseScript = """
-param($__instances, $SqlCredential, $Database, $ExcludeDatabase, $__excludeSystem, $__boundVerbose)
+param($__instances, $SqlCredential, $Database, $ExcludeDatabase, $__excludeSystem, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__instances, $SqlCredential, $Database, $ExcludeDatabase, $__excludeSystem, $__boundVerbose)
+    param($__instances, $SqlCredential, $Database, $ExcludeDatabase, $__excludeSystem, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaDatabase -SqlInstance $__instances -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase -ExcludeSystem:$__excludeSystem
-} $__instances $SqlCredential $Database $ExcludeDatabase $__excludeSystem $__boundVerbose 3>&1
+} $__instances $SqlCredential $Database $ExcludeDatabase $__excludeSystem $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: $server.Query($sql, $db.name) - the database-scoped ETS call.

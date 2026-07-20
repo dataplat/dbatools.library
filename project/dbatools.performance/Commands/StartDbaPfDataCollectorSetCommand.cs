@@ -68,7 +68,14 @@ public sealed class StartDbaPfDataCollectorSetCommand : DbaBaseCmdlet
         }, BodyScript,
             ComputerName, Credential, CollectorSet, InputObject,
             TestBound("ComputerName"), !NoWait.ToBool(), EnableException.ToBool(),
-            this, BoundVerbose());
+            this, BoundVerbose(), BoundDebug());
+    }
+
+    private object? BoundDebug()
+    {
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
     }
 
     private object? BoundVerbose()
@@ -99,11 +106,12 @@ public sealed class StartDbaPfDataCollectorSetCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($ComputerName, $Credential, $CollectorSet, $InputObject, $__computerNameBound, $wait, $EnableException, $__realCmdlet, $__boundVerbose)
+param($ComputerName, $Credential, $CollectorSet, $InputObject, $__computerNameBound, $wait, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($ComputerName, $Credential, $CollectorSet, $InputObject, $__computerNameBound, $wait, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($ComputerName, $Credential, $CollectorSet, $InputObject, $__computerNameBound, $wait, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $setscript = {
         $setname = $args[0]; $wait = $args[1]
@@ -147,6 +155,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Get-DbaPfDataCollectorSet -ComputerName $computer -Credential $Credential -CollectorSet $setname
         }
     }
-} $ComputerName $Credential $CollectorSet $InputObject $__computerNameBound $wait $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $ComputerName $Credential $CollectorSet $InputObject $__computerNameBound $wait $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

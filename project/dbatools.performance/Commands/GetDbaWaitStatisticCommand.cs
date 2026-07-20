@@ -78,7 +78,7 @@ public sealed class GetDbaWaitStatisticCommand : DbaInstanceCmdlet
     protected override void BeginProcessing()
     {
         // PS: the whole begin block VERBATIM - returned as a hashtable (W1-092 law).
-        Collection<PSObject> results = NestedCommand.InvokeScoped(this, BeginScript, ExcludeWaitType, IncludeWaitType, IncludeIgnorable.ToBool(), Threshold, BoundVerbose());
+        Collection<PSObject> results = NestedCommand.InvokeScoped(this, BeginScript, ExcludeWaitType, IncludeWaitType, IncludeIgnorable.ToBool(), Threshold, BoundVerbose(), BoundDebug());
         Hashtable? bag = results.Count == 1 ? PSObject.AsPSObject(results[0]).BaseObject as Hashtable : null;
         _sql = bag is not null ? bag["Sql"] : null;
         _details = bag is not null ? bag["Details"] : null;
@@ -126,6 +126,14 @@ public sealed class GetDbaWaitStatisticCommand : DbaInstanceCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -138,11 +146,12 @@ public sealed class GetDbaWaitStatisticCommand : DbaInstanceCmdlet
     // $defaultIgnorable, the ArrayList ignorable build, $ignorableSql/$sql, the
     // verbose/debug messages) returning a hashtable.
     private const string BeginScript = """
-param($ExcludeWaitType, $IncludeWaitType, $IncludeIgnorable, $Threshold, $__boundVerbose)
+param($ExcludeWaitType, $IncludeWaitType, $IncludeIgnorable, $Threshold, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($ExcludeWaitType, $IncludeWaitType, $IncludeIgnorable, $Threshold, $__boundVerbose)
+    param($ExcludeWaitType, $IncludeWaitType, $IncludeIgnorable, $Threshold, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     # Normalize user-supplied wait types before building the filter list.
     $normalizedExcludeWaitType = @()
     if ($ExcludeWaitType) {
@@ -943,7 +952,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     Write-Message -Level Debug -Message $sql
     @{ Sql = $sql; Details = $details; Category = $category; DefaultIgnorable = $defaultIgnorable }
-} $ExcludeWaitType $IncludeWaitType $IncludeIgnorable $Threshold $__boundVerbose 3>&1
+} $ExcludeWaitType $IncludeWaitType $IncludeIgnorable $Threshold $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the per-instance row loop VERBATIM (dynamic $category/$details reads, the

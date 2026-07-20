@@ -69,7 +69,7 @@ public sealed class GetDbaDbFeatureUsageCommand : DbaInstanceCmdlet
         {
             try
             {
-                foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetDatabaseScript, instance, SqlCredential, Database, ExcludeDatabase, BoundVerbose()))
+                foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetDatabaseScript, instance, SqlCredential, Database, ExcludeDatabase, BoundVerbose(), BoundDebug()))
                 {
                     if (fetched is not null)
                         inputObjects.Add(fetched);
@@ -122,6 +122,14 @@ public sealed class GetDbaDbFeatureUsageCommand : DbaInstanceCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -132,13 +140,14 @@ public sealed class GetDbaDbFeatureUsageCommand : DbaInstanceCmdlet
 
     // PS: Get-DbaDatabase called with ALL FOUR parameters verbatim (null when unbound).
     private const string GetDatabaseScript = """
-param($__instance, $SqlCredential, $Database, $ExcludeDatabase, $__boundVerbose)
+param($__instance, $SqlCredential, $Database, $ExcludeDatabase, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__instance, $SqlCredential, $Database, $ExcludeDatabase, $__boundVerbose)
+    param($__instance, $SqlCredential, $Database, $ExcludeDatabase, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaDatabase -SqlInstance $__instance -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase
-} $__instance $SqlCredential $Database $ExcludeDatabase $__boundVerbose 3>&1
+} $__instance $SqlCredential $Database $ExcludeDatabase $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: $db.Query($sql) - the Database-scoped ETS call (the W1-052 seam).

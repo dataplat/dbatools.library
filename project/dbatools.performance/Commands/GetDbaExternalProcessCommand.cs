@@ -41,8 +41,8 @@ public sealed class GetDbaExternalProcessCommand : DbaBaseCmdlet
         {
             try
             {
-                object? sqlPid = PipelineValue(NestedCommand.InvokeScoped(this, GetSqlPidScript, computer, Credential, BoundVerbose()));
-                object? processes = PipelineValue(NestedCommand.InvokeScoped(this, GetChildProcessesScript, computer, Credential, sqlPid, BoundVerbose()));
+                object? sqlPid = PipelineValue(NestedCommand.InvokeScoped(this, GetSqlPidScript, computer, Credential, BoundVerbose(), BoundDebug()));
+                object? processes = PipelineValue(NestedCommand.InvokeScoped(this, GetChildProcessesScript, computer, Credential, sqlPid, BoundVerbose(), BoundDebug()));
 
                 foreach (object? process in EnumerateValue(processes))
                 {
@@ -126,6 +126,14 @@ public sealed class GetDbaExternalProcessCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -136,24 +144,26 @@ public sealed class GetDbaExternalProcessCommand : DbaBaseCmdlet
 
     // PS: the sqlservr pid fetch VERBATIM (parenthesized pipe + .ProcessId member enum).
     private const string GetSqlPidScript = """
-param($__computer, $Credential, $__boundVerbose)
+param($__computer, $Credential, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $__boundVerbose)
+    param($__computer, $Credential, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     (Get-DbaCmObject -ComputerName $__computer -Credential $Credential -ClassName win32_process | Where-Object ProcessName -eq "sqlservr.exe").ProcessId
-} $__computer $Credential $__boundVerbose 3>&1
+} $__computer $Credential $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the child-process fetch VERBATIM (ParentProcessId -in $sqlpid).
     private const string GetChildProcessesScript = """
-param($__computer, $Credential, $__sqlpid, $__boundVerbose)
+param($__computer, $Credential, $__sqlpid, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $__sqlpid, $__boundVerbose)
+    param($__computer, $Credential, $__sqlpid, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaCmObject -ComputerName $__computer -Credential $Credential -ClassName win32_process | Where-Object ParentProcessId -in $__sqlpid
-} $__computer $Credential $__sqlpid $__boundVerbose 3>&1
+} $__computer $Credential $__sqlpid $__boundVerbose $__boundDebug 3>&1
 """;
 
     private const string SelectDefaultViewScript = """

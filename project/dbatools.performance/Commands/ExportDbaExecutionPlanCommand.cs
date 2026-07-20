@@ -214,7 +214,7 @@ public sealed class ExportDbaExecutionPlanCommand : DbaInstanceCmdlet
                 BagError(caughtRecord);
                 try
                 {
-                    NestedCommand.InvokeScoped(this, StopFunctionTypoScript, caughtRecord, instance, EnableException.ToBool(), BoundVerbose());
+                    NestedCommand.InvokeScoped(this, StopFunctionTypoScript, caughtRecord, instance, EnableException.ToBool(), BoundVerbose(), BoundDebug());
                 }
                 catch (FlowControlException)
                 {
@@ -284,7 +284,7 @@ public sealed class ExportDbaExecutionPlanCommand : DbaInstanceCmdlet
         try
         {
             NestedCommand.InvokeScopedStreaming(this, item => WriteObject(item), ExportPlanScript,
-                    this, planObject, Path, EnableException.ToBool(), BoundVerbose());
+                    this, planObject, Path, EnableException.ToBool(), BoundVerbose(), BoundDebug());
         }
         catch (PipelineStoppedException)
         {
@@ -380,6 +380,14 @@ public sealed class ExportDbaExecutionPlanCommand : DbaInstanceCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -414,11 +422,12 @@ public sealed class ExportDbaExecutionPlanCommand : DbaInstanceCmdlet
     // cmdlet under that name poisons them (lab-caught: ConvertToFinalInvalidCastException
     // storm). The three ShouldProcess sites are the ONLY token change in the verbatim body.
     private const string ExportPlanScript = """
-param($__realCmdlet, $object, $path, $EnableException, $__boundVerbose)
+param($__realCmdlet, $object, $path, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__realCmdlet, $object, $path, $EnableException, $__boundVerbose)
+    param($__realCmdlet, $object, $path, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     function Export-Plan {
         param(
             [object]$object
@@ -460,18 +469,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     }
     Export-Plan $object
-} $__realCmdlet $object $path $EnableException $__boundVerbose 3>&1
+} $__realCmdlet $object $path $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the query catch VERBATIM, -ErroRecord TYPO included.
     private const string StopFunctionTypoScript = """
-param($__record, $instance, $EnableException, $__boundVerbose)
+param($__record, $instance, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__record, $instance, $EnableException, $__boundVerbose)
+    param($__record, $instance, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $_ = $__record
     Stop-Function -Message "Issue collecting execution plans" -Target $instance -ErroRecord $_ -Continue
-} $__record $instance $EnableException $__boundVerbose 3>&1
+} $__record $instance $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 }

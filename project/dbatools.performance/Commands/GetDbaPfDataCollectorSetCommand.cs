@@ -66,7 +66,7 @@ public sealed class GetDbaPfDataCollectorSetCommand : DbaBaseCmdlet
         {
             try
             {
-                foreach (PSObject? item in NestedCommand.InvokeScoped(this, InvokeScript, computer, Credential, CollectorSet, BoundVerbose()))
+                foreach (PSObject? item in NestedCommand.InvokeScoped(this, InvokeScript, computer, Credential, CollectorSet, BoundVerbose(), BoundDebug()))
                     WriteObject(item);
             }
             catch (PipelineStoppedException)
@@ -82,6 +82,14 @@ public sealed class GetDbaPfDataCollectorSetCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -93,11 +101,12 @@ public sealed class GetDbaPfDataCollectorSetCommand : DbaBaseCmdlet
     // PS: the begin-block $setscript VERBATIM + the local/remote invocation split and
     // the Select-DefaultView $columns pipe.
     private const string InvokeScript = """
-param($__computer, $Credential, $CollectorSet, $__boundVerbose)
+param($__computer, $Credential, $CollectorSet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $CollectorSet, $__boundVerbose)
+    param($__computer, $Credential, $CollectorSet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $scriptBlock = {
         # Get names / status info
         $schedule = New-Object -ComObject "Schedule.Service"
@@ -216,6 +225,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     } else {
         Invoke-Command2 -ComputerName $__computer -Credential $Credential -ScriptBlock $scriptBlock -ArgumentList $CollectorSet, $Credential -ErrorAction Stop | Select-DefaultView -Property $columns
     }
-} $__computer $Credential $CollectorSet $__boundVerbose 3>&1
+} $__computer $Credential $CollectorSet $__boundVerbose $__boundDebug 3>&1
 """;
 }

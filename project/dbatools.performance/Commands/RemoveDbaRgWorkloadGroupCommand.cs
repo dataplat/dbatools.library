@@ -95,7 +95,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             // rebinding; otherwise the hop seeds from the accumulated carrier total (falling
             // back to the invocation-bound value on the first record).
             SelectProcessInputObject(),
-            EnableException.ToBool(), BoundVerbose());
+            EnableException.ToBool(), BoundVerbose(), BoundDebug());
     }
 
     protected override void BeginProcessing()
@@ -131,10 +131,17 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             }
         }, EndScript,
             _effectiveInputObject, SkipReconfigure.ToBool(), EnableException.ToBool(),
-            this, BoundVerbose());
+            this, BoundVerbose(), BoundDebug());
     }
 
     private const string CarrierMarker = "__dbatoolsW1117Carrier";
+
+    private object? BoundDebug()
+    {
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
 
     private object? BoundVerbose()
     {
@@ -164,11 +171,12 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
     }
 
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $InputObject, $EnableException, $__boundVerbose)
+param($SqlInstance, $SqlCredential, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $InputObject, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($SqlInstance, $SqlCredential, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $InputObject, $EnableException, $__boundVerbose)
+    param($SqlInstance, $SqlCredential, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $InputObject, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if (-not $InputObject -and -not $WorkloadGroup) {
         Stop-Function -Message "You must pipe in a workload group or specify a WorkloadGroup." -FunctionName Remove-DbaRgWorkloadGroup
@@ -198,15 +206,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     [pscustomobject]@{ __dbatoolsW1117Carrier = $true; InputObject = $InputObject }
-} $SqlInstance $SqlCredential $WorkloadGroup $ResourcePool $ResourcePoolType $InputObject $EnableException $__boundVerbose 3>&1 2>&1
+} $SqlInstance $SqlCredential $WorkloadGroup $ResourcePool $ResourcePoolType $InputObject $EnableException $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 
     private const string EndScript = """
-param($InputObject, $SkipReconfigure, $EnableException, $__realCmdlet, $__boundVerbose)
+param($InputObject, $SkipReconfigure, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($InputObject, $SkipReconfigure, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($InputObject, $SkipReconfigure, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($wklGroup in $InputObject) {
         $server = $wklGroup.Parent.Parent.Parent
@@ -242,6 +251,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         $output
     }
-} $InputObject $SkipReconfigure $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $InputObject $SkipReconfigure $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

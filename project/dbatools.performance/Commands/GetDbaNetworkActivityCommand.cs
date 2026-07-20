@@ -97,7 +97,7 @@ public sealed class GetDbaNetworkActivityCommand : DbaBaseCmdlet
 
         foreach (string? computer in names)
         {
-            object? server = PipelineValue(NestedCommand.InvokeScoped(this, ResolveScript, computer, Credential, BoundVerbose()));
+            object? server = PipelineValue(NestedCommand.InvokeScoped(this, ResolveScript, computer, Credential, BoundVerbose(), BoundDebug()));
             object? fullName = DotAccess(server, "FullComputerName");
             if (LanguagePrimitives.IsTrue(fullName))
             {
@@ -177,6 +177,14 @@ public sealed class GetDbaNetworkActivityCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the dbatools hops (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -192,13 +200,14 @@ New-CimSessionOption -Protocol DCom
 
     // PS: Resolve-DbaNetworkName (dbatools hop with the verbose carrier, no -ErrorAction).
     private const string ResolveScript = """
-param($__computer, $Credential, $__boundVerbose)
+param($__computer, $Credential, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $__boundVerbose)
+    param($__computer, $Credential, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Resolve-DbaNetworkName -ComputerName $__computer -Credential $Credential
-} $__computer $Credential $__boundVerbose 3>&1
+} $__computer $Credential $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: New-CimSession over WSMan (engine hop, -ErrorAction SilentlyContinue verbatim).

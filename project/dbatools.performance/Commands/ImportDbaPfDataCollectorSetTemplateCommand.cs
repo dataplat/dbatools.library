@@ -173,7 +173,7 @@ public sealed class ImportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
             TaskArguments ?? "", TaskUserTextArguments ?? "", StopOnCompletion.ToBool(),
             _pathState, Template, Instance, _moduleRoot, _state,
             TestBound("Path"), TestBound("Template"), TestBound("DisplayName"), TestBound("RootPath"),
-            EnableException.ToBool(), this, BoundVerbose());
+            EnableException.ToBool(), this, BoundVerbose(), BoundDebug());
     }
 
     /// <summary>Removes the silent $error copy the nested pipeline bagged for a merged-back
@@ -199,6 +199,14 @@ public sealed class ImportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -224,11 +232,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // the $instance shadowing, the counter cloning) plus the begin-block scriptblocks
     // it invokes; the trailing sentinel carries the mutated fn-scope state back.
     private const string ProcessScript = """
-param($ComputerName, $Credential, $DisplayName, $SchedulesEnabled, $RootPath, $Segment, $SegmentMaxDuration, $SegmentMaxSize, $Subdirectory, $SubdirectoryFormat, $SubdirectoryFormatPattern, $Task, $TaskRunAsSelf, $TaskArguments, $TaskUserTextArguments, $StopOnCompletion, $Path, $Template, $Instance, $__moduleRoot, $__state, $__pathBound, $__templateBound, $__displayNameBound, $__rootPathBound, $EnableException, $__realCmdlet, $__boundVerbose)
+param($ComputerName, $Credential, $DisplayName, $SchedulesEnabled, $RootPath, $Segment, $SegmentMaxDuration, $SegmentMaxSize, $Subdirectory, $SubdirectoryFormat, $SubdirectoryFormatPattern, $Task, $TaskRunAsSelf, $TaskArguments, $TaskUserTextArguments, $StopOnCompletion, $Path, $Template, $Instance, $__moduleRoot, $__state, $__pathBound, $__templateBound, $__displayNameBound, $__rootPathBound, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($ComputerName, $Credential, $DisplayName, $SchedulesEnabled, $RootPath, $Segment, $SegmentMaxDuration, $SegmentMaxSize, $Subdirectory, $SubdirectoryFormat, $SubdirectoryFormatPattern, $Task, $TaskRunAsSelf, $TaskArguments, $TaskUserTextArguments, $StopOnCompletion, $Path, $Template, $Instance, $__moduleRoot, $__state, $__pathBound, $__templateBound, $__displayNameBound, $__rootPathBound, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($ComputerName, $Credential, $DisplayName, $SchedulesEnabled, $RootPath, $Segment, $SegmentMaxDuration, $SegmentMaxSize, $Subdirectory, $SubdirectoryFormat, $SubdirectoryFormatPattern, $Task, $TaskRunAsSelf, $TaskArguments, $TaskUserTextArguments, $StopOnCompletion, $Path, $Template, $Instance, $__moduleRoot, $__state, $__pathBound, $__templateBound, $__displayNameBound, $__rootPathBound, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $moduleRoot = $__moduleRoot
 
     $setscript = {
@@ -395,6 +404,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     @{ __w1107State = @{ Path = $Path; DisplayName = $DisplayName; Name = $Name; RootName = $RootName; output = $output; instance = $instance; xml = $xml; plainxml = $plainxml; contents = $contents; instances = $instances; datacollector = $datacollector; sqlcounters = $sqlcounters; newcollection = $newcollection; templatepath = $templatepath } }
-} $ComputerName $Credential $DisplayName $SchedulesEnabled $RootPath $Segment $SegmentMaxDuration $SegmentMaxSize $Subdirectory $SubdirectoryFormat $SubdirectoryFormatPattern $Task $TaskRunAsSelf $TaskArguments $TaskUserTextArguments $StopOnCompletion $Path $Template $Instance $__moduleRoot $__state $__pathBound $__templateBound $__displayNameBound $__rootPathBound $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $ComputerName $Credential $DisplayName $SchedulesEnabled $RootPath $Segment $SegmentMaxDuration $SegmentMaxSize $Subdirectory $SubdirectoryFormat $SubdirectoryFormatPattern $Task $TaskRunAsSelf $TaskArguments $TaskUserTextArguments $StopOnCompletion $Path $Template $Instance $__moduleRoot $__state $__pathBound $__templateBound $__displayNameBound $__rootPathBound $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

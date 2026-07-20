@@ -141,7 +141,7 @@ public sealed class GetDbaPfDataCollectorCounterSampleCommand : DbaBaseCmdlet
             {
                 try
                 {
-                    foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetCounterObjectScript, computer, effectiveCredential, CollectorSet, Collector, BoundVerbose()))
+                    foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetCounterObjectScript, computer, effectiveCredential, CollectorSet, Collector, BoundVerbose(), BoundDebug()))
                         _accumulated.Add(fetched);
                 }
                 catch (PipelineStoppedException) { throw; }
@@ -167,7 +167,7 @@ public sealed class GetDbaPfDataCollectorCounterSampleCommand : DbaBaseCmdlet
             // The hop owns the whole per-object body; the only throw-through is the
             // EE Stop-Function (the function's terminating path), which propagates.
             NestedCommand.InvokeScopedStreaming(this, item => WriteObject(item), SampleProjectionScript,
-                    counterObject, effectiveCredential, Continuous.ToBool(), ListSet, MaxSamples, SampleInterval, EnableException.ToBool(), BoundVerbose());
+                    counterObject, effectiveCredential, Continuous.ToBool(), ListSet, MaxSamples, SampleInterval, EnableException.ToBool(), BoundVerbose(), BoundDebug());
         }
     }
 
@@ -257,6 +257,14 @@ public sealed class GetDbaPfDataCollectorCounterSampleCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -267,13 +275,14 @@ public sealed class GetDbaPfDataCollectorCounterSampleCommand : DbaBaseCmdlet
 
     // PS: Get-DbaPfDataCollectorCounter per computer (nested public, verbose carrier).
     private const string GetCounterObjectScript = """
-param($__computer, $Credential, $CollectorSet, $Collector, $__boundVerbose)
+param($__computer, $Credential, $CollectorSet, $Collector, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $CollectorSet, $Collector, $__boundVerbose)
+    param($__computer, $Credential, $CollectorSet, $Collector, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaPfDataCollectorCounter -ComputerName $__computer -Credential $Credential -CollectorSet $CollectorSet -Collector $Collector
-} $__computer $Credential $CollectorSet $Collector $__boundVerbose 3>&1
+} $__computer $Credential $CollectorSet $Collector $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the per-counterobject sample body VERBATIM ($params build incl. the
@@ -281,11 +290,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // no-op -Credential/-ListSet pass-through quirks, the try/catch Stop-Function
     // -Continue, and the per-sample projection + Select-DefaultView exclude pair).
     private const string SampleProjectionScript = """
-param($counterobject, $Credential, $Continuous, $ListSet, $MaxSamples, $SampleInterval, $EnableException, $__boundVerbose)
+param($counterobject, $Credential, $Continuous, $ListSet, $MaxSamples, $SampleInterval, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($counterobject, $Credential, $Continuous, $ListSet, $MaxSamples, $SampleInterval, $EnableException, $__boundVerbose)
+    param($counterobject, $Credential, $Continuous, $ListSet, $MaxSamples, $SampleInterval, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     # the foreach shell absorbs Stop-Function -Continue's `continue` the way the
     # function's counterobject loop did - the caller then moves to the next object
     foreach ($__w1090Shell in 1) {
@@ -355,6 +365,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $counterobject $Credential $Continuous $ListSet $MaxSamples $SampleInterval $EnableException $__boundVerbose 3>&1
+} $counterobject $Credential $Continuous $ListSet $MaxSamples $SampleInterval $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 }

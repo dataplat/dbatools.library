@@ -99,7 +99,7 @@ public sealed class RemoveDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
                 try
                 {
                     foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetCounterScript,
-                        computer, effectiveCredential, CollectorSet, Collector, Counter, BoundVerbose()))
+                        computer, effectiveCredential, CollectorSet, Collector, Counter, BoundVerbose(), BoundDebug()))
                     {
                         _accumulated.Add(fetched);
                     }
@@ -128,7 +128,7 @@ public sealed class RemoveDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             }
         }, MutationScript,
             _accumulated.ToArray(), Counter, effectiveCredential, EnableException.ToBool(),
-            this, BoundVerbose());
+            this, BoundVerbose(), BoundDebug());
     }
 
     private static bool PsTruthyList(List<object?> values)
@@ -184,6 +184,13 @@ public sealed class RemoveDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
         return collected.ToArray();
     }
 
+    private object? BoundDebug()
+    {
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))
@@ -212,21 +219,23 @@ public sealed class RemoveDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
     }
 
     private const string GetCounterScript = """
-param($__computer, $Credential, $CollectorSet, $Collector, $Counter, $__boundVerbose)
+param($__computer, $Credential, $CollectorSet, $Collector, $Counter, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $CollectorSet, $Collector, $Counter, $__boundVerbose)
+    param($__computer, $Credential, $CollectorSet, $Collector, $Counter, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaPfDataCollectorCounter -ComputerName $__computer -Credential $Credential -CollectorSet $CollectorSet -Collector $Collector -Counter $Counter
-} $__computer $Credential $CollectorSet $Collector $Counter $__boundVerbose 3>&1
+} $__computer $Credential $CollectorSet $Collector $Counter $__boundVerbose $__boundDebug 3>&1
 """;
 
     private const string MutationScript = """
-param($InputObject, $Counter, $Credential, $EnableException, $__realCmdlet, $__boundVerbose)
+param($InputObject, $Counter, $Credential, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($InputObject, $Counter, $Credential, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($InputObject, $Counter, $Credential, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $setscript = {
         $setname = $args[0]; $removexml = $args[1]
         $CollectorSet = New-Object -ComObject Pla.DataCollectorSet
@@ -268,6 +277,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $InputObject $Counter $Credential $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $InputObject $Counter $Credential $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

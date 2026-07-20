@@ -64,7 +64,14 @@ public sealed class RemoveDbaRgResourcePoolCommand : DbaBaseCmdlet
             }
         }, BodyScript,
             SqlInstance, SqlCredential, ResourcePool, Type, SkipReconfigure.ToBool(),
-            InputObject, TestBound("Type"), EnableException.ToBool(), this, BoundVerbose());
+            InputObject, TestBound("Type"), EnableException.ToBool(), this, BoundVerbose(), BoundDebug());
+    }
+
+    private object? BoundDebug()
+    {
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
     }
 
     private object? BoundVerbose()
@@ -95,11 +102,12 @@ public sealed class RemoveDbaRgResourcePoolCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $ResourcePool, $Type, $SkipReconfigure, $InputObject, $__typeBound, $EnableException, $__realCmdlet, $__boundVerbose)
+param($SqlInstance, $SqlCredential, $ResourcePool, $Type, $SkipReconfigure, $InputObject, $__typeBound, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($SqlInstance, $SqlCredential, $ResourcePool, $Type, $SkipReconfigure, $InputObject, $__typeBound, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($SqlInstance, $SqlCredential, $ResourcePool, $Type, $SkipReconfigure, $InputObject, $__typeBound, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     if (-not $InputObject -and -not $ResourcePool) {
         Stop-Function -Message "You must pipe in a resource pool or specify a ResourcePool." -FunctionName Remove-DbaRgResourcePool
@@ -152,6 +160,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -ErrorRecord $_ -Target $resPool -Continue -FunctionName Remove-DbaRgResourcePool
         }
     }
-} $SqlInstance $SqlCredential $ResourcePool $Type $SkipReconfigure $InputObject $__typeBound $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $SqlInstance $SqlCredential $ResourcePool $Type $SkipReconfigure $InputObject $__typeBound $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

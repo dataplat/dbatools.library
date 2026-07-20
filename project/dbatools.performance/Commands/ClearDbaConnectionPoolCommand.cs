@@ -75,7 +75,7 @@ public sealed class ClearDbaConnectionPoolCommand : DbaBaseCmdlet
                 // faults at ANY depth under Invoke-Command2 unwind to this catch instead
                 // of writing-and-continuing - EngineTryScope reproduces exactly that.
                 using EngineTryScope tryScope = EngineTryScope.Enter(this);
-                foreach (PSObject item in NestedCommand.InvokeScoped(this, InvokeCommand2Script, computer, Credential, shape, BoundVerbose()))
+                foreach (PSObject item in NestedCommand.InvokeScoped(this, InvokeCommand2Script, computer, Credential, shape, BoundVerbose(), BoundDebug()))
                 {
                     // The hop merges the error stream back (2>&1): a NON-terminating error
                     // from the real Invoke-Command2 (e.g. the remote session's TypeNotFound
@@ -117,6 +117,14 @@ public sealed class ClearDbaConnectionPoolCommand : DbaBaseCmdlet
     /// <summary>A bound -Verbose reached the function's module-scoped nested calls through
     /// the function-LOCAL $VerbosePreference; the hop script re-establishes it from this
     /// carrier (null = not bound - the ambient chain already matches).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -172,17 +180,18 @@ public sealed class ClearDbaConnectionPoolCommand : DbaBaseCmdlet
     // Each branch carries the function's scriptblock VERBATIM; the call shapes replicate
     // the function's four distinct Invoke-Command2 parameter bindings exactly.
     private const string InvokeCommand2Script = """
-param($computer, $credential, $__shape, $__boundVerbose)
+param($computer, $credential, $__shape, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($computer, $credential, $__shape, $__boundVerbose)
+    param($computer, $credential, $__shape, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     switch ($__shape) {
         "RemoteCred" { Invoke-Command2 -ComputerName $computer -Credential $credential -ScriptBlock { [Microsoft.Data.SqlClient.SqlConnection]::ClearAllPools() } 3>&1 2>&1 }
         "Remote" { Invoke-Command2 -ComputerName $computer -ScriptBlock { [Microsoft.Data.SqlClient.SqlConnection]::ClearAllPools() } 3>&1 2>&1 }
         "LocalCred" { Invoke-Command2 -Credential $credential -ScriptBlock { [Microsoft.Data.SqlClient.SqlConnection]::ClearAllPools() } 3>&1 2>&1 }
         "Local" { Invoke-Command2 -ScriptBlock { [Microsoft.Data.SqlClient.SqlConnection]::ClearAllPools() } 3>&1 2>&1 }
     }
-} $computer $credential $__shape $__boundVerbose
+} $computer $credential $__shape $__boundVerbose $__boundDebug
 """;
 }

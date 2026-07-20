@@ -57,7 +57,14 @@ public sealed class SetDbaResourceGovernorCommand : DbaBaseCmdlet
             }
         }, BodyScript,
             SqlInstance, SqlCredential, Enabled.ToBool(), Disabled.ToBool(),
-            ClassifierFunction, EnableException.ToBool(), this, BoundVerbose());
+            ClassifierFunction, EnableException.ToBool(), this, BoundVerbose(), BoundDebug());
+    }
+
+    private object? BoundDebug()
+    {
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
     }
 
     private object? BoundVerbose()
@@ -88,11 +95,12 @@ public sealed class SetDbaResourceGovernorCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Enabled, $Disabled, $ClassifierFunction, $EnableException, $__realCmdlet, $__boundVerbose)
+param($SqlInstance, $SqlCredential, $Enabled, $Disabled, $ClassifierFunction, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($SqlInstance, $SqlCredential, $Enabled, $Disabled, $ClassifierFunction, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($SqlInstance, $SqlCredential, $Enabled, $Disabled, $ClassifierFunction, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($instance in $SqlInstance) {
         try {
@@ -147,6 +155,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         Get-DbaResourceGovernor -SqlInstance $server
     }
-} $SqlInstance $SqlCredential $Enabled $Disabled $ClassifierFunction $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $SqlInstance $SqlCredential $Enabled $Disabled $ClassifierFunction $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

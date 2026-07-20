@@ -64,10 +64,17 @@ public sealed class RemoveDbaPfDataCollectorSetCommand : DbaBaseCmdlet
             }
         }, BodyScript,
             ComputerName, Credential, CollectorSet, InputObject,
-            TestBound("ComputerName"), EnableException.ToBool(), this, BoundVerbose());
+            TestBound("ComputerName"), EnableException.ToBool(), this, BoundVerbose(), BoundDebug());
     }
 
     /// <summary>A bound -Verbose carrier for the module-scoped process body.</summary>
+    private object? BoundDebug()
+    {
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         if (MyInvocation.BoundParameters.TryGetValue("Verbose", out object? verbose))
@@ -97,11 +104,12 @@ public sealed class RemoveDbaPfDataCollectorSetCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($ComputerName, $Credential, $CollectorSet, $InputObject, $__computerNameBound, $EnableException, $__realCmdlet, $__boundVerbose)
+param($ComputerName, $Credential, $CollectorSet, $InputObject, $__computerNameBound, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($ComputerName, $Credential, $CollectorSet, $InputObject, $__computerNameBound, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($ComputerName, $Credential, $CollectorSet, $InputObject, $__computerNameBound, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $setscript = {
         $setname = $args
@@ -155,6 +163,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $ComputerName $Credential $CollectorSet $InputObject $__computerNameBound $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $ComputerName $Credential $CollectorSet $InputObject $__computerNameBound $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

@@ -65,7 +65,7 @@ public sealed class GetDbaManagementObjectCommand : DbaBaseCmdlet
             try
             {
                 WriteMessage(MessageLevel.Verbose, "Executing scriptblock against " + PsText(computer));
-                foreach (PSObject? item in NestedCommand.InvokeScoped(this, InvokeScript, computer, Credential, VersionNumber, BoundVerbose()))
+                foreach (PSObject? item in NestedCommand.InvokeScoped(this, InvokeScript, computer, Credential, VersionNumber, BoundVerbose(), BoundDebug()))
                     WriteObject(item);
             }
             catch (PipelineStoppedException)
@@ -89,6 +89,14 @@ public sealed class GetDbaManagementObjectCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -99,11 +107,12 @@ public sealed class GetDbaManagementObjectCommand : DbaBaseCmdlet
 
     // PS: the begin-block scriptblock VERBATIM + the local/remote invocation split.
     private const string InvokeScript = """
-param($__computer, $Credential, $VersionNumber, $__boundVerbose)
+param($__computer, $Credential, $VersionNumber, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $VersionNumber, $__boundVerbose)
+    param($__computer, $Credential, $VersionNumber, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
         $scriptBlock = {
             $VersionNumber = [int]$args[0]
             $remote = $args[1]
@@ -338,6 +347,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Invoke-Command2 -ComputerName $__computer -ScriptBlock $scriptBlock -Credential $Credential -ArgumentList $VersionNumber, $true -ErrorAction Stop
         }
     }
-} $__computer $Credential $VersionNumber $__boundVerbose 3>&1
+} $__computer $Credential $VersionNumber $__boundVerbose $__boundDebug 3>&1
 """;
 }

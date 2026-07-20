@@ -92,7 +92,7 @@ public sealed class GetDbaCpuUsageCommand : DbaInstanceCmdlet
             // PS: $processes = Get-DbaProcess -SqlInstance $server (statement-conditional)
             try
             {
-                _processes = NestedCommand.InvokeScoped(this, GetProcessesScript, server, BoundVerbose());
+                _processes = NestedCommand.InvokeScoped(this, GetProcessesScript, server, BoundVerbose(), BoundDebug());
             }
             catch (PipelineStoppedException) { throw; }
             catch (RuntimeException ex) { StatementFault.Surface(this, ex, "Get-DbaCpuUsage"); }
@@ -100,7 +100,7 @@ public sealed class GetDbaCpuUsageCommand : DbaInstanceCmdlet
             // PS: $threads = Get-DbaCmObject ... | Where-Object { sql* and >= $Threshold }
             try
             {
-                _threads = NestedCommand.InvokeScoped(this, GetThreadsScript, instance.ComputerName, Credential, Threshold, BoundVerbose());
+                _threads = NestedCommand.InvokeScoped(this, GetThreadsScript, instance.ComputerName, Credential, Threshold, BoundVerbose(), BoundDebug());
             }
             catch (PipelineStoppedException) { throw; }
             catch (RuntimeException ex) { StatementFault.Surface(this, ex, "Get-DbaCpuUsage"); }
@@ -283,6 +283,14 @@ public sealed class GetDbaCpuUsageCommand : DbaInstanceCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -292,23 +300,25 @@ public sealed class GetDbaCpuUsageCommand : DbaInstanceCmdlet
     }
 
     private const string GetProcessesScript = """
-param($server, $__boundVerbose)
+param($server, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $__boundVerbose)
+    param($server, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaProcess -SqlInstance $server
-} $server $__boundVerbose 3>&1
+} $server $__boundVerbose $__boundDebug 3>&1
 """;
 
     private const string GetThreadsScript = """
-param($__computerName, $Credential, $Threshold, $__boundVerbose)
+param($__computerName, $Credential, $Threshold, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computerName, $Credential, $Threshold, $__boundVerbose)
+    param($__computerName, $Credential, $Threshold, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaCmObject -ComputerName $__computerName -ClassName Win32_PerfFormattedData_PerfProc_Thread -Credential $Credential | Where-Object { $_.Name -like "sql*" -and $_.PercentProcessorTime -ge $Threshold }
-} $__computerName $Credential $Threshold $__boundVerbose 3>&1
+} $__computerName $Credential $Threshold $__boundVerbose $__boundDebug 3>&1
 """;
 
     private const string ServerQueryScript = """

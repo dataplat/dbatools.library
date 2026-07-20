@@ -221,7 +221,7 @@ public sealed class AddDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             // exception (W1-026 pattern).
             try
             {
-                NestedCommand.InvokeScoped(this, TestElevationScript, computer, EnableException.ToBool(), BoundVerbose());
+                NestedCommand.InvokeScoped(this, TestElevationScript, computer, EnableException.ToBool(), BoundVerbose(), BoundDebug());
             }
             catch (FlowControlException)
             {
@@ -306,7 +306,7 @@ public sealed class AddDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
                     // this catch instead of writing-and-continuing (EngineTryScope = the
                     // W1-045 S08 lab split).
                     using EngineTryScope tryScope = EngineTryScope.Enter(this);
-                    Collection<PSObject> results = NestedCommand.InvokeScoped(this, InvokeCommand2Script, computer, Credential, setname, _plainxml, BoundVerbose());
+                    Collection<PSObject> results = NestedCommand.InvokeScoped(this, InvokeCommand2Script, computer, Credential, setname, _plainxml, BoundVerbose(), BoundDebug());
 
                     // PS: Write-Message -Level Verbose -Message " $results"
                     WriteMessage(MessageLevel.Verbose, " " + PsText(results));
@@ -485,6 +485,14 @@ public sealed class AddDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
     /// <summary>A bound -Verbose reached the function's module-scoped nested calls through
     /// the function-LOCAL $VerbosePreference; the hop scripts re-establish it from this
     /// carrier (null = not bound - the ambient chain already matches).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -660,23 +668,25 @@ param($__io)
 """;
 
     private const string TestElevationScript = """
-param($computer, $enable, $__boundVerbose)
+param($computer, $enable, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($computer, $enable, $__boundVerbose)
+    param($computer, $enable, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Test-ElevationRequirement -ComputerName $computer -Continue -EnableException $enable 3>&1
-} $computer $enable $__boundVerbose
+} $computer $enable $__boundVerbose $__boundDebug
 """;
 
     // The inner PLA scriptblock is VERBATIM from the function's begin block (comments
     // included) - Invoke-Command2 runs it in-process locally or serializes it for remoting.
     private const string InvokeCommand2Script = """
-param($computer, $credential, $setname, $plainxml, $__boundVerbose)
+param($computer, $credential, $setname, $plainxml, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($computer, $credential, $setname, $plainxml, $__boundVerbose)
+    param($computer, $credential, $setname, $plainxml, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $setscript = {
         $setname = $args[0]; $Addxml = $args[1]
         $set = New-Object -ComObject Pla.DataCollectorSet
@@ -685,6 +695,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $set.Query($setname, $Null)
     }
     Invoke-Command2 -ComputerName $computer -Credential $credential -ScriptBlock $setscript -ArgumentList $setname, $plainxml -ErrorAction Stop 3>&1
-} $computer $credential $setname $plainxml $__boundVerbose
+} $computer $credential $setname $plainxml $__boundVerbose $__boundDebug
 """;
 }

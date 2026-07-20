@@ -76,18 +76,26 @@ public sealed class GetDbaWindowsLogCommand : DbaBaseCmdlet
     {
         foreach (DbaInstanceParameter? instance in SqlInstance ?? new DbaInstanceParameter[0])
         {
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript, _state, instance, Start, End, Credential, MaxRemoteThreads, BoundVerbose()))
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript, _state, instance, Start, End, Credential, MaxRemoteThreads, BoundVerbose(), BoundDebug()))
                 WriteObject(item);
         }
     }
 
     protected override void EndProcessing()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript, _state, BoundVerbose()))
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript, _state, BoundVerbose(), BoundDebug()))
             WriteObject(item);
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -283,11 +291,12 @@ $RunspacePool.Open()
     // PS: the process body VERBATIM (the helpers re-defined over the live state, the
     // per-instance Start-Runspace + Receive-Runspace pair).
     private const string ProcessScript = """
-param($__state, $instance, $Start, $End, $Credential, $MaxRemoteThreads, $__boundVerbose)
+param($__state, $instance, $Start, $End, $Credential, $MaxRemoteThreads, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__state, $instance, $Start, $End, $Credential, $MaxRemoteThreads, $__boundVerbose)
+    param($__state, $instance, $Start, $End, $Credential, $MaxRemoteThreads, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $RunspaceCollection = $__state.RunspaceCollection
     $RunspacePool = $__state.RunspacePool
     $scriptBlock_RemoteExecution = $__state.ScriptBlockRemote
@@ -325,16 +334,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     Write-Message -Level VeryVerbose -Message "Processing <c='green'>$instance</c>" -Target $instance
     Start-Runspace
     Receive-Runspace
-} $__state $instance $Start $End $Credential $MaxRemoteThreads $__boundVerbose 3>&1
+} $__state $instance $Start $End $Credential $MaxRemoteThreads $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the end block VERBATIM (drain, close, restore DefaultRunspace).
     private const string EndScript = """
-param($__state, $__boundVerbose)
+param($__state, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__state, $__boundVerbose)
+    param($__state, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $RunspaceCollection = $__state.RunspaceCollection
     $RunspacePool = $__state.RunspacePool
     $defaultrunspace = $__state.DefaultRunspace
@@ -365,6 +375,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $RunspacePool.Close()
     $RunspacePool.Dispose()
     [System.Management.Automation.Runspaces.Runspace]::DefaultRunspace = $defaultrunspace
-} $__state $__boundVerbose 3>&1
+} $__state $__boundVerbose $__boundDebug 3>&1
 """;
 }

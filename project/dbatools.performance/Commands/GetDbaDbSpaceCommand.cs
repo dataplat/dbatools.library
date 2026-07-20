@@ -140,7 +140,7 @@ public sealed class GetDbaDbSpaceCommand : DbaInstanceCmdlet
         {
             try
             {
-                foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetDatabaseScript, SqlInstance, SqlCredential, Database, ExcludeDatabase, BoundVerbose()))
+                foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetDatabaseScript, SqlInstance, SqlCredential, Database, ExcludeDatabase, BoundVerbose(), BoundDebug()))
                     inputObjects.Add(fetched);
             }
             catch (PipelineStoppedException) { throw; }
@@ -338,6 +338,14 @@ public sealed class GetDbaDbSpaceCommand : DbaInstanceCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -349,13 +357,14 @@ public sealed class GetDbaDbSpaceCommand : DbaInstanceCmdlet
     // PS: Get-DbaDatabase called with the WHOLE -SqlInstance array and all parameters
     // verbatim (null when unbound).
     private const string GetDatabaseScript = """
-param($__instances, $SqlCredential, $Database, $ExcludeDatabase, $__boundVerbose)
+param($__instances, $SqlCredential, $Database, $ExcludeDatabase, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__instances, $SqlCredential, $Database, $ExcludeDatabase, $__boundVerbose)
+    param($__instances, $SqlCredential, $Database, $ExcludeDatabase, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaDatabase -SqlInstance $__instances -SqlCredential $SqlCredential -Database $Database -ExcludeDatabase $ExcludeDatabase
-} $__instances $SqlCredential $Database $ExcludeDatabase $__boundVerbose 3>&1
+} $__instances $SqlCredential $Database $ExcludeDatabase $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: ($db.ExecuteWithResults($sql)).Tables.Rows - verbatim member-enum walk.

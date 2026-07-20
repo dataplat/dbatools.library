@@ -85,7 +85,7 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
         // PS: $null = Test-ExportDirectory -Path $Path - the helper's Stop-Function warning
         // re-emits; its interrupt lands in the WRONG scope in the function world, so no
         // interrupt is armed here either (quirk preserved). EE throws propagate.
-        NestedCommand.InvokeScoped(this, TestExportDirectoryScript, Path, EnableException.ToBool(), BoundVerbose());
+        NestedCommand.InvokeScoped(this, TestExportDirectoryScript, Path, EnableException.ToBool(), BoundVerbose(), BoundDebug());
     }
 
     protected override void ProcessRecord()
@@ -156,7 +156,7 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
             {
                 try
                 {
-                    Collection<PSObject> cleaned = NestedCommand.InvokeScoped(this, RemoveInvalidFileNameCharsScript, DotAccess(setObject, "Name"), EnableException.ToBool(), BoundVerbose());
+                    Collection<PSObject> cleaned = NestedCommand.InvokeScoped(this, RemoveInvalidFileNameCharsScript, DotAccess(setObject, "Name"), EnableException.ToBool(), BoundVerbose(), BoundDebug());
                     _csname = cleaned.Count > 0 ? (object?)cleaned[cleaned.Count - 1] : null;
                     _csnameAssigned = true;
                     FilePath = PsText(Path) + "\\" + PsText(_csname) + ".xml";
@@ -358,6 +358,14 @@ public sealed class ExportDbaPfDataCollectorSetTemplateCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -377,22 +385,24 @@ param($__params)
 """;
 
     private const string TestExportDirectoryScript = """
-param($__path, $EnableException, $__boundVerbose)
+param($__path, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__path, $EnableException, $__boundVerbose)
+    param($__path, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $null = Test-ExportDirectory -Path $__path
-} $__path $EnableException $__boundVerbose 3>&1
+} $__path $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 
     private const string RemoveInvalidFileNameCharsScript = """
-param($__name, $EnableException, $__boundVerbose)
+param($__name, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__name, $EnableException, $__boundVerbose)
+    param($__name, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Remove-InvalidFileNameChars -Name $__name
-} $__name $EnableException $__boundVerbose 3>&1
+} $__name $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 }

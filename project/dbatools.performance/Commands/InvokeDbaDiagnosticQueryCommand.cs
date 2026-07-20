@@ -101,7 +101,7 @@ public sealed class InvokeDbaDiagnosticQueryCommand : DbaInstanceCmdlet
     protected override void BeginProcessing()
     {
         Collection<PSObject> results = NestedCommand.InvokeScoped(this, BeginScript,
-            Path, ExcludeQueryTextColumn.ToBool(), ExcludePlanColumn.ToBool(), NoColumnParsing.ToBool(), EnableException.ToBool(), BoundVerbose());
+            Path, ExcludeQueryTextColumn.ToBool(), ExcludePlanColumn.ToBool(), NoColumnParsing.ToBool(), EnableException.ToBool(), BoundVerbose(), BoundDebug());
         foreach (PSObject? item in results)
         {
             Hashtable? bag = item?.BaseObject as Hashtable;
@@ -141,7 +141,7 @@ public sealed class InvokeDbaDiagnosticQueryCommand : DbaInstanceCmdlet
                 Database, ExcludeDatabase, ExcludeQuery, QueryName,
                 UseSelectionHelper.ToBool(), InstanceOnly.ToBool(), DatabaseSpecific.ToBool(),
                 OutputPath ?? "", ExportQueries.ToBool(), _state,
-                EnableException.ToBool(), this, BoundVerbose());
+                EnableException.ToBool(), this, BoundVerbose(), BoundDebug());
             foreach (PSObject? item in results)
             {
                 Hashtable? sentinel = item?.BaseObject as Hashtable;
@@ -167,6 +167,14 @@ public sealed class InvokeDbaDiagnosticQueryCommand : DbaInstanceCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -179,11 +187,12 @@ public sealed class InvokeDbaDiagnosticQueryCommand : DbaInstanceCmdlet
     // $base fallback read, the parser loop) - returned as a bag; the Stop-Function
     // early-return path leaves the bag unemitted.
     private const string BeginScript = """
-param($Path, $ExcludeQueryTextColumn, $ExcludePlanColumn, $NoColumnParsing, $EnableException, $__boundVerbose)
+param($Path, $ExcludeQueryTextColumn, $ExcludePlanColumn, $NoColumnParsing, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Path, $ExcludeQueryTextColumn, $ExcludePlanColumn, $NoColumnParsing, $EnableException, $__boundVerbose)
+    param($Path, $ExcludeQueryTextColumn, $ExcludePlanColumn, $NoColumnParsing, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $ProgressId = Get-Random
     $__begun = $false
     # the dot-sourced block shares this scope; the begin Stop-Function's `return`
@@ -241,18 +250,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $__begun = $true
     }
     @{ __w1108Begin = $true; ProgressId = $ProgressId; ScriptVersions = $scriptversions; Interrupted = (-not $__begun) }
-} $Path $ExcludeQueryTextColumn $ExcludePlanColumn $NoColumnParsing $EnableException $__boundVerbose 3>&1
+} $Path $ExcludeQueryTextColumn $ExcludePlanColumn $NoColumnParsing $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the per-instance body VERBATIM (version switch, database discovery, the
     // sticky $QueryName/$first mutations, the scriptpart loop with routed
     // ShouldProcess, progress, queries, projections, exports, WhatIf objects).
     private const string InstanceScript = """
-param($server, $instance, $scriptversions, $ProgressId, $Database, $ExcludeDatabase, $ExcludeQuery, $QueryName, $UseSelectionHelper, $instanceOnly, $DatabaseSpecific, $OutputPath, $ExportQueries, $__state, $EnableException, $__realCmdlet, $__boundVerbose)
+param($server, $instance, $scriptversions, $ProgressId, $Database, $ExcludeDatabase, $ExcludeQuery, $QueryName, $UseSelectionHelper, $instanceOnly, $DatabaseSpecific, $OutputPath, $ExportQueries, $__state, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $instance, $scriptversions, $ProgressId, $Database, $ExcludeDatabase, $ExcludeQuery, $QueryName, $UseSelectionHelper, $instanceOnly, $DatabaseSpecific, $OutputPath, $ExportQueries, $__state, $EnableException, $__realCmdlet, $__boundVerbose)
+    param($server, $instance, $scriptversions, $ProgressId, $Database, $ExcludeDatabase, $ExcludeQuery, $QueryName, $UseSelectionHelper, $instanceOnly, $DatabaseSpecific, $OutputPath, $ExportQueries, $__state, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     function Invoke-DiagnosticQuerySelectionHelper {
         [CmdletBinding()]
@@ -525,7 +535,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     }
     @{ __w1108State = @{ first = $first; QueryName = $QueryName; databases = $databases; halt = $__halt } }
-} $server $instance $scriptversions $ProgressId $Database $ExcludeDatabase $ExcludeQuery $QueryName $UseSelectionHelper $instanceOnly $DatabaseSpecific $OutputPath $ExportQueries $__state $EnableException $__realCmdlet $__boundVerbose 3>&1 2>&1
+} $server $instance $scriptversions $ProgressId $Database $ExcludeDatabase $ExcludeQuery $QueryName $UseSelectionHelper $instanceOnly $DatabaseSpecific $OutputPath $ExportQueries $__state $EnableException $__realCmdlet $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 
     // PS: the end block VERBATIM.

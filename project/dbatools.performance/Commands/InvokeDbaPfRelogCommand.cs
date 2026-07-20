@@ -101,21 +101,21 @@ public sealed class InvokeDbaPfRelogCommand : DbaBaseCmdlet
     protected override void BeginProcessing()
     {
         Collection<PSObject> results = NestedCommand.InvokeScoped(this, BeginScript,
-            Path, BeginTime, EndTime, Destination ?? "", TestBound("BeginTime"), TestBound("EndTime"), TestBound("Destination"), EnableException.ToBool(), BoundVerbose());
+            Path, BeginTime, EndTime, Destination ?? "", TestBound("BeginTime"), TestBound("EndTime"), TestBound("Destination"), EnableException.ToBool(), BoundVerbose(), BoundDebug());
         CaptureState(results, emitOthers: false);
     }
 
     protected override void ProcessRecord()
     {
         Collection<PSObject> results = NestedCommand.InvokeScoped(this, ProcessScript,
-            InputObject, Append.ToBool(), Type, Path, AllTime.ToBool(), _state, EnableException.ToBool(), BoundVerbose());
+            InputObject, Append.ToBool(), Type, Path, AllTime.ToBool(), _state, EnableException.ToBool(), BoundVerbose(), BoundDebug());
         CaptureState(results, emitOthers: true);
     }
 
     protected override void EndProcessing()
     {
         Collection<PSObject> results = NestedCommand.InvokeScoped(this, EndScript,
-            Append.ToBool(), AllowClobber.ToBool(), PerformanceCounter, PerformanceCounterPath ?? "", Interval, ConfigPath ?? "", Summary.ToBool(), Multithread.ToBool(), Raw.ToBool(), Type, Destination ?? "", Path, _state, EnableException.ToBool(), BoundVerbose());
+            Append.ToBool(), AllowClobber.ToBool(), PerformanceCounter, PerformanceCounterPath ?? "", Interval, ConfigPath ?? "", Summary.ToBool(), Multithread.ToBool(), Raw.ToBool(), Type, Destination ?? "", Path, _state, EnableException.ToBool(), BoundVerbose(), BoundDebug());
         CaptureState(results, emitOthers: true);
     }
 
@@ -135,6 +135,14 @@ public sealed class InvokeDbaPfRelogCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -145,11 +153,12 @@ public sealed class InvokeDbaPfRelogCommand : DbaBaseCmdlet
 
     // PS: the begin block VERBATIM (module-scope $script: writes preserved).
     private const string BeginScript = """
-param($Path, $BeginTime, $EndTime, $Destination, $__begintimeBound, $__endtimeBound, $__destinationBound, $EnableException, $__boundVerbose)
+param($Path, $BeginTime, $EndTime, $Destination, $__begintimeBound, $__endtimeBound, $__destinationBound, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Path, $BeginTime, $EndTime, $Destination, $__begintimeBound, $__endtimeBound, $__destinationBound, $EnableException, $__boundVerbose)
+    param($Path, $BeginTime, $EndTime, $Destination, $__begintimeBound, $__endtimeBound, $__destinationBound, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
 
 
@@ -172,17 +181,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     @{ __w1109State = @{ allpaths = $allpaths; originaldestination = $originaldestination } }
-} $Path $BeginTime $EndTime $Destination $__begintimeBound $__endtimeBound $__destinationBound $EnableException $__boundVerbose 3>&1
+} $Path $BeginTime $EndTime $Destination $__begintimeBound $__endtimeBound $__destinationBound $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the process block VERBATIM (the record-less Append gate's `return` exits the
     // dot-sourced block so the sentinel still emits - the W1-108 law).
     private const string ProcessScript = """
-param($InputObject, $Append, $Type, $Path, $AllTime, $__state, $EnableException, $__boundVerbose)
+param($InputObject, $Append, $Type, $Path, $AllTime, $__state, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($InputObject, $Append, $Type, $Path, $AllTime, $__state, $EnableException, $__boundVerbose)
+    param($InputObject, $Append, $Type, $Path, $AllTime, $__state, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $allpaths = $__state.allpaths
     . {
 
@@ -238,17 +248,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     }
     @{ __w1109State = @{ allpaths = $allpaths; originaldestination = $__state.originaldestination } }
-} $InputObject $Append $Type $Path $AllTime $__state $EnableException $__boundVerbose 3>&1
+} $InputObject $Append $Type $Path $AllTime $__state $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the end block VERBATIM (the unique filter, the relog scriptblock, the
     // Multithread/serial split with the W1-080 scope-equivalent local invocations).
     private const string EndScript = """
-param($Append, $AllowClobber, $PerformanceCounter, $PerformanceCounterPath, $Interval, $ConfigPath, $Summary, $Multithread, $Raw, $Type, $Destination, $Path, $__state, $EnableException, $__boundVerbose)
+param($Append, $AllowClobber, $PerformanceCounter, $PerformanceCounterPath, $Interval, $ConfigPath, $Summary, $Multithread, $Raw, $Type, $Destination, $Path, $__state, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($Append, $AllowClobber, $PerformanceCounter, $PerformanceCounterPath, $Interval, $ConfigPath, $Summary, $Multithread, $Raw, $Type, $Destination, $Path, $__state, $EnableException, $__boundVerbose)
+    param($Append, $AllowClobber, $PerformanceCounter, $PerformanceCounterPath, $Interval, $ConfigPath, $Summary, $Multithread, $Raw, $Type, $Destination, $Path, $__state, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $allpaths = $__state.allpaths
     $originaldestination = $__state.originaldestination
     . {
@@ -436,6 +447,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     }
     @{ __w1109State = @{ allpaths = $allpaths; originaldestination = $originaldestination } }
-} $Append $AllowClobber $PerformanceCounter $PerformanceCounterPath $Interval $ConfigPath $Summary $Multithread $Raw $Type $Destination $Path $__state $EnableException $__boundVerbose 3>&1
+} $Append $AllowClobber $PerformanceCounter $PerformanceCounterPath $Interval $ConfigPath $Summary $Multithread $Raw $Type $Destination $Path $__state $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 }

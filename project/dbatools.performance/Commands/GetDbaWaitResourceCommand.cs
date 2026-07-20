@@ -78,7 +78,7 @@ public sealed class GetDbaWaitResourceCommand : DbaBaseCmdlet
 
         // The whole post-connect body is VERBATIM; the only throw-through is the
         // EE Stop-Function (the function terminating path), which propagates.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript, server, WaitResource, Row.ToBool(), EnableException.ToBool(), BoundVerbose()))
+        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript, server, WaitResource, Row.ToBool(), EnableException.ToBool(), BoundVerbose(), BoundDebug()))
             WriteObject(item);
     }
 
@@ -90,6 +90,14 @@ public sealed class GetDbaWaitResourceCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -110,11 +118,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // PS: the post-connect body VERBATIM (the $matches captures, the ID lookup, the
     // PAGE and KEY branches with their warnings/faults, the -Row expansion).
     private const string BodyScript = """
-param($server, $WaitResource, $Row, $EnableException, $__boundVerbose)
+param($server, $WaitResource, $Row, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $WaitResource, $Row, $EnableException, $__boundVerbose)
+    param($server, $WaitResource, $Row, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $null = $WaitResource -match '^(?<Type>[A-Z]*): (?<dbid>[0-9]*):*'
     $resourceType = $matches.Type
     $dbId = $matches.DbId
@@ -198,6 +207,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $output
         }
     }
-} $server $WaitResource $Row $EnableException $__boundVerbose 3>&1
+} $server $WaitResource $Row $EnableException $__boundVerbose $__boundDebug 3>&1
 """;
 }

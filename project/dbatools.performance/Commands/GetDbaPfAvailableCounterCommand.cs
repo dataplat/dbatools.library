@@ -62,7 +62,7 @@ public sealed class GetDbaPfAvailableCounterCommand : DbaBaseCmdlet
             try
             {
                 bool hasPattern = LanguagePrimitives.IsTrue(_pattern);
-                foreach (PSObject? item in NestedCommand.InvokeScoped(this, InvokeScript, computer, Credential, _pattern, hasPattern, BoundVerbose()))
+                foreach (PSObject? item in NestedCommand.InvokeScoped(this, InvokeScript, computer, Credential, _pattern, hasPattern, BoundVerbose(), BoundDebug()))
                     WriteObject(item);
             }
             catch (PipelineStoppedException)
@@ -78,6 +78,14 @@ public sealed class GetDbaPfAvailableCounterCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -88,11 +96,12 @@ public sealed class GetDbaPfAvailableCounterCommand : DbaBaseCmdlet
 
     // PS: the begin-block scriptblock VERBATIM + the Invoke-Command2 pipe split.
     private const string InvokeScript = """
-param($__computer, $Credential, $pattern, $__hasPattern, $__boundVerbose)
+param($__computer, $Credential, $pattern, $__hasPattern, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $pattern, $__hasPattern, $__boundVerbose)
+    param($__computer, $Credential, $pattern, $__hasPattern, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
         $scriptBlock = {
             $counters = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib\009' -Name 'counter' | Select-Object -ExpandProperty Counter |
             Where-Object { $_ -notmatch '[0-90000]' } | Sort-Object | Get-Unique
@@ -112,6 +121,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         Invoke-Command2 -ComputerName $__computer -Credential $Credential -ScriptBlock $scriptBlock -ArgumentList $credential -ErrorAction Stop |
             Select-DefaultView -ExcludeProperty Credential
     }
-} $__computer $Credential $pattern $__hasPattern $__boundVerbose 3>&1
+} $__computer $Credential $pattern $__hasPattern $__boundVerbose $__boundDebug 3>&1
 """;
 }

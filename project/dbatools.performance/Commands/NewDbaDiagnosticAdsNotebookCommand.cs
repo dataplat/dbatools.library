@@ -56,7 +56,7 @@ public sealed class NewDbaDiagnosticAdsNotebookCommand : DbaBaseCmdlet
         // PS: an unbound [String] parameter reads "" (W1-087), never null.
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
             SqlInstance, SqlCredential, TargetVersion ?? "", Path,
-            IncludeDatabaseSpecific.ToBool(), EnableException.ToBool(), BoundVerbose()))
+            IncludeDatabaseSpecific.ToBool(), EnableException.ToBool(), BoundVerbose(), BoundDebug()))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -71,6 +71,14 @@ public sealed class NewDbaDiagnosticAdsNotebookCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -105,11 +113,12 @@ public sealed class NewDbaDiagnosticAdsNotebookCommand : DbaBaseCmdlet
     // Stop-Functions carry -FunctionName per W1-090; EE rides as a hop param that
     // Stop-Function resolves dynamically).
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $TargetVersion, $Path, $IncludeDatabaseSpecific, $EnableException, $__boundVerbose)
+param($SqlInstance, $SqlCredential, $TargetVersion, $Path, $IncludeDatabaseSpecific, $EnableException, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($SqlInstance, $SqlCredential, $TargetVersion, $Path, $IncludeDatabaseSpecific, $EnableException, $__boundVerbose)
+    param($SqlInstance, $SqlCredential, $TargetVersion, $Path, $IncludeDatabaseSpecific, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     # validate input parameters: you cannot provide $TargetVersion and $SqlInstance
     # together. If you specify a SqlInstance, version will be determined from metadata
     if (-not $TargetVersion -and -not $SqlInstance) {
@@ -197,6 +206,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     [IO.File]::WriteAllLines($Path, (ConvertTo-Json -InputObject $outputObject -Depth 3))
     Get-ChildItem -Path $Path
-} $SqlInstance $SqlCredential $TargetVersion $Path $IncludeDatabaseSpecific $EnableException $__boundVerbose 3>&1 2>&1
+} $SqlInstance $SqlCredential $TargetVersion $Path $IncludeDatabaseSpecific $EnableException $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 }

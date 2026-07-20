@@ -101,7 +101,7 @@ public sealed class GetDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             {
                 try
                 {
-                    foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetCollectorScript, computer, effectiveCredential, CollectorSet, Collector, BoundVerbose()))
+                    foreach (PSObject? fetched in NestedCommand.InvokeScoped(this, GetCollectorScript, computer, effectiveCredential, CollectorSet, Collector, BoundVerbose(), BoundDebug()))
                         _accumulated.Add(fetched);
                 }
                 catch (PipelineStoppedException) { throw; }
@@ -192,6 +192,14 @@ public sealed class GetDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
     }
 
     /// <summary>A bound -Verbose carrier for the hop scopes (W1-044 convention).</summary>
+    private object? BoundDebug()
+    {
+        object? debug;
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
+    }
+
     private object? BoundVerbose()
     {
         object? verbose;
@@ -202,13 +210,14 @@ public sealed class GetDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
 
     // PS: Get-DbaPfDataCollector per computer (nested public, verbose carrier).
     private const string GetCollectorScript = """
-param($__computer, $Credential, $CollectorSet, $Collector, $__boundVerbose)
+param($__computer, $Credential, $CollectorSet, $Collector, $__boundVerbose, $__boundDebug)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($__computer, $Credential, $CollectorSet, $Collector, $__boundVerbose)
+    param($__computer, $Credential, $CollectorSet, $Collector, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     Get-DbaPfDataCollector -ComputerName $__computer -Credential $Credential -CollectorSet $CollectorSet -Collector $Collector
-} $__computer $Credential $CollectorSet $Collector $__boundVerbose 3>&1
+} $__computer $Credential $CollectorSet $Collector $__boundVerbose $__boundDebug 3>&1
 """;
 
     // PS: the per-collector counter walk + emission VERBATIM.
