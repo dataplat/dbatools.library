@@ -191,7 +191,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             try {
                 $serverstores += Get-DbaRegServerStore -SqlInstance $instance -SqlCredential $SqlCredential -EnableException
             } catch {
-                Stop-Function -Message "Cannot access Central Management Server '$instance'" -ErrorRecord $_ -Continue -FunctionName Get-DbaRegServerGroup
+                Stop-Function -Message "Cannot access Central Management Server '$instance'" -ErrorRecord $_ -Continue -FunctionName Get-DbaRegServerGroup -ModuleName "dbatools"
             }
         }
 
@@ -202,7 +202,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         foreach ($serverstore in $serverstores) {
             if ($Group) {
                 foreach ($currentgroup in $Group) {
-                    Write-Message -Level Verbose -Message "Processing $currentgroup" -FunctionName Get-DbaRegServerGroup
+                    Write-Message -Level Verbose -Message "Processing $currentgroup" -FunctionName Get-DbaRegServerGroup -ModuleName "dbatools"
                     if ($currentgroup -is [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup]) {
                         $currentgroup = Get-RegServerGroupReverseParse -object $currentgroup
                     }
@@ -218,7 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         do {
                             if ($groupobject) {
                                 $groupobject = $groupobject.ServerGroups[$split[$i]]
-                                Write-Message -Level Verbose -Message "Parsed $($groupobject.Name)" -FunctionName Get-DbaRegServerGroup
+                                Write-Message -Level Verbose -Message "Parsed $($groupobject.Name)" -FunctionName Get-DbaRegServerGroup -ModuleName "dbatools"
                             }
                         }
                         until ($i++ -eq $split.GetUpperBound(0))
@@ -229,7 +229,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         try {
                             $thisgroup = $serverstore.DatabaseEngineServerGroup.ServerGroups[$currentgroup]
                             if ($thisgroup) {
-                                Write-Message -Level Verbose -Message "Added $($thisgroup.Name)" -FunctionName Get-DbaRegServerGroup
+                                Write-Message -Level Verbose -Message "Added $($thisgroup.Name)" -FunctionName Get-DbaRegServerGroup -ModuleName "dbatools"
                                 $groups += $thisgroup
                             }
                         } catch {
@@ -239,23 +239,23 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "Added all root server groups" -FunctionName Get-DbaRegServerGroup
+                Write-Message -Level Verbose -Message "Added all root server groups" -FunctionName Get-DbaRegServerGroup -ModuleName "dbatools"
                 $groups = $serverstore.DatabaseEngineServerGroup.ServerGroups
             }
 
             if ($Group -eq 'DatabaseEngineServerGroup') {
-                Write-Message -Level Verbose -Message "Added root group" -FunctionName Get-DbaRegServerGroup
+                Write-Message -Level Verbose -Message "Added root group" -FunctionName Get-DbaRegServerGroup -ModuleName "dbatools"
                 $groups = $serverstore.DatabaseEngineServerGroup
             }
 
             if ($ExcludeGroup) {
                 $excluded = Get-DbaRegServerGroup -SqlInstance $serverstore.ParentServer -SqlCredential $SqlCredential -Group $ExcludeGroup
-                Write-Message -Level Verbose -Message "Excluding $ExcludeGroup" -FunctionName Get-DbaRegServerGroup
+                Write-Message -Level Verbose -Message "Excluding $ExcludeGroup" -FunctionName Get-DbaRegServerGroup -ModuleName "dbatools"
                 $groups = $groups | Where-Object { $_.Urn.Value -notin $excluded.Urn.Value }
             }
 
             if ($Id) {
-                Write-Message -Level Verbose -Message "Filtering for id $Id. Id 1 = default." -FunctionName Get-DbaRegServerGroup
+                Write-Message -Level Verbose -Message "Filtering for id $Id. Id 1 = default." -FunctionName Get-DbaRegServerGroup -ModuleName "dbatools"
                 if ($Id -eq 1) {
                     $groups = $serverstore.DatabaseEngineServerGroup
                 } else {

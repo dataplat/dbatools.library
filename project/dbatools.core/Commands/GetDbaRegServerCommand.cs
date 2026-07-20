@@ -64,7 +64,6 @@ namespace Dataplat.Dbatools.Commands;
 /// Select-DefaultView. Surface pinned by migration/baselines/Get-DbaRegServer.json.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaRegServer")]
-[Alias("Get-DbaRegisteredServer")]
 public sealed class GetDbaRegServerCommand : DbaBaseCmdlet
 {
     /// <summary>The CMS instance(s); defaults to the configured default CMS.</summary>
@@ -291,7 +290,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # begin's once-computed column set
     $defaults = $__beginState.Defaults
     # DEF-007 config defaults, matching the source parameter defaults
-    if (-not $SqlInstance) { $SqlInstance = Get-DbatoolsConfigValue -FullName 'commands.get-dbaregserver.defaultcms' }
+    if (-not $PSBoundParameters.ContainsKey('SqlInstance')) { $SqlInstance = Get-DbatoolsConfigValue -FullName 'commands.get-dbaregserver.defaultcms' }
     if (-not $PSBoundParameters.ContainsKey('IncludeLocal')) { $IncludeLocal = [bool](Get-DbatoolsConfigValue -FullName 'commands.get-dbaregserver.includelocal') }
     # $azureids (codex r1): initialized only inside the local-store path (:244), but read at :308 in
     # the unconditional "foreach ($server in $servers)" loop. On a record that does NOT take the
@@ -314,7 +313,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             try {
                 $serverstore = Get-DbaRegServerStore -SqlInstance $instance -SqlCredential $SqlCredential -EnableException
             } catch {
-                Stop-Function -Message "Cannot access Central Management Server '$instance'." -ErrorRecord $_ -Continue -FunctionName Get-DbaRegServer
+                Stop-Function -Message "Cannot access Central Management Server '$instance'." -ErrorRecord $_ -Continue -FunctionName Get-DbaRegServer -ModuleName "dbatools"
                 continue
             }
             $serverstores += $serverstore
@@ -387,27 +386,27 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($Name) {
-            Write-Message -Level Verbose -Message "Filtering by name for $name" -FunctionName Get-DbaRegServer
+            Write-Message -Level Verbose -Message "Filtering by name for $name" -FunctionName Get-DbaRegServer -ModuleName "dbatools"
             $servers = $servers | Where-Object Name -in $Name
         }
 
         if ($ServerName) {
-            Write-Message -Level Verbose -Message "Filtering by servername for $servername" -FunctionName Get-DbaRegServer
+            Write-Message -Level Verbose -Message "Filtering by servername for $servername" -FunctionName Get-DbaRegServer -ModuleName "dbatools"
             $servers = $servers | Where-Object ServerName -in $ServerName
         }
 
         if ($Pattern) {
-            Write-Message -Level Verbose -Message "Filtering by pattern for $Pattern" -FunctionName Get-DbaRegServer
+            Write-Message -Level Verbose -Message "Filtering by pattern for $Pattern" -FunctionName Get-DbaRegServer -ModuleName "dbatools"
             $servers = $servers | Where-Object { & $matchesPattern $_.Name $_.ServerName $Pattern }
         }
 
         if ($ExcludeServerName) {
-            Write-Message -Level Verbose -Message "Excluding servers: $ExcludeServerName" -FunctionName Get-DbaRegServer
+            Write-Message -Level Verbose -Message "Excluding servers: $ExcludeServerName" -FunctionName Get-DbaRegServer -ModuleName "dbatools"
             $servers = $servers | Where-Object ServerName -notin $ExcludeServerName
         }
 
         if ($Id) {
-            Write-Message -Level Verbose -Message "Filtering by id for $Id (1 = default/root)" -FunctionName Get-DbaRegServer
+            Write-Message -Level Verbose -Message "Filtering by id for $Id (1 = default/root)" -FunctionName Get-DbaRegServer -ModuleName "dbatools"
             $servers = $servers | Where-Object Id -in $Id
         }
 
@@ -492,7 +491,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if ($IncludeSelf -and $serverstores) {
             foreach ($currentServerStore in $serverstores) {
-                Write-Message -Level Verbose -Message "Adding CMS instance" -FunctionName Get-DbaRegServer
+                Write-Message -Level Verbose -Message "Adding CMS instance" -FunctionName Get-DbaRegServer -ModuleName "dbatools"
                 $self = [PSCustomObject]@{
                     Name         = "CMS Instance"
                     ServerName   = $currentServerStore.SqlInstance
