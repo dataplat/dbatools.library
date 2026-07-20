@@ -145,20 +145,25 @@ public sealed partial class UpdateDbaServiceAccountCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            Credential, PreviousPassword, NoRestart.ToBool(), EnableException.ToBool(),
-            _state, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // DEF-001 cond1 fix (W3-114 re-open, coord 19:06 RATIFIED): the source's end{} loop emits a
+        // result object per found service (ps:305) THEN can throw mid-loop via Stop-Function -Continue
+        // under -EnableException (ps:284 update-failure catch, ps:307 service-not-found). A buffered
+        // InvokeScoped discards every already-emitted row when EndScript throws, where the streaming
+        // function world keeps them. Stream each item out as it is produced - identical to ProcessRecord.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, EndScript,
+            Credential, PreviousPassword, NoRestart.ToBool(), EnableException.ToBool(),
+            _state, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
