@@ -123,8 +123,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__boundKeys, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    Write-Message -Level InternalComment -Message "Starting"
-    Write-Message -Level Verbose -Message "Bound parameters: $__boundKeys"
+    Write-Message -Level InternalComment -Message "Starting" -FunctionName Get-DbaCmConnection -ModuleName "dbatools"
+    Write-Message -Level Verbose -Message "Bound parameters: $__boundKeys" -FunctionName Get-DbaCmConnection -ModuleName "dbatools"
 } $__boundKeys $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
@@ -141,7 +141,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($name in $ComputerName) {
-        Write-Message -Level VeryVerbose -Message "Processing search. ComputerName: '$name' | Username: '$UserName'"
+        Write-Message -Level VeryVerbose -Message "Processing search. ComputerName: '$name' | Username: '$UserName'" -FunctionName Get-DbaCmConnection -ModuleName "dbatools"
         ([Dataplat.Dbatools.Connection.ConnectionHost]::Connections.Values | Where-Object { ($_.ComputerName -like $name) -and ($_.Credentials.UserName -like $UserName) })
     }
 } $ComputerName $UserName $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
@@ -159,7 +159,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    Write-Message -Level InternalComment -Message "Ending"
+    Write-Message -Level InternalComment -Message "Ending" -FunctionName Get-DbaCmConnection -ModuleName "dbatools"
 } $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

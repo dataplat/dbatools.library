@@ -9,17 +9,22 @@ namespace Dataplat.Dbatools.Commands;
 /// <summary>
 /// Returns the user-maintained tab-completion instance list. Port of
 /// public/Get-DbaInstanceList.ps1 (W3-036). This command has an EMPTY param() - no parameters at all,
-/// not even EnableException - so it deliberately inherits PSCmdlet DIRECTLY rather than DbaBaseCmdlet:
-/// DbaBaseCmdlet contributes an EnableException parameter, which would ADD a parameter the retired
-/// function never had and break the surface. NestedCommand.InvokeScopedStreaming takes a plain
-/// PSCmdlet host, so the compatibility hop still works. The process body is a single
+/// not even EnableException. It inherits DbaBaseCmdlet per the absolute base-class rule and
+/// preserves the zero-parameter surface by OVERRIDING EnableException WITHOUT the [Parameter]
+/// attribute: the binder reads the most-derived declaration's attributes (documented on the
+/// base's virtual property), so the parameter disappears from the surface while the base
+/// machinery (StopFunction/WriteMessage via virtual dispatch) stays intact. The process body is a single
 /// Get-DbatoolsConfigValue call (one terminal emit, no loop, no Stop-Function), so DEF-001 is not in
 /// play; the hop still runs through InvokeScopedStreaming for uniformity. The body is fully verbatim.
 /// Surface pinned by migration/baselines/Get-DbaInstanceList.json.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaInstanceList")]
-public sealed class GetDbaInstanceListCommand : PSCmdlet
+public sealed class GetDbaInstanceListCommand : DbaBaseCmdlet
 {
+    /// <summary>Attribute-less override removes EnableException from this command's surface -
+    /// the retired function has an EMPTY param() (see class summary).</summary>
+    public override SwitchParameter EnableException { get; set; }
+
     protected override void ProcessRecord()
     {
         NestedCommand.InvokeScopedStreaming(this, item =>
