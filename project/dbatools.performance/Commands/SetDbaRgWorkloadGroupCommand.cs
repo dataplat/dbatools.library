@@ -200,7 +200,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $wklGroup.GroupMaximumRequests = $GroupMaximumRequests
         }
 
-        # Execute
+        #Execute
         try {
             if ($__realCmdlet.ShouldProcess($server, "Altering workload group $wklGroup")) {
                 $wklGroup.Alter()
@@ -209,7 +209,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure setting the workload group $wklGroup." -ErrorRecord $_ -Target $wklGroup -Continue -FunctionName Set-DbaRgWorkloadGroup
         }
 
-        # Reconfigure Resource Governor
+        #Reconfigure Resource Governor
         try {
             if ($SkipReconfigure) {
                 Write-Message -Level Warning -Message "Workload group changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Set-DbaRgWorkloadGroup -ModuleName "dbatools"
