@@ -252,7 +252,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-        if ($Pscmdlet.ShouldProcess($destination, "Removing temp file")) {
+        # Also inside the skip gate: the mismatch path's warning points the user at the
+        # exported SQL for manual use - the function world's return preserved it (codex r2).
+        if ((-not $__skipProcessRemainder) -and $Pscmdlet.ShouldProcess($destination, "Removing temp file")) {
             Remove-Item $sqlfilename -ErrorAction SilentlyContinue
         }
 
