@@ -244,9 +244,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $CollectorSet.Query($setname, $Null)
     }
 
+    # ATTRIBUTION SHIM (the W3-084 Get-PSCallStack class): Test-ElevationRequirement stamps its
+    # Stop-Function with (Get-PSCallStack)[1].Command - the CALLER frame. Called bare from this hop
+    # that frame is the scriptblock => [<ScriptBlock>] attribution. The named wrapper restores the
+    # source's own frame; -Continue flow control unwinds through the wrapper to the foreach exactly
+    # as through the source frame.
+    function Remove-DbaPfDataCollectorCounter {
+        param($__splat)
+        Test-ElevationRequirement @__splat
+    }
+
     foreach ($object in $InputObject) {
         $computer = $InputObject.ComputerName
-        $null = Test-ElevationRequirement -ComputerName $computer -Continue
+        $null = Remove-DbaPfDataCollectorCounter @{ ComputerName = $computer; Continue = $true }
         $setname = $InputObject.DataCollectorSet
         $collectorname = $InputObject.DataCollector
 
