@@ -203,12 +203,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $sqlfilename = Export-DbaSpConfigure $sourceserver
         }
 
+        # The source's process-block `return` exits only the process block - end{} still runs
+        # (disconnects + completion message). In this CONCATENATED hop a bare return would skip
+        # the appended end body, so the mismatch case sets a skip flag and falls through (codex).
+        $__skipProcessRemainder = $false
         if ($sourceserver.versionMajor -ne $destserver.versionMajor -and $force -eq $false) {
             Write-Message -Level Warning -Message "Source SQL Server major version and Destination SQL Server major version must match for sp_configure migration. Use -Force to override this precaution or check the exported sql file, $sqlfilename, and run manually." -FunctionName Import-DbaSpConfigure -ModuleName "dbatools"
-            return
+            $__skipProcessRemainder = $true
         }
 
-        If ($Pscmdlet.ShouldProcess($destination, "Execute sp_configure")) {
+        If ((-not $__skipProcessRemainder) -and $Pscmdlet.ShouldProcess($destination, "Execute sp_configure")) {
             $sourceserver.Configuration.ShowAdvancedOptions.ConfigValue = $true
             $sourceserver.Configuration.Alter($true)
             $destserver.Configuration.ShowAdvancedOptions.ConfigValue = $true
