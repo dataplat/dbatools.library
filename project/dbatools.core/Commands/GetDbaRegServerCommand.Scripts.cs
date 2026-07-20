@@ -106,7 +106,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             try {
                 $serverstore = Get-DbaRegServerStore -SqlInstance $instance -SqlCredential $SqlCredential -EnableException
             } catch {
-                Stop-Function -Message "Cannot access Central Management Server '$instance'." -ErrorRecord $_ -Continue -FunctionName Get-DbaRegServer -ModuleName "dbatools"
+                Stop-Function -Message "Cannot access Central Management Server '$instance'." -ErrorRecord $_ -Continue -FunctionName Get-DbaRegServer
                 continue
             }
             $serverstores += $serverstore
