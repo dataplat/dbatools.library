@@ -33,9 +33,10 @@ internal static class NestedConnect
     }
 
     private const string ConnectScript =
-        "param($__connectParams, $__wp, $__vp) " +
+        "param($__connectParams, $__wp, $__vp, $__dp) " +
         "if ($null -ne $__wp) { $WarningPreference = $__wp } " +
         "if ($null -ne $__vp) { $VerbosePreference = $__vp } " +
+        "if ($null -ne $__dp) { $DebugPreference = $__dp } " +
         "try { $__server = Connect-DbaInstance @__connectParams -WarningVariable __nestedWarnings; @{ ok = $true; server = $__server; warnings = $__nestedWarnings } } " +
         "catch { @{ ok = $false; record = $_; warnings = $__nestedWarnings } }";
 
@@ -48,6 +49,12 @@ internal static class NestedConnect
         object? verboseValue;
         if (host.MyInvocation.BoundParameters.TryGetValue("Verbose", out verboseValue))
             boundVerbose = LanguagePrimitives.IsTrue(verboseValue) ? "Continue" : "SilentlyContinue";
+        // Debug rides the same seam (the class the 41-hop carrier fix closed at hop level;
+        // without this the nested Connect-DbaInstance's debug records stay suppressed).
+        object? boundDebug = null;
+        object? debugValue;
+        if (host.MyInvocation.BoundParameters.TryGetValue("Debug", out debugValue))
+            boundDebug = LanguagePrimitives.IsTrue(debugValue) ? "Continue" : "SilentlyContinue";
 
         ScriptBlock script = ScriptBlock.Create(ConnectScript);
 
@@ -60,7 +67,7 @@ internal static class NestedConnect
             host.SessionState.PSVariable.Set("PSDefaultParameterValues", new DefaultParameterDictionary());
         try
         {
-            results = host.InvokeCommand.InvokeScript(true, script, null, connectParams, boundWarningAction, boundVerbose);
+            results = host.InvokeCommand.InvokeScript(true, script, null, connectParams, boundWarningAction, boundVerbose, boundDebug);
         }
         finally
         {
