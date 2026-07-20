@@ -14,10 +14,11 @@ namespace Dataplat.Dbatools.Commands;
 /// command with no begin/end blocks. DEF-001 cond1+cond2: the process foreach EMITS a [PSCustomObject]
 /// per instance (from the Invoke-Command2 remote read) AND has reachable Stop-Function -Continue at
 /// Resolve-DbaNetworkName / Invoke-ManagedComputerCommand / the REGROOT lookup / Invoke-Command2, so
-/// the hop STREAMS via InvokeScopedStreaming. Cross-record-state check: $instanceName is conditionally
-/// set (the DisplayName.Replace try), but its stale value is UNREACHABLE - the stale case (null
-/// DisplayName) coincides with an empty $regRoot, which Stop-Function -Continues before the emit - so
-/// no carrier is needed (unlike W3-006/010's reachable $result). The SqlInstance default
+/// the hop STREAMS via InvokeScopedStreaming. Cross-record-state: $instanceName is conditionally
+/// set (the DisplayName.Replace try) and the stale-value path IS reachable when Replace throws on
+/// a record whose REGROOT resolved (codex r3 refuted the earlier unreachable claim) - so the
+/// function world's prior-record value must survive into later hops: carried via the
+/// __dbatoolsGepNameCarrier sentinel (DEF-011/012, same shape as the Set sibling). The SqlInstance default
 /// ($env:COMPUTERNAME) is applied in ProcessRecord ONLY when the parameter was not explicitly bound.
 /// Intentional rewrites (the body is otherwise verbatim): $PScmdlet.ShouldProcess ->
 /// $__realCmdlet.ShouldProcess (ConfirmImpact LOW mirrored); explicit -FunctionName
