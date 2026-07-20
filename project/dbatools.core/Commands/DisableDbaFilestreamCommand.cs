@@ -153,7 +153,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Get-DbaFilestream -SqlInstance $instance -SqlCredential $SqlCredential -Credential $Credential
 
             if ($filestreamstate -ne $level -and -not $Force) {
-                Write-Message -Level Warning -Message "[$instance] $result"
+                Write-Message -Level Warning -Message "[$instance] $result" -FunctionName Disable-DbaFilestream -ModuleName "dbatools"
             }
         }
     }

@@ -153,7 +153,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # Validations
     # Ensure BackupFileExtension does not begin with a .
     if ($BackupFileExtension -match "^[.]") {
-        Write-Message -Level Warning -Message "Parameter -BackupFileExtension begins with a period '$BackupFileExtension'. A period is automatically prepended to -BackupFileExtension and need not be passed in."
+        Write-Message -Level Warning -Message "Parameter -BackupFileExtension begins with a period '$BackupFileExtension'. A period is automatically prepended to -BackupFileExtension and need not be passed in." -FunctionName Find-DbaBackup -ModuleName "dbatools"
     }
     # Ensure Path is a proper path
     if (!(Test-Path $Path -PathType 'Container')) {
@@ -162,18 +162,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     if (Test-FunctionInterrupt) { return }
     # Process stuff
-    Write-Message -Message "Finding backups on $Path" -Level Verbose
+    Write-Message -Message "Finding backups on $Path" -Level Verbose -FunctionName Find-DbaBackup -ModuleName "dbatools"
     # Convert Retention Value to an actual DateTime
     try {
         $RetentionDate = Convert-UserFriendlyRetentionToDatetime -UserFriendlyRetention $RetentionPeriod
-        Write-Message -Message "Backup Retention Date set to $RetentionDate" -Level Verbose
+        Write-Message -Message "Backup Retention Date set to $RetentionDate" -Level Verbose -FunctionName Find-DbaBackup -ModuleName "dbatools"
     } catch {
         Stop-Function -Message "Failed to interpret retention time." -ErrorRecord $_ -FunctionName Find-DbaBackup
     }
 
     # Filter out unarchived files if -CheckArchiveBit parameter is used
     if ($CheckArchiveBit) {
-        Write-Message -Message "Removing only archived files." -Level Verbose
+        Write-Message -Message "Removing only archived files." -Level Verbose -FunctionName Find-DbaBackup -ModuleName "dbatools"
         filter DbaArchiveBitFilter {
             if ($_.Attributes -notmatch "Archive") {
                 $_
@@ -190,7 +190,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     Get-ChildItem $Path -Filter "*.$BackupFileExtension" -File -Recurse -ErrorAction SilentlyContinue -ErrorVariable EnumErrors |
         Where-Object LastWriteTime -lt $RetentionDate | DbaArchiveBitFilter
     if ($EnumErrors) {
-        Write-Message "Errors encountered enumerating files." -Level Warning -ErrorRecord $EnumErrors
+        Write-Message "Errors encountered enumerating files." -Level Warning -ErrorRecord $EnumErrors -FunctionName Find-DbaBackup -ModuleName "dbatools"
     }
 } $Path $BackupFileExtension $RetentionPeriod $CheckArchiveBit $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;

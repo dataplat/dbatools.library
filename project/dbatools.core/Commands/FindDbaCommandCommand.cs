@@ -115,7 +115,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     function Get-DbaIndex() {
         if ($__realCmdlet.ShouldProcess($dest, "Recreating index")) {
             $dbamodule = Get-Module -Name dbatools
-            $allCommands = $dbamodule.ExportedCommands.Values | Where-Object CommandType -In 'Function', 'Cmdlet' | Where-Object Name -NotIn 'Write-Message' | Sort-Object -Property Name | Select-Object -Unique
+            $allCommands = $dbamodule.ExportedCommands.Values | Where-Object CommandType -In 'Function', 'Cmdlet' | Where-Object Name -NotIn 'Write-Message' | Sort-Object -Property Name | Select-Object -Unique -FunctionName Find-DbaCommand -ModuleName "dbatools"
             #Had to add Unique because Select-DbaObject was getting populated twice once written to the index file
 
             $helpcoll = New-Object System.Collections.Generic.List[System.Object]
@@ -134,10 +134,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $Pattern = $Pattern.TrimEnd("s")
     $idxFile = Resolve-Path "$moduleDirectory\bin\dbatools-index.json"
     if (!(Test-Path $idxFile) -or $Rebuild) {
-        Write-Message -Level Verbose -Message "Rebuilding index into $idxFile"
+        Write-Message -Level Verbose -Message "Rebuilding index into $idxFile" -FunctionName Find-DbaCommand -ModuleName "dbatools"
         $swRebuild = [system.diagnostics.stopwatch]::StartNew()
         Get-DbaIndex
-        Write-Message -Level Verbose -Message "Rebuild done in $($swRebuild.ElapsedMilliseconds)ms"
+        Write-Message -Level Verbose -Message "Rebuild done in $($swRebuild.ElapsedMilliseconds)ms" -FunctionName Find-DbaCommand -ModuleName "dbatools"
     }
     $consolidated = Get-Content -Raw $idxFile | ConvertFrom-Json
     $result = $consolidated

@@ -127,7 +127,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($instance in $SqlInstance) {
-        Write-Message -Level VeryVerbose -Message "Processing $instance." -Target $instance
+        Write-Message -Level VeryVerbose -Message "Processing $instance." -Target $instance -FunctionName Enable-DbaHideInstance -ModuleName "dbatools"
         if ($instance.IsLocalHost) {
             $null = Test-ElevationRequirement -ComputerName $instance -Continue
         }
@@ -171,10 +171,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if ([System.String]::IsNullOrEmpty($vsname)) { $vsname = $instance }
 
-        Write-Message -Level Verbose -Message "Regroot: $regRoot" -Target $instance
-        Write-Message -Level Verbose -Message "ServiceAcct: $serviceAccount" -Target $instance
-        Write-Message -Level Verbose -Message "InstanceName: $instanceName" -Target $instance
-        Write-Message -Level Verbose -Message "VSNAME: $vsname" -Target $instance
+        Write-Message -Level Verbose -Message "Regroot: $regRoot" -Target $instance -FunctionName Enable-DbaHideInstance -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "ServiceAcct: $serviceAccount" -Target $instance -FunctionName Enable-DbaHideInstance -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "InstanceName: $instanceName" -Target $instance -FunctionName Enable-DbaHideInstance -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "VSNAME: $vsname" -Target $instance -FunctionName Enable-DbaHideInstance -ModuleName "dbatools"
 
         $scriptBlock = {
             $regPath = "Registry::HKEY_LOCAL_MACHINE\$($args[0])\MSSQLServer\SuperSocketNetLib"
@@ -192,7 +192,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($__realCmdlet.ShouldProcess("local", "Connecting to $instance to modify the HideInstance value in $regRoot for $($instance.InstanceName)")) {
             try {
                 Invoke-Command2 -ComputerName $resolved.FullComputerName -Credential $Credential -ArgumentList $regRoot, $vsname, $instanceName -ScriptBlock $scriptBlock -ErrorAction Stop | Select-Object -Property * -ExcludeProperty PSComputerName, RunspaceId, PSShowComputerName
-                Write-Message -Level Critical -Message "HideInstance was successfully set on $($resolved.FullComputerName) for the $instanceName instance. The change takes effect immediately for new connections." -Target $instance
+                Write-Message -Level Critical -Message "HideInstance was successfully set on $($resolved.FullComputerName) for the $instanceName instance. The change takes effect immediately for new connections." -Target $instance -FunctionName Enable-DbaHideInstance -ModuleName "dbatools"
             } catch {
                 Stop-Function -Message "Failed to connect to $($resolved.FullComputerName) using PowerShell remoting" -ErrorRecord $_ -Target $instance -Continue -FunctionName Enable-DbaHideInstance
             }
