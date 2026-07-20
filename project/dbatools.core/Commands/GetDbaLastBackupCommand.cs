@@ -19,8 +19,9 @@ namespace Dataplat.Dbatools.Commands;
 /// InvokeScopedStreaming. Cross-record-state check: every per-db variable ($Last*/$Since*/$Status/
 /// $result) is set before it is read within each db iteration - no stale carry. No ShouldProcess.
 /// Positions match the retired function (SqlInstance=0, SqlCredential=1, Database=2, ExcludeDatabase=3;
-/// ExcludeReplica/EnableException=switch/null). Substitution only: explicit -FunctionName
-/// Get-DbaLastBackup on Stop-Function (W1-090); the body is otherwise verbatim. Surface pinned by
+/// ExcludeReplica/EnableException=switch/null). Intentional rewrites: explicit -FunctionName
+/// Get-DbaLastBackup on Stop-Function (W1-090) and -FunctionName/-ModuleName on the three direct
+/// Write-Message calls (DEF-006); the body is otherwise verbatim. Surface pinned by
 /// migration/baselines/Get-DbaLastBackup.json.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaLastBackup")]
@@ -95,8 +96,8 @@ public sealed class GetDbaLastBackupCommand : DbaBaseCmdlet
     }
 
     // PS: the begin block (the nested Get-DbaDateOrNull function + the $StartOfTime constant) inlines
-    // ahead of the process body, which is VERBATIM per record. Substitution only: explicit -FunctionName
-    // Get-DbaLastBackup on Stop-Function (W1-090).
+    // ahead of the process body, which runs per record. Intentional rewrites: -FunctionName on
+    // Stop-Function (W1-090) and DEF-006 attribution on the three direct Write-Message calls.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $ExcludeReplica, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
