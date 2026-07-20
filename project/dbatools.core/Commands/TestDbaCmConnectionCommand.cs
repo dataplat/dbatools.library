@@ -81,12 +81,19 @@ public sealed partial class TestDbaCmConnectionCommand : DbaBaseCmdlet
     // and it is skipped entirely only when the parameter was bound on the COMMAND LINE.
     // That is why _boundOnCommandLine is snapshotted in BeginProcessing: by ProcessRecord,
     // BoundParameters also carries pipeline-bound values and can no longer tell the two apart.
-    // RESIDUAL, deliberate: for records after the first, PS converts the default BEFORE binding
-    // the record's own value; a compiled cmdlet binds before ProcessRecord runs, so the port
-    // converts in the other order. Unobservable here - the ctor's effect is
-    // ConnectionHost.Connections[name] = connection keyed BY NAME, and for two different names
-    // order does not change the resulting cache; for the same name (piping the local box) the
-    // first call registers and the second finds the existing entry in either order.
+    // RESIDUAL, deliberate and NOT fully benign: for records after the first, PS converts the
+    // default BEFORE binding the record's own value; a compiled cmdlet binds before
+    // ProcessRecord runs, so the port converts in the opposite order within such a record.
+    // Scope of the difference, stated precisely rather than waved off (codex r3 corrected an
+    // earlier "unobservable" claim here): the resulting KEY SET and the object each key maps to
+    // are identical either way, because the ctor's effect is
+    // ConnectionHost.Connections[name] = connection keyed BY NAME - for two different names
+    // order cannot change the mapping, and for the same name one call registers while the other
+    // finds the existing entry. What CAN differ is Dictionary INSERTION ORDER, which leaks
+    // through ConnectionHost.Connections.Keys/.Values and hence through Get-DbaCmConnection's
+    // output ordering - reachable only if something removes the local-box key mid-pipeline
+    // between records. Closing it would require converting the default ahead of the binder,
+    // which a compiled cmdlet cannot do. Flagged for the re-gate; not asserted as a non-issue.
     private DbaCmConnectionParameter[]? _defaultComputerName;
     private bool _boundOnCommandLine;
     private bool _seenFirstRecord;
@@ -101,6 +108,11 @@ public sealed partial class TestDbaCmConnectionCommand : DbaBaseCmdlet
         // DEF-007: snapshot command-line boundness and apply the default once for the
         // invocation (this is also the ONLY conversion an empty pipeline gets, matching the
         // source, whose process block never runs but whose default has already been applied).
+        // Reset per invocation, not just assigned: a reused cmdlet instance would otherwise
+        // carry _seenFirstRecord=true into the next invocation and convert the default twice
+        // for its first record (codex r3).
+        _seenFirstRecord = false;
+        _defaultComputerName = null;
         _boundOnCommandLine = MyInvocation.BoundParameters.ContainsKey(nameof(ComputerName));
         if (!_boundOnCommandLine)
         {
