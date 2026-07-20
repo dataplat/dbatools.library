@@ -14,7 +14,7 @@ namespace Dataplat.Dbatools.Commands;
 /// is NO end hop - the begin constants inline into the process script. DEF-012: the emit block
 /// (Add-Member + Select-DefaultView) sits OUTSIDE the inner foreach, so $sp/$db/$server/$status/
 /// $note DO persist across records in the function world and are carried (trailer packet
-/// __dbatoolsDspCarrier -> the _carried* fields). DEF-001 cond1+cond2: the process body EMITS (Select-DefaultView) per record AND has
+/// __dbatoolsDspCarrier, keyed on a per-invocation token, -> _carrierState). DEF-001 cond1+cond2: the process body EMITS (Select-DefaultView) per record AND has
 /// reachable Stop-Function -Continue at Connect-DbaInstance / the procedure-parse checks, so the
 /// hop STREAMS via InvokeScopedStreaming - a buffered hop would lose an earlier record's emit
 /// when a later record throws under -EnableException. The source's Test-Bound guards
