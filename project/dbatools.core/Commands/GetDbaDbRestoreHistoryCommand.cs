@@ -55,7 +55,6 @@ public sealed class GetDbaDbRestoreHistoryCommand : DbaBaseCmdlet
     public SwitchParameter Last { get; set; }
 
     /// <summary>Filters to a specific restore type.</summary>
-    [Parameter]
     [Parameter(Position = 5)]
     [PsStringCast]
     [ValidateSet("Database", "File", "Filegroup", "Differential", "Log", "Verifyonly", "Revert")]
