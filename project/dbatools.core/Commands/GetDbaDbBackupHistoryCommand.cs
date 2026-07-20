@@ -70,12 +70,13 @@ public sealed partial class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
     public PSObject? Since { get; set; }
 
     /// <summary>Restrict to a specific recovery fork GUID (or empty).</summary>
-    // codex r3 (supersedes r1 #2's [AllowNull]): [AllowNull] does not bypass [ValidatePattern] for
-    // $null - [PsStringCast] coerces the bound $null to "" at bind time exactly as the source's
-    // [string] cast does, and the pattern's ^$ alternative then accepts it.
+    // r5 parity correction (supersedes the r3/r4 pattern debate): the SOURCE declares a plain
+    // [string]$RecoveryFork with NO validation - the GUID pattern was an invented constraint, and
+    // any added bind-time rejection is a surface divergence (legacy accepts arbitrary strings and
+    // simply matches nothing downstream). [PsStringCast] stays for the bound-$null -> "" cast the
+    // source's [string] performs.
     [Parameter]
     [PsStringCast]
-    [ValidatePattern(@"^(\{)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(\})?$|^$")]
     public string? RecoveryFork { get; set; }
 
     /// <summary>Return the last full recovery chain (full + diff + logs) per database.</summary>
