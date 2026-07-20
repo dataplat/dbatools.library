@@ -133,25 +133,29 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
             boundParameters.ContainsKey("Schema"),
             this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            EffectivePreference("VerbosePreference"), EffectivePreference("DebugPreference"),
+            EffectivePreference("ErrorActionPreference"), EffectivePreference("WarningPreference"));
     }
 
     private object? BoundCommonParameter(string name)
     {
-        // MyInvocation.BoundParameters is empty for this cmdlet (W2-151), so the explicit-bound test never
-        // fires and -Verbose/-Debug were silently not forwarded into the hop. Read the effective preference
-        // the caller established instead: it is exactly what the source function's inner Write-* calls
-        // honour, so forwarding it reproduces parity (-Verbose sets VerbosePreference=Continue for the
-        // scope; -Verbose:$false sets SilentlyContinue). WhatIf/Confirm are deliberately left null - the
-        // only ShouldProcess gate (ProcessScript) routes through $__realCmdlet, which reads the outer
-        // cmdlet's real preference, so their inner-splat forwarding is unnecessary.
-        if (name == "Verbose")
-            return GetVariableValue("VerbosePreference", ActionPreference.SilentlyContinue) is ActionPreference vp && vp != ActionPreference.SilentlyContinue;
-        if (name == "Debug")
-            return GetVariableValue("DebugPreference", ActionPreference.SilentlyContinue) is ActionPreference dp && dp != ActionPreference.SilentlyContinue;
+        // WhatIf/Confirm only: MyInvocation.BoundParameters is empty for this cmdlet (W2-151), so this
+        // returns null and the hop's single ShouldProcess gate routes through $__realCmdlet, which reads
+        // the outer cmdlet's real WhatIf/Confirm preference. Verbose/Debug/ErrorAction/WarningAction are
+        // carried EXACTLY via EffectivePreference (below), not collapsed to a bool.
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
         return null;
+    }
+
+    // Carries the caller's EXACT effective preference (as a string the hop assigns to its preference
+    // variable), reproducing what the source function's inner commands inherit. Empty
+    // MyInvocation.BoundParameters could not tell that -ErrorAction/-WarningAction were passed and
+    // collapsed -Verbose/-Debug to a bool, losing Stop/Inquire/Ignore; the effective preference keeps
+    // every value (-Verbose sets VerbosePreference=Continue, -ErrorAction Stop sets Stop, etc.).
+    private object? EffectivePreference(string preferenceVariable)
+    {
+        return GetVariableValue(preferenceVariable, null) is ActionPreference p ? (object)p.ToString() : null;
     }
 
     // Reconstructs the caller's supplied-parameter set without MyInvocation.BoundParameters, which is empty

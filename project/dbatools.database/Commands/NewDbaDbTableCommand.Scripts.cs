@@ -14,17 +14,18 @@ public sealed partial class NewDbaDbTableCommand
     // assigns each key onto the SMO Table; the hop's own $PSBoundParameters would carry the plumbing
     // and 49 null placeholders, nulling real properties and then failing on $object.__realCmdlet.
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $Name, $Schema, $ColumnMap, $ColumnObject, $Passthru, $InputObject, $EnableException, $__boundParameters, $__state, $__boundSqlInstance, $__boundDatabase, $__boundName, $__boundSchema, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $Name, $Schema, $ColumnMap, $ColumnObject, $Passthru, $InputObject, $EnableException, $__boundParameters, $__state, $__boundSqlInstance, $__boundDatabase, $__boundName, $__boundSchema, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__verbosePref, $__debugPref, $__errorActionPref, $__warningPref)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
-if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
-if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [String[]]$Database, [String]$Name, [String]$Schema, [hashtable[]]$ColumnMap, [Microsoft.SqlServer.Management.Smo.Column[]]$ColumnObject, $Passthru, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__boundParameters, $__state, $__boundSqlInstance, $__boundDatabase, $__boundName, $__boundSchema, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
-    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [String[]]$Database, [String]$Name, [String]$Schema, [hashtable[]]$ColumnMap, [Microsoft.SqlServer.Management.Smo.Column[]]$ColumnObject, $Passthru, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__boundParameters, $__state, $__boundSqlInstance, $__boundDatabase, $__boundName, $__boundSchema, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__verbosePref, $__debugPref, $__errorActionPref, $__warningPref)
+    if ($null -ne $__verbosePref) { $VerbosePreference = $__verbosePref }
+    if ($null -ne $__debugPref) { $DebugPreference = $__debugPref }
+    if ($null -ne $__errorActionPref) { $ErrorActionPreference = $__errorActionPref }
+    if ($null -ne $__warningPref) { $WarningPreference = $__warningPref }
 
     # the body projects the CALLER's bound parameters onto the SMO Table (source :512); the hop's own
     # automatic $PSBoundParameters would carry plumbing and null placeholders instead
@@ -232,6 +233,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         SchemaAssigned       = [bool]$__sc
         Schema               = $(if ($__sc) { $__sc.Value } else { $null })
     } }
-} $SqlInstance $SqlCredential $Database $Name $Schema $ColumnMap $ColumnObject $Passthru $InputObject $EnableException $__boundParameters $__state $__boundSqlInstance $__boundDatabase $__boundName $__boundSchema $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $Name $Schema $ColumnMap $ColumnObject $Passthru $InputObject $EnableException $__boundParameters $__state $__boundSqlInstance $__boundDatabase $__boundName $__boundSchema $__realCmdlet $__boundWhatIf $__boundConfirm $__verbosePref $__debugPref $__errorActionPref $__warningPref @__commonParameters 3>&1 2>&1
 """;
 }
