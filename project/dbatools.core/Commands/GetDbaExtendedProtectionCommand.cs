@@ -68,6 +68,7 @@ public sealed class GetDbaExtendedProtectionCommand : DbaBaseCmdlet
             {
                 // DEF-011/012: $instanceName cross-record persistence (see ProcessScript note).
                 _carriedInstanceName = item.Properties["InstanceName"]?.Value;
+                _carriedInstanceNameAssigned = item.Properties["InstanceNameAssigned"]?.Value;
                 return;
             }
             WriteObject(item);
@@ -75,10 +76,11 @@ public sealed class GetDbaExtendedProtectionCommand : DbaBaseCmdlet
             instances, Credential, EnableException.ToBool(), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            _carriedInstanceName);
+            _carriedInstanceName, _carriedInstanceNameAssigned);
     }
 
     private object? _carriedInstanceName;
+    private object? _carriedInstanceNameAssigned;
 
     private object? BoundCommonParameter(string name)
     {
@@ -112,7 +114,7 @@ public sealed class GetDbaExtendedProtectionCommand : DbaBaseCmdlet
     // Write-Message calls; the W3-084 elevation-shim wrapper. SqlInstance arrives already
     // defaulted to the computer name by ProcessRecord.
     private const string ProcessScript = """
-param($SqlInstance, $Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedInstanceName)
+param($SqlInstance, $Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedInstanceName, $__carriedInstanceNameAssigned)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -121,11 +123,11 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedInstanceName)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$Credential, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedInstanceName, $__carriedInstanceNameAssigned)
     # DEF-011/012 (codex r3, same shape as the Set sibling and Enable-DbaHideInstance): the
     # source's $instanceName persists across pipeline records through a later record's
     # DisplayName.Replace throw; seed from the carrier, emit the final value below.
-    if ($null -ne $__carriedInstanceName) { $instanceName = $__carriedInstanceName }
+    if ($null -ne $__carriedInstanceNameAssigned -and [bool]$__carriedInstanceNameAssigned) { $instanceName = $__carriedInstanceName }
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     # ATTRIBUTION SHIM (the W3-084 Get-PSCallStack class): Test-ElevationRequirement stamps
     # its Stop-Function with (Get-PSCallStack)[1].Command - the CALLER frame. Called bare
@@ -208,7 +210,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-    [pscustomobject]@{ __dbatoolsGepNameCarrier = $true; InstanceName = $instanceName }
-} $SqlInstance $Credential $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedInstanceName @__commonParameters 3>&1 2>&1
+    [pscustomobject]@{ __dbatoolsGepNameCarrier = $true; InstanceName = $instanceName; InstanceNameAssigned = (Test-Path variable:instanceName) }
+} $SqlInstance $Credential $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedInstanceName $__carriedInstanceNameAssigned @__commonParameters 3>&1 2>&1
 """;
 }
