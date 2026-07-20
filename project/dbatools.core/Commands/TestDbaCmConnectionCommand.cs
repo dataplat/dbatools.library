@@ -37,11 +37,14 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class TestDbaCmConnectionCommand : DbaBaseCmdlet
 {
     /// <summary>The computer(s) to test against; defaults to this computer.</summary>
+    // DEF-007: NO property initializer here. A C# initializer runs at CONSTRUCTION, on every
+    // invocation, before binding - and DbaCmConnectionParameter's ctor REGISTERS into the live
+    // ConnectionHost cache (Parameter/DbaCmConnectionParameter.cs:69-70), so the default's
+    // converter mutated shared state even when -ComputerName was explicitly bound, where the PS
+    // bind-time default evaluates ZERO times. Applied in ProcessRecord instead - see the gate
+    // there for why BeginProcessing is the wrong place for it.
     [Parameter(ValueFromPipeline = true, Position = 0)]
-    public DbaCmConnectionParameter[] ComputerName { get; set; } =
-        (DbaCmConnectionParameter[])LanguagePrimitives.ConvertTo(
-            Environment.GetEnvironmentVariable("COMPUTERNAME"),
-            typeof(DbaCmConnectionParameter[]), System.Globalization.CultureInfo.InvariantCulture);
+    public DbaCmConnectionParameter[]? ComputerName { get; set; }
 
     /// <summary>Credential for the remote tests.</summary>
     [Parameter(Position = 1)]
@@ -92,8 +95,24 @@ public sealed partial class TestDbaCmConnectionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
+        // DEF-007: apply the $env:COMPUTERNAME default HERE, gated on boundness, so the
+        // side-effecting converter fires only on the path where PS would evaluate the default.
+        // NOT in BeginProcessing (as DEF-007's fix note proposed): ComputerName is
+        // ValueFromPipeline, and at begin time a piped value is not yet bound - a begin-time
+        // gate would register localhost on exactly the piped path it must leave alone.
+        // BoundParameters DOES carry a pipeline-bound parameter by the time ProcessRecord runs.
+        // Kept in a LOCAL, never written back to the property, so nothing leaks across records.
+        DbaCmConnectionParameter[]? computers = ComputerName;
+        if (!MyInvocation.BoundParameters.ContainsKey(nameof(ComputerName)) &&
+            (computers is null || computers.Length == 0))
+        {
+            computers = (DbaCmConnectionParameter[])LanguagePrimitives.ConvertTo(
+                Environment.GetEnvironmentVariable("COMPUTERNAME"),
+                typeof(DbaCmConnectionParameter[]), System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            ComputerName, Credential, Type, Force.ToBool(), EnableException.ToBool(),
+            computers, Credential, Type, Force.ToBool(), EnableException.ToBool(),
             _state,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
