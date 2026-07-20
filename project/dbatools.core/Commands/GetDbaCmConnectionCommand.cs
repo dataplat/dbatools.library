@@ -71,6 +71,9 @@ public sealed class GetDbaCmConnectionCommand : DbaBaseCmdlet
 
     protected override void EndProcessing()
     {
+        if (Interrupted)
+            return;
+
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
