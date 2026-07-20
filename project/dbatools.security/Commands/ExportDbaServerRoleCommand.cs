@@ -365,6 +365,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         }
     }
+        # Named-wrapper shim (W2-208): the END/emit phase runs inside a function carrying the command's
+        # name so Get-ExportFilePath's (Get-PSCallStack)[1].Command default-filename resolves to
+        # Export-DbaServerRole, not <ScriptBlock> (which produced invalid -<scriptblock>.sql names).
+        function Export-DbaServerRole {
         if (Test-FunctionInterrupt) { return }
 
         $eol = [System.Environment]::NewLine
@@ -411,6 +415,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $sql
             }
         }
+        }
+        . Export-DbaServerRole
 } $SqlInstance $SqlCredential $__batches $ScriptingOptionsObject $ServerRole $ExcludeServerRole $Path $FilePath $BatchSeparator $Encoding $ExcludeFixedRole $IncludeRoleMember $Passthru $NoClobber $Append $NoPrefix $EnableException $__pathBound $__batchSepBound $__scriptingBound $__boundPathValue $__boundFilePathValue $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;

@@ -150,6 +150,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     if (-not $__pathBound) { $Path = Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport' }
 
+        # Named-wrapper shim (W2-208): the process body runs inside a function carrying the command's
+        # name so Get-ExportFilePath's (Get-PSCallStack)[1].Command default-filename (unbound-FilePath leg)
+        # resolves to Export-DbaSysDbUserObject, not <ScriptBlock>. Dot-sourced, so scope is unchanged.
+        function Export-DbaSysDbUserObject {
         foreach ($instance in $SqlInstance) {
             try {
                 Write-Message -Level Verbose -Message "Attempting to connect to $instance" -FunctionName Export-DbaSysDbUserObject -ModuleName "dbatools"
@@ -226,6 +230,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message ("Exporting system objects failed on '{0}'" -f $server.Name) -FunctionName Export-DbaSysDbUserObject
             }
         }
+        }
+        . Export-DbaSysDbUserObject
 } $SqlInstance $SqlCredential $IncludeDependencies $BatchSeparator $Path $FilePath $NoPrefix $ScriptingOptionsObject $NoClobber $PassThru $EnableException $__pathBound $__scriptingBound $__boundPathValue $__boundFilePathValue $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 
 """;
