@@ -33,45 +33,54 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
 
     /// <summary>The workload-group names to create.</summary>
     [Parameter(Position = 2)]
+    [PsStringArrayCast]
     public string[]? WorkloadGroup { get; set; }
 
     /// <summary>The resource pool that will contain the workload groups.</summary>
     [Parameter(Position = 3)]
+    [PsStringCast]
     public string ResourcePool { get; set; } = "default";
 
     /// <summary>Internal or External resource pool.</summary>
     [Parameter(Position = 4)]
+    [PsStringCast]
     [ValidateSet("Internal", "External")]
     public string ResourcePoolType { get; set; } = "Internal";
 
     /// <summary>Relative scheduling importance.</summary>
     [Parameter(Position = 5)]
+    [PsStringCast]
     [ValidateSet("LOW", "MEDIUM", "HIGH")]
     public string Importance { get; set; } = "MEDIUM";
 
     /// <summary>Maximum memory grant percentage per request.</summary>
     [Parameter(Position = 6)]
     [ValidateRange(1, 100)]
+    [PsIntCast]
     public int RequestMaximumMemoryGrantPercentage { get; set; } = 25;
 
     /// <summary>Maximum CPU time per request in seconds.</summary>
     [Parameter(Position = 7)]
     [ValidateRange(0, int.MaxValue)]
+    [PsIntCast]
     public int RequestMaximumCpuTimeInSeconds { get; set; }
 
     /// <summary>Memory-grant wait timeout in seconds.</summary>
     [Parameter(Position = 8)]
     [ValidateRange(0, int.MaxValue)]
+    [PsIntCast]
     public int RequestMemoryGrantTimeoutInSeconds { get; set; }
 
     /// <summary>Maximum degree of parallelism.</summary>
     [Parameter(Position = 9)]
     [ValidateRange(0, 64)]
+    [PsIntCast]
     public int MaximumDegreeOfParallelism { get; set; }
 
     /// <summary>Maximum concurrent requests for the group.</summary>
     [Parameter(Position = 10)]
     [ValidateRange(0, int.MaxValue)]
+    [PsIntCast]
     public int GroupMaximumRequests { get; set; }
 
     /// <summary>Skip the Resource Governor reconfigure after creation.</summary>
@@ -125,8 +134,17 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
                 RequestMaximumCpuTimeInSeconds, RequestMemoryGrantTimeoutInSeconds,
                 MaximumDegreeOfParallelism, GroupMaximumRequests,
                 SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
-                this, BoundVerbose(), pipelineItem);
+                this, BoundVerbose(), BoundDebug(), pipelineItem);
         }
+    }
+
+    /// <summary>A bound -Debug carrier, mirroring BoundVerbose (source debug records
+    /// otherwise vanish - the hop scope never sees the caller's -Debug).</summary>
+    private object? BoundDebug()
+    {
+        if (MyInvocation.BoundParameters.TryGetValue("Debug", out object? debug))
+            return LanguagePrimitives.IsTrue(debug);
+        return null;
     }
 
     /// <summary>A bound -Verbose carrier for module-scoped nested commands.</summary>
@@ -160,11 +178,12 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
     }
 
     private const string BodyScript = """
-param($server, $instance, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $Importance, $RequestMaximumMemoryGrantPercentage, $RequestMaximumCpuTimeInSeconds, $RequestMemoryGrantTimeoutInSeconds, $MaximumDegreeOfParallelism, $GroupMaximumRequests, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__pipelineItem)
+param($server, $instance, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $Importance, $RequestMaximumMemoryGrantPercentage, $RequestMaximumCpuTimeInSeconds, $RequestMemoryGrantTimeoutInSeconds, $MaximumDegreeOfParallelism, $GroupMaximumRequests, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug, $__pipelineItem)
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    param($server, $instance, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $Importance, $RequestMaximumMemoryGrantPercentage, $RequestMaximumCpuTimeInSeconds, $RequestMemoryGrantTimeoutInSeconds, $MaximumDegreeOfParallelism, $GroupMaximumRequests, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__pipelineItem)
+    param($server, $instance, $WorkloadGroup, $ResourcePool, $ResourcePoolType, $Importance, $RequestMaximumMemoryGrantPercentage, $RequestMaximumCpuTimeInSeconds, $RequestMemoryGrantTimeoutInSeconds, $MaximumDegreeOfParallelism, $GroupMaximumRequests, $SkipReconfigure, $Force, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug, $__pipelineItem)
     if ($null -ne $__boundVerbose) { $VerbosePreference = $(if ($__boundVerbose) { "Continue" } else { "SilentlyContinue" }) }
+    if ($null -ne $__boundDebug) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     # Process-block $_ carrier: the already-exists Stop-Function reads $_ into -ErrorRecord.
     $_ = $__pipelineItem
 
@@ -215,6 +234,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         Get-DbaRgResourcePool -SqlInstance $server -Type $ResourcePoolType | Where-Object Name -eq $resPool.Name | Get-DbaRgWorkloadGroup | Where-Object Name -eq $wklGroup
     }
-} $server $instance $WorkloadGroup $ResourcePool $ResourcePoolType $Importance $RequestMaximumMemoryGrantPercentage $RequestMaximumCpuTimeInSeconds $RequestMemoryGrantTimeoutInSeconds $MaximumDegreeOfParallelism $GroupMaximumRequests $SkipReconfigure $Force $EnableException $__realCmdlet $__boundVerbose $__pipelineItem 3>&1 2>&1
+} $server $instance $WorkloadGroup $ResourcePool $ResourcePoolType $Importance $RequestMaximumMemoryGrantPercentage $RequestMaximumCpuTimeInSeconds $RequestMemoryGrantTimeoutInSeconds $MaximumDegreeOfParallelism $GroupMaximumRequests $SkipReconfigure $Force $EnableException $__realCmdlet $__boundVerbose $__boundDebug $__pipelineItem 3>&1 2>&1
 """;
 }
