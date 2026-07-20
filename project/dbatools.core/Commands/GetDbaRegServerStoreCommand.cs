@@ -17,9 +17,12 @@ namespace Dataplat.Dbatools.Commands;
 /// LOCAL file store via NonPublic reflection (InitChildObjects) - that reflection is ordinary
 /// PowerShell running in module scope, so it is carried verbatim with no special C# handling; it
 /// emits nothing. The source's $PSBoundParameters.SqlInstance check is carried as its VALUE-TRUTHINESS proxy - $PSBoundParameters.SqlInstance returns the VALUE (falsy for -SqlInstance @()), NOT mere boundness (the
-/// scriptblock cannot see the real cmdlet's $PSBoundParameters). Cross-record-state check: $server /
-/// $store are per-iteration; the file-store block runs only when SqlInstance is unbound (hence no
-/// pipeline, one process record) - no stale carry. No ShouldProcess. Positions match the retired
+/// scriptblock cannot see the real cmdlet's $PSBoundParameters). Cross-record-state: $server and
+/// $store are FUNCTION-scoped (not per-iteration locals), and the local-store branch also runs for
+/// a bound-but-falsy SqlInstance (@()) under the value-truthiness proxy - the no-carry conclusion
+/// holds for the TRUE reason that every successful path ASSIGNS both variables before any read in
+/// the same iteration, while every failure path Stop-Function -Continues past the reads, so a
+/// prior record's value is never observable (assigned-vs-unset semantics never diverge; codex). No ShouldProcess. Positions match the retired
 /// function (SqlInstance=0, SqlCredential=1; EnableException=switch/null). Substitutions only:
 /// $PSBoundParameters.SqlInstance -> the carried $__pboundSqlInstance flag, explicit -FunctionName
 /// Get-DbaRegServerStore on Stop-Function (W1-090); the body is otherwise verbatim. Surface pinned by
