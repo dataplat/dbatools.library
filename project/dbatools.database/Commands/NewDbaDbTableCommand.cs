@@ -130,7 +130,7 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
             boundParameters.ContainsKey("SqlInstance"),
             boundParameters.ContainsKey("Database"),
             boundParameters.ContainsKey("Name"),
-            boundParameters.ContainsKey("Schema"),
+            SchemaBound,
             this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
@@ -138,6 +138,17 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
 
     private object? BoundCommonParameter(string name)
     {
+        // MyInvocation.BoundParameters is empty for this cmdlet (W2-151), so the explicit-bound test never
+        // fires and -Verbose/-Debug were silently not forwarded into the hop. Read the effective preference
+        // the caller established instead: it is exactly what the source function's inner Write-* calls
+        // honour, so forwarding it reproduces parity (-Verbose sets VerbosePreference=Continue for the
+        // scope; -Verbose:$false sets SilentlyContinue). WhatIf/Confirm are deliberately left null - the
+        // only ShouldProcess gate (ProcessScript) routes through $__realCmdlet, which reads the outer
+        // cmdlet's real preference, so their inner-splat forwarding is unnecessary.
+        if (name == "Verbose")
+            return GetVariableValue("VerbosePreference", ActionPreference.SilentlyContinue) is ActionPreference vp && vp != ActionPreference.SilentlyContinue;
+        if (name == "Debug")
+            return GetVariableValue("DebugPreference", ActionPreference.SilentlyContinue) is ActionPreference dp && dp != ActionPreference.SilentlyContinue;
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
         return null;
