@@ -54,10 +54,7 @@ public sealed class StopDbaPfDataCollectorSetCommand : DbaBaseCmdlet
     protected override void ProcessRecord()
     {
         if (Interrupted) { return; }
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            ComputerName, Credential, CollectorSet, InputObject,
-            TestBound("ComputerName"), !NoWait.ToBool(), EnableException.ToBool(),
-            this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -68,7 +65,10 @@ public sealed class StopDbaPfDataCollectorSetCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            ComputerName, Credential, CollectorSet, InputObject,
+            TestBound("ComputerName"), !NoWait.ToBool(), EnableException.ToBool(),
+            this, BoundVerbose());
     }
 
     private object? BoundVerbose()
@@ -131,7 +131,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $computer = $set.ComputerName
         $status = $set.State
 
-        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Stop-DbaPfDataCollectorSet
+        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Stop-DbaPfDataCollectorSet -ModuleName "dbatools"
         if ($status -ne "Running") {
             Stop-Function -Message "$setname on $computer is already stopped." -Continue -FunctionName Stop-DbaPfDataCollectorSet
         }

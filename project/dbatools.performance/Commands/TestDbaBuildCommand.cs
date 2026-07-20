@@ -69,11 +69,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
 
     protected override void BeginProcessing()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            MaxBehind, MaxTimeBehind,
-            TestBound("MinimumBuild"), TestBound("MaxBehind"),
-            TestBound("MaxTimeBehind"), TestBound("Latest"),
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -90,7 +86,11 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BeginScript,
+            MaxBehind, MaxTimeBehind,
+            TestBound("MinimumBuild"), TestBound("MaxBehind"),
+            TestBound("MaxTimeBehind"), TestBound("Latest"),
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -293,10 +293,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $targetCUName = $null
         $buildRefEntry = $IdxRef | Where-Object VersionObject -eq $inputbuild
         if ($BuildVersion.MatchType -eq 'Approximate') {
-            Write-Message -Level Warning -Message "$($BuildVersion.Build) is not recognized as a correct version" -FunctionName Test-DbaBuild
+            Write-Message -Level Warning -Message "$($BuildVersion.Build) is not recognized as a correct version" -FunctionName Test-DbaBuild -ModuleName "dbatools"
         }
         if ($MinimumBuild) {
-            Write-Message -Level Debug -Message "Comparing $MinimumBuild to $inputbuild" -FunctionName Test-DbaBuild
+            Write-Message -Level Debug -Message "Comparing $MinimumBuild to $inputbuild" -FunctionName Test-DbaBuild -ModuleName "dbatools"
             if ($inputbuild -ge $MinimumBuild) {
                 $compliant = $true
             }
@@ -304,7 +304,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $buildAnchor = "$($inputbuild.Major).$($inputbuild.Minor).*"
             if ($inputbuild.Minor -notin (0, 50)) {
                 $buildAnchor = "$($inputbuild.Major).$($inputbuild.Minor - $inputbuild.Minor % 10).*"
-                Write-Message -Level Debug -Message "Normalized Minor Version to account version aliases" -FunctionName Test-DbaBuild
+                Write-Message -Level Debug -Message "Normalized Minor Version to account version aliases" -FunctionName Test-DbaBuild -ModuleName "dbatools"
             }
             $IdxVersion = $IdxRef | Where-Object Version -Like $buildAnchor
             $lastsp = ''
@@ -337,7 +337,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $targetSP = 0
                     }
                     $targetSPName = $AllSPs[$targetSP]
-                    Write-Message -Level Debug -Message "Target SP is $targetSPName - $targetSP on $($AllSPs.Length)" -FunctionName Test-DbaBuild
+                    Write-Message -Level Debug -Message "Target SP is $targetSPName - $targetSP on $($AllSPs.Length)" -FunctionName Test-DbaBuild -ModuleName "dbatools"
                     $targetedBuild = $SPsAndCUs | Where-Object SP -eq $targetSPName | Select-Object -First 1
                 }
                 if ($ParsedMaxBehind.ContainsKey('CU')) {
@@ -349,7 +349,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $targetCU = 0
                         }
                         $targetCUName = $AllCUs[$targetCU]
-                        Write-Message -Level Debug -Message "Target CU is $targetCUName - $targetCU on $($AllCUs.Length)" -FunctionName Test-DbaBuild
+                        Write-Message -Level Debug -Message "Target CU is $targetCUName - $targetCU on $($AllCUs.Length)" -FunctionName Test-DbaBuild -ModuleName "dbatools"
                         $targetedBuild = $SPsAndCUs | Where-Object VersionObject -gt $targetedBuild.VersionObject | Where-Object CU -eq $targetCUName | Select-Object -First 1
                     }
                 }
@@ -361,7 +361,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $buildAnchor = "$($inputbuild.Major).$($inputbuild.Minor).*"
             if ($inputbuild.Minor -notin (0, 50)) {
                 $buildAnchor = "$($inputbuild.Major).$($inputbuild.Minor - $inputbuild.Minor % 10).*"
-                Write-Message -Level Debug -Message "Normalized Minor Version to account version aliases" -FunctionName Test-DbaBuild
+                Write-Message -Level Debug -Message "Normalized Minor Version to account version aliases" -FunctionName Test-DbaBuild -ModuleName "dbatools"
             }
             $IdxVersion = $IdxRef | Where-Object Version -Like $buildAnchor
             $today = (Get-Date).Date
@@ -373,7 +373,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $targetedBuild = $IdxVersion | Where-Object { $_.ReleaseDate -and [datetime]$_.ReleaseDate -ge $cutoffDate } | Select-Object -First 1
             $currentBuildEntry = $IdxVersion | Where-Object VersionObject -eq $inputbuild
             if (-not $currentBuildEntry -or -not $currentBuildEntry.ReleaseDate) {
-                Write-Message -Level Warning -Message "No ReleaseDate found for build $inputbuild - cannot determine time-based compliance" -FunctionName Test-DbaBuild
+                Write-Message -Level Warning -Message "No ReleaseDate found for build $inputbuild - cannot determine time-based compliance" -FunctionName Test-DbaBuild -ModuleName "dbatools"
                 $compliant = $false
             } else {
                 $compliant = ([datetime]$currentBuildEntry.ReleaseDate -ge $cutoffDate)

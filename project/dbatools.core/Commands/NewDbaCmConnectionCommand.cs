@@ -126,8 +126,17 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { computer }, Credential, UseWindowsCredentials.ToBool(),
+            NestedCommand.InvokeScopedStreaming(this, item =>
+            {
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    RemoveHopErrorBookkeeping(nestedError);
+                    WriteError(nestedError);
+                    return;
+                }
+                WriteObject(item);
+            }, ProcessScript,
+            new[] { computer }, Credential, UseWindowsCredentials.ToBool(),
                 OverrideExplicitCredential.ToBool(), DisabledConnectionTypes,
                 DisableBadCredentialCache.ToBool(), DisableCimPersistence.ToBool(),
                 DisableCredentialAutoRegister.ToBool(), EnableCredentialFailover.ToBool(),
@@ -140,16 +149,7 @@ public sealed class NewDbaCmConnectionCommand : DbaBaseCmdlet
                 TestBound(nameof(WindowsCredentialsAreBad)), TestBound(nameof(CimWinRMOptions)),
                 TestBound(nameof(CimDCOMOptions)), this,
                 BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-            {
-                if (item?.BaseObject is ErrorRecord nestedError)
-                {
-                    RemoveHopErrorBookkeeping(nestedError);
-                    WriteError(nestedError);
-                    continue;
-                }
-                WriteObject(item);
-            }
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -213,8 +213,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__boundKeys, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    Write-Message -Level InternalComment -Message "Starting execution" -FunctionName New-DbaCmConnection
-    Write-Message -Level Verbose -Message "Bound parameters: $__boundKeys" -FunctionName New-DbaCmConnection
+    Write-Message -Level InternalComment -Message "Starting execution" -FunctionName New-DbaCmConnection -ModuleName "dbatools"
+    Write-Message -Level Verbose -Message "Bound parameters: $__boundKeys" -FunctionName New-DbaCmConnection -ModuleName "dbatools"
 
     $disable_cache = Get-DbatoolsConfigValue -Name 'ComputerManagement.Cache.Disable.All' -Fallback $false
     @{ __w3063DisableCache = $disable_cache }
@@ -244,7 +244,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     foreach ($connectionObject in $ComputerName) {
         if ($__realCmdlet.ShouldProcess($($connectionObject.connection.computername), "Creating connection object")) {
             if (-not $connectionObject.Success) { Stop-Function -Message "Failed to interpret computername input: $($connectionObject.InputObject)" -Category InvalidArgument -Target $connectionObject.InputObject -Continue -FunctionName New-DbaCmConnection }
-            Write-Message -Level VeryVerbose -Message "Processing computer: $($connectionObject.Connection.ComputerName)" -Target $connectionObject.Connection -FunctionName New-DbaCmConnection
+            Write-Message -Level VeryVerbose -Message "Processing computer: $($connectionObject.Connection.ComputerName)" -Target $connectionObject.Connection -FunctionName New-DbaCmConnection -ModuleName "dbatools"
 
             $connection = New-Object -TypeName Dataplat.Dbatools.Connection.ManagementConnection -ArgumentList $connectionObject.Connection.ComputerName
             if ($__boundCredential) { $connection.Credentials = $Credential }
@@ -271,9 +271,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if (-not $disable_cache) {
-                Write-Message -Level Verbose -Message "Writing connection to cache" -FunctionName New-DbaCmConnection
+                Write-Message -Level Verbose -Message "Writing connection to cache" -FunctionName New-DbaCmConnection -ModuleName "dbatools"
                 [Dataplat.Dbatools.Connection.ConnectionHost]::Connections[$connectionObject.Connection.ComputerName] = $connection
-            } else { Write-Message -Level Verbose -Message "Skipping writing to cache, since the cache has been disabled." -FunctionName New-DbaCmConnection }
+            } else { Write-Message -Level Verbose -Message "Skipping writing to cache, since the cache has been disabled." -FunctionName New-DbaCmConnection -ModuleName "dbatools" }
             $connection
         }
     }
@@ -292,7 +292,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    Write-Message -Level InternalComment -Message "Stopping execution" -FunctionName New-DbaCmConnection
+    Write-Message -Level InternalComment -Message "Stopping execution" -FunctionName New-DbaCmConnection -ModuleName "dbatools"
 } $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

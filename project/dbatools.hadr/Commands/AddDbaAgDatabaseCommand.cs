@@ -31,6 +31,7 @@ public sealed partial class AddDbaAgDatabaseCommand : DbaBaseCmdlet
     /// <summary>The availability group the databases are added to.</summary>
     [Parameter(ParameterSetName = "NonPipeline", Mandatory = true)]
     [Parameter(ParameterSetName = "Pipeline", Mandatory = true, Position = 0)]
+    [PsStringCast]
     public string? AvailabilityGroup { get; set; }
 
     /// <summary>The databases to add to the availability group.</summary>
@@ -55,6 +56,7 @@ public sealed partial class AddDbaAgDatabaseCommand : DbaBaseCmdlet
     [Parameter(ParameterSetName = "NonPipeline")]
     [Parameter(ParameterSetName = "Pipeline")]
     [ValidateSet("Automatic", "Manual")]
+    [PsStringCast]
     public string? SeedingMode { get; set; }
 
     /// <summary>Network path readable by every replica, used for backup/restore staging.</summary>
@@ -129,29 +131,32 @@ public sealed partial class AddDbaAgDatabaseCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w4001State"))
+            {
+                _state = sentinel["__w4001State"] as Hashtable;
+                return;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, AvailabilityGroup, Database, Secondary,
             SecondarySqlCredential, InputObject, SeedingMode, SharedPath,
             UseLastBackup.ToBool(), AdvancedBackupParams, NoWait.ToBool(),
             MasterKeySecurePassword, EnableException.ToBool(), _state, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
-            BoundRawParameter("ProgressAction")))
-        {
-            Hashtable? sentinel = item?.BaseObject as Hashtable;
-            if (sentinel is not null && sentinel.ContainsKey("__w4001State"))
-            {
-                _state = sentinel["__w4001State"] as Hashtable;
-                continue;
-            }
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundRawParameter("ProgressAction"));
     }
 
     private object? BoundRawParameter(string name)

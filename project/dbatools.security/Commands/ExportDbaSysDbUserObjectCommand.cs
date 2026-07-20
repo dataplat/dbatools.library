@@ -152,7 +152,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($instance in $SqlInstance) {
             try {
-                Write-Message -Level Verbose -Message "Attempting to connect to $instance" -FunctionName Export-DbaSysDbUserObject
+                Write-Message -Level Verbose -Message "Attempting to connect to $instance" -FunctionName Export-DbaSysDbUserObject -ModuleName "dbatools"
                 try {
                     $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
                 } catch {

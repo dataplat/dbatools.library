@@ -108,9 +108,7 @@ public sealed class ExportDbaDacPackageCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, TestBound(nameof(Path)), ParameterSetName, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable beginState && beginState.ContainsKey("__exportDbaDacPackageBegin"))
             {
@@ -118,16 +116,18 @@ public sealed class ExportDbaDacPackageCommand : DbaBaseCmdlet
                 {
                     _beginInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Path, TestBound(nameof(Path)), ParameterSetName, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -135,13 +135,7 @@ public sealed class ExportDbaDacPackageCommand : DbaBaseCmdlet
         if (Interrupted || _beginInterrupted || _processInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, AllUserDatabases.ToBool(), Path,
-            FilePath, DacOption, ExtendedParameters, ExtendedProperties, Type, Table,
-            EnableException.ToBool(), ParameterSetName,
-            TestBound(nameof(Database)), TestBound(nameof(ExcludeDatabase)), TestBound(nameof(AllUserDatabases)),
-            TestBound(nameof(Path)) ? (object?)Path : null, TestBound(nameof(FilePath)) ? (object?)FilePath : null,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable procState && procState.ContainsKey("__exportDbaDacPackageProcess"))
             {
@@ -149,16 +143,22 @@ public sealed class ExportDbaDacPackageCommand : DbaBaseCmdlet
                 {
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, AllUserDatabases.ToBool(), Path,
+            FilePath, DacOption, ExtendedParameters, ExtendedProperties, Type, Table,
+            EnableException.ToBool(), ParameterSetName,
+            TestBound(nameof(Database)), TestBound(nameof(ExcludeDatabase)), TestBound(nameof(AllUserDatabases)),
+            TestBound(nameof(Path)) ? (object?)Path : null, TestBound(nameof(FilePath)) ? (object?)FilePath : null,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -338,7 +338,7 @@ WHERE database_id > 4  -- Exclude system databases (master=1, tempdb=2, model=3,
 
             $query += "`nORDER BY name"
 
-            Write-Message -Level Verbose -Message "Executing query: $query" -FunctionName Export-DbaDacPackage
+            Write-Message -Level Verbose -Message "Executing query: $query" -FunctionName Export-DbaDacPackage -ModuleName "dbatools"
 
             $splatQuery = @{
                 SqlInstance     = $server
@@ -360,7 +360,7 @@ WHERE database_id > 4  -- Exclude system databases (master=1, tempdb=2, model=3,
                 Stop-Function -Message "Databases not found on $instance" -Target $instance -Continue -FunctionName Export-DbaDacPackage
             }
 
-            Write-Message -Level Verbose -Message "Found $($dbNames.Count) databases: $($dbNames -join ", ")" -FunctionName Export-DbaDacPackage
+            Write-Message -Level Verbose -Message "Found $($dbNames.Count) databases: $($dbNames -join ", ")" -FunctionName Export-DbaDacPackage -ModuleName "dbatools"
 
             # Convert database names to objects for compatibility with rest of function
             $dbs = $dbNames | ForEach-Object { [PSCustomObject]@{ name = $_ } }
@@ -373,7 +373,7 @@ WHERE database_id > 4  -- Exclude system databases (master=1, tempdb=2, model=3,
                     $connstring = "$connstring;Database=$dbName"
                 }
 
-                Write-Message -Level Verbose -Message "Using connection string $connstring" -FunctionName Export-DbaDacPackage
+                Write-Message -Level Verbose -Message "Using connection string $connstring" -FunctionName Export-DbaDacPackage -ModuleName "dbatools"
 
                 if ($Type -eq 'Dacpac') {
                     $ext = 'dacpac'
@@ -399,7 +399,7 @@ WHERE database_id > 4  -- Exclude system databases (master=1, tempdb=2, model=3,
                     $null = $output = Register-ObjectEvent -InputObject $dacSvc -EventName "Message" -SourceIdentifier "msg" -Action { $EventArgs.Message.Message }
 
                     if ($Type -eq 'Dacpac') {
-                        Write-Message -Level Verbose -Message "Initiating Dacpac extract to $FilePath" -FunctionName Export-DbaDacPackage
+                        Write-Message -Level Verbose -Message "Initiating Dacpac extract to $FilePath" -FunctionName Export-DbaDacPackage -ModuleName "dbatools"
                         #not sure how to extract that info from the existing DAC application, leaving 1.0.0.0 for now
                         $version = New-Object System.Version -ArgumentList '1.0.0.0'
                         try {
@@ -410,7 +410,7 @@ WHERE database_id > 4  -- Exclude system databases (master=1, tempdb=2, model=3,
                             Unregister-Event -SourceIdentifier "msg"
                         }
                     } elseif ($Type -eq 'Bacpac') {
-                        Write-Message -Level Verbose -Message "Initiating Bacpac export to $FilePath" -FunctionName Export-DbaDacPackage
+                        Write-Message -Level Verbose -Message "Initiating Bacpac export to $FilePath" -FunctionName Export-DbaDacPackage -ModuleName "dbatools"
                         try {
                             $dacSvc.ExportBacpac($FilePath, $dbName, $opts, $tblList, $null)
                         } catch {
@@ -447,7 +447,7 @@ WHERE database_id > 4  -- Exclude system databases (master=1, tempdb=2, model=3,
                         $stdout = $process.StandardOutput.ReadToEnd()
                         $stderr = $process.StandardError.ReadToEnd()
                         $process.WaitForExit()
-                        Write-Message -level Verbose -Message "StandardOutput: $stdout" -FunctionName Export-DbaDacPackage
+                        Write-Message -level Verbose -Message "StandardOutput: $stdout" -FunctionName Export-DbaDacPackage -ModuleName "dbatools"
                         $finalResult = $stdout
                     } catch {
                         Stop-Function -Message "SQLPackage Failure" -ErrorRecord $_ -Continue -FunctionName Export-DbaDacPackage

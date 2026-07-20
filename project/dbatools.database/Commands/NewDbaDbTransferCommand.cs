@@ -145,22 +145,22 @@ public sealed class NewDbaDbTransferCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            EnableException, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__newDbaDbTransferBegin"))
             {
                 _state = sentinel["__newDbaDbTransferBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            EnableException, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -168,25 +168,25 @@ public sealed class NewDbaDbTransferCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, Database, InputObject, EnableException, _state,
-            MyInvocation.BoundParameters.ContainsKey("SqlInstance"),
-            MyInvocation.BoundParameters.ContainsKey("Database"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__newDbaDbTransferProcess"))
             {
                 _state = sentinel["__newDbaDbTransferProcess"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, Database, InputObject, EnableException, _state,
+            MyInvocation.BoundParameters.ContainsKey("SqlInstance"),
+            MyInvocation.BoundParameters.ContainsKey("Database"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()

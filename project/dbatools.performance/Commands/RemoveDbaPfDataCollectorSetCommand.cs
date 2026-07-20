@@ -51,9 +51,7 @@ public sealed class RemoveDbaPfDataCollectorSetCommand : DbaBaseCmdlet
     protected override void ProcessRecord()
     {
         if (Interrupted) { return; }
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            ComputerName, Credential, CollectorSet, InputObject,
-            TestBound("ComputerName"), EnableException.ToBool(), this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -64,7 +62,9 @@ public sealed class RemoveDbaPfDataCollectorSetCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            ComputerName, Credential, CollectorSet, InputObject,
+            TestBound("ComputerName"), EnableException.ToBool(), this, BoundVerbose());
     }
 
     /// <summary>A bound -Verbose carrier for the module-scoped process body.</summary>
@@ -136,7 +136,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         $null = Test-ElevationRequirement -ComputerName $computer -Continue
 
-        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Remove-DbaPfDataCollectorSet
+        Write-Message -Level Verbose -Message "$setname on $ComputerName is $status." -FunctionName Remove-DbaPfDataCollectorSet -ModuleName "dbatools"
 
         if ($status -eq "Running") {
             Stop-Function -Message "$setname on $computer is running. Use Stop-DbaPfDataCollectorSet to stop first." -Continue -FunctionName Remove-DbaPfDataCollectorSet

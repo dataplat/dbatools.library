@@ -19,7 +19,7 @@ namespace Dataplat.Dbatools.Commands;
 /// text. Name resolution picks up whichever implementation is live, so a command that exists as
 /// either a script function or a compiled cmdlet behaves identically through this entry point.
 /// </remarks>
-internal static class NestedCommand
+internal static partial class NestedCommand
 {
     /// <summary>
     /// Replaces the effective $PSDefaultParameterValues with an empty table for the duration of a
@@ -85,7 +85,9 @@ internal static class NestedCommand
     internal static Collection<PSObject> Invoke(PSCmdlet host, string commandName, IDictionary parameters, object? pipelineInput = null)
     {
         using (ShieldDefaultParameterValues(host))
+        using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Collection<PSObject> raw;
             if (pipelineInput is null)
             {
@@ -103,6 +105,10 @@ internal static class NestedCommand
             {
                 if (item?.BaseObject is WarningRecord warning)
                     host.WriteWarning(warning.Message);
+                else if (item?.BaseObject is ErrorRecord nonTerminating)
+                    // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
+                    // and caller-side preference handling see them, as the function world does.
+                    host.WriteError(nonTerminating);
                 else
                     output.Add(item!);
             }
@@ -133,15 +139,22 @@ internal static class NestedCommand
     internal static Collection<PSObject> InvokeScoped(PSCmdlet host, string scriptText, params object?[] scriptArgs)
     {
         using (ShieldDefaultParameterValues(host))
+        using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
+            string __seedToken = Guid.NewGuid().ToString("N");
             ScriptBlock script = ScriptBlock.Create(
-                "param($__nestedCommandArguments)\n& {\n" + scriptText + "\n} @__nestedCommandArguments");
+                "param($__nestedCommandArguments)\n" + ModuleRootSeedProlog(__seedToken) + "& {\n" + scriptText + "\n} @__nestedCommandArguments" + ModuleRootSeedEpilog(__seedToken));
             Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, script, null, new object?[] { scriptArgs });
             Collection<PSObject> output = new Collection<PSObject>();
             foreach (PSObject item in raw)
             {
                 if (item?.BaseObject is WarningRecord warning)
                     host.WriteWarning(warning.Message);
+                else if (item?.BaseObject is ErrorRecord nonTerminating)
+                    // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
+                    // and caller-side preference handling see them, as the function world does.
+                    host.WriteError(nonTerminating);
                 else
                     output.Add(item!);
             }
@@ -177,14 +190,17 @@ internal static class NestedCommand
         params object?[] scriptArgs)
     {
         using (ShieldDefaultParameterValues(host))
+        using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
             string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
+            string __seedToken = Guid.NewGuid().ToString("N");
             string wrapper =
-                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\ntry { & {\n" + scriptText +
+                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\n" + ModuleRootSeedProlog(__seedToken) + "try { & {\n" + scriptText +
                 "\n} @__nestedCommandArguments 6>&1 5>&1 4>&1 3>&1 2>&1 } catch { " +
                 "$__nestedTermination.ErrorRecord = $PSItem; " +
-                "Write-Output $__nestedTerminationMarker }";
+                "Write-Output $__nestedTerminationMarker }" + ModuleRootSeedEpilog(__seedToken);
 
             ErrorRecord? terminatingError = null;
             // Pipeline-stop parity: a downstream early stop - e.g. `<command> | Select-Object -First N` -
@@ -228,6 +244,11 @@ internal static class NestedCommand
                             information.MessageData,
                             new List<string>(information.Tags).ToArray());
                     }
+                    else if (item?.BaseObject is ErrorRecord nonTerminating)
+                    {
+                        // Same channel correction as the item-form branches above.
+                        host.WriteError(nonTerminating);
+                    }
                     else
                     {
                         onOutput(item!);
@@ -269,6 +290,7 @@ internal static class NestedCommand
 
             if (terminatingError is not null)
             {
+                bridge.Complete(terminatingError);
                 RemoveCapturedErrorBookkeeping(host, terminatingError);
                 host.InvokeCommand.InvokeScript(
                     false,
@@ -321,7 +343,9 @@ internal static class NestedCommand
     internal static void InvokeStreamed(PSCmdlet host, string commandName, IDictionary parameters, IEnumerable pipelineInput)
     {
         using (ShieldDefaultParameterValues(host))
+        using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             ScriptBlock script = ScriptBlock.Create("param($__parameters) & " + commandName + " @__parameters 3>&1");
             SteppablePipeline pipeline = script.GetSteppablePipeline(CommandOrigin.Internal, new object[] { parameters });
             bool stopped = false;
@@ -362,6 +386,9 @@ internal static class NestedCommand
         object? unwrapped = item is PSObject psObject ? psObject.BaseObject : item;
         if (unwrapped is WarningRecord warning)
             host.WriteWarning(warning.Message);
+        else if (unwrapped is ErrorRecord nonTerminating)
+            // Same channel correction as the item-form branches above.
+            host.WriteError(nonTerminating);
         else
             host.WriteObject(item);
     }

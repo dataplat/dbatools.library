@@ -50,22 +50,22 @@ public sealed class FindDbaUserObjectCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Pattern, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaUserObjectBegin"))
             {
                 _state = sentinel["__findDbaUserObjectBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Pattern, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -73,18 +73,18 @@ public sealed class FindDbaUserObjectCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, EnableException.ToBool(), _state,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, EnableException.ToBool(), _state,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -127,7 +127,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
         if ($Pattern -match '^[\w\d\.-]+\\[\w\d\.-]+$') {
-            Write-Message -Level Verbose -Message "Too few slashes, adding extra as required by regex" -FunctionName Find-DbaUserObject
+            Write-Message -Level Verbose -Message "Too few slashes, adding extra as required by regex" -FunctionName Find-DbaUserObject -ModuleName "dbatools"
             $Pattern = $Pattern.Replace('\', '\\')
         }
 
@@ -160,21 +160,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             ## Credentials
             if (-not $pattern) {
-                Write-Message -Level Verbose -Message "Gathering data on instance objects" -FunctionName Find-DbaUserObject
+                Write-Message -Level Verbose -Message "Gathering data on instance objects" -FunctionName Find-DbaUserObject -ModuleName "dbatools"
                 $creds = $server.Credentials
                 $proxies = $server.JobServer.ProxyAccounts
                 $endPoints = $server.Endpoints | Where-Object { $_.Owner -ne $saname }
 
-                Write-Message -Level Verbose -Message "Gather data on Agent Jobs ownership" -FunctionName Find-DbaUserObject
+                Write-Message -Level Verbose -Message "Gather data on Agent Jobs ownership" -FunctionName Find-DbaUserObject -ModuleName "dbatools"
                 #Variable marked as unused by PSScriptAnalyzer
                 #$jobs = $server.JobServer.Jobs | Where-Object { $_.OwnerLoginName -ne $saname }
             } else {
-                Write-Message -Level Verbose -Message "Gathering data on instance objects" -FunctionName Find-DbaUserObject
+                Write-Message -Level Verbose -Message "Gathering data on instance objects" -FunctionName Find-DbaUserObject -ModuleName "dbatools"
                 $creds = $server.Credentials | Where-Object { $_.Identity -match $pattern }
                 $proxies = $server.JobServer.ProxyAccounts | Where-Object { $_.CredentialIdentity -match $pattern }
                 $endPoints = $server.Endpoints | Where-Object { $_.Owner -match $pattern }
 
-                Write-Message -Level Verbose -Message "Gather data on Agent Jobs ownership" -FunctionName Find-DbaUserObject
+                Write-Message -Level Verbose -Message "Gather data on Agent Jobs ownership" -FunctionName Find-DbaUserObject -ModuleName "dbatools"
                 #Variable marked as unused by PSScriptAnalyzer
                 #$jobs = $server.JobServer.Jobs | Where-Object { $_.OwnerLoginName -match $pattern }
             }
@@ -182,7 +182,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             ## dbs
             if (-not $pattern) {
                 foreach ($db in $server.Databases | Where-Object { $_.Owner -ne $saname }) {
-                    Write-Message -Level Verbose -Message "checking if $db is owned " -FunctionName Find-DbaUserObject
+                    Write-Message -Level Verbose -Message "checking if $db is owned " -FunctionName Find-DbaUserObject -ModuleName "dbatools"
 
                     [PSCustomObject]@{
                         ComputerName = $server.ComputerName
@@ -295,7 +295,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             ## Server Roles
             if (-not $pattern) {
                 foreach ($role in $server.Roles | Where-Object { $_.Owner -ne $saname }) {
-                    Write-Message -Level Verbose -Message "checking if $db is owned " -FunctionName Find-DbaUserObject
+                    Write-Message -Level Verbose -Message "checking if $db is owned " -FunctionName Find-DbaUserObject -ModuleName "dbatools"
                     [PSCustomObject]@{
                         ComputerName = $server.ComputerName
                         InstanceName = $server.ServiceName
@@ -322,7 +322,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             ## Loop internal database
             foreach ($db in $server.Databases | Where-Object IsAccessible) {
-                Write-Message -Level Verbose -Message "Gather user owned object in database: $db" -FunctionName Find-DbaUserObject
+                Write-Message -Level Verbose -Message "Gather user owned object in database: $db" -FunctionName Find-DbaUserObject -ModuleName "dbatools"
                 ##schemas
                 $sysSchemas = "DatabaseMailUserRole", "db_ssisadmin", "db_ssisltduser", "db_ssisoperator", "SQLAgentOperatorRole", "SQLAgentReaderRole", "SQLAgentUserRole", "TargetServersRole", "RSExecRole"
 

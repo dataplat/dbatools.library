@@ -27,11 +27,11 @@ namespace Dataplat.Dbatools.Commands;
 /// SupportsShouldProcess, so -WhatIf/-Confirm set the preference New-Item inherits) - without the
 /// carry the port would create the -Path directory under -WhatIf.
 ///
-/// The process body reads $PSBoundParameters.Query/FileNameColumn/BinaryColumn/FilePath - boundness
+/// The process body reads $PSBoundParameters.Query/FileNameColumn/BinaryColumn/FilePath - a TRUTHINESS test of the bound VALUE (W2-071 fix:
 /// reads that cannot ride a hop, because inside the hop $PSBoundParameters is the inner
 /// scriptblock's own positional binding where every parameter looks bound. They are carried as
 /// flags from C# (MyInvocation.BoundParameters.ContainsKey) and each $PSBoundParameters.X is
-/// replaced by its carried flag - the same rule as Test-Bound.
+/// carried as the raw VALUE via BoundRaw, so -not $PSBoundParameters.X becomes -not on the value - was boundness/Test-Bound, which diverged on a bound-but-falsy value like -Query "".
 ///
 /// The single $Pscmdlet.ShouldProcess routes to the real cmdlet via $__realCmdlet (ConfirmImpact
 /// Medium); -WhatIf/-Confirm ride the carriers. In-hop Stop-Function/Write-Message carry
@@ -106,10 +106,7 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, FilePath, EnableException.ToBool(),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__exportDbaBinaryFileBegin"))
             {
@@ -117,16 +114,19 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
                 {
                     _beginInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Path, FilePath, EnableException.ToBool(),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -134,28 +134,35 @@ public sealed class ExportDbaBinaryFileCommand : DbaBaseCmdlet
         if (Interrupted || _beginInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, Table, Schema, FileNameColumn, BinaryColumn,
-            Path, Query, FilePath, InputObject, EnableException.ToBool(),
-            TestBound(nameof(Query)), TestBound(nameof(FileNameColumn)), TestBound(nameof(BinaryColumn)),
-            TestBound(nameof(FilePath)),
-            this, BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, Table, Schema, FileNameColumn, BinaryColumn,
+            Path, Query, FilePath, InputObject, EnableException.ToBool(),
+            BoundRaw("Query"), BoundRaw("FileNameColumn"), BoundRaw("BinaryColumn"),
+            BoundRaw("FilePath"),
+            this, BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
     {
         if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
             return LanguagePrimitives.IsTrue(value);
+        return null;
+    }
+
+    private object? BoundRaw(string name)
+    {
+        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
+            return value;
         return null;
     }
 
@@ -203,7 +210,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         if ($Path) {
             if (-not (Test-Path -Path $Path -PathType Container)) {
-                Write-Message -Level Verbose -Message "Creating path $Path" -FunctionName Export-DbaBinaryFile
+                Write-Message -Level Verbose -Message "Creating path $Path" -FunctionName Export-DbaBinaryFile -ModuleName "dbatools"
                 $null = New-Item -Path $Path -ItemType Directory -Force
             }
         }
@@ -214,8 +221,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     // PS: the process block VERBATIM. Edits: $Pscmdlet.ShouldProcess -> $__realCmdlet, -FunctionName
-    // on direct Stop-Function/Write-Message, and each $PSBoundParameters.X boundness read replaced by
-    // its carried flag ($__boundQuery/$__boundFileNameColumn/$__boundBinaryColumn/$__boundFilePath).
+    // on direct Stop-Function/Write-Message, and each $PSBoundParameters.X TRUTHINESS read replaced by
+    // its carried raw VALUE via BoundRaw ($__boundQuery/$__boundFileNameColumn/$__boundBinaryColumn/$__boundFilePath).
     // The ExecuteReader binary-stream loop, the filestream/binarywriter, and the finally ride as-is.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $Table, $Schema, $FileNameColumn, $BinaryColumn, $Path, $Query, $FilePath, $InputObject, $EnableException, $__boundQuery, $__boundFileNameColumn, $__boundBinaryColumn, $__boundFilePath, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
@@ -240,7 +247,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-        Write-Message -Level Verbose -Message "Found $($InputObject.count) tables" -FunctionName Export-DbaBinaryFile
+        Write-Message -Level Verbose -Message "Found $($InputObject.count) tables" -FunctionName Export-DbaBinaryFile -ModuleName "dbatools"
         foreach ($tbl in $InputObject) {
             # auto detect column that is binary
             # if none or multiple, make them specify the binary column
@@ -281,7 +288,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 SELECT 'BackupCert.cer', * FROM OPENROWSET(BULK N'C:\temp\BackupCert.cer', SINGLE_BLOB) rs
             #>
             try {
-                Write-Message -Level Verbose -Message "Query: $Query" -FunctionName Export-DbaBinaryFile
+                Write-Message -Level Verbose -Message "Query: $Query" -FunctionName Export-DbaBinaryFile -ModuleName "dbatools"
                 $reader = $server.ConnectionContext.ExecuteReader($Query)
 
                 # Create a byte array for the stream.

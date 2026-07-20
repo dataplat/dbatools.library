@@ -54,9 +54,7 @@ public sealed class GetDbaDbMailHistoryCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, since, Status, EnableException.ToBool(), _server,
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -73,7 +71,9 @@ public sealed class GetDbaDbMailHistoryCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+            new[] { instance }, SqlCredential, since, Status, EnableException.ToBool(), _server,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -185,7 +185,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $sql = "$sql $where"
         }
 
-        Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbMailHistory
+        Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbMailHistory -ModuleName "dbatools"
 
         try {
             $server.Query($sql) | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, Profile, Recipients, CopyRecipients, BlindCopyRecipients, Subject, Importance, Sensitivity, FileAttachments, AttachmentEncoding, SendRequestDate, SendRequestUser, SentStatus, SentDate

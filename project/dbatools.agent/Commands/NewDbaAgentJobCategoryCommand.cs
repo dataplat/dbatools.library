@@ -166,7 +166,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($Force) { $ConfirmPreference = 'none' }
 
     if (-not $CategoryType) {
-        Write-Message -Message "Setting the category type to 'LocalJob'" -Level Verbose -FunctionName New-DbaAgentJobCategory
+        Write-Message -Message "Setting the category type to 'LocalJob'" -Level Verbose -FunctionName New-DbaAgentJobCategory -ModuleName "dbatools"
         $CategoryType = "LocalJob"
     }
 

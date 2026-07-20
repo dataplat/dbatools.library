@@ -104,10 +104,7 @@ public sealed class GetDbaAgentJobHistoryCommand : DbaBaseCmdlet
         if (_beginInterrupted || Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            _filter, SqlInstance, SqlCredential, Job, ExcludeJob,
-            ExcludeJobSteps.ToBool(), WithOutputFile.ToBool(), JobCollection,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -118,7 +115,10 @@ public sealed class GetDbaAgentJobHistoryCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            _filter, SqlInstance, SqlCredential, Job, ExcludeJob,
+            ExcludeJobSteps.ToBool(), WithOutputFile.ToBool(), JobCollection,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -299,7 +299,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         } catch {
-            Stop-Function -Message "Could not get Agent Job History from $instance" -Target $instance -Continue -FunctionName Get-JobHistory
+            Stop-Function -Message "Could not get Agent Job History from $instance" -Target $instance -Continue
         }
     }
 

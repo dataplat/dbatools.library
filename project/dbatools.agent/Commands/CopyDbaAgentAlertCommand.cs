@@ -55,11 +55,7 @@ public sealed class CopyDbaAgentAlertCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
-            Alert, ExcludeAlert, IncludeDefaults.ToBool(), Force.ToBool(),
-            EnableException.ToBool(), this, BoundCommonParameter("Verbose"),
-            BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -70,7 +66,11 @@ public sealed class CopyDbaAgentAlertCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
+            Alert, ExcludeAlert, IncludeDefaults.ToBool(), Force.ToBool(),
+            EnableException.ToBool(), this, BoundCommonParameter("Verbose"),
+            BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -140,18 +140,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     DateTime          = [Dataplat.Dbatools.Utility.DbaDateTime](Get-Date)
                 }
                 try {
-                    Write-Message -Message "Creating Alert Defaults" -Level Verbose -FunctionName Copy-DbaAgentAlert
+                    Write-Message -Message "Creating Alert Defaults" -Level Verbose -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                     $sql = $sourceServer.JobServer.AlertSystem.Script() | Out-String
                     $sql = $sql -replace [Regex]::Escape("'$source'"), "'$destinstance'"
 
-                    Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentAlert
+                    Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                     $null = $destServer.Query($sql)
 
                     $copyAgentAlertStatus.Status = "Successful"
                 } catch {
                     $copyAgentAlertStatus.Status = "Failed"
                     $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Issue creating alert defaults on $destinstance | $PSItem" -FunctionName Copy-DbaAgentAlert
+                    Write-Message -Level Verbose -Message "Issue creating alert defaults on $destinstance | $PSItem" -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                 }
             }
         }
@@ -183,7 +183,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyAgentAlertStatus.Status = "Skipped"
                             $copyAgentAlertStatus.Notes = "Operator(s) [$operatorList] do not exist on destination"
                             $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Message "One or more operators alerted by [$alertName] is not present at the destination. Alert will not be copied. Use Copy-DbaAgentOperator to copy the operator(s) to the destination. Missing operator(s): $operatorList" -Level Warning -FunctionName Copy-DbaAgentAlert
+                            Write-Message -Message "One or more operators alerted by [$alertName] is not present at the destination. Alert will not be copied. Use Copy-DbaAgentOperator to copy the operator(s) to the destination. Missing operator(s): $operatorList" -Level Warning -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                         }
                         continue
                     }
@@ -196,22 +196,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copyAgentAlertStatus.Status = "Skipped"
                         $copyAgentAlertStatus.Notes = "Already exists on destination"
                         $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Message "Alert [$alertName] exists at destination. Use -Force to drop and migrate." -Level Verbose -FunctionName Copy-DbaAgentAlert
+                        Write-Message -Message "Alert [$alertName] exists at destination. Use -Force to drop and migrate." -Level Verbose -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                     }
                     continue
                 }
 
                 if ($__realCmdlet.ShouldProcess($destinstance, "Dropping alert $alertName and recreating")) {
                     try {
-                        Write-Message -Message "Dropping Alert $alertName on $destServer." -Level Verbose -FunctionName Copy-DbaAgentAlert
+                        Write-Message -Message "Dropping Alert $alertName on $destServer." -Level Verbose -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                         $sql = "EXEC msdb.dbo.sp_delete_alert @name = N'$($alertname)';"
-                        Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentAlert
+                        Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                         $null = $destServer.Query($sql)
                         $destAlerts.Refresh()
                     } catch {
                         $copyAgentAlertStatus.Status = "Failed"
                         $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Issue dropping/recreating alert $alertname on $destInstance | $PSItem" -FunctionName Copy-DbaAgentAlert
+                        Write-Message -Level Verbose -Message "Issue dropping/recreating alert $alertname on $destInstance | $PSItem" -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                         continue
                     }
                 }
@@ -226,7 +226,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($serverAlert.EventDescriptionKeyword) { $conflictMessage += " with error text '$($serverAlert.Severity)'" }
                     $conflictMessage += ". Skipping."
 
-                    Write-Message -Level Verbose -Message $conflictMessage -FunctionName Copy-DbaAgentAlert
+                    Write-Message -Level Verbose -Message $conflictMessage -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                     $copyAgentAlertStatus.Status = "Skipped"
                     $copyAgentAlertStatus.Notes = $conflictMessage
                     $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
@@ -234,7 +234,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 continue
             }
             if ($serverAlert.JobName -and $destServer.JobServer.Jobs.Name -NotContains $serverAlert.JobName) {
-                Write-Message -Level Verbose -Message "Alert [$alertName] has job [$($serverAlert.JobName)] configured as response. The job does not exist on destination $destServer. Skipping." -FunctionName Copy-DbaAgentAlert
+                Write-Message -Level Verbose -Message "Alert [$alertName] has job [$($serverAlert.JobName)] configured as response. The job does not exist on destination $destServer. Skipping." -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                 if ($__realCmdlet.ShouldProcess($destinstance, "Checking for conflicts")) {
                     $copyAgentAlertStatus.Status = "Skipped"
                     $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
@@ -244,11 +244,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($__realCmdlet.ShouldProcess($destinstance, "Creating Alert $alertName")) {
                 try {
-                    Write-Message -Message "Copying Alert $alertName" -Level Verbose -FunctionName Copy-DbaAgentAlert
+                    Write-Message -Message "Copying Alert $alertName" -Level Verbose -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                     $sql = $serverAlert.Script() | Out-String
                     $sql = $sql -replace "@job_id=N'........-....-....-....-............", "@job_id=N'00000000-0000-0000-0000-000000000000"
 
-                    Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentAlert
+                    Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                     $null = $destServer.Query($sql)
 
                     $copyAgentAlertStatus.Status = "Successful"
@@ -256,7 +256,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } catch {
                     $copyAgentAlertStatus.Status = "Failed"
                     $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Issue creating alert $alertname on $destinstance | $PSItem" -FunctionName Copy-DbaAgentAlert
+                    Write-Message -Level Verbose -Message "Issue creating alert $alertname on $destinstance | $PSItem" -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                 }
             }
 
@@ -281,13 +281,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($__realCmdlet.ShouldProcess($destinstance, "Adding $alertName to $jobName")) {
                     try {
                         <# THERE needs to be validation within this block to see if the $jobName actually exists on the source server. #>
-                        Write-Message -Message "Adding $alertName to $jobName" -Level Verbose -FunctionName Copy-DbaAgentAlert
+                        Write-Message -Message "Adding $alertName to $jobName" -Level Verbose -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                         $newJob = $destServer.JobServer.Jobs[$jobName]
                         $newJobId = ($newJob.JobId) -replace " ", ""
                         $sql = $sql -replace '00000000-0000-0000-0000-000000000000', $newJobId
                         $sql = $sql -replace 'sp_add_alert', 'sp_update_alert'
 
-                        Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentAlert
+                        Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                         $null = $destServer.Query($sql)
 
                         $copyAgentAlertStatus.Status = "Successful"
@@ -295,7 +295,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     } catch {
                         $copyAgentAlertStatus.Status = "Failed"
                         $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Issue adding alert to job to $destinstance | $PSItem" -FunctionName Copy-DbaAgentAlert
+                        Write-Message -Level Verbose -Message "Issue adding alert to job to $destinstance | $PSItem" -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                         continue
                     }
                 }
@@ -316,17 +316,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     foreach ($notify in $notifications) {
                         $notifyCollection = @()
                         if ($notify.UseNetSend -eq $true) {
-                            Write-Message -Message "Adding net send" -Level Verbose -FunctionName Copy-DbaAgentAlert
+                            Write-Message -Message "Adding net send" -Level Verbose -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                             $notifyCollection += "NetSend"
                         }
 
                         if ($notify.UseEmail -eq $true) {
-                            Write-Message -Message "Adding email" -Level Verbose -FunctionName Copy-DbaAgentAlert
+                            Write-Message -Message "Adding email" -Level Verbose -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                             $notifyCollection += "NotifyEmail"
                         }
 
                         if ($notify.UsePager -eq $true) {
-                            Write-Message -Message "Adding pager" -Level Verbose -FunctionName Copy-DbaAgentAlert
+                            Write-Message -Message "Adding pager" -Level Verbose -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                             $notifyCollection += "Pager"
                         }
 
@@ -338,7 +338,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } catch {
                     $copyAgentAlertStatus.Status = "Failed"
                     $copyAgentAlertStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Issue moving notifications to $destinstance for the alert $alertName | $PSItem" -FunctionName Copy-DbaAgentAlert
+                    Write-Message -Level Verbose -Message "Issue moving notifications to $destinstance for the alert $alertName | $PSItem" -FunctionName Copy-DbaAgentAlert -ModuleName "dbatools"
                 }
             }
         }

@@ -40,9 +40,7 @@ public sealed class TestDbaInstantFileInitializationCommand : DbaBaseCmdlet
                 : new[] { new DbaInstanceParameter(defaultComputer) };
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            computers, Credential, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -53,7 +51,9 @@ public sealed class TestDbaInstantFileInitializationCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            computers, Credential, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -95,7 +95,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($computer in $ComputerName) {
             try {
-                Write-Message -Level Verbose -Message "Getting SQL Server Engine services on $computer" -FunctionName Test-DbaInstantFileInitialization
+                Write-Message -Level Verbose -Message "Getting SQL Server Engine services on $computer" -FunctionName Test-DbaInstantFileInitialization -ModuleName "dbatools"
                 $splatGetService = @{
                     ComputerName    = $computer
                     Credential      = $Credential
@@ -108,12 +108,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if (-not $services) {
-                Write-Message -Level Verbose -Message "No SQL Server Engine services found on $computer" -FunctionName Test-DbaInstantFileInitialization
+                Write-Message -Level Verbose -Message "No SQL Server Engine services found on $computer" -FunctionName Test-DbaInstantFileInitialization -ModuleName "dbatools"
                 continue
             }
 
             try {
-                Write-Message -Level Verbose -Message "Getting Windows privileges on $computer" -FunctionName Test-DbaInstantFileInitialization
+                Write-Message -Level Verbose -Message "Getting Windows privileges on $computer" -FunctionName Test-DbaInstantFileInitialization -ModuleName "dbatools"
                 $splatGetPrivilege = @{
                     ComputerName    = $computer
                     Credential      = $Credential
@@ -125,7 +125,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($service in $services) {
-                Write-Message -Level Verbose -Message "Checking IFI for service $($service.ServiceName) on $computer" -FunctionName Test-DbaInstantFileInitialization
+                Write-Message -Level Verbose -Message "Checking IFI for service $($service.ServiceName) on $computer" -FunctionName Test-DbaInstantFileInitialization -ModuleName "dbatools"
 
                 $serviceVirtualAccount = "NT SERVICE\$($service.ServiceName)"
                 $serviceNameIFI = ($privileges | Where-Object User -eq $serviceVirtualAccount).InstantFileInitialization -eq $true

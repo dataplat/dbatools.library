@@ -78,6 +78,18 @@ namespace Dataplat.Dbatools.Csv.Reader
                 return false;
             }
 
+            // TB-012 product decision: a concurrent Dispose returns the pooled _buffer to the
+            // pool and nulls the field while this thread is mid-read - the torn dereference
+            // surfaced as a raw NullReferenceException (dispose-race stress test, third shape).
+            // Snapshot the field ONCE and dereference only the local: the null observation
+            // point below is the single disposal-specific path, so a disposed reader presents
+            // as DISPOSED while a genuine NRE on a live reader propagates unmasked (a
+            // catch-when(_isClosed) translation was rejected in review - the flag is sampled
+            // after the throw, so concurrent disposal could mask an unrelated fault).
+            char[] buffer = _buffer;
+            if (buffer == null)
+                throw new ObjectDisposedException(GetType().Name);
+
             _lineBuilder.Clear();
             bool inQuotes = false;
             int quotedFieldLength = 0;
@@ -86,7 +98,7 @@ namespace Dataplat.Dbatools.Csv.Reader
             {
                 if (_bufferPosition >= _bufferLength)
                 {
-                    _bufferLength = _reader.Read(_buffer, 0, _buffer.Length);
+                    _bufferLength = _reader.Read(buffer, 0, buffer.Length);
                     _bufferPosition = 0;
 
                     if (_bufferLength == 0)
@@ -102,7 +114,7 @@ namespace Dataplat.Dbatools.Csv.Reader
                     }
                 }
 
-                char c = _buffer[_bufferPosition++];
+                char c = buffer[_bufferPosition++];
 
                 if (c == _options.Quote)
                 {
@@ -123,16 +135,16 @@ namespace Dataplat.Dbatools.Csv.Reader
                     if (!inQuotes || !_options.AllowMultilineFields)
                     {
                         // Check for \r\n
-                        if (_bufferPosition < _bufferLength && _buffer[_bufferPosition] == '\n')
+                        if (_bufferPosition < _bufferLength && buffer[_bufferPosition] == '\n')
                         {
                             _bufferPosition++;
                         }
                         else if (_bufferPosition >= _bufferLength)
                         {
                             // Peek next buffer
-                            _bufferLength = _reader.Read(_buffer, 0, _buffer.Length);
+                            _bufferLength = _reader.Read(buffer, 0, buffer.Length);
                             _bufferPosition = 0;
-                            if (_bufferLength > 0 && _buffer[0] == '\n')
+                            if (_bufferLength > 0 && buffer[0] == '\n')
                             {
                                 _bufferPosition++;
                             }

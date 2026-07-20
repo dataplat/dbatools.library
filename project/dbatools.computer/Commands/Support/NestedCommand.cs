@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
 
@@ -20,7 +21,7 @@ namespace Dataplat.Dbatools.Commands;
 /// internal per-assembly and the shared dbatools project is pinned to LangVersion 7.3, so promoting
 /// it there means an owner LangVersion/style decision - OWNER HAND-BACK, keep the copies in sync.
 /// </summary>
-internal static class NestedCommand
+internal static partial class NestedCommand
 {
     /// <summary>
     /// Replicates the module scope boundary the retired PS functions had around their
@@ -78,7 +79,9 @@ internal static class NestedCommand
     internal static Collection<PSObject> Invoke(PSCmdlet host, string commandName, IDictionary parameters, object? pipelineInput = null)
     {
         using (ShieldDefaultParameterValues(host))
+        using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Collection<PSObject> raw;
             if (pipelineInput is null)
             {
@@ -96,6 +99,10 @@ internal static class NestedCommand
             {
                 if (item?.BaseObject is WarningRecord warning)
                     host.WriteWarning(warning.Message);
+                else if (item?.BaseObject is ErrorRecord nonTerminating)
+                    // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
+                    // and caller-side preference handling see them, as the function world does.
+                    host.WriteError(nonTerminating);
                 else
                     output.Add(item!);
             }
@@ -111,7 +118,9 @@ internal static class NestedCommand
     internal static void InvokeStreamed(PSCmdlet host, string commandName, IDictionary parameters, IEnumerable pipelineInput)
     {
         using (ShieldDefaultParameterValues(host))
+        using (PropagateActionPreferences(host))
         {
+            using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             ScriptBlock script = ScriptBlock.Create("param($__parameters) & " + commandName + " @__parameters 3>&1");
             SteppablePipeline pipeline = script.GetSteppablePipeline(CommandOrigin.Internal, new object[] { parameters });
             bool stopped = false;
@@ -151,6 +160,9 @@ internal static class NestedCommand
         object? unwrapped = item is PSObject psObject ? psObject.BaseObject : item;
         if (unwrapped is WarningRecord warning)
             host.WriteWarning(warning.Message);
+        else if (unwrapped is ErrorRecord nonTerminating)
+            // Same channel correction as the item-form branches above.
+            host.WriteError(nonTerminating);
         else
             host.WriteObject(item);
     }

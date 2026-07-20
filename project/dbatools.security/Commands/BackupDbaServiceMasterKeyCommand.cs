@@ -28,28 +28,28 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class BackupDbaServiceMasterKeyCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
     public DbaInstanceParameter[] SqlInstance { get; set; } = null!;
 
     /// <summary>Alternative credential for the target instances.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>A credential whose password is used to encrypt the exported service master key.</summary>
-    [Parameter]
+    [Parameter(Position = 2)]
     public PSCredential? KeyCredential { get; set; }
 
     /// <summary>The password that encrypts the exported service master key.</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     [Alias("Password")]
     public System.Security.SecureString? SecurePassword { get; set; }
 
     /// <summary>The directory the exported files are written to; defaults to the instance backup directory.</summary>
-    [Parameter]
+    [Parameter(Position = 4)]
     public string? Path { get; set; }
 
     /// <summary>An explicit base file name for the exported key file.</summary>
-    [Parameter]
+    [Parameter(Position = 5)]
     public string? FileBaseName { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
@@ -66,21 +66,26 @@ public sealed class BackupDbaServiceMasterKeyCommand : DbaBaseCmdlet
         // SecureString is passed on as-is; it is not converted here.
         System.Security.SecureString? effectivePassword = KeyCredential != null ? KeyCredential.Password : SecurePassword;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, KeyCredential, effectivePassword, Path, FileBaseName,
-            EnableException.ToBool(), this,
-            TestBound(nameof(Path)),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] streamed via InvokeScopedStreaming: the body loops $SqlInstance emitting one
+        // key object per instance (Select-DefaultView) and carries loop-local -Continue
+        // Stop-Functions that throw terminating under -EnableException; a buffered InvokeScoped
+        // would lose an earlier instance's already-emitted key object when a later instance throws.
+        // Streaming yields each record as produced, so earlier emits survive. No state carry.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, KeyCredential, effectivePassword, Path, FileBaseName,
+            EnableException.ToBool(), this,
+            TestBound(nameof(Path)),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -186,7 +191,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $status = "Success"
             } catch {
                 $status = "Failure"
-                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaServiceMasterKey
+                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaServiceMasterKey -ModuleName "dbatools"
             }
 
             Add-Member -Force -InputObject $masterkey -MemberType NoteProperty -Name ComputerName -value $server.ComputerName
@@ -201,3 +206,4 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $SqlInstance $SqlCredential $KeyCredential $SecurePassword $Path $FileBaseName $EnableException $__realCmdlet $__boundPath $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
+

@@ -67,23 +67,23 @@ public sealed class FindDbaViewCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            IncludeSystemObjects.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaViewBegin"))
             {
                 _state = sentinel["__findDbaViewBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            IncludeSystemObjects.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -91,9 +91,7 @@ public sealed class FindDbaViewCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern, IncludeSystemDatabases.ToBool(),
-            EnableException.ToBool(), _state, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaViewProcess"))
             {
@@ -101,16 +99,18 @@ public sealed class FindDbaViewCommand : DbaBaseCmdlet
                 {
                     _state = state["State"] as Hashtable ?? _state;
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern, IncludeSystemDatabases.ToBool(),
+            EnableException.ToBool(), _state, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
@@ -118,17 +118,17 @@ public sealed class FindDbaViewCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, EndScript,
+            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -205,7 +205,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.versionMajor -lt 9) {
-                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaView
+                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaView -ModuleName "dbatools"
                 Continue
             }
 
@@ -226,13 +226,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $totalcount = 0
             $dbcount = $dbs.count
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaView
+                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaView -ModuleName "dbatools"
 
                 # If system objects aren't needed, find view text using SQL
                 # This prevents SMO from having to enumerate
 
                 if (!$IncludeSystemObjects) {
-                    Write-Message -Level Debug -Message $sql -FunctionName Find-DbaView
+                    Write-Message -Level Debug -Message $sql -FunctionName Find-DbaView -ModuleName "dbatools"
                     $rows = $db.ExecuteWithResults($sql).Tables.Rows
                     $vwcount = 0
 
@@ -242,7 +242,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $viewSchema = $row.ViewSchema
                         $view = $row.name
 
-                        Write-Message -Level Verbose -Message "Looking in View: $viewSchema.$view TextBody for $pattern" -FunctionName Find-DbaView
+                        Write-Message -Level Verbose -Message "Looking in View: $viewSchema.$view TextBody for $pattern" -FunctionName Find-DbaView -ModuleName "dbatools"
                         if ($row.TextBody -match $Pattern) {
                             $vw = $db.Views | Where-Object { $_.Schema -eq $viewSchema -and $_.Name -eq $view }
 
@@ -275,7 +275,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $viewSchema = $row.ViewSchema
                         $view = $vw.Name
 
-                        Write-Message -Level Verbose -Message "Looking in View: $viewSchema.$view TextBody for $pattern" -FunctionName Find-DbaView
+                        Write-Message -Level Verbose -Message "Looking in View: $viewSchema.$view TextBody for $pattern" -FunctionName Find-DbaView -ModuleName "dbatools"
                         if ($vw.TextBody -match $Pattern) {
 
                             $viewText = $vw.TextBody.split($eol)
@@ -299,9 +299,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
                     }
                 }
-                Write-Message -Level Verbose -Message "Evaluated $vwcount views in $db" -FunctionName Find-DbaView
+                Write-Message -Level Verbose -Message "Evaluated $vwcount views in $db" -FunctionName Find-DbaView -ModuleName "dbatools"
             }
-            Write-Message -Level Verbose -Message "Evaluated $totalcount total views in $dbcount databases" -FunctionName Find-DbaView
+            Write-Message -Level Verbose -Message "Evaluated $totalcount total views in $dbcount databases" -FunctionName Find-DbaView -ModuleName "dbatools"
         }
 
     $__state.EveryServerVwCount = $everyservervwcount
@@ -323,7 +323,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $everyservervwcount = $__state.EveryServerVwCount
 
-        Write-Message -Level Verbose -Message "Evaluated $everyservervwcount total views" -FunctionName Find-DbaView
+        Write-Message -Level Verbose -Message "Evaluated $everyservervwcount total views" -FunctionName Find-DbaView -ModuleName "dbatools"
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

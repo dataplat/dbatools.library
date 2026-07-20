@@ -43,18 +43,18 @@ public sealed class TestDbaLinkedServerConnectionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -112,7 +112,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($ls in $linkedServerCollection) {
-                Write-Message -Level Verbose -Message "Testing linked server $($ls.name) on server $($ls.parent.name)" -FunctionName Test-DbaLinkedServerConnection
+                Write-Message -Level Verbose -Message "Testing linked server $($ls.name) on server $($ls.parent.name)" -FunctionName Test-DbaLinkedServerConnection -ModuleName "dbatools"
                 try {
                     $null = $ls.TestConnection()
                     $result = "Success"

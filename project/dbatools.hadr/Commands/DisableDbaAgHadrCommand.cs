@@ -48,20 +48,23 @@ public sealed class DisableDbaAgHadrCommand : DbaBaseCmdlet
         // scriptblock invocation per record reproduces that; per-element would reset
         // the CommandRuntime per instance. The source's process-scope `return` on the
         // elevation check likewise exits the whole record in both worlds.
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, Credential, Force.ToBool(), TestBound(nameof(Force)),
-            EnableException.ToBool(),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, Credential, Force.ToBool(), TestBound(nameof(Force)),
+            EnableException.ToBool(),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -133,14 +136,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             #>
 
             try {
-                Write-Message -Level Verbose -Message "Checking current Hadr setting for $computer" -FunctionName Disable-DbaAgHadr
+                Write-Message -Level Verbose -Message "Checking current Hadr setting for $computer" -FunctionName Disable-DbaAgHadr -ModuleName "dbatools"
                 $currentState = Get-WmiHadr -SqlInstance $instance -Credential $Credential
             } catch {
                 Stop-Function -Message "Failure to pull current state of Hadr setting on $computer" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Disable-DbaAgHadr
             }
 
             $isHadrEnabled = $currentState.IsHadrEnabled
-            Write-Message -Level InternalComment -Message "$instance Hadr current value: $isHadrEnabled" -FunctionName Disable-DbaAgHadr
+            Write-Message -Level InternalComment -Message "$instance Hadr current value: $isHadrEnabled" -FunctionName Disable-DbaAgHadr -ModuleName "dbatools"
 
             # hadr results from sql wmi can be iffy, skip the check
             <#
@@ -178,7 +181,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $newState = Get-WmiHadr -SqlInstance $instance -Credential $Credential
 
                 if (-not $__boundForce) { # SOURCE: if (Test-Bound -Not -ParameterName Force) {
-                    Write-Message -Level Warning -Message "You must restart the SQL Server for it to take effect." -FunctionName Disable-DbaAgHadr
+                    Write-Message -Level Warning -Message "You must restart the SQL Server for it to take effect." -FunctionName Disable-DbaAgHadr -ModuleName "dbatools"
                 }
 
                 [PSCustomObject]@{

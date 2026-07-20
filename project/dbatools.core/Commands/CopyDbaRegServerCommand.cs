@@ -65,11 +65,7 @@ public sealed class CopyDbaRegServerCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Source, SourceSqlCredential, Destination, DestinationSqlCredential, Group,
-            SwitchServerName.ToBool(), Force.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -80,7 +76,11 @@ public sealed class CopyDbaRegServerCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            Source, SourceSqlCredential, Destination, DestinationSqlCredential, Group,
+            SwitchServerName.ToBool(), Force.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

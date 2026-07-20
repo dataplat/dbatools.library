@@ -49,19 +49,19 @@ public sealed class GetDbaDbCheckConstraintCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, EnableException.ToBool(),
-            TestBound(nameof(ExcludeSystemTable)),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, EnableException.ToBool(),
+            TestBound(nameof(ExcludeSystemTable)),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -122,7 +122,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             foreach ($db in $databases) {
                 if (!$db.IsAccessible) {
-                    Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbCheckConstraint
+                    Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbCheckConstraint -ModuleName "dbatools"
                     continue
                 }
 
@@ -132,7 +132,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if ($tbl.Checks.Count -eq 0) {
-                        Write-Message -Message "No Checks exist in $tbl table on the $db database on $instance" -Target $tbl -Level Verbose -FunctionName Get-DbaDbCheckConstraint
+                        Write-Message -Message "No Checks exist in $tbl table on the $db database on $instance" -Target $tbl -Level Verbose -FunctionName Get-DbaDbCheckConstraint -ModuleName "dbatools"
                         continue
                     }
 

@@ -322,7 +322,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $targetDescription = $TargetPath
         }
 
-        Write-Message -Level Verbose -Message "Running sqlpackage DeployReport for $sourcePathFull against $targetDescription." -FunctionName Compare-DbaDbSchema
+        Write-Message -Level Verbose -Message "Running sqlpackage DeployReport for $sourcePathFull against $targetDescription." -FunctionName Compare-DbaDbSchema -ModuleName "dbatools"
 
         try {
             $startInfo = New-Object System.Diagnostics.ProcessStartInfo
@@ -340,7 +340,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $stderr = $process.StandardError.ReadToEnd()
             $process.WaitForExit()
 
-            Write-Message -Level Verbose -Message "sqlpackage stdout: $stdout" -FunctionName Compare-DbaDbSchema
+            Write-Message -Level Verbose -Message "sqlpackage stdout: $stdout" -FunctionName Compare-DbaDbSchema -ModuleName "dbatools"
 
             if ($process.ExitCode -ne 0) {
                 Stop-Function -Message "sqlpackage failed: $stderr" -Target $SourcePath -FunctionName Compare-DbaDbSchema
@@ -387,7 +387,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if (-not $KeepReport) {
             Remove-Item -Path $reportFile -ErrorAction SilentlyContinue
         } else {
-            Write-Message -Level Verbose -Message "Deployment report kept at $reportFile" -FunctionName Compare-DbaDbSchema
+            Write-Message -Level Verbose -Message "Deployment report kept at $reportFile" -FunctionName Compare-DbaDbSchema -ModuleName "dbatools"
         }
     }
 

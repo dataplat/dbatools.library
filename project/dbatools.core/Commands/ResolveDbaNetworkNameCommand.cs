@@ -96,18 +96,18 @@ public sealed class ResolveDbaNetworkNameCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { computer }, Credential, effectiveTurbo, EnableException.ToBool(),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+            new[] { computer }, Credential, effectiveTurbo, EnableException.ToBool(),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -174,7 +174,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if (-not (Test-Windows -NoWarn)) {
-            Write-Message -Level Verbose -Message "Non-Windows client detected. Turbo (DNS resolution only) set to $true" -FunctionName Resolve-DbaNetworkName
+            Write-Message -Level Verbose -Message "Non-Windows client detected. Turbo (DNS resolution only) set to $true" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
             $Turbo = $true
         }
     }
@@ -226,7 +226,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # resolve IP address
             try {
-                Write-Message -Level VeryVerbose -Message "Resolving $cName using .NET.Dns GetHostEntry" -FunctionName Resolve-DbaNetworkName
+                Write-Message -Level VeryVerbose -Message "Resolving $cName using .NET.Dns GetHostEntry" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
                 $resolved = [System.Net.Dns]::GetHostEntry($cName)
                 $ipaddresses = $resolved.AddressList | Sort-Object -Property AddressFamily # prioritize IPv4
                 $ipaddress = $ipaddresses[0].IPAddressToString
@@ -236,10 +236,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # try to resolve IP into a hostname
             try {
-                Write-Message -Level VeryVerbose -Message "Resolving $ipaddress using .NET.Dns GetHostByAddress" -FunctionName Resolve-DbaNetworkName
+                Write-Message -Level VeryVerbose -Message "Resolving $ipaddress using .NET.Dns GetHostByAddress" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
                 $fqdn = [System.Net.Dns]::GetHostByAddress($ipaddress).HostName
             } catch {
-                Write-Message -Level Debug -Message "Failed to resolve $ipaddress using .NET.Dns GetHostByAddress" -FunctionName Resolve-DbaNetworkName
+                Write-Message -Level Debug -Message "Failed to resolve $ipaddress using .NET.Dns GetHostByAddress" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
                 $fqdn = $resolved.HostName
             }
 
@@ -283,7 +283,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # re-try DNS reverse zone lookup if the IP to use is not the first one
             if ($ipaddresses[0].IPAddressToString -ne $ipaddress) {
                 try {
-                    Write-Message -Level VeryVerbose -Message "Resolving $ipaddress using .NET.Dns GetHostByAddress" -FunctionName Resolve-DbaNetworkName
+                    Write-Message -Level VeryVerbose -Message "Resolving $ipaddress using .NET.Dns GetHostByAddress" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
                     $fqdn = [System.Net.Dns]::GetHostByAddress($ipaddress).HostName
                     # re-adjust DNS domain again
                     $dnsDomain = Get-ComputerDomainName -FQDN $fqdn -ComputerName $cName
@@ -301,12 +301,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $result.DNSHostEntry = $fqdn
                     $result.FQDN = $fqdn
                 } catch {
-                    Write-Message -Level VeryVerbose -Message "Failed to obtain a new name from $ipaddress, re-using $fqdn" -FunctionName Resolve-DbaNetworkName
+                    Write-Message -Level VeryVerbose -Message "Failed to obtain a new name from $ipaddress, re-using $fqdn" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
                 }
             }
 
 
-            Write-Message -Level Debug -Message "Getting domain name from the remote host $fqdn" -FunctionName Resolve-DbaNetworkName
+            Write-Message -Level Debug -Message "Getting domain name from the remote host $fqdn" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
             try {
                 $ScBlock = {
                     return [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().DomainName
@@ -327,7 +327,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $result.Domain = $dnsDomain
                 }
                 try {
-                    Write-Message -Level Debug -Message "Getting DNS domain from the remote host $($cParams.ComputerName)" -FunctionName Resolve-DbaNetworkName
+                    Write-Message -Level Debug -Message "Getting DNS domain from the remote host $($cParams.ComputerName)" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
                     $dnsSuffix = Invoke-Command2 @cParams -ScriptBlock $ScBlock -ErrorAction Stop -Raw
                     $result.DNSDomain = $dnsSuffix
                     if ($dnsSuffix) {
@@ -337,18 +337,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                     $result.FullComputerName = $fullComputerName
                 } catch {
-                    Write-Message -Level Verbose -Message "Unable to get DNS domain information from $($cParams.ComputerName)" -FunctionName Resolve-DbaNetworkName
+                    Write-Message -Level Verbose -Message "Unable to get DNS domain information from $($cParams.ComputerName)" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
                 }
             } catch {
-                Write-Message -Level Verbose -Message "Unable to get domain name from $($cParams.ComputerName)" -FunctionName Resolve-DbaNetworkName
+                Write-Message -Level Verbose -Message "Unable to get domain name from $($cParams.ComputerName)" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
             }
 
             # getting a DNS host entry for the full name
             try {
-                Write-Message -Level VeryVerbose -Message "Resolving $($result.FullComputerName) using .NET.Dns GetHostEntry" -FunctionName Resolve-DbaNetworkName
+                Write-Message -Level VeryVerbose -Message "Resolving $($result.FullComputerName) using .NET.Dns GetHostEntry" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
                 $result.DNSHostEntry = ([System.Net.Dns]::GetHostEntry($result.FullComputerName)).HostName
             } catch {
-                Write-Message -Level Verbose -Message ".NET.Dns GetHostEntry failed for $($result.FullComputerName)" -FunctionName Resolve-DbaNetworkName
+                Write-Message -Level Verbose -Message ".NET.Dns GetHostEntry failed for $($result.FullComputerName)" -FunctionName Resolve-DbaNetworkName -ModuleName "dbatools"
             }
 
             # returning the final result

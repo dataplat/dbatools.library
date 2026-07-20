@@ -54,18 +54,18 @@ public sealed class GetDbaDependencyCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            InputObject, AllowSystemObjects.ToBool(), Parents.ToBool(), IncludeSelf.ToBool(),
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            InputObject, AllowSystemObjects.ToBool(), Parents.ToBool(), IncludeSelf.ToBool(),
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -149,13 +149,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             $urnCollection = New-Object Microsoft.SqlServer.Management.Smo.UrnCollection
 
-            Write-Message -Level 5 -Message "Adding $Object which is a $($Object.urn.Type)" -FunctionName $FunctionName
+            Write-Message -Level 5 -Message "Adding $Object which is a $($Object.urn.Type)" -FunctionName $FunctionName -ModuleName "dbatools"
             $urnCollection.Add([Microsoft.SqlServer.Management.Sdk.Sfc.Urn]$Object.urn)
 
             #now we set up an event listener go get progress reports
             $progressReportEventHandler = [Microsoft.SqlServer.Management.Smo.ProgressReportEventHandler] {
                 $name = $_.Current.GetAttribute('Name');
-                Write-Message -Level 5 -Message "Analysed $name" -FunctionName $FunctionName
+                Write-Message -Level 5 -Message "Analysed $name" -FunctionName $FunctionName -ModuleName "dbatools"
             }
             $scripter.add_DiscoveryProgress($progressReportEventHandler)
 
@@ -273,7 +273,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         #endregion Utility functions
 
         foreach ($Item in $InputObject) {
-            Write-Message -Level Verbose -Message "Processing: $Item" -FunctionName Get-DbaDependency
+            Write-Message -Level Verbose -Message "Processing: $Item" -FunctionName Get-DbaDependency -ModuleName "dbatools"
             if ($null -eq $Item.urn) {
                 Stop-Function -Message "$Item is not a valid SMO object" -Category InvalidData -Continue -Target $Item -FunctionName Get-DbaDependency
             }
@@ -294,7 +294,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $limitCount = 2
             if ($IncludeSelf) { $limitCount = 1 }
             if ($tree.Count -lt $limitCount) {
-                Write-Message -Message "No dependencies detected for $($Item)" -Level Important -FunctionName Get-DbaDependency
+                Write-Message -Message "No dependencies detected for $($Item)" -Level Important -FunctionName Get-DbaDependency -ModuleName "dbatools"
                 continue
             }
 

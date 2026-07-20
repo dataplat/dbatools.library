@@ -239,7 +239,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $newop = Get-DbaAgentOperator -SqlInstance $server -Operator $Operator
                 if (-not $newop -and $OperatorEmail) {
                     if ($__realCmdlet.ShouldProcess($instance, "Creating operator $Operator with email $OperatorEmail")) {
-                        Write-Message -Level Verbose -Message "Creating operator $Operator with email $OperatorEmail on $instance" -FunctionName Install-DbaAgentAdminAlert
+                        Write-Message -Level Verbose -Message "Creating operator $Operator with email $OperatorEmail on $instance" -FunctionName Install-DbaAgentAdminAlert -ModuleName "dbatools"
                         $parms = @{
                             SqlInstance = $server
                             Operator    = $Operator
@@ -269,7 +269,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $newcat = Get-DbaAgentAlertCategory -SqlInstance $server -Category $Category
                 if (-not $newcat) {
                     if ($__realCmdlet.ShouldProcess($instance, "Creating alert category $Category")) {
-                        Write-Message -Level Verbose -Message "Creating alert category $Category on $instance" -FunctionName Install-DbaAgentAdminAlert
+                        Write-Message -Level Verbose -Message "Creating alert category $Category on $instance" -FunctionName Install-DbaAgentAdminAlert -ModuleName "dbatools"
                         $parms = @{
                             SqlInstance = $server
                             Category    = $Category

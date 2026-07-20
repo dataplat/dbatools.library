@@ -72,19 +72,19 @@ public sealed class GetDbaHelpIndexCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, InputObject, ObjectName,
-            IncludeStats.ToBool(), IncludeDataTypes.ToBool(), Raw.ToBool(), IncludeFragmentation.ToBool(),
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, InputObject, ObjectName,
+            IncludeStats.ToBool(), IncludeDataTypes.ToBool(), Raw.ToBool(), IncludeFragmentation.ToBool(),
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -532,7 +532,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         "
         #endRegion SizesQuery
 
-        Write-Message -Level Debug -Message $SizesQuery -FunctionName Get-DbaHelpIndex
+        Write-Message -Level Debug -Message $SizesQuery -FunctionName Get-DbaHelpIndex -ModuleName "dbatools"
 
         foreach ($instance in $SqlInstance) {
             try {
@@ -551,7 +551,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "$db is not accessible. Skipping." -Continue -FunctionName Get-DbaHelpIndex
             }
 
-            Write-Message -Level Debug -Message "$SizesQuery" -FunctionName Get-DbaHelpIndex
+            Write-Message -Level Debug -Message "$SizesQuery" -FunctionName Get-DbaHelpIndex -ModuleName "dbatools"
             try {
                 $IndexDetails = $db.Query($SizesQuery)
 

@@ -77,21 +77,21 @@ public sealed class NewDbaCustomErrorCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { instance }, SqlCredential, MessageID, Severity, MessageText ?? "", Language,
-                WithLog.ToBool(), EnableException.ToBool(),
-                TestBound(nameof(Language)), TestBound(nameof(WithLog)), this,
-                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+            new[] { instance }, SqlCredential, MessageID, Severity, MessageText ?? "", Language,
+                WithLog.ToBool(), EnableException.ToBool(),
+                TestBound(nameof(Language)), TestBound(nameof(WithLog)), this,
+                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -160,7 +160,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $langId = $languageDetails.msglangid
 
         if ($__realCmdlet.ShouldProcess($instance, "Creating new server message with id $MessageID on $instance")) {
-            Write-Message -Level Verbose -Message "Creating new server message with id $MessageID on $instance" -FunctionName New-DbaCustomError
+            Write-Message -Level Verbose -Message "Creating new server message with id $MessageID on $instance" -FunctionName New-DbaCustomError -ModuleName "dbatools"
             try {
                 $userDefinedMessage = New-Object -TypeName Microsoft.SqlServer.Management.Smo.UserDefinedMessage
                 $userDefinedMessage.Parent = $server

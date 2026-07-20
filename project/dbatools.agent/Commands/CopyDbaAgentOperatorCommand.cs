@@ -50,10 +50,7 @@ public sealed class CopyDbaAgentOperatorCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
-            Operator, ExcludeOperator, Force.ToBool(), EnableException.ToBool(), this,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -64,7 +61,10 @@ public sealed class CopyDbaAgentOperatorCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
+            Operator, ExcludeOperator, Force.ToBool(), EnableException.ToBool(), this,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -145,23 +145,23 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copyOperatorStatus.Status = "Skipped"
                         $copyOperatorStatus.Notes = "Already exists on destination"
                         $copyOperatorStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Operator $operatorName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentOperator
+                        Write-Message -Level Verbose -Message "Operator $operatorName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentOperator -ModuleName "dbatools"
                     }
                     continue
                 } else {
                     if ($failsafe.FailSafeOperator -eq $operatorName) {
-                        Write-Message -Level Verbose -Message "$operatorName is the failsafe operator. Skipping drop." -FunctionName Copy-DbaAgentOperator
+                        Write-Message -Level Verbose -Message "$operatorName is the failsafe operator. Skipping drop." -FunctionName Copy-DbaAgentOperator -ModuleName "dbatools"
                         continue
                     }
 
                     if ($__realCmdlet.ShouldProcess($destinstance, "Dropping operator $operatorName and recreating")) {
                         try {
-                            Write-Message -Level Verbose -Message "Dropping Operator $operatorName" -FunctionName Copy-DbaAgentOperator
+                            Write-Message -Level Verbose -Message "Dropping Operator $operatorName" -FunctionName Copy-DbaAgentOperator -ModuleName "dbatools"
                             $destServer.JobServer.Operators[$operatorName].Drop()
                         } catch {
                             $copyOperatorStatus.Status = "Failed"
                             $copyOperatorStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Issue dropping operator $operatorName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentOperator
+                            Write-Message -Level Verbose -Message "Issue dropping operator $operatorName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentOperator -ModuleName "dbatools"
                             continue
                         }
                     }
@@ -170,9 +170,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             if ($__realCmdlet.ShouldProcess($destinstance, "Creating Operator $operatorName")) {
                 try {
-                    Write-Message -Level Verbose -Message "Copying Operator $operatorName" -FunctionName Copy-DbaAgentOperator
+                    Write-Message -Level Verbose -Message "Copying Operator $operatorName" -FunctionName Copy-DbaAgentOperator -ModuleName "dbatools"
                     $sql = $sOperator.Script() | Out-String
-                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentOperator
+                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentOperator -ModuleName "dbatools"
                     $destServer.Query($sql)
                     $destServer.JobServer.Operators.Refresh()
 
@@ -181,7 +181,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } catch {
                     $copyOperatorStatus.Status = "Failed"
                     $copyOperatorStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Issue creating operator $operatorName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentOperator
+                    Write-Message -Level Verbose -Message "Issue creating operator $operatorName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentOperator -ModuleName "dbatools"
                     continue
                 }
             }

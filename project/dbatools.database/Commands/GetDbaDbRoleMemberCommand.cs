@@ -68,19 +68,19 @@ public sealed class GetDbaDbRoleMemberCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Role, ExcludeRole, ExcludeFixedRole.ToBool(),
-            InputObject, EnableException.ToBool(), TestBound(nameof(IncludeSystemUser)),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, Role, ExcludeRole, ExcludeFixedRole.ToBool(),
+            InputObject, EnableException.ToBool(), TestBound(nameof(IncludeSystemUser)),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -146,22 +146,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
             switch ($inputType) {
                 'Dataplat.Dbatools.Parameter.DbaInstanceParameter' {
-                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Get-DbaDbRoleMember
+                    Write-Message -Level Verbose -Message "Processing DbaInstanceParameter through InputObject" -FunctionName Get-DbaDbRoleMember -ModuleName "dbatools"
                     $dbRoles = Get-DbaDbRole @dbRoleParams
                 }
                 'Microsoft.SqlServer.Management.Smo.Server' {
-                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Get-DbaDbRoleMember
+                    Write-Message -Level Verbose -Message "Processing Server through InputObject" -FunctionName Get-DbaDbRoleMember -ModuleName "dbatools"
                     $dbRoles = Get-DbaDbRole @dbRoleParams
                 }
                 'Microsoft.SqlServer.Management.Smo.Database' {
                     $dbRoleParams.Remove('SqlInstance')
                     $dbRoleParams.Remove('SqlCredential')
                     $dbRoleParams.Remove('Database')
-                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Get-DbaDbRoleMember
+                    Write-Message -Level Verbose -Message "Processing Database through InputObject" -FunctionName Get-DbaDbRoleMember -ModuleName "dbatools"
                     $dbRoles = $input | Get-DbaDbRole @dbRoleParams
                 }
                 'Microsoft.SqlServer.Management.Smo.DatabaseRole' {
-                    Write-Message -Level Verbose -Message "Processing DatabaseRole through InputObject" -FunctionName Get-DbaDbRoleMember
+                    Write-Message -Level Verbose -Message "Processing DatabaseRole through InputObject" -FunctionName Get-DbaDbRoleMember -ModuleName "dbatools"
                     $dbRoles = $input
                 }
                 default {
@@ -172,7 +172,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             foreach ($dbRole in $dbRoles) {
                 $db = $dbRole.Parent
                 $server = $db.Parent
-                Write-Message -Level 'Verbose' -Message "Getting Database Role Members for $dbRole in $db on $server" -FunctionName Get-DbaDbRoleMember
+                Write-Message -Level 'Verbose' -Message "Getting Database Role Members for $dbRole in $db on $server" -FunctionName Get-DbaDbRoleMember -ModuleName "dbatools"
 
                 $members = $dbRole.EnumMembers()
                 foreach ($member in $members) {

@@ -55,19 +55,19 @@ public sealed class SetDbaMaxMemoryCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Max, InputObject, EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Max, InputObject, EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -129,17 +129,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         try {
             if ($UseRecommended) {
-                Write-Message -Level Verbose -Message "Change $server SQL Server Max Memory from $($result.MaxValue) to $($result.RecommendedValue) " -FunctionName Set-DbaMaxMemory
+                Write-Message -Level Verbose -Message "Change $server SQL Server Max Memory from $($result.MaxValue) to $($result.RecommendedValue) " -FunctionName Set-DbaMaxMemory -ModuleName "dbatools"
 
                 if ($result.RecommendedValue -eq 0 -or $null -eq $result.RecommendedValue) {
                     $maxMem = $result.RecommendedValue
-                    Write-Message -Level VeryVerbose -Message "Max memory recommended: $maxMem" -FunctionName Set-DbaMaxMemory
+                    Write-Message -Level VeryVerbose -Message "Max memory recommended: $maxMem" -FunctionName Set-DbaMaxMemory -ModuleName "dbatools"
                     $server.Configuration.MaxServerMemory.ConfigValue = $maxMem
                 } else {
                     $server.Configuration.MaxServerMemory.ConfigValue = $result.RecommendedValue
                 }
             } else {
-                Write-Message -Level Verbose -Message "Change $server SQL Server Max Memory from $($result.MaxValue) to $Max " -FunctionName Set-DbaMaxMemory
+                Write-Message -Level Verbose -Message "Change $server SQL Server Max Memory from $($result.MaxValue) to $Max " -FunctionName Set-DbaMaxMemory -ModuleName "dbatools"
                 $server.Configuration.MaxServerMemory.ConfigValue = $Max
             }
 

@@ -113,11 +113,7 @@ public sealed class MoveDbaRegServerGroupCommand : DbaBaseCmdlet
             _bindInitialized = true;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Group, NewGroup, _inputObjectState,
-            EnableException.ToBool(), _state, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3062State"))
@@ -127,16 +123,20 @@ public sealed class MoveDbaRegServerGroupCommand : DbaBaseCmdlet
                 {
                     _inputObjectState = _state["InputObject"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Group, NewGroup, _inputObjectState,
+            EnableException.ToBool(), _state, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -231,7 +231,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $groupobject = Get-DbaRegServerGroup -SqlInstance $server -Group $NewGroup
         }
 
-        Write-Message -Level Verbose -Message "Found $($groupobject.Name) on $($parentserver.ServerConnection.ServerName)" -FunctionName Move-DbaRegServerGroup
+        Write-Message -Level Verbose -Message "Found $($groupobject.Name) on $($parentserver.ServerConnection.ServerName)" -FunctionName Move-DbaRegServerGroup -ModuleName "dbatools"
 
         if (-not $groupobject) {
             Stop-Function -Message "Group '$NewGroup' not found on $server" -Continue -FunctionName Move-DbaRegServerGroup
@@ -239,10 +239,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if ($__realCmdlet.ShouldProcess($regservergroup.SqlInstance, "Moving $($regservergroup.Name) to $($groupobject.Name)")) {
             try {
-                Write-Message -Level Verbose -Message "Parsing $groupobject" -FunctionName Move-DbaRegServerGroup
+                Write-Message -Level Verbose -Message "Parsing $groupobject" -FunctionName Move-DbaRegServerGroup -ModuleName "dbatools"
                 $newname = Get-RegServerGroupReverseParse $groupobject
                 $newname = "$newname\$($regservergroup.Name)"
-                Write-Message -Level Verbose -Message "Executing $($regservergroup.ScriptMove($groupobject).GetScript())" -FunctionName Move-DbaRegServerGroup
+                Write-Message -Level Verbose -Message "Executing $($regservergroup.ScriptMove($groupobject).GetScript())" -FunctionName Move-DbaRegServerGroup -ModuleName "dbatools"
                 $null = $parentserver.ServerConnection.ExecuteNonQuery($regservergroup.ScriptMove($groupobject).GetScript())
                 Get-DbaRegServerGroup -SqlInstance $server -Group $newname
                 $parentserver.ServerConnection.Disconnect()

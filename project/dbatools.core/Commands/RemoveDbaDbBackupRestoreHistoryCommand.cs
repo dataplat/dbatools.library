@@ -82,11 +82,7 @@ public sealed class RemoveDbaDbBackupRestoreHistoryCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, InputObject, EnableException.ToBool(),
-            _state, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             // Process hops re-emit the sentinel to carry the cross-record $servername
             // leak (B batch [P3]: assigned inside the per-db try, read by the catch -
@@ -95,16 +91,20 @@ public sealed class RemoveDbaDbBackupRestoreHistoryCommand : DbaBaseCmdlet
             if (sentinel is not null && sentinel.ContainsKey("__w3075State"))
             {
                 _state = sentinel["__w3075State"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, InputObject, EnableException.ToBool(),
+            _state, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

@@ -156,11 +156,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, [PSCredential]$SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, [int]$TargetLogSize, [int]$IncrementSize, [int]$TargetVlfCount, [int]$LogFileId, $ShrinkLogFile, [int]$ShrinkSize, [string]$BackupDirectory, $ExcludeDiskSpaceValidation, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        Write-Message -Level Verbose -Message "Set ErrorActionPreference to Inquire." -FunctionName Expand-DbaDbLogFile
+        Write-Message -Level Verbose -Message "Set ErrorActionPreference to Inquire." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
         $ErrorActionPreference = 'Inquire'
 
         #Convert MB to KB (SMO works in KB)
-        Write-Message -Level Verbose -Message "Convert variables MB to KB (SMO works in KB)." -FunctionName Expand-DbaDbLogFile
+        Write-Message -Level Verbose -Message "Convert variables MB to KB (SMO works in KB)." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
         [int]$TargetLogSizeKB = $TargetLogSize * 1024
         [int]$LogIncrementSize = $IncrementSize * 1024
         [int]$ShrinkSizeKB = $ShrinkSize * 1024
@@ -286,7 +286,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         #Set base information
-        Write-Message -Level Verbose -Message "Initialize the instance '$SqlInstance'." -FunctionName Expand-DbaDbLogFile
+        Write-Message -Level Verbose -Message "Initialize the instance '$SqlInstance'." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
         try {
             $server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential
@@ -316,12 +316,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             #control the iteration number
             $databaseProgressbar = 0;
 
-            Write-Message -Level Verbose -Message "Resolving FullComputerName name." -FunctionName Expand-DbaDbLogFile
+            Write-Message -Level Verbose -Message "Resolving FullComputerName name." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
             # We don't have windows credentials here, so Resolve-DbaNetworkName has to respect that and work like Resolve-NetBiosName did before.
             $resolvedComputerName = Resolve-DbaComputerName -ComputerName $SqlInstance
 
             $databases = $server.Databases | Where-Object IsAccessible
-            Write-Message -Level Verbose -Message "Number of databases found: $($databases.Count)." -FunctionName Expand-DbaDbLogFile
+            Write-Message -Level Verbose -Message "Number of databases found: $($databases.Count)." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
             if ($Database) {
                 $databases = $databases | Where-Object Name -In $Database
             }
@@ -330,11 +330,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             #go through all databases
-            Write-Message -Level Verbose -Message "Processing...foreach database..." -FunctionName Expand-DbaDbLogFile
+            Write-Message -Level Verbose -Message "Processing...foreach database..." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
             foreach ($db in $databases) {
                 $dbName = $db.Name
 
-                Write-Message -Level Verbose -Message "Working on $dbName." -FunctionName Expand-DbaDbLogFile
+                Write-Message -Level Verbose -Message "Working on $dbName." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                 $databaseProgressbar += 1
 
                 #set step to reutilize on logging operations
@@ -356,21 +356,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     $numLogfiles = $db.LogFiles.Count
 
-                    Write-Message -Level Verbose -Message "$step - Use log file: $logfile." -FunctionName Expand-DbaDbLogFile
+                    Write-Message -Level Verbose -Message "$step - Use log file: $logfile." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                     $currentSize = $logfile.Size
                     $currentSizeMB = $currentSize / 1024
 
                     #Get the number of VLFs
                     $initialVLFCount = Measure-DbaDbVirtualLogFile -SqlInstance $server -Database $dbName
 
-                    Write-Message -Level Verbose -Message "$step - Log file current size: $([System.Math]::Round($($currentSize/1024.0), 2)) MB " -FunctionName Expand-DbaDbLogFile
+                    Write-Message -Level Verbose -Message "$step - Log file current size: $([System.Math]::Round($($currentSize/1024.0), 2)) MB " -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                     [long]$requiredSpace = ($TargetLogSizeKB - $currentSize)
 
                     if ($ExcludeDiskSpaceValidation -eq $false) {
-                        Write-Message -Level Verbose -Message "Verifying if sufficient space exists ($([System.Math]::Round($($requiredSpace / 1024.0), 2))MB) on the volume to perform this task." -FunctionName Expand-DbaDbLogFile
+                        Write-Message -Level Verbose -Message "Verifying if sufficient space exists ($([System.Math]::Round($($requiredSpace / 1024.0), 2))MB) on the volume to perform this task." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
                         [long]$TotalTLogFreeDiskSpaceKB = 0
-                        Write-Message -Level Verbose -Message "Get TLog drive free space" -FunctionName Expand-DbaDbLogFile
+                        Write-Message -Level Verbose -Message "Get TLog drive free space" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
                         try {
                             # That would need a Credential, but we don't have one...
@@ -395,7 +395,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                             while (!$match -and (-not [string]::IsNullOrEmpty($DrivePath)) -and ($DrivePath -ne "\"))
 
-                            Write-Message -Level Verbose -Message "Total TLog Free Disk Space in MB: $([System.Math]::Round($($TotalTLogFreeDiskSpaceKB / 1024.0), 2))" -FunctionName Expand-DbaDbLogFile
+                            Write-Message -Level Verbose -Message "Total TLog Free Disk Space in MB: $([System.Math]::Round($($TotalTLogFreeDiskSpaceKB / 1024.0), 2))" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
                         } catch {
                             #Could not validate the disk space. Will ask if we want to continue.
@@ -405,10 +405,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         if (($TotalTLogFreeDiskSpaceKB -le 0) -or ([string]::IsNullOrEmpty($TotalTLogFreeDiskSpaceKB))) {
                             $message = "Cannot validate freespace on drive where the log file resides for database '$dbName'. Continuing without disk space validation."
                             if (-not $__realCmdlet.ShouldProcess($server.name, $message)) {
-                                Write-Message -Level Warning -Message "Operation cancelled by user" -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Warning -Message "Operation cancelled by user" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                 return
                             }
-                            Write-Message -Level Warning -Message $message -FunctionName Expand-DbaDbLogFile
+                            Write-Message -Level Warning -Message $message -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                         } elseif ($requiredSpace -gt $TotalTLogFreeDiskSpaceKB) {
                             Write-Message -Level Verbose -Message "There is not enough space on volume to perform this task. `r`n" `
                                 "Available space: $([System.Math]::Round($($TotalTLogFreeDiskSpaceKB / 1024.0), 2))MB;`r`n" `
@@ -418,9 +418,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if ($currentSize -ige $TargetLogSizeKB -and ($ShrinkLogFile -eq $false)) {
-                        Write-Message -Level Verbose -Message "$step - [INFO] The T-Log file '$logfile' size is already equal or greater than target size - No action required." -FunctionName Expand-DbaDbLogFile
+                        Write-Message -Level Verbose -Message "$step - [INFO] The T-Log file '$logfile' size is already equal or greater than target size - No action required." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                     } else {
-                        Write-Message -Level Verbose -Message "$step - [OK] There is sufficient free space to perform this task." -FunctionName Expand-DbaDbLogFile
+                        Write-Message -Level Verbose -Message "$step - [OK] There is sufficient free space to perform this task." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
                         # If SQL Server version is greater or equal to 2012
                         if ($server.Version.Major -ge "11") {
@@ -447,17 +447,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
 
                             if (($IncrementSize % 4096) -eq 0) {
-                                Write-Message -Level Verbose -Message "Your instance version is below SQL 2012, remember the known BUG mentioned on HELP. `r`nUse Get-Help Expand-DbaTLogFileResponsibly to read help`r`nUse a different value for incremental size.`r`n" -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Verbose -Message "Your instance version is below SQL 2012, remember the known BUG mentioned on HELP. `r`nUse Get-Help Expand-DbaTLogFileResponsibly to read help`r`nUse a different value for incremental size.`r`n" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                 return
                             }
                         }
-                        Write-Message -Level Verbose -Message "Instance $server version: $($server.Version.Major) - Suggested TLog increment size: $($SuggestLogIncrementSize)MB" -FunctionName Expand-DbaDbLogFile
+                        Write-Message -Level Verbose -Message "Instance $server version: $($server.Version.Major) - Suggested TLog increment size: $($SuggestLogIncrementSize)MB" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
                         # Shrink Log File to desired size before re-growth to desired size (You need to remove as many VLF's as possible to ensure proper growth)
                         $ShrinkSize = $ShrinkSizeKB / 1024
                         if ($ShrinkLogFile -eq $true) {
                             if ($db.RecoveryModel -eq [Microsoft.SqlServer.Management.Smo.RecoveryModel]::Simple) {
-                                Write-Message -Level Warning -Message "Database '$dbName' is in Simple RecoveryModel which does not allow log backups. Do not specify -ShrinkLogFile and -ShrinkSize parameters." -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Warning -Message "Database '$dbName' is in Simple RecoveryModel which does not allow log backups. Do not specify -ShrinkLogFile and -ShrinkSize parameters." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                 Continue
                             }
 
@@ -466,7 +466,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $sqlResult = $server.ConnectionContext.ExecuteWithResults($sql);
 
                                 if ($sqlResult.Tables[0].Rows[0]["last_log_backup_lsn"] -is [System.DBNull]) {
-                                    Write-Message -Level Warning -Message "First, you need to make a full backup before you can do Tlog backup on database '$dbName' (last_log_backup_lsn is null)." -FunctionName Expand-DbaDbLogFile
+                                    Write-Message -Level Warning -Message "First, you need to make a full backup before you can do Tlog backup on database '$dbName' (last_log_backup_lsn is null)." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                     Continue
                                 }
                             } catch {
@@ -474,8 +474,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
 
                             If ($__realCmdlet.ShouldProcess($($server.name), "Backing up TLog for $dbName")) {
-                                Write-Message -Level Verbose -Message "We are about to backup the Tlog for database '$dbName' to '$backupdirectory' and shrink the log." -FunctionName Expand-DbaDbLogFile
-                                Write-Message -Level Verbose -Message "Starting Size = $currentSizeMB." -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Verbose -Message "We are about to backup the Tlog for database '$dbName' to '$backupdirectory' and shrink the log." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
+                                Write-Message -Level Verbose -Message "Starting Size = $currentSizeMB." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
                                 $DefaultCompression = $server.Configuration.DefaultBackupCompression.ConfigValue
 
@@ -519,7 +519,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                     $currentSize = $logfile.Size
                                     $currentSizeMB = $currentSize / 1024
-                                    Write-Message -Level Verbose -Message "TLog backup and truncate for database '$dbName' finished. Current TLog size after $backupRetries backups is $($currentSize/1024)MB" -FunctionName Expand-DbaDbLogFile
+                                    Write-Message -Level Verbose -Message "TLog backup and truncate for database '$dbName' finished. Current TLog size after $backupRetries backups is $($currentSize/1024)MB" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                 }
                             }
                         }
@@ -532,7 +532,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $LogIncrementSize = $SuggestLogIncrementSize
                         } else {
                             if ($LogIncrementSize -lt $SuggestLogIncrementSize) {
-                                Write-Message -Level Warning -Message "The input value for increment size is $([System.Math]::Round($LogIncrementSize / 1024, 0))MB, which is less than the suggested value of $($SuggestLogIncrementSize / 1024)MB." -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Warning -Message "The input value for increment size is $([System.Math]::Round($LogIncrementSize / 1024, 0))MB, which is less than the suggested value of $($SuggestLogIncrementSize / 1024)MB." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                             }
                         }
 
@@ -541,7 +541,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             # When ShrinkLogFile was used, remeasure VLFs post-shrink as the new baseline
                             if ($ShrinkLogFile) {
                                 $vlfCountBaseline = Measure-DbaDbVirtualLogFile -SqlInstance $server -Database $dbName
-                                Write-Message -Level Verbose -Message "$step - VLF count after shrinking: $($vlfCountBaseline.Total)" -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Verbose -Message "$step - VLF count after shrinking: $($vlfCountBaseline.Total)" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                             } else {
                                 $vlfCountBaseline = $initialVLFCount
                             }
@@ -549,7 +549,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $additionalVlfsAllowed = $TargetVlfCount - $vlfCountBaseline.Total
 
                             if ($additionalVlfsAllowed -le 0) {
-                                Write-Message -Level Warning -Message "$step - Current VLF count ($($vlfCountBaseline.Total)) is already at or above the target VLF count ($TargetVlfCount) for database '$dbName'. Use -ShrinkLogFile to reduce VLF count first, then re-expand." -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Warning -Message "$step - Current VLF count ($($vlfCountBaseline.Total)) is already at or above the target VLF count ($TargetVlfCount) for database '$dbName'. Use -ShrinkLogFile to reduce VLF count first, then re-expand." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                 continue
                             }
 
@@ -559,21 +559,21 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $calculatedIncrementKB = Find-TargetVlfIncrementSize -CurrentSizeKB $currentSize -TargetSizeKB $TargetLogSizeKB -AdditionalVlfsAllowed $additionalVlfsAllowed -SqlMajorVersion $server.Version.Major
 
                                 if ($null -eq $calculatedIncrementKB) {
-                                    Write-Message -Level Warning -Message "$step - Cannot achieve target VLF count of $TargetVlfCount for database '$dbName': the VLF budget is too small for the required growth from $currentSizeMB MB to $TargetLogSize MB. Increase -TargetVlfCount or use -ShrinkLogFile to start from a lower base." -FunctionName Expand-DbaDbLogFile
+                                    Write-Message -Level Warning -Message "$step - Cannot achieve target VLF count of $TargetVlfCount for database '$dbName': the VLF budget is too small for the required growth from $currentSizeMB MB to $TargetLogSize MB. Increase -TargetVlfCount or use -ShrinkLogFile to start from a lower base." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                     continue
                                 }
 
                                 $estimatedAdditionalVlfCount = Get-VlfCountForGrowthPlan -InitialSizeKB $currentSize -TargetSizeKB $TargetLogSizeKB -IncrementKB $calculatedIncrementKB -SqlMajorVersion $server.Version.Major
-                                Write-Message -Level Verbose -Message "$step - TargetVlfCount ${TargetVlfCount}: overriding increment size to $([Math]::Round($calculatedIncrementKB / 1024.0, 2))MB to add an estimated $estimatedAdditionalVlfCount VLFs (was $([Math]::Round($LogIncrementSize / 1024.0, 2))MB)." -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Verbose -Message "$step - TargetVlfCount ${TargetVlfCount}: overriding increment size to $([Math]::Round($calculatedIncrementKB / 1024.0, 2))MB to add an estimated $estimatedAdditionalVlfCount VLFs (was $([Math]::Round($LogIncrementSize / 1024.0, 2))MB)." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                 $LogIncrementSize = [int]$calculatedIncrementKB
                             }
                         }
 
                         #start growing file
                         If ($__realCmdlet.ShouldProcess($($server.name), "Starting log growth. Increment chunk size: $($LogIncrementSize/1024)MB for database '$dbName'")) {
-                            Write-Message -Level Verbose -Message "Starting log growth. Increment chunk size: $($LogIncrementSize/1024)MB for database '$dbName'" -FunctionName Expand-DbaDbLogFile
+                            Write-Message -Level Verbose -Message "Starting log growth. Increment chunk size: $($LogIncrementSize/1024)MB for database '$dbName'" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
-                            Write-Message -Level Verbose -Message "$step - While current size less than target log size." -FunctionName Expand-DbaDbLogFile
+                            Write-Message -Level Verbose -Message "$step - While current size less than target log size." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
                             while ($currentSize -lt $TargetLogSizeKB) {
 
@@ -584,38 +584,38 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     -PercentComplete ($currentSize / $TargetLogSizeKB * 100) `
                                     -Status "Remaining - $([System.Math]::Round($($($TargetLogSizeKB - $currentSize) / 1024.0), 2)) MB"
 
-                                Write-Message -Level Verbose -Message "$step - Verifying if the log can grow or if it's already at the desired size." -FunctionName Expand-DbaDbLogFile
+                                Write-Message -Level Verbose -Message "$step - Verifying if the log can grow or if it's already at the desired size." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                 if (($TargetLogSizeKB - $currentSize) -lt $LogIncrementSize) {
-                                    Write-Message -Level Verbose -Message "$step - Log size is lower than the increment size. Setting current size equals $TargetLogSizeKB." -FunctionName Expand-DbaDbLogFile
+                                    Write-Message -Level Verbose -Message "$step - Log size is lower than the increment size. Setting current size equals $TargetLogSizeKB." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                     $currentSize = $TargetLogSizeKB
                                 } else {
-                                    Write-Message -Level Verbose -Message "$step - Grow the $logfile file in $([System.Math]::Round($($LogIncrementSize / 1024.0), 2)) MB" -FunctionName Expand-DbaDbLogFile
+                                    Write-Message -Level Verbose -Message "$step - Grow the $logfile file in $([System.Math]::Round($($LogIncrementSize / 1024.0), 2)) MB" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                     $currentSize += $LogIncrementSize
                                 }
 
                                 #When -WhatIf Switch, do not run
                                 if ($__realCmdlet.ShouldProcess("$step - File will grow to $([System.Math]::Round($($currentSize/1024.0), 2)) MB", "This action will grow the file $logfile on database $dbName to $([System.Math]::Round($($currentSize/1024.0), 2)) MB .`r`nDo you wish to continue?", "Perform grow")) {
-                                    Write-Message -Level Verbose -Message "$step - Set size $logfile to $([System.Math]::Round($($currentSize/1024.0), 2)) MB" -FunctionName Expand-DbaDbLogFile
+                                    Write-Message -Level Verbose -Message "$step - Set size $logfile to $([System.Math]::Round($($currentSize/1024.0), 2)) MB" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                     $logfile.size = $currentSize
 
-                                    Write-Message -Level Verbose -Message "$step - Applying changes" -FunctionName Expand-DbaDbLogFile
+                                    Write-Message -Level Verbose -Message "$step - Applying changes" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                                     $logfile.Alter()
-                                    Write-Message -Level Verbose -Message "$step - Changes have been applied" -FunctionName Expand-DbaDbLogFile
+                                    Write-Message -Level Verbose -Message "$step - Changes have been applied" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
                                     #Will put the info like VolumeFreeSpace up to date
                                     $logfile.Refresh()
                                 }
                             }
 
-                            Write-Message -Level Verbose -Message "`r`n$step - [OK] Growth process for logfile '$logfile' on database '$dbName', has been finished." -FunctionName Expand-DbaDbLogFile
+                            Write-Message -Level Verbose -Message "`r`n$step - [OK] Growth process for logfile '$logfile' on database '$dbName', has been finished." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 
-                            Write-Message -Level Verbose -Message "$step - Grow $logfile log file on $dbName database finished." -FunctionName Expand-DbaDbLogFile
+                            Write-Message -Level Verbose -Message "$step - Grow $logfile log file on $dbName database finished." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                         }
                     }
                 }
                 #else verifying existence
                 else {
-                    Write-Message -Level Verbose -Message "Database '$dbName' does not exist on instance '$SqlInstance'." -FunctionName Expand-DbaDbLogFile
+                    Write-Message -Level Verbose -Message "Database '$dbName' does not exist on instance '$SqlInstance'." -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
                 }
 
                 #Get the number of VLFs
@@ -641,7 +641,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
 
-        Write-Message -Level Verbose -Message "Process finished $((Get-Date) - ($initialTime))" -FunctionName Expand-DbaDbLogFile
+        Write-Message -Level Verbose -Message "Process finished $((Get-Date) - ($initialTime))" -FunctionName Expand-DbaDbLogFile -ModuleName "dbatools"
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $TargetLogSize $IncrementSize $TargetVlfCount $LogFileId $ShrinkLogFile $ShrinkSize $BackupDirectory $ExcludeDiskSpaceValidation $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

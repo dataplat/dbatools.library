@@ -67,23 +67,23 @@ public sealed class FindDbaStoredProcedureCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            IncludeSystemObjects.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaStoredProcedureBegin"))
             {
                 _state = sentinel["__findDbaStoredProcedureBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            IncludeSystemObjects.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -91,9 +91,7 @@ public sealed class FindDbaStoredProcedureCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern, IncludeSystemDatabases.ToBool(),
-            EnableException.ToBool(), _state, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaStoredProcedureProcess"))
             {
@@ -101,16 +99,18 @@ public sealed class FindDbaStoredProcedureCommand : DbaBaseCmdlet
                 {
                     _state = state["State"] as Hashtable ?? _state;
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern, IncludeSystemDatabases.ToBool(),
+            EnableException.ToBool(), _state, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
@@ -118,17 +118,17 @@ public sealed class FindDbaStoredProcedureCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, EndScript,
+            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -207,7 +207,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.versionMajor -lt 9) {
-                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaStoredProcedure
+                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
                 Continue
             }
 
@@ -228,9 +228,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $totalcount = 0
             $dbcount = $dbs.count
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaStoredProcedure
+                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
 
-                Write-Message -Level Debug -Message $sql -FunctionName Find-DbaStoredProcedure
+                Write-Message -Level Debug -Message $sql -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
                 $rows = $db.ExecuteWithResults($sql).Tables.Rows
                 $sproccount = 0
 
@@ -240,7 +240,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $procSchema = $row.ProcSchema
                     $proc = $row.Name
 
-                    Write-Message -Level Verbose -Message "Looking in stored procedure: $procSchema.$proc textBody for $pattern" -FunctionName Find-DbaStoredProcedure
+                    Write-Message -Level Verbose -Message "Looking in stored procedure: $procSchema.$proc textBody for $pattern" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
                     if ($row.TextBody -match $Pattern) {
                         $sp = $db.StoredProcedures | Where-Object { $_.Schema -eq $procSchema -and $_.Name -eq $proc }
 
@@ -267,9 +267,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                 }
 
-                Write-Message -Level Verbose -Message "Evaluated $sproccount stored procedures in $db" -FunctionName Find-DbaStoredProcedure
+                Write-Message -Level Verbose -Message "Evaluated $sproccount stored procedures in $db" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
             }
-            Write-Message -Level Verbose -Message "Evaluated $totalcount total stored procedures in $dbcount databases" -FunctionName Find-DbaStoredProcedure
+            Write-Message -Level Verbose -Message "Evaluated $totalcount total stored procedures in $dbcount databases" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
         }
 
     $__state.EveryServerSpCount = $everyserverspcount
@@ -291,7 +291,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $everyserverspcount = $__state.EveryServerSpCount
 
-        Write-Message -Level Verbose -Message "Evaluated $everyserverspcount total stored procedures" -FunctionName Find-DbaStoredProcedure
+        Write-Message -Level Verbose -Message "Evaluated $everyserverspcount total stored procedures" -FunctionName Find-DbaStoredProcedure -ModuleName "dbatools"
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

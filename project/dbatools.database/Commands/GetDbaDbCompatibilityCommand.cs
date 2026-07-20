@@ -110,7 +110,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     foreach ($__continueGuard in @(1)) {
         if ((-not $__boundSqlInstance) -and (-not $__boundInputObject)) {
-            Write-Message -Level Warning -Message "You must specify either a SQL instance or pipe a database collection" -FunctionName Get-DbaDbCompatibility
+            Write-Message -Level Warning -Message "You must specify either a SQL instance or pipe a database collection" -FunctionName Get-DbaDbCompatibility -ModuleName "dbatools"
             continue
         }
 
@@ -121,7 +121,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         foreach ($db in $InputObject) {
             $server = $db.Parent
             $ServerVersion = $server.VersionMajor
-            Write-Message -Level Verbose -Message "SQL Server is using Version: $ServerVersion" -FunctionName Get-DbaDbCompatibility
+            Write-Message -Level Verbose -Message "SQL Server is using Version: $ServerVersion" -FunctionName Get-DbaDbCompatibility -ModuleName "dbatools"
 
             [PSCustomObject]@{
                 ComputerName  = $server.ComputerName

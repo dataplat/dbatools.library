@@ -104,7 +104,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
         if ((-not $__boundSqlInstance) -and (-not $__boundInputObject)) {
-            Write-Message -Level Warning -Message "You must specify either a SQL instance or supply an InputObject" -FunctionName Get-DbaDbFileMapping
+            Write-Message -Level Warning -Message "You must specify either a SQL instance or supply an InputObject" -FunctionName Get-DbaDbFileMapping -ModuleName "dbatools"
             return
         }
 
@@ -114,7 +114,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if ($db.IsAccessible) {
-                Write-Message -Level Verbose -Message "Processing database: $db" -FunctionName Get-DbaDbFileMapping
+                Write-Message -Level Verbose -Message "Processing database: $db" -FunctionName Get-DbaDbFileMapping -ModuleName "dbatools"
                 $fileMap = @{ }
 
                 foreach ($file in $db.FileGroups.Files) {
@@ -132,7 +132,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     FileMapping  = $fileMap
                 }
             } else {
-                Write-Message -Level Verbose -Message "Skipping processing of database: $db as database is not accessible" -FunctionName Get-DbaDbFileMapping
+                Write-Message -Level Verbose -Message "Skipping processing of database: $db as database is not accessible" -FunctionName Get-DbaDbFileMapping -ModuleName "dbatools"
             }
         }
 } $SqlInstance $SqlCredential $Database $InputObject $EnableException $__boundSqlInstance $__boundInputObject $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

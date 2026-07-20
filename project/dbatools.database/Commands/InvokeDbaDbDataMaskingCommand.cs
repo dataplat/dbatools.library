@@ -296,22 +296,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Set defaults
         if (-not $ModulusFactor) {
             $ModulusFactor = 10
-            Write-Message -Level Verbose -Message "Modulus factor set to $ModulusFactor" -FunctionName Invoke-DbaDbDataMasking
+            Write-Message -Level Verbose -Message "Modulus factor set to $ModulusFactor" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
         }
 
         if (-not $CommandTimeout) {
             $CommandTimeout = 300
-            Write-Message -Level Verbose -Message "Command time-out set to $CommandTimeout" -FunctionName Invoke-DbaDbDataMasking
+            Write-Message -Level Verbose -Message "Command time-out set to $CommandTimeout" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
         }
 
         if (-not $BatchSize) {
             $BatchSize = 1000
-            Write-Message -Level Verbose -Message "Batch size set to $BatchSize" -FunctionName Invoke-DbaDbDataMasking
+            Write-Message -Level Verbose -Message "Batch size set to $BatchSize" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
         }
 
         if (-not $Retry) {
             $Retry = 1000
-            Write-Message -Level Verbose -Message "Retry count set to $Retry" -FunctionName Invoke-DbaDbDataMasking
+            Write-Message -Level Verbose -Message "Retry count set to $Retry" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
         }
     }
 
@@ -418,7 +418,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # Check if the deterministic values table is already present
             if ($server.Databases['tempdb'].Tables.Name -contains 'DeterministicValues') {
-                Write-Message -Level Verbose -Message "Deterministic values table already exists. Dropping it...." -FunctionName Invoke-DbaDbDataMasking
+                Write-Message -Level Verbose -Message "Deterministic values table already exists. Dropping it...." -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                 $query = "DROP TABLE [dbo].[DeterministicValues];"
                 $server.Databases['tempdb'].Query($query)
             }
@@ -440,7 +440,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # Import the dictionary files
             if ($DictionaryFilePath.Count -ge 1) {
                 foreach ($file in $DictionaryFilePath) {
-                    Write-Message -Level Verbose -Message "Importing dictionary file '$file'" -FunctionName Invoke-DbaDbDataMasking
+                    Write-Message -Level Verbose -Message "Importing dictionary file '$file'" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                     if (Test-Path -Path $file) {
                         try {
                             # Import the keys and values
@@ -478,7 +478,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $stringBuilder = [System.Text.StringBuilder]''
 
                     if ($tableobject.Name -in $ExcludeTable) {
-                        Write-Message -Level Verbose -Message "Skipping $($tableobject.Name) because it is explicitly excluded" -FunctionName Invoke-DbaDbDataMasking
+                        Write-Message -Level Verbose -Message "Skipping $($tableobject.Name) because it is explicitly excluded" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                         continue
                     }
 
@@ -498,7 +498,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # Skip column and index creation when -WhatIf is active to avoid leaving behind schema changes
                     if (-not $WhatIfPreference) {
                         if (-not ($dbTable.Columns | Where-Object { $_.Identity -eq $true })) {
-                            Write-Message -Level Verbose -Message "Adding identity column to table [$($dbTable.Schema)].[$($dbTable.Name)]" -FunctionName Invoke-DbaDbDataMasking
+                            Write-Message -Level Verbose -Message "Adding identity column to table [$($dbTable.Schema)].[$($dbTable.Name)]" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                             $query = "ALTER TABLE [$($dbTable.Schema)].[$($dbTable.Name)] ADD MaskingID BIGINT IDENTITY(1, 1) NOT NULL;"
 
                             try {
@@ -519,7 +519,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         # Check if the index for the identity column is already present
                         try {
                             if ($dbTable.Indexes.Name -contains $maskingIndexName) {
-                                Write-Message -Level Verbose -Message "Masking index already exists in table [$($dbTable.Schema)].[$($dbTable.Name)]. Dropping it..." -FunctionName Invoke-DbaDbDataMasking
+                                Write-Message -Level Verbose -Message "Masking index already exists in table [$($dbTable.Schema)].[$($dbTable.Name)]. Dropping it..." -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                 $dbTable.Indexes[$($maskingIndexName)].Drop()
                             }
                         } catch {
@@ -528,7 +528,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                         # Create the index for the identity column
                         try {
-                            Write-Message -Level Verbose -Message "Adding index on identity column [$($identityColumn)] in table [$($dbTable.Schema)].[$($dbTable.Name)]" -FunctionName Invoke-DbaDbDataMasking
+                            Write-Message -Level Verbose -Message "Adding index on identity column [$($identityColumn)] in table [$($dbTable.Schema)].[$($dbTable.Name)]" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
 
                             $query = "CREATE NONCLUSTERED INDEX [$($maskingIndexName)] ON [$($dbTable.Schema)].[$($dbTable.Name)]([$($identityColumn)])"
 
@@ -603,11 +603,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     #region unique indexes
                     # Check if the table contains unique indexes
                     if ($WhatIfPreference -and $tableobject.HasUniqueIndex) {
-                        Write-Message -Level Verbose -Message "Skipping unique value preparation for [$($tableobject.Schema)].[$($tableobject.Name)] because -WhatIf is active" -FunctionName Invoke-DbaDbDataMasking
+                        Write-Message -Level Verbose -Message "Skipping unique value preparation for [$($tableobject.Schema)].[$($tableobject.Name)] because -WhatIf is active" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                     } elseif ($tableobject.HasUniqueIndex) {
 
                         # Loop through the rows and generate a unique value for each row
-                        Write-Message -Level Verbose -Message "Generating unique values for [$($tableobject.Schema)].[$($tableobject.Name)]" -FunctionName Invoke-DbaDbDataMasking
+                        Write-Message -Level Verbose -Message "Generating unique values for [$($tableobject.Schema)].[$($tableobject.Name)]" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
 
                         $params = @{
                             SqlInstance   = $server
@@ -636,7 +636,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $uniqueDataTableName = $indexToTable.TempTableName
 
                                 if ($server.Databases['tempdb'].Tables.Name -contains $indexToTable.TempTableName) {
-                                    Write-Message -Level Verbose -Message "Table '$($indexToTable.TempTableName)' already exists. Dropping it.." -FunctionName Invoke-DbaDbDataMasking
+                                    Write-Message -Level Verbose -Message "Table '$($indexToTable.TempTableName)' already exists. Dropping it.." -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                     try {
                                         $query = "DROP TABLE $($indexToTable.TempTableName)"
                                         Invoke-DbaQuery -SqlInstance $server -SqlCredential $SqlCredential -Database 'tempdb' -Query $query
@@ -647,7 +647,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                 # Create the temporary table
                                 try {
-                                    Write-Message -Level Verbose -Message "Creating temporary table '$($indexToTable.TempTableName)'" -FunctionName Invoke-DbaDbDataMasking
+                                    Write-Message -Level Verbose -Message "Creating temporary table '$($indexToTable.TempTableName)'" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                     Invoke-DbaQuery -SqlInstance $server -SqlCredential $SqlCredential -Database 'tempdb' -Query $indexToTable.CreateStatement
                                 } catch {
                                     Stop-Function -Message "Could not create temporary table #[$($tableobject.Schema)].[$($tableobject.Name)]" -FunctionName Invoke-DbaDbDataMasking
@@ -655,7 +655,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                 # Create the unique index table
                                 try {
-                                    Write-Message -Level Verbose -Message "Creating the unique index for temporary table '$($indexToTable.TempTableName)'" -FunctionName Invoke-DbaDbDataMasking
+                                    Write-Message -Level Verbose -Message "Creating the unique index for temporary table '$($indexToTable.TempTableName)'" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                     Invoke-DbaQuery -SqlInstance $server -SqlCredential $SqlCredential -Database 'tempdb' -Query $indexToTable.UniqueIndexStatement
                                 } catch {
                                     Stop-Function -Message "Could not create temporary table #[$($tableobject.Schema)].[$($tableobject.Name)]" -FunctionName Invoke-DbaDbDataMasking
@@ -780,7 +780,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                         $null = $server.Databases['tempdb'].Query($insertQuery)
                                         $insertFailed = $false
                                     } catch {
-                                        Write-Message -Level Verbose -Message "Could not insert value" -FunctionName Invoke-DbaDbDataMasking
+                                        Write-Message -Level Verbose -Message "Could not insert value" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                         $insertFailed = $true
                                     }
 
@@ -903,7 +903,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                             $null = $server.Databases['tempdb'].Query($insertQuery)
                                             $insertFailed = $false
                                         } catch {
-                                            Write-Message -Level Verbose -Message "Could not insert value" -FunctionName Invoke-DbaDbDataMasking
+                                            Write-Message -Level Verbose -Message "Could not insert value" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                             $insertFailed = $true
                                             $retryCount++
                                         }
@@ -911,14 +911,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 }
 
                                 try {
-                                    Write-Message -Level Verbose -Message "Creating masking index for [$($indexToTable.TempTableName)]" -FunctionName Invoke-DbaDbDataMasking
+                                    Write-Message -Level Verbose -Message "Creating masking index for [$($indexToTable.TempTableName)]" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                     $query = "CREATE NONCLUSTERED INDEX [NIX_$($indexToTable.TempTableName)_MaskID] ON [$($indexToTable.TempTableName)]([RowNr])"
                                     $null = $server.Databases['tempdb'].Query($query)
                                 } catch {
                                     Stop-Function -Message "Could not add masking index for [$($indexToTable.TempTableName)]" -ErrorRecord $_ -FunctionName Invoke-DbaDbDataMasking
                                 }
                             } else {
-                                Write-Message -Level Verbose -Message "Table [$($tableobject.Schema)].[$($tableobject.Name)] does not contain any masking index columns to process" -FunctionName Invoke-DbaDbDataMasking
+                                Write-Message -Level Verbose -Message "Table [$($tableobject.Schema)].[$($tableobject.Name)] does not contain any masking index columns to process" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                             }
                         } else {
                             Stop-Function -Message "The table does not have any indexes" -FunctionName Invoke-DbaDbDataMasking
@@ -942,7 +942,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if (-not $tablecolumns) {
-                        Write-Message -Level Verbose "No columns to process in [$($dbName)].[$($tableobject.Schema)].[$($tableobject.Name)], moving on" -FunctionName Invoke-DbaDbDataMasking
+                        Write-Message -Level Verbose "No columns to process in [$($dbName)].[$($tableobject.Schema)].[$($tableobject.Name)], moving on" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                         continue
                     }
 
@@ -1003,7 +1003,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     $newValue = $columnobject.StaticValue
 
                                     if ($null -eq $newValue -and -not $columnobject.Nullable) {
-                                        Write-Message -Message "Column '$($columnobject.Name)' static value cannot be null when column is set not to be nullable." -Level Warning -FunctionName Invoke-DbaDbDataMasking
+                                        Write-Message -Message "Column '$($columnobject.Name)' static value cannot be null when column is set not to be nullable." -Level Warning -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                         continue
                                     }
                                 }
@@ -1216,7 +1216,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                         Invoke-DbaDbDataMasking $progressParams
 
-                                        Write-Message -Level Verbose -Message "Executing batch $batchNr/$totalBatches" -FunctionName Invoke-DbaDbDataMasking
+                                        Write-Message -Level Verbose -Message "Executing batch $batchNr/$totalBatches" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
 
                                         $queryParams = @{
                                             SqlInstance     = $instance
@@ -1245,7 +1245,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         # Process Actions separately
                         if ($columnsWithActions.Count -ge 1) {
                             foreach ($columnObject in $columnsWithActions) {
-                                Write-Message -Level Verbose -Message "Processing action for [$($columnObject.Name)]" -FunctionName Invoke-DbaDbDataMasking
+                                Write-Message -Level Verbose -Message "Processing action for [$($columnObject.Name)]" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
 
                                 [bool]$validAction = $true
                                 $columnAction = $columnobject.Action
@@ -1336,7 +1336,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         # Process Composites separately
                         if ($columnsWithComposites.Count -ge 1) {
                             foreach ($columnObject in $columnsWithComposites) {
-                                Write-Message -Level Verbose -Message "Processing composite for [$($columnObject.Name)]" -FunctionName Invoke-DbaDbDataMasking
+                                Write-Message -Level Verbose -Message "Processing composite for [$($columnObject.Name)]" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
 
                                 $compositeItems = @()
 
@@ -1442,7 +1442,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                             # Check if the index is there
                             if ($dbTable.Indexes.Name -contains $maskingIndexName) {
-                                Write-Message -Level verbose -Message "Removing identity index from table [$($dbTable.Schema)].[$($dbTable.Name)]" -FunctionName Invoke-DbaDbDataMasking
+                                Write-Message -Level verbose -Message "Removing identity index from table [$($dbTable.Schema)].[$($dbTable.Name)]" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                                 $dbTable.Indexes[$($maskingIndexName)].Drop()
                             }
                         } catch {
@@ -1453,7 +1453,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # Clean up the identity column (always runs, regardless of -WhatIf or errors during masking)
                     if ($cleanupIdentityColumn) {
                         try {
-                            Write-Message -Level Verbose -Message "Removing identity column [$($identityColumn)] from table [$($dbTable.Schema)].[$($dbTable.Name)]" -FunctionName Invoke-DbaDbDataMasking
+                            Write-Message -Level Verbose -Message "Removing identity column [$($identityColumn)] from table [$($dbTable.Schema)].[$($dbTable.Name)]" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
 
                             $query = "ALTER TABLE [$($dbTable.Schema)].[$($dbTable.Name)] DROP COLUMN [$($identityColumn)]"
 
@@ -1465,7 +1465,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                     # Cleanup
                     if ($uniqueDataTableName) {
-                        Write-Message -Message "Cleaning up unique temporary table '$uniqueDataTableName'" -Level verbose -FunctionName Invoke-DbaDbDataMasking
+                        Write-Message -Message "Cleaning up unique temporary table '$uniqueDataTableName'" -Level verbose -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                         $query = "DROP TABLE [$($uniqueDataTableName)];"
                         try {
                             $null = Invoke-DbaQuery -SqlInstance $server -SqlCredential $SqlCredential -Database 'tempdb' -Query $query -EnableException
@@ -1484,7 +1484,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         [array]$dictResult = $server.Databases['tempdb'].Query($query)
 
                         if ($dictResult.Count -ge 1) {
-                            Write-Message -Message "Writing dictionary for $($db.Name)" -Level Verbose -FunctionName Invoke-DbaDbDataMasking
+                            Write-Message -Message "Writing dictionary for $($db.Name)" -Level Verbose -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
 
                             # Check if the output directory already exists
                             if (-not (Test-Path -Path $DictionaryExportPath)) {
@@ -1505,7 +1505,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                             Get-ChildItem -Path $dictionaryFileName
                         } else {
-                            Write-Message -Level Verbose -Message "No values to export as a dictionary" -FunctionName Invoke-DbaDbDataMasking
+                            Write-Message -Level Verbose -Message "No values to export as a dictionary" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                         }
                     } catch {
                         Stop-Function -Message "Something went wrong writing the dictionary to the $DictionaryExportPath" -Target $DictionaryExportPath -Continue -ErrorRecord $_ -FunctionName Invoke-DbaDbDataMasking
@@ -1520,7 +1520,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $query = "DROP TABLE dbo.DeterministicValues"
 
                 try {
-                    Write-Message -Level Verbose -Message "Cleaning up deterministic values table" -FunctionName Invoke-DbaDbDataMasking
+                    Write-Message -Level Verbose -Message "Cleaning up deterministic values table" -FunctionName Invoke-DbaDbDataMasking -ModuleName "dbatools"
                     $null = $server.Databases['tempdb'].Query($query)
                 } catch {
                     Stop-Function -Message "Could not remove deterministic value table" -ErrorRecord $_ -FunctionName Invoke-DbaDbDataMasking

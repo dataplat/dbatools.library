@@ -46,10 +46,7 @@ public sealed class GetDbaAgentProxyCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, Proxy, ExcludeProxy, EnableException.ToBool(),
-                TestBound(nameof(Proxy)), TestBound(nameof(ExcludeProxy)), _server,
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -59,15 +56,28 @@ public sealed class GetDbaAgentProxyCommand : DbaBaseCmdlet
                 else if (item is not null && LanguagePrimitives.IsTrue(
                     item.Properties["__GetDbaAgentProxyProcessComplete"]?.Value))
                 {
-                    object? serverState = item.Properties["Server"]?.Value;
-                    _server = serverState is PSObject wrapper ? wrapper.BaseObject : serverState;
+                    _server = UnwrapHopValue(item.Properties["Server"]?.Value);
                 }
                 else
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+                new[] { instance }, SqlCredential, Proxy, ExcludeProxy, EnableException.ToBool(),
+                TestBound(nameof(Proxy)), TestBound(nameof(ExcludeProxy)), _server,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
+    }
+
+    // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
+    // wrapper rather than the BaseObject, so unwrapping one would discard it - keep it wrapped.
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -117,8 +127,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaAgentProxy
         }
 
-        Write-Message -Level Verbose -Message "Getting Edition from $server" -FunctionName Get-DbaAgentProxy
-        Write-Message -Level Verbose -Message "$server is a $($server.Edition)" -FunctionName Get-DbaAgentProxy
+        Write-Message -Level Verbose -Message "Getting Edition from $server" -FunctionName Get-DbaAgentProxy -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "$server is a $($server.Edition)" -FunctionName Get-DbaAgentProxy -ModuleName "dbatools"
 
         if ($server.Edition -like 'Express*') {
             Stop-Function -Message "There is no SQL Agent on $server, it's a $($server.Edition)" -Continue -FunctionName Get-DbaAgentProxy

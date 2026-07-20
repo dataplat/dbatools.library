@@ -95,17 +95,7 @@ public sealed class SetDbaRgResourcePoolCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, ResourcePool, Type,
-            MinimumCpuPercentage, MaximumCpuPercentage, CapCpuPercentage,
-            MinimumMemoryPercentage, MaximumMemoryPercentage,
-            MinimumIOPSPerVolume, MaximumIOPSPerVolume, MaximumProcesses,
-            SkipReconfigure.ToBool(), InputObject,
-            TestBound("Type"), TestBound("MinimumCpuPercentage"),
-            TestBound("MaximumCpuPercentage"), TestBound("CapCpuPercentage"),
-            TestBound("MinimumMemoryPercentage"), TestBound("MaximumMemoryPercentage"),
-            TestBound("MinimumIOPSPerVolume"), TestBound("MaximumIOPSPerVolume"),
-            TestBound("MaximumProcesses"), EnableException.ToBool(), this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -116,7 +106,17 @@ public sealed class SetDbaRgResourcePoolCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, ResourcePool, Type,
+            MinimumCpuPercentage, MaximumCpuPercentage, CapCpuPercentage,
+            MinimumMemoryPercentage, MaximumMemoryPercentage,
+            MinimumIOPSPerVolume, MaximumIOPSPerVolume, MaximumProcesses,
+            SkipReconfigure.ToBool(), InputObject,
+            TestBound("Type"), TestBound("MinimumCpuPercentage"),
+            TestBound("MaximumCpuPercentage"), TestBound("CapCpuPercentage"),
+            TestBound("MinimumMemoryPercentage"), TestBound("MaximumMemoryPercentage"),
+            TestBound("MinimumIOPSPerVolume"), TestBound("MaximumIOPSPerVolume"),
+            TestBound("MaximumProcesses"), EnableException.ToBool(), this, BoundVerbose());
     }
 
     private object? BoundVerbose()
@@ -218,7 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($server.ResourceGovernor.ServerVersion.Major -ge 11) {
                     $resPool.CapCpuPercentage = $CapCpuPercentage
                 } elseif ($server.ResourceGovernor.ServerVersion.Major -lt 11) {
-                    Write-Message -Level Warning -Message "SQL Server version 2012+ required to specify a CPU percentage cap." -FunctionName Set-DbaRgResourcePool
+                    Write-Message -Level Warning -Message "SQL Server version 2012+ required to specify a CPU percentage cap." -FunctionName Set-DbaRgResourcePool -ModuleName "dbatools"
                 }
             }
         }
@@ -235,7 +235,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         # Reconfigure Resource Governor
         try {
             if ($SkipReconfigure) {
-                Write-Message -Level Warning -Message "Resource pool changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Set-DbaRgResourcePool
+                Write-Message -Level Warning -Message "Resource pool changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Set-DbaRgResourcePool -ModuleName "dbatools"
             } elseif ($__realCmdlet.ShouldProcess($server, "Reconfiguring the Resource Governor")) {
                 $server.ResourceGovernor.Alter()
             }

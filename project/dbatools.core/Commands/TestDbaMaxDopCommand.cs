@@ -34,18 +34,18 @@ public sealed class TestDbaMaxDopCommand : DbaBaseCmdlet
 
         foreach (DbaInstanceParameter instance in SqlInstance)
         {
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new DbaInstanceParameter[] { instance }, SqlCredential, EnableException.ToBool(),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+            new DbaInstanceParameter[] { instance }, SqlCredential, EnableException.ToBool(),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -201,16 +201,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($server.VersionMajor -ge 13) {
                 #Variable marked as unused by PSScriptAnalyzer
                 #$hasScopedConfig = $true
-                Write-Message -Level Verbose -Message "SQL Server 2016 or higher detected, checking each database's MaxDop." -FunctionName Test-DbaMaxDop
+                Write-Message -Level Verbose -Message "SQL Server 2016 or higher detected, checking each database's MaxDop." -FunctionName Test-DbaMaxDop -ModuleName "dbatools"
 
                 $databases = $server.Databases | Where-Object { $_.IsSystemObject -eq $false }
 
                 foreach ($database in $databases) {
                     if ($database.IsAccessible -eq $false) {
-                        Write-Message -Level Verbose -Message "Database $database is not accessible." -FunctionName Test-DbaMaxDop
+                        Write-Message -Level Verbose -Message "Database $database is not accessible." -FunctionName Test-DbaMaxDop -ModuleName "dbatools"
                         continue
                     }
-                    Write-Message -Level Verbose -Message "Checking database '$($database.Name)'." -FunctionName Test-DbaMaxDop
+                    Write-Message -Level Verbose -Message "Checking database '$($database.Name)'." -FunctionName Test-DbaMaxDop -ModuleName "dbatools"
 
                     $dbmaxdop = $database.MaxDop
 

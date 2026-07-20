@@ -83,23 +83,23 @@ public sealed class FindDbaSimilarTableCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            ExcludeViews.ToBool(), SchemaName, TableName, MatchPercentThreshold, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaSimilarTableBegin"))
             {
                 _state = sentinel["__findDbaSimilarTableBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            ExcludeViews.ToBool(), SchemaName, TableName, MatchPercentThreshold, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -107,9 +107,7 @@ public sealed class FindDbaSimilarTableCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, IncludeSystemDatabases.ToBool(),
-            EnableException.ToBool(), _state, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaSimilarTableProcess"))
             {
@@ -117,16 +115,18 @@ public sealed class FindDbaSimilarTableCommand : DbaBaseCmdlet
                 {
                     _state = state["State"] as Hashtable ?? _state;
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, IncludeSystemDatabases.ToBool(),
+            EnableException.ToBool(), _state, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
@@ -134,17 +134,17 @@ public sealed class FindDbaSimilarTableCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, EndScript,
+            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -293,7 +293,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         $sql = "$sqlSelect $sqlWhere $sqlGroupBy $sqlHaving $sqlOrderBy"
 
-        Write-Message -Level Debug -Message $sql -FunctionName Find-DbaSimilarTable
+        Write-Message -Level Debug -Message $sql -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
 
 
     @{ __findDbaSimilarTableBegin = @{ Sql = $sql; EveryServerVwCount = $everyServerVwCount; VwCount = $null } }
@@ -346,7 +346,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dbCount = $dbs.count
             foreach ($db in $dbs) {
 
-                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaSimilarTable
+                Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
                 $rows = $db.Query($sql)
 
                 foreach ($row in $rows) {
@@ -377,10 +377,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $totalCount = $totalCount + $rows.Count
                 $everyServerVwCount = $everyServerVwCount + $rows.Count
 
-                Write-Message -Level Verbose -Message "Found $vwCount tables/views in $db" -FunctionName Find-DbaSimilarTable
+                Write-Message -Level Verbose -Message "Found $vwCount tables/views in $db" -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
             }
 
-            Write-Message -Level Verbose -Message "Found $totalCount total tables/views in $dbCount databases" -FunctionName Find-DbaSimilarTable
+            Write-Message -Level Verbose -Message "Found $totalCount total tables/views in $dbCount databases" -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
         }
 
     $__state.EveryServerVwCount = $everyServerVwCount
@@ -403,7 +403,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $everyServerVwCount = $__state.EveryServerVwCount
 
-        Write-Message -Level Verbose -Message "Found $everyServerVwCount total tables/views" -FunctionName Find-DbaSimilarTable
+        Write-Message -Level Verbose -Message "Found $everyServerVwCount total tables/views" -FunctionName Find-DbaSimilarTable -ModuleName "dbatools"
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

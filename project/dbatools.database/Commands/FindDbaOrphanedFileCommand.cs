@@ -80,22 +80,22 @@ public sealed class FindDbaOrphanedFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            FileType, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaOrphanedFileBegin"))
             {
                 _state = sentinel["__findDbaOrphanedFileBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            FileType, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -103,9 +103,7 @@ public sealed class FindDbaOrphanedFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Path, Recurse.ToBool(), LocalOnly.ToBool(), RemoteOnly.ToBool(),
-            EnableException.ToBool(), _state, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaOrphanedFileProcess"))
             {
@@ -113,16 +111,18 @@ public sealed class FindDbaOrphanedFileCommand : DbaBaseCmdlet
                 {
                     _state = state["State"] as Hashtable ?? _state;
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Path, Recurse.ToBool(), LocalOnly.ToBool(), RemoteOnly.ToBool(),
+            EnableException.ToBool(), _state, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
@@ -130,17 +130,17 @@ public sealed class FindDbaOrphanedFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, EndScript,
+            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -424,7 +424,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             # Include the default data and log directories from the instance
-            Write-Message -Level Debug -Message "Adding paths" -FunctionName Find-DbaOrphanedFile
+            Write-Message -Level Debug -Message "Adding paths" -FunctionName Find-DbaOrphanedFile -ModuleName "dbatools"
             $sqlpaths += "$($server.RootDirectory)\DATA"
             $sqlpaths += Get-SqlDefaultPaths $server data
             $sqlpaths += Get-SqlDefaultPaths $server log
@@ -522,7 +522,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $result = $__state.Result
 
         if ($result.count -eq 0) {
-            Write-Message -Level Verbose -Message "No orphaned files found" -FunctionName Find-DbaOrphanedFile
+            Write-Message -Level Verbose -Message "No orphaned files found" -FunctionName Find-DbaOrphanedFile -ModuleName "dbatools"
         }
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;

@@ -84,14 +84,17 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
 
     private object? _supportedDataTypes, _supportedFakerMaskingTypes, _supportedFakerSubTypes;
     private bool _processInterrupted;
+    // DEF-011/012: prior-record process-scope state carried between hops via the sentinel.
+    private object? _uniqueValueColumns;
+    private object? _transaction;
+    private object? _elapsed;
 
     protected override void BeginProcessing()
     {
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Locale, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__dgBegin"))
             {
@@ -101,16 +104,17 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
                     _supportedFakerMaskingTypes = state["SupportedFakerMaskingTypes"];
                     _supportedFakerSubTypes = state["SupportedFakerSubTypes"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Locale, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -118,28 +122,32 @@ public sealed class InvokeDbaDbDataGeneratorCommand : DbaBaseCmdlet
         if (Interrupted || _processInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, FilePath, Locale, CharacterString, Table, Column, ExcludeTable,
-            ExcludeColumn, MaxValue, ModulusFactor, EnableException.ToBool(),
-            _supportedDataTypes, _supportedFakerMaskingTypes, _supportedFakerSubTypes, this,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__dgProcess"))
             {
                 if (sentinel["__dgProcess"] is Hashtable state)
                 {
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
+                    _uniqueValueColumns = state["UniqueValueColumns"];
+                    _transaction = state["Transaction"];
+                    _elapsed = state["Elapsed"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, FilePath, Locale, CharacterString, Table, Column, ExcludeTable,
+            ExcludeColumn, MaxValue, ModulusFactor, EnableException.ToBool(),
+            _supportedDataTypes, _supportedFakerMaskingTypes, _supportedFakerSubTypes, this,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            _uniqueValueColumns, _transaction, _elapsed);
     }
 
     private object? BoundCommonParameter(string name)
@@ -201,15 +209,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 """;
 
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $FilePath, $Locale, $CharacterString, $Table, $Column, $ExcludeTable, $ExcludeColumn, $MaxValue, $ModulusFactor, $EnableException, $supportedDataTypes, $supportedFakerMaskingTypes, $supportedFakerSubTypes, $__realCmdlet, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $FilePath, $Locale, $CharacterString, $Table, $Column, $ExcludeTable, $ExcludeColumn, $MaxValue, $ModulusFactor, $EnableException, $supportedDataTypes, $supportedFakerMaskingTypes, $supportedFakerSubTypes, $__realCmdlet, $__boundVerbose, $__boundDebug, $__carriedUniqueValueColumns, $__carriedTransaction, $__carriedElapsed)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [object]$FilePath, [string]$Locale, [string]$CharacterString, [string[]]$Table, [string[]]$Column, [string[]]$ExcludeTable, [string[]]$ExcludeColumn, [int]$MaxValue, [int]$ModulusFactor, $EnableException, $supportedDataTypes, $supportedFakerMaskingTypes, $supportedFakerSubTypes, $__realCmdlet, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [object]$FilePath, [string]$Locale, [string]$CharacterString, [string[]]$Table, [string[]]$Column, [string[]]$ExcludeTable, [string[]]$ExcludeColumn, [int]$MaxValue, [int]$ModulusFactor, $EnableException, $supportedDataTypes, $supportedFakerMaskingTypes, $supportedFakerSubTypes, $__realCmdlet, $__boundVerbose, $__boundDebug, $__carriedUniqueValueColumns, $__carriedTransaction, $__carriedElapsed)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+    # DEF-011/012 cross-record carries (codex r2): the function world's process scope persists
+    # $uniqueValueColumns / $transaction / $elapsed across pipeline records; each hop is a fresh
+    # scope, so they are seeded from the sentinel-carried prior-record values here and emitted
+    # back below. The verbatim body is untouched.
+    if ($null -ne $__carriedUniqueValueColumns) { $uniqueValueColumns = $__carriedUniqueValueColumns }
+    if ($null -ne $__carriedTransaction) { $transaction = $__carriedTransaction }
+    if ($null -ne $__carriedElapsed) { $elapsed = $__carriedElapsed }
     . {
         if (Test-FunctionInterrupt) { return }
 
@@ -274,7 +289,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 foreach ($tableobject in $tables.Tables) {
 
                     if ($tableobject.Name -in $ExcludeTable -or ($Table -and $tableobject.Name -notin $Table)) {
-                        Write-Message -Level Verbose -Message "Skipping $($tableobject.Name) because it is explicitly excluded" -FunctionName Invoke-DbaDbDataGenerator
+                        Write-Message -Level Verbose -Message "Skipping $($tableobject.Name) because it is explicitly excluded" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                         continue
                     }
 
@@ -287,7 +302,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # Check if the table contains unique indexes
                     if ($tableobject.HasUniqueIndex) {
                         # Loop through the rows and generate a unique value for each row
-                        Write-Message -Level Verbose -Message "Generating unique values for $($tableobject.Name)" -FunctionName Invoke-DbaDbDataGenerator
+                        Write-Message -Level Verbose -Message "Generating unique values for $($tableobject.Name)" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
 
                         for ($i = 0; $i -lt $tableobject.Rows; $i++) {
                             $rowValue = New-Object PSCustomObject
@@ -377,7 +392,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if (-not $tablecolumns) {
-                        Write-Message -Level Verbose "No columns to process in $($db.Name).$($tableobject.Schema).$($tableobject.Name), moving on" -FunctionName Invoke-DbaDbDataGenerator
+                        Write-Message -Level Verbose "No columns to process in $($db.Name).$($tableobject.Schema).$($tableobject.Name), moving on" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                         continue
                     }
 
@@ -394,7 +409,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             try {
                                 $null = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $db.Name -Query $query
                             } catch {
-                                Write-Message -Level VeryVerbose -Message "$query" -FunctionName Invoke-DbaDbDataGenerator
+                                Write-Message -Level VeryVerbose -Message "$query" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                                 $errormessage = $_.Exception.Message.ToString()
                                 Stop-Function -Message "Error truncating $($tableobject.Schema).$($tableobject.Name): $errormessage" -Target $query -Continue -ErrorRecord $_ -FunctionName Invoke-DbaDbDataGenerator
                             }
@@ -418,7 +433,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     }
                                 }
                             } catch {
-                                Write-Message -Level VeryVerbose -Message "$query" -FunctionName Invoke-DbaDbDataGenerator
+                                Write-Message -Level VeryVerbose -Message "$query" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                                 $errormessage = $_.Exception.Message.ToString()
                                 Stop-Function -Message "Error getting identity values from $($tableobject.Schema).$($tableobject.Name): $errormessage" -Target $query -Continue -ErrorRecord $_ -FunctionName Invoke-DbaDbDataGenerator
                             }
@@ -550,7 +565,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $sqlcmd = New-Object Microsoft.Data.SqlClient.SqlCommand($insertQuery, $sqlconn, $transaction)
                             $null = $sqlcmd.ExecuteNonQuery()
                         } catch {
-                            Write-Message -Level VeryVerbose -Message "$insertQuery" -FunctionName Invoke-DbaDbDataGenerator
+                            Write-Message -Level VeryVerbose -Message "$insertQuery" -FunctionName Invoke-DbaDbDataGenerator -ModuleName "dbatools"
                             $errormessage = $_.Exception.Message.ToString()
                             Stop-Function -Message "Error inserting $($tableobject.Schema).$($tableobject.Name): $errormessage" -Target $insertQuery -Continue -ErrorRecord $_ -FunctionName Invoke-DbaDbDataGenerator
                         }
@@ -586,7 +601,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
-    @{ __dgProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
-} $SqlInstance $SqlCredential $Database $FilePath $Locale $CharacterString $Table $Column $ExcludeTable $ExcludeColumn $MaxValue $ModulusFactor $EnableException $supportedDataTypes $supportedFakerMaskingTypes $supportedFakerSubTypes $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    @{ __dgProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value); UniqueValueColumns = $uniqueValueColumns; Transaction = $transaction; Elapsed = $elapsed } }
+} $SqlInstance $SqlCredential $Database $FilePath $Locale $CharacterString $Table $Column $ExcludeTable $ExcludeColumn $MaxValue $ModulusFactor $EnableException $supportedDataTypes $supportedFakerMaskingTypes $supportedFakerSubTypes $__realCmdlet $__boundVerbose $__boundDebug $__carriedUniqueValueColumns $__carriedTransaction $__carriedElapsed @__commonParameters 3>&1 2>&1
 """;
 }

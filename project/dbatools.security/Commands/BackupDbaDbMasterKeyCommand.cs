@@ -28,40 +28,40 @@ namespace Dataplat.Dbatools.Commands;
 public sealed class BackupDbaDbMasterKeyCommand : DbaBaseCmdlet
 {
     /// <summary>The target SQL Server instance or instances.</summary>
-    [Parameter]
+    [Parameter(Position = 0)]
     public DbaInstanceParameter[]? SqlInstance { get; set; }
 
     /// <summary>Alternative credential for the target instances.</summary>
-    [Parameter]
+    [Parameter(Position = 1)]
     public PSCredential? SqlCredential { get; set; }
 
     /// <summary>A credential whose password is used to encrypt the exported master key.</summary>
-    [Parameter]
+    [Parameter(Position = 2)]
     public PSCredential? Credential { get; set; }
 
     /// <summary>The database or databases whose master keys are exported.</summary>
-    [Parameter]
+    [Parameter(Position = 3)]
     public string[]? Database { get; set; }
 
     /// <summary>Databases to exclude from the export.</summary>
-    [Parameter]
+    [Parameter(Position = 4)]
     public string[]? ExcludeDatabase { get; set; }
 
     /// <summary>The password that encrypts the exported master key.</summary>
-    [Parameter]
+    [Parameter(Position = 5)]
     [Alias("Password")]
     public System.Security.SecureString? SecurePassword { get; set; }
 
     /// <summary>The directory the exported files are written to; defaults to the instance backup directory.</summary>
-    [Parameter]
+    [Parameter(Position = 6)]
     public string? Path { get; set; }
 
     /// <summary>An explicit base file name for the exported key file.</summary>
-    [Parameter]
+    [Parameter(Position = 7)]
     public string? FileBaseName { get; set; }
 
     /// <summary>Database objects, typically piped from Get-DbaDatabase.</summary>
-    [Parameter(ValueFromPipeline = true)]
+    [Parameter(ValueFromPipeline = true, Position = 8)]
     public Microsoft.SqlServer.Management.Smo.Database[]? InputObject { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
@@ -78,21 +78,25 @@ public sealed class BackupDbaDbMasterKeyCommand : DbaBaseCmdlet
         // passed on as-is; it is not converted here.
         System.Security.SecureString? effectivePassword = Credential != null ? Credential.Password : SecurePassword;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Credential, Database, ExcludeDatabase, effectivePassword,
-            Path, FileBaseName, InputObject, EnableException.ToBool(), this,
-            TestBound(nameof(Path)),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Credential, Database, ExcludeDatabase, effectivePassword,
+            Path, FileBaseName, InputObject, EnableException.ToBool(), this,
+            TestBound(nameof(Path)),
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -166,14 +170,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $actualPath = "$Path".TrimEnd('\').TrimEnd('/')
 
         if (-not $db.IsAccessible) {
-            Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Backup-DbaDbMasterKey
+            Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             continue
         }
 
         $masterkey = $db.MasterKey
 
         if (-not $masterkey) {
-            Write-Message -Message "No master key exists in the $dbname database on $instance" -Target $db -Level Verbose -FunctionName Backup-DbaDbMasterKey
+            Write-Message -Message "No master key exists in the $dbname database on $instance" -Target $db -Level Verbose -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             continue
         }
 
@@ -214,7 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $status = "Success"
             } catch {
                 $status = "Failure"
-                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaDbMasterKey
+                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             }
 
             Add-Member -Force -InputObject $masterkey -MemberType NoteProperty -Name ComputerName -value $server.ComputerName
@@ -231,3 +235,4 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 } $SqlInstance $SqlCredential $Credential $Database $ExcludeDatabase $SecurePassword $Path $FileBaseName $InputObject $EnableException $__realCmdlet $__boundPath $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
+

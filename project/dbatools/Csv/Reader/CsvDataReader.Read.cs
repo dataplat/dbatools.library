@@ -24,7 +24,27 @@ namespace Dataplat.Dbatools.Csv.Reader
         /// <exception cref="OperationCanceledException">Thrown when the <see cref="CsvReaderOptions.CancellationToken"/> is cancelled.</exception>
         public bool Read()
         {
-            ThrowIfClosed();
+            // Admission is atomic with Close's count-check (same lock): either this read is
+            // admitted first (Close then defers the pool return) or Close wins (this throws).
+            // A bare check-then-increment left a window where Close could observe zero, return
+            // the buffer, and let the admitted read NRE (codex r5).
+            lock (_bufferLifecycleLock)
+            {
+                ThrowIfClosed();
+                System.Threading.Interlocked.Increment(ref _activeReads);
+            }
+            try
+            {
+                return ReadUnderActiveCount();
+            }
+            finally
+            {
+                System.Threading.Interlocked.Decrement(ref _activeReads);
+            }
+        }
+
+        private bool ReadUnderActiveCount()
+        {
 
             // Reset LumenWorks compatibility flags
             _missingFieldFlag = false;

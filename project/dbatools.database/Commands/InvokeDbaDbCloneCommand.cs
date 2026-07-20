@@ -72,10 +72,7 @@ public sealed class InvokeDbaDbCloneCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Database, SqlInstance, ExcludeStatistics.ToBool(), ExcludeQueryStore.ToBool(), EnableException.ToBool(),
-            TestBound(nameof(ExcludeStatistics)), TestBound(nameof(ExcludeQueryStore)),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__cloneBegin"))
             {
@@ -89,16 +86,19 @@ public sealed class InvokeDbaDbCloneCommand : DbaBaseCmdlet
                     _sql2016min = state["Sql2016min"];
                     _beginInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Database, SqlInstance, ExcludeStatistics.ToBool(), ExcludeQueryStore.ToBool(), EnableException.ToBool(),
+            TestBound(nameof(ExcludeStatistics)), TestBound(nameof(ExcludeQueryStore)),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -108,20 +108,20 @@ public sealed class InvokeDbaDbCloneCommand : DbaBaseCmdlet
         if (Interrupted || _beginInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, InputObject, CloneDatabase, EnableException.ToBool(),
-            _sqlStats, _sqlWith, _sql2012min, _sql2014min, _sql2014CuMin, _sql2016min, this,
-            TestBound(nameof(CloneDatabase)), TestBound(nameof(ExcludeStatistics)), TestBound(nameof(ExcludeQueryStore)),
-            TestBound(nameof(UpdateStatistics)), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, InputObject, CloneDatabase, EnableException.ToBool(),
+            _sqlStats, _sqlWith, _sql2012min, _sql2014min, _sql2014CuMin, _sql2016min, this,
+            TestBound(nameof(CloneDatabase)), TestBound(nameof(ExcludeStatistics)), TestBound(nameof(ExcludeQueryStore)),
+            TestBound(nameof(UpdateStatistics)), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -295,7 +295,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ( ($__boundUpdateStatistics) -and (-not $__boundExcludeStatistics) ) {
                 if ($__realCmdlet.ShouldProcess($instance, "Update statistics in $($db.Name)")) {
                     try {
-                        Write-Message -Level Verbose -Message "Updating statistics" -FunctionName Invoke-DbaDbClone
+                        Write-Message -Level Verbose -Message "Updating statistics" -FunctionName Invoke-DbaDbClone -ModuleName "dbatools"
                         $null = $db.Invoke($sqlStats)
                     } catch {
                         Stop-Function -Message "Failure" -ErrorRecord $_ -Target $server -FunctionName Invoke-DbaDbClone -Continue
@@ -306,14 +306,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dbName = $db.Name
 
             foreach ($clonedb in $CloneDatabase) {
-                Write-Message -Level Verbose -Message "Cloning $clonedb from $db" -FunctionName Invoke-DbaDbClone
+                Write-Message -Level Verbose -Message "Cloning $clonedb from $db" -FunctionName Invoke-DbaDbClone -ModuleName "dbatools"
                 if ($server.Databases[$clonedb]) {
                     Stop-Function -Message "Destination clone database $clonedb already exists" -Target $instance -FunctionName Invoke-DbaDbClone -Continue
                 } else {
                     if ($__realCmdlet.ShouldProcess($instance, "Execute DBCC CloneDatabase($dbName, $clonedb)")) {
                         try {
                             $sql = "DBCC CLONEDATABASE('$dbName','$clonedb') $sqlWith"
-                            Write-Message -Level Debug -Message "Sql Statement: $sql" -FunctionName Invoke-DbaDbClone
+                            Write-Message -Level Debug -Message "Sql Statement: $sql" -FunctionName Invoke-DbaDbClone -ModuleName "dbatools"
                             $null = $db.Invoke($sql)
                             $server.Databases.Refresh()
                             Get-DbaDatabase -SqlInstance $server -Database $clonedb

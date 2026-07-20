@@ -96,12 +96,7 @@ public sealed class NewDbaDacProfileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, EnableException.ToBool(),
-            MyInvocation.BoundParameters.ContainsKey("SqlInstance"),
-            MyInvocation.BoundParameters.ContainsKey("ConnectionString"),
-            MyInvocation.BoundParameters.ContainsKey("Path"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__newDbaDacProfileBegin"))
             {
@@ -110,16 +105,21 @@ public sealed class NewDbaDacProfileCommand : DbaBaseCmdlet
                     _beginState = state;
                     _interrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Path, EnableException.ToBool(),
+            MyInvocation.BoundParameters.ContainsKey("SqlInstance"),
+            MyInvocation.BoundParameters.ContainsKey("ConnectionString"),
+            MyInvocation.BoundParameters.ContainsKey("Path"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -127,25 +127,25 @@ public sealed class NewDbaDacProfileCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ConnectionString, PublishOptions,
-            EnableException.ToBool(), _beginState, _state, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__newDbaDacProfileProcess"))
             {
                 _state = sentinel["__newDbaDacProfileProcess"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ConnectionString, PublishOptions,
+            EnableException.ToBool(), _beginState, _state, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -310,7 +310,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     try {
                         $server = [DbaInstance]($instanceName.ToString().Replace('--', '\'))
                         $publishProfile = Join-Path $Path "$($instanceName.Replace('--','-'))-$db-publish.xml" -ErrorAction Stop
-                        Write-Message -Level Verbose -Message "Writing to $publishProfile" -FunctionName New-DbaDacProfile
+                        Write-Message -Level Verbose -Message "Writing to $publishProfile" -FunctionName New-DbaDacProfile -ModuleName "dbatools"
                         $profileTemplate | Out-File $publishProfile -ErrorAction Stop
                         [PSCustomObject]@{
                             ComputerName     = $server.ComputerName

@@ -113,7 +113,26 @@ public sealed class NewDbaLinkedServerCommand : DbaBaseCmdlet
             _bindInitialized = true;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
+        NestedCommand.InvokeScopedStreaming(this, item =>
+        {
+            Hashtable? sentinel = item?.BaseObject as Hashtable;
+            if (sentinel is not null && sentinel.ContainsKey("__w3067State"))
+            {
+                _state = sentinel["__w3067State"] as Hashtable;
+                if (_state is not null)
+                {
+                    _inputObjectState = _state["InputObject"];
+                }
+                return;
+            }
+            if (item?.BaseObject is ErrorRecord nestedError)
+            {
+                RemoveHopErrorBookkeeping(nestedError);
+                WriteError(nestedError);
+                return;
+            }
+            WriteObject(item);
+        }, ProcessScript,
             SqlInstance, SqlCredential, LinkedServer, ServerProduct, Provider, DataSource,
             Location, ProviderString, Catalog, SecurityContext, SecurityContextRemoteUser,
             SecurityContextRemoteUserPassword, _inputObjectState, EnableException.ToBool(),
@@ -125,26 +144,7 @@ public sealed class NewDbaLinkedServerCommand : DbaBaseCmdlet
             TestBound(nameof(SecurityContextRemoteUser)),
             TestBound(nameof(SecurityContextRemoteUserPassword)), this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
-        {
-            Hashtable? sentinel = item?.BaseObject as Hashtable;
-            if (sentinel is not null && sentinel.ContainsKey("__w3067State"))
-            {
-                _state = sentinel["__w3067State"] as Hashtable;
-                if (_state is not null)
-                {
-                    _inputObjectState = _state["InputObject"];
-                }
-                continue;
-            }
-            if (item?.BaseObject is ErrorRecord nestedError)
-            {
-                RemoveHopErrorBookkeeping(nestedError);
-                WriteError(nestedError);
-                continue;
-            }
-            WriteObject(item);
-        }
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

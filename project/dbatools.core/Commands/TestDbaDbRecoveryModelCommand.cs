@@ -85,18 +85,18 @@ public sealed class TestDbaDbRecoveryModelCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, EnableException.ToBool(), _state,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, EnableException.ToBool(), _state,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -176,7 +176,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $sql = "$sqlRecoveryModel $databasefilter"
 
-    Write-Message -Level Debug -Message $sql -FunctionName Test-DbaDbRecoveryModel
+    Write-Message -Level Debug -Message $sql -FunctionName Test-DbaDbRecoveryModel -ModuleName "dbatools"
 
     @{ __w3108State = @{ sql = $sql; RecoveryModel = $RecoveryModel } }
 } $Database $ExcludeDatabase $RecoveryModel $__boundRecoveryModel $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
@@ -211,7 +211,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $results = $server.Query($sql)
 
                 if (-not $results) {
-                    Write-Message -Level Verbose -Message "Server '$instance' does not have any databases in the $RecoveryModel recovery model." -FunctionName Test-DbaDbRecoveryModel
+                    Write-Message -Level Verbose -Message "Server '$instance' does not have any databases in the $RecoveryModel recovery model." -FunctionName Test-DbaDbRecoveryModel -ModuleName "dbatools"
                 }
 
                 foreach ($row in $results) {

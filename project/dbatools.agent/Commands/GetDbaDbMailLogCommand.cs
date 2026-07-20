@@ -73,9 +73,7 @@ public sealed class GetDbaDbMailLogCommand : DbaBaseCmdlet
                 return;
             }
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, since, Type, EnableException.ToBool(), _server,
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -92,7 +90,9 @@ public sealed class GetDbaDbMailLogCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+            new[] { instance }, SqlCredential, since, Type, EnableException.ToBool(), _server,
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -190,7 +190,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $sql = "$sql $where"
         }
 
-        Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbMailLog
+        Write-Message -Level Debug -Message $sql -FunctionName Get-DbaDbMailLog -ModuleName "dbatools"
 
         try {
             $server.Query($sql) | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, LogDate, EventType, Description, Login

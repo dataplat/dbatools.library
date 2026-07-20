@@ -54,12 +54,7 @@ public sealed class CopyDbaAgentServerCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
-            DisableJobsOnDestination.ToBool(), DisableJobsOnSource.ToBool(),
-            ExcludeServerProperties.ToBool(), Force.ToBool(), EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"), BoundCommonParameter("Verbose"),
-            BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -70,7 +65,12 @@ public sealed class CopyDbaAgentServerCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
+            DisableJobsOnDestination.ToBool(), DisableJobsOnSource.ToBool(),
+            ExcludeServerProperties.ToBool(), Force.ToBool(), EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"), BoundCommonParameter("Verbose"),
+            BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -178,12 +178,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } else {
             if ($PSCmdlet.ShouldProcess($destinstance, "Copying Agent Properties")) {
                 try {
-                    Write-Message -Level Verbose -Message "Copying SQL Agent Properties" -FunctionName Copy-DbaAgentServer
+                    Write-Message -Level Verbose -Message "Copying SQL Agent Properties" -FunctionName Copy-DbaAgentServer -ModuleName "dbatools"
                     $sql = $sourceAgent.Script() | Out-String
                     $sql = $sql -replace [Regex]::Escape("'$source'"), "'$destinstance'"
                     $sql = $sql -replace [Regex]::Escape("@errorlog_file="), [Regex]::Escape("--@errorlog_file=")
                     $sql = $sql -replace [Regex]::Escape("@auto_start="), [Regex]::Escape("--@auto_start=")
-                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentServer
+                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentServer -ModuleName "dbatools"
                     $null = $destServer.Query($sql)
                     $copyAgentPropStatus.Status = "Successful"
                     $copyAgentPropStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
@@ -193,7 +193,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyAgentPropStatus.Status = "Failed"
                     $copyAgentPropStatus.Notes = $message
                     $copyAgentPropStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Issue copying SQL Agent properties on $destinstance | $PSItem" -FunctionName Copy-DbaAgentServer
+                    Write-Message -Level Verbose -Message "Issue copying SQL Agent properties on $destinstance | $PSItem" -FunctionName Copy-DbaAgentServer -ModuleName "dbatools"
                     continue
                 }
             }

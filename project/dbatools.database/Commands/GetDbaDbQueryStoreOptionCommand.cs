@@ -48,9 +48,7 @@ public sealed class GetDbaDbQueryStoreOptionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            ExcludeDatabase, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__qsoBegin"))
             {
@@ -58,16 +56,18 @@ public sealed class GetDbaDbQueryStoreOptionCommand : DbaBaseCmdlet
                 {
                     _excludeDatabase = state["ExcludeDatabase"] as object[];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            ExcludeDatabase, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -75,18 +75,18 @@ public sealed class GetDbaDbQueryStoreOptionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, _excludeDatabase, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, _excludeDatabase, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -157,7 +157,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dbs = Get-DbaDatabase -SqlInstance $server -ExcludeDatabase $ExcludeDatabase -Database $Database | Where-Object IsAccessible
 
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Processing $($db.Name) on $instance" -FunctionName Get-DbaDbQueryStoreOption
+                Write-Message -Level Verbose -Message "Processing $($db.Name) on $instance" -FunctionName Get-DbaDbQueryStoreOption -ModuleName "dbatools"
                 $qso = $db.QueryStoreOptions
 
                 if ($server.VersionMajor -eq 14) {

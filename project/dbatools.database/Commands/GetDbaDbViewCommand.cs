@@ -162,7 +162,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $fqtn = Get-ObjectNameParts -ObjectName $v
 
                 if (-not $fqtn.Parsed) {
-                    Write-Message -Level Warning -Message "Please check you are using proper three-part names. If your search value contains special characters you must use [ ] to wrap the name. The value $t could not be parsed as a valid name." -FunctionName Get-DbaDbView
+                    Write-Message -Level Warning -Message "Please check you are using proper three-part names. If your search value contains special characters you must use [ ] to wrap the name. The value $t could not be parsed as a valid name." -FunctionName Get-DbaDbView -ModuleName "dbatools"
                     Continue
                 }
 
@@ -206,14 +206,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         foreach ($db in $InputObject) {
-            Write-Message -Level Verbose -Message "processing $db" -FunctionName Get-DbaDbView
+            Write-Message -Level Verbose -Message "processing $db" -FunctionName Get-DbaDbView -ModuleName "dbatools"
 
             # Let the SMO read all properties referenced in this command for all views in the database in one query.
             # Downside: If some other properties were already read outside of this command in the used SMO, they are cleared.
             try {
                 $db.Views.ClearAndInitialize('', [string[]]('Name', 'Schema', 'IsSystemObject', 'CreateDate', 'DateLastModified'))
             } catch {
-                Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbView
+                Write-Message -Level Verbose -Message "ClearAndInitialize failed: $_" -FunctionName Get-DbaDbView -ModuleName "dbatools"
             }
 
             if ($fqtns) {
@@ -230,7 +230,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $vw = $db.Views | Where-Object { $_.Name -in $fqtn.View -and $fqtn.Schema -in ($_.Schema, $null) -and $fqtn.Database -in ($_.Parent.Name, $null) }
 
                     if (-not $vw) {
-                        Write-Message -Level Verbose -Message "Could not find view $($fqtn.View) in $db on $($db.Parent.DomainInstanceName)" -FunctionName Get-DbaDbView
+                        Write-Message -Level Verbose -Message "Could not find view $($fqtn.View) in $db on $($db.Parent.DomainInstanceName)" -FunctionName Get-DbaDbView -ModuleName "dbatools"
                     }
                     $views += $vw
                 }
@@ -239,12 +239,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if (-not $db.IsAccessible) {
-                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping" -FunctionName Get-DbaDbView
+                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping" -FunctionName Get-DbaDbView -ModuleName "dbatools"
                 continue
             }
 
             if (-not $views) {
-                Write-Message -Message "No views exist in the $db database on $($db.Parent.DomainInstanceName)" -Target $db -Level Verbose -FunctionName Get-DbaDbView
+                Write-Message -Message "No views exist in the $db database on $($db.Parent.DomainInstanceName)" -Target $db -Level Verbose -FunctionName Get-DbaDbView -ModuleName "dbatools"
                 continue
             }
 

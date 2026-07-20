@@ -62,25 +62,25 @@ public sealed class SetDbaExtendedProtectionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, Credential, Value, EnableException.ToBool(), _state, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3092State"))
             {
                 _state = sentinel["__w3092State"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, Credential, Value, EnableException.ToBool(), _state, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -151,7 +151,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     foreach ($instance in $SqlInstance) {
-        Write-Message -Level VeryVerbose -Message "Processing $instance." -Target $instance -FunctionName Set-DbaExtendedProtection
+        Write-Message -Level VeryVerbose -Message "Processing $instance." -Target $instance -FunctionName Set-DbaExtendedProtection -ModuleName "dbatools"
         if ($instance.IsLocalHost) {
             $null = Set-DbaExtendedProtection -__splat @{ ComputerName = $instance; Continue = $true }
         }
@@ -195,11 +195,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if ([System.String]::IsNullOrEmpty($vsname)) { $vsname = $instance }
 
-        Write-Message -Level Verbose -Message "Regroot: $regRoot" -Target $instance -FunctionName Set-DbaExtendedProtection
-        Write-Message -Level Verbose -Message "ServiceAcct: $serviceaccount" -Target $instance -FunctionName Set-DbaExtendedProtection
-        Write-Message -Level Verbose -Message "InstanceName: $instancename" -Target $instance -FunctionName Set-DbaExtendedProtection
-        Write-Message -Level Verbose -Message "VSNAME: $vsname" -Target $instance -FunctionName Set-DbaExtendedProtection
-        Write-Message -Level Verbose -Message "Value: $Value" -Target $instance -FunctionName Set-DbaExtendedProtection
+        Write-Message -Level Verbose -Message "Regroot: $regRoot" -Target $instance -FunctionName Set-DbaExtendedProtection -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "ServiceAcct: $serviceaccount" -Target $instance -FunctionName Set-DbaExtendedProtection -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "InstanceName: $instancename" -Target $instance -FunctionName Set-DbaExtendedProtection -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "VSNAME: $vsname" -Target $instance -FunctionName Set-DbaExtendedProtection -ModuleName "dbatools"
+        Write-Message -Level Verbose -Message "Value: $Value" -Target $instance -FunctionName Set-DbaExtendedProtection -ModuleName "dbatools"
 
         $scriptblock = {
             $regPath = "Registry::HKEY_LOCAL_MACHINE\$($args[0])\MSSQLServer\SuperSocketNetLib"
@@ -216,7 +216,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if (Test-ShouldProcess -Context $__realCmdlet -Target "local" -Action "Connecting to $instance to modify the ExtendedProtection value in $regRoot for $($instance.InstanceName)") {
             try {
                 Invoke-Command2 -ComputerName $resolved.FullComputerName -Credential $Credential -ArgumentList $regRoot, $vsname, $instancename, $Value -ScriptBlock $scriptblock -ErrorAction Stop | Select-Object -Property * -ExcludeProperty PSComputerName, RunspaceId, PSShowComputerName
-                Write-Message -Level Critical -Message "ExtendedProtection was successfully set on $($resolved.FullComputerName) for the $instancename instance. The change takes effect immediately for new connections." -Target $instance -FunctionName Set-DbaExtendedProtection
+                Write-Message -Level Critical -Message "ExtendedProtection was successfully set on $($resolved.FullComputerName) for the $instancename instance. The change takes effect immediately for new connections." -Target $instance -FunctionName Set-DbaExtendedProtection -ModuleName "dbatools"
             } catch {
                 Stop-Function -Message "Failed to connect to $($resolved.FullComputerName) using PowerShell remoting" -ErrorRecord $_ -Target $instance -Continue -FunctionName Set-DbaExtendedProtection
             }

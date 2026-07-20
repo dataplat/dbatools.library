@@ -75,10 +75,8 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
                 item.Properties["__CompareDbaLoginBeginComplete"]?.Value))
             {
                 completed = true;
-                object? server = item.Properties["SourceServer"]?.Value;
-                _sourceServer = server is PSObject serverWrapper ? serverWrapper.BaseObject : server;
-                object? logins = item.Properties["SourceLogins"]?.Value;
-                _sourceLogins = logins is PSObject loginsWrapper ? loginsWrapper.BaseObject : logins;
+                _sourceServer = UnwrapHopValue(item.Properties["SourceServer"]?.Value);
+                _sourceLogins = UnwrapHopValue(item.Properties["SourceLogins"]?.Value);
             }
             else if (item is not null)
             {
@@ -97,19 +95,52 @@ public sealed class CompareDbaLoginCommand : DbaBaseCmdlet
         if (_beginInterrupted || Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            Destination, DestinationSqlCredential, Login, ExcludeLogin, ExcludeSystemLogin.ToBool(),
-            _sourceServer, _sourceLogins, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
-            WriteObject(item);
+            if (item is not null)
+                WriteObject(item);
+        }, ProcessScript,
+            Destination, DestinationSqlCredential, Login, ExcludeLogin, ExcludeSystemLogin.ToBool(),
+            _sourceServer, _sourceLogins, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+    }
+
+    /// <summary>
+    /// Unwraps a value the begin hop carried out through its sentinel.
+    /// </summary>
+    /// <remarks>
+    /// A command that produced NO output leaves the script variable holding AutomationNull, which
+    /// behaves as $null in PowerShell but unwraps to a truthy, property-less object - so it comes
+    /// back as null instead. Otherwise the value is unwrapped ONLY when the wrapper adds nothing:
+    /// note properties (whether Add-Member decoration on an SMO object or the members of a
+    /// [PSCustomObject]) live on the PSObject wrapper, not the BaseObject, so unwrapping such a
+    /// value silently discards them. Cardinality is settled at the sentinel, where the carried
+    /// collection is normalized with @(), never inferred here - a genuinely empty
+    /// [pscustomobject]@{} and a no-output result are indistinguishable by shape, and only the
+    /// sentinel knows which it holds.
+    /// </remarks>
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        foreach (PSMemberInfo member in wrapper.Members)
+        {
+            if (member is PSNoteProperty)
+                return wrapper;
         }
+        return wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -172,7 +203,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
     $sourceLogins = Get-DbaLogin @splatGetSource
 
-    [pscustomobject]@{ __CompareDbaLoginBeginComplete = $true; SourceServer = $sourceServer; SourceLogins = $sourceLogins }
+    # SourceLogins is normalized to an array so the seam carries cardinality unambiguously: a
+    # no-output result becomes an empty array rather than AutomationNull, which the process replay
+    # would otherwise receive as a truthy, property-less object and iterate over.
+    [pscustomobject]@{ __CompareDbaLoginBeginComplete = $true; SourceServer = $sourceServer; SourceLogins = @($sourceLogins) }
 } $Source $SourceSqlCredential $Login $ExcludeLogin $ExcludeSystemLogin $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 

@@ -121,14 +121,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if (-not $db.IsAccessible) {
-                Write-Message -Level Warning -Message "$db is not accessible, skipping" -FunctionName Get-DbaDbEncryptionKey
+                Write-Message -Level Warning -Message "$db is not accessible, skipping" -FunctionName Get-DbaDbEncryptionKey -ModuleName "dbatools"
                 continue
             }
 
             $keys = $db.DatabaseEncryptionKey | Where-Object EncryptionAlgorithm
 
             if ($null -eq $keys) {
-                Write-Message -Message "No encryption key exists in the $db database on $($db.Parent.Name)" -Target $db -Level Verbose -FunctionName Get-DbaDbEncryptionKey
+                Write-Message -Message "No encryption key exists in the $db database on $($db.Parent.Name)" -Target $db -Level Verbose -FunctionName Get-DbaDbEncryptionKey -ModuleName "dbatools"
                 continue
             }
 

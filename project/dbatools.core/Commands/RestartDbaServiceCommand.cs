@@ -289,7 +289,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dependentServices = @()
             foreach ($dependentService in @("Agent", "PolyBase", "Launchpad")) {
                 if (!($processArray | Where-Object { $_.ServiceType -eq $dependentService -and $_.InstanceName -eq $service.InstanceName -and $_.ComputerName -eq $service.ComputerName })) {
-                    Write-Message -Level Verbose -Message "Adding $dependentService service to the list for service $($service.ServiceName) on $($service.ComputerName), since -Force has been specified" -FunctionName Restart-DbaService
+                    Write-Message -Level Verbose -Message "Adding $dependentService service to the list for service $($service.ServiceName) on $($service.ComputerName), since -Force has been specified" -FunctionName Restart-DbaService -ModuleName "dbatools"
                     $dependentServices += $dependentService
                 }
             }

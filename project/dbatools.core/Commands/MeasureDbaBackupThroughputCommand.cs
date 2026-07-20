@@ -74,11 +74,7 @@ public sealed class MeasureDbaBackupThroughputCommand : DbaBaseCmdlet
             // -Since is surface-typed System.DateTime (baseline law), so an unbound Since
             // must travel as $null - not default(DateTime) - for the body's `if ($Since)`
             // truthiness gate to keep the function's unbound behavior.
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, Database, ExcludeDatabase,
-                TestBound(nameof(Since)) ? (object)Since : null, Last.ToBool(), Type,
-                DeviceType, EnableException.ToBool(),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -89,7 +85,11 @@ public sealed class MeasureDbaBackupThroughputCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+            new[] { instance }, SqlCredential, Database, ExcludeDatabase,
+                TestBound(nameof(Since)) ? (object)Since : null, Last.ToBool(), Type,
+                DeviceType, EnableException.ToBool(),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -151,7 +151,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         foreach ($db in $DatabaseCollection) {
-            Write-Message -Level VeryVerbose -Message "Retrieving history for $db." -FunctionName Measure-DbaBackupThroughput
+            Write-Message -Level VeryVerbose -Message "Retrieving history for $db." -FunctionName Measure-DbaBackupThroughput -ModuleName "dbatools"
             $allHistory = @()
 
             # Splatting didn't work
@@ -175,7 +175,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $allHistory += $history | Select-Object ComputerName, InstanceName, SqlInstance, Database, MBps, TotalSize, Start, End
             }
 
-            Write-Message -Level VeryVerbose -Message "Calculating averages for $db." -FunctionName Measure-DbaBackupThroughput
+            Write-Message -Level VeryVerbose -Message "Calculating averages for $db." -FunctionName Measure-DbaBackupThroughput -ModuleName "dbatools"
             foreach ($db in ($allHistory | Sort-Object Database | Group-Object Database)) {
 
                 $measureMb = $db.Group.MBps | Measure-Object -Average -Minimum -Maximum

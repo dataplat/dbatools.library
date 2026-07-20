@@ -241,7 +241,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $AdGroups = $AdGroups | Where-Object Name -notlike "$($server.ComputerName)\*"
             $ADGroupOut = @()
             foreach ($AdGroup in $AdGroups) {
-                Write-Message -Level Verbose -Message "Looking at Group: $AdGroup" -FunctionName Find-DbaLoginInGroup
+                Write-Message -Level Verbose -Message "Looking at Group: $AdGroup" -FunctionName Find-DbaLoginInGroup -ModuleName "dbatools"
                 $ADGroupOut += Get-AllLogins $AdGroup.Name -ParentADGroup $AdGroup.Name
             }
 

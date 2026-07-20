@@ -6,7 +6,8 @@ public sealed partial class InvokeDbaDbLogShippingCommand
 {
     // PS: the process block VERBATIM, first third (composed as ProcessScript =
     // A + newline + B + newline + C; re-parsed at build verification),
-    // CRLF-preserved. Whole-record hop. Frame: the 84-value parameter-table splat,
+    // CRLF-preserved. Whole-record hop. Frame: the caller-bound parameter-table splat
+    // (bound-only, same contract as the begin frame),
     // the 47-variable carry injection from the begin sentinel, and a reproduction
     // of begin line 588's `if ($Force) { $ConfirmPreference = 'none' }` (fn-scope
     // suppression the 7 inner-PSCmdlet gates read - begin set it once in the

@@ -112,11 +112,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if (!$db.IsAccessible) {
-                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbUserDefinedTableType
+                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbUserDefinedTableType -ModuleName "dbatools"
                 continue
             }
             if ($db.UserDefinedTableTypes.Count -eq 0) {
-                Write-Message -Message "No User Defined Table Types exist in the $db database on $instance" -Target $db -Level Output -FunctionName Get-DbaDbUserDefinedTableType
+                Write-Message -Message "No User Defined Table Types exist in the $db database on $instance" -Target $db -Level Output -FunctionName Get-DbaDbUserDefinedTableType -ModuleName "dbatools"
                 continue
             }
 

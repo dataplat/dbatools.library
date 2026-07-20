@@ -97,10 +97,7 @@ public sealed class ImportDbaBinaryFileCommand : DbaBaseCmdlet
         if (Interrupted || _processInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, Table, Schema, Statement, FileNameColumn, BinaryColumn,
-            NoFileNameColumn.ToBool(), InputObject, FilePath, Path, EnableException.ToBool(),
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__ibfProcess"))
             {
@@ -108,16 +105,19 @@ public sealed class ImportDbaBinaryFileCommand : DbaBaseCmdlet
                 {
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, Table, Schema, Statement, FileNameColumn, BinaryColumn,
+            NoFileNameColumn.ToBool(), InputObject, FilePath, Path, EnableException.ToBool(),
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -208,7 +208,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 return
             }
         }
-        Write-Message -Level Verbose -Message "Found $($InputObject.count) tables" -FunctionName Import-DbaBinaryFile
+        Write-Message -Level Verbose -Message "Found $($InputObject.count) tables" -FunctionName Import-DbaBinaryFile -ModuleName "dbatools"
         foreach ($tbl in $InputObject) {
             # auto detect column that is binary
             # if none or multiple, make them specify the binary column
@@ -245,7 +245,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($__realCmdlet.ShouldProcess($env:computername, "Importing $file to $($tbl.Name) in $($tbl.Parent.Name) on $($server.Name)")) {
                     try {
                         $filestream = New-Object System.IO.FileStream $file, Open
-                        Write-Message -Level Verbose -Message "Importing $filename" -FunctionName Import-DbaBinaryFile
+                        Write-Message -Level Verbose -Message "Importing $filename" -FunctionName Import-DbaBinaryFile -ModuleName "dbatools"
 
                         $binaryreader = New-Object System.IO.BinaryReader $filestream
                         $fileBytes = $binaryreader.ReadBytes($filestream.Length)
@@ -258,13 +258,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         }
 
-                        Write-Message -Level Verbose -Message "Statement: $Statement" -FunctionName Import-DbaBinaryFile
+                        Write-Message -Level Verbose -Message "Statement: $Statement" -FunctionName Import-DbaBinaryFile -ModuleName "dbatools"
                         $cmd = $server.ConnectionContext.SqlConnectionObject.CreateCommand()
                         $cmd.CommandText = $Statement
                         $cmd.Connection.Open()
 
                         $datatype = ($tbl.Columns | Where-Object Name -eq $BinaryColumn).DataType
-                        Write-Message -Level Verbose -Message "Binary column datatype is $datatype" -FunctionName Import-DbaBinaryFile
+                        Write-Message -Level Verbose -Message "Binary column datatype is $datatype" -FunctionName Import-DbaBinaryFile -ModuleName "dbatools"
                         if (-not $NoFileNameColumn) {
                             $null = $cmd.Parameters.AddWithValue("@FileName", $filename)
                         }
@@ -279,7 +279,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $binaryreader.Close()
                             $binaryreader.Dispose()
                         } catch {
-                            Write-Message -Level Verbose -Message "Something went wrong: $PSItem" -FunctionName Import-DbaBinaryFile
+                            Write-Message -Level Verbose -Message "Something went wrong: $PSItem" -FunctionName Import-DbaBinaryFile -ModuleName "dbatools"
                         }
 
                         [PSCustomObject]@{

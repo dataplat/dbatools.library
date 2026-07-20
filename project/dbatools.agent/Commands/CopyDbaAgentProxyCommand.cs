@@ -49,10 +49,7 @@ public sealed class CopyDbaAgentProxyCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
-            ProxyAccount, ExcludeProxyAccount, Force.ToBool(), EnableException.ToBool(), this,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -63,7 +60,10 @@ public sealed class CopyDbaAgentProxyCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
+            ProxyAccount, ExcludeProxyAccount, Force.ToBool(), EnableException.ToBool(), this,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -148,7 +148,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyAgentProxyAccountStatus.Status = "Skipped"
                     $copyAgentProxyAccountStatus.Notes = "Skipping migration of $proxyName due to misconfigured (empty) credential name"
                     $copyAgentProxyAccountStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Skipping migration of $proxyName due to misconfigured (empty) credential name" -FunctionName Copy-DbaAgentProxy
+                    Write-Message -Level Verbose -Message "Skipping migration of $proxyName due to misconfigured (empty) credential name" -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                 }
                 continue
             }
@@ -164,7 +164,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $copyAgentProxyAccountStatus.Status = "Skipped"
                     $copyAgentProxyAccountStatus.Notes = "Associated credential account, $CredentialName, does not exist on $destinstance"
                     $copyAgentProxyAccountStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                    Write-Message -Level Verbose -Message "Associated credential account, $CredentialName, does not exist on $destinstance" -FunctionName Copy-DbaAgentProxy
+                    Write-Message -Level Verbose -Message "Associated credential account, $CredentialName, does not exist on $destinstance" -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                 }
                 continue
             }
@@ -178,19 +178,19 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copyAgentProxyAccountStatus.Status = "Skipped"
                         $copyAgentProxyAccountStatus.Notes = "Already exists on destination"
                         $copyAgentProxyAccountStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Server proxy account $proxyName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentProxy
+                        Write-Message -Level Verbose -Message "Server proxy account $proxyName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                     }
                     continue
                 } else {
                     if ($__realCmdlet.ShouldProcess($destinstance, "Dropping server proxy account $proxyName and recreating")) {
                         try {
-                            Write-Message -Level Verbose -Message "Dropping server proxy account $proxyName" -FunctionName Copy-DbaAgentProxy
+                            Write-Message -Level Verbose -Message "Dropping server proxy account $proxyName" -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                             $destServer.JobServer.ProxyAccounts[$proxyName].Drop()
                         } catch {
                             $copyAgentProxyAccountStatus.Status = "Failed"
                             $copyAgentProxyAccountStatus.Notes = "Could not drop"
                             $copyAgentProxyAccountStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Issue dropping proxy account $proxyName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentProxy
+                            Write-Message -Level Verbose -Message "Issue dropping proxy account $proxyName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                             continue
                         }
                     }
@@ -202,9 +202,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $copyAgentProxyAccountStatus.Type = "ProxyAccount"
 
                 try {
-                    Write-Message -Level Verbose -Message "Copying server proxy account $proxyName" -FunctionName Copy-DbaAgentProxy
+                    Write-Message -Level Verbose -Message "Copying server proxy account $proxyName" -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                     $sql = $account.Script() | Out-String
-                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentProxy
+                    Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                     $destServer.Query($sql)
 
                     $copyAgentProxyAccountStatus.Status = "Successful"
@@ -215,11 +215,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copyAgentProxyAccountStatus.Status = "Skipping"
                         $copyAgentProxyAccountStatus.Notes = "Failure"
                         $copyAgentProxyAccountStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "One or more subsystems do not exist on the destination server. Skipping that part." -FunctionName Copy-DbaAgentProxy
+                        Write-Message -Level Verbose -Message "One or more subsystems do not exist on the destination server. Skipping that part." -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                     } else {
                         $copyAgentProxyAccountStatus.Status = "Failed"
                         $copyAgentProxyAccountStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Issue creating proxy account $proxyName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentProxy
+                        Write-Message -Level Verbose -Message "Issue creating proxy account $proxyName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                         continue
                     }
                 }

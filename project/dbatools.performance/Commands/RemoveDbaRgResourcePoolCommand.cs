@@ -51,9 +51,7 @@ public sealed class RemoveDbaRgResourcePoolCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, ResourcePool, Type, SkipReconfigure.ToBool(),
-            InputObject, TestBound("Type"), EnableException.ToBool(), this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -64,7 +62,9 @@ public sealed class RemoveDbaRgResourcePoolCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, ResourcePool, Type, SkipReconfigure.ToBool(),
+            InputObject, TestBound("Type"), EnableException.ToBool(), this, BoundVerbose());
     }
 
     private object? BoundVerbose()
@@ -144,7 +144,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # Reconfigure Resource Governor
             if ($SkipReconfigure) {
-                Write-Message -Level Warning -Message "Resource pool changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Remove-DbaRgResourcePool
+                Write-Message -Level Warning -Message "Resource pool changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Remove-DbaRgResourcePool -ModuleName "dbatools"
             } elseif ($__realCmdlet.ShouldProcess($server, "Reconfiguring the Resource Governor")) {
                 $server.ResourceGovernor.Alter()
             }

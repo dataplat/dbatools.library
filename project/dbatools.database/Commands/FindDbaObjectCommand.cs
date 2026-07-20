@@ -81,23 +81,23 @@ public sealed class FindDbaObjectCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            ObjectType, IncludeSystemObjects.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaObjectBegin"))
             {
                 _state = sentinel["__findDbaObjectBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            ObjectType, IncludeSystemObjects.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -105,19 +105,19 @@ public sealed class FindDbaObjectCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern,
-            IncludeColumns.ToBool(), IncludeSystemDatabases.ToBool(), EnableException.ToBool(), _state,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern,
+            IncludeColumns.ToBool(), IncludeSystemDatabases.ToBool(), EnableException.ToBool(), _state,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -255,7 +255,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.versionMajor -lt 9) {
-                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaObject
+                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaObject -ModuleName "dbatools"
                 Continue
             }
 
@@ -274,9 +274,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             foreach ($db in $dbs) {
-                Write-Message -Level Verbose -Message "Searching object names in database $db on $instance" -FunctionName Find-DbaObject
+                Write-Message -Level Verbose -Message "Searching object names in database $db on $instance" -FunctionName Find-DbaObject -ModuleName "dbatools"
 
-                Write-Message -Level Debug -Message $sqlObjects -FunctionName Find-DbaObject
+                Write-Message -Level Debug -Message $sqlObjects -FunctionName Find-DbaObject -ModuleName "dbatools"
                 $objectRows = $db.ExecuteWithResults($sqlObjects).Tables.Rows
 
                 foreach ($row in $objectRows) {
@@ -297,9 +297,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ($IncludeColumns) {
-                    Write-Message -Level Verbose -Message "Searching column names in database $db on $instance" -FunctionName Find-DbaObject
+                    Write-Message -Level Verbose -Message "Searching column names in database $db on $instance" -FunctionName Find-DbaObject -ModuleName "dbatools"
 
-                    Write-Message -Level Debug -Message $sqlColumns -FunctionName Find-DbaObject
+                    Write-Message -Level Debug -Message $sqlColumns -FunctionName Find-DbaObject -ModuleName "dbatools"
                     $columnRows = $db.ExecuteWithResults($sqlColumns).Tables.Rows
 
                     foreach ($row in $columnRows) {

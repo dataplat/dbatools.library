@@ -283,8 +283,8 @@ public sealed class ExportDbaExecutionPlanCommand : DbaInstanceCmdlet
     {
         try
         {
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ExportPlanScript, this, planObject, Path, EnableException.ToBool(), BoundVerbose()))
-                WriteObject(item);
+            NestedCommand.InvokeScopedStreaming(this, item => WriteObject(item), ExportPlanScript,
+                    this, planObject, Path, EnableException.ToBool(), BoundVerbose());
         }
         catch (PipelineStoppedException)
         {

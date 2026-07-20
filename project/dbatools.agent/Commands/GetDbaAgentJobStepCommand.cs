@@ -52,9 +52,7 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, InputObject, _server, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -69,15 +67,15 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
                     ? null
                     : (SmoAgentJob[]?)LanguagePrimitives.ConvertTo(
                         inputState, typeof(SmoAgentJob[]), CultureInfo.InvariantCulture);
-                _server = item.Properties["Server"]?.Value;
-                if (_server is PSObject serverWrapper)
-                    _server = serverWrapper.BaseObject;
+                _server = UnwrapHopValue(item.Properties["Server"]?.Value);
             }
             else
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, InputObject, _server, EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
@@ -100,6 +98,17 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
                 WriteObject(item);
             }
         }
+    }
+
+    // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
+    // wrapper rather than the BaseObject, so unwrapping one would discard it - keep it wrapped.
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)
@@ -146,7 +155,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } catch {
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaAgentJobStep
         }
-        Write-Message -Level Verbose -Message "Collecting jobs on $instance" -FunctionName Get-DbaAgentJobStep
+        Write-Message -Level Verbose -Message "Collecting jobs on $instance" -FunctionName Get-DbaAgentJobStep -ModuleName "dbatools"
         $InputObject += $server.JobServer.Jobs
     }
     [pscustomobject]@{
@@ -177,7 +186,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($ExcludeDisabledJobs) {
         $InputObject = $InputObject | Where-Object IsEnabled -eq $true
     }
-    Write-Message -Level Verbose -Message "Collecting job steps on ($server.Name)" -FunctionName Get-DbaAgentJobStep
+    Write-Message -Level Verbose -Message "Collecting job steps on ($server.Name)" -FunctionName Get-DbaAgentJobStep -ModuleName "dbatools"
     foreach ($agentJobStep in $InputObject.jobsteps) {
         Add-Member -Force -InputObject $agentJobStep -MemberType NoteProperty -Name ComputerName -value $agentJobStep.Parent.Parent.Parent.ComputerName
         Add-Member -Force -InputObject $agentJobStep -MemberType NoteProperty -Name InstanceName -value $agentJobStep.Parent.Parent.Parent.ServiceName

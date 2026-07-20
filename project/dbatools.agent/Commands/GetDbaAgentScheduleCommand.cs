@@ -51,9 +51,7 @@ public sealed class GetDbaAgentScheduleCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                new[] { instance }, SqlCredential, Schedule, ScheduleUid, Id, EnableException.ToBool(),
-                _server, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -63,15 +61,27 @@ public sealed class GetDbaAgentScheduleCommand : DbaBaseCmdlet
                 else if (item is not null && LanguagePrimitives.IsTrue(
                     item.Properties["__GetDbaAgentScheduleProcessComplete"]?.Value))
                 {
-                    object? serverState = item.Properties["Server"]?.Value;
-                    _server = serverState is PSObject wrapper ? wrapper.BaseObject : serverState;
+                    _server = UnwrapHopValue(item.Properties["Server"]?.Value);
                 }
                 else
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+                new[] { instance }, SqlCredential, Schedule, ScheduleUid, Id, EnableException.ToBool(),
+                _server, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
+    }
+
+    // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
+    // wrapper rather than the BaseObject, so unwrapping one would discard it - keep it wrapped.
+    private static object? UnwrapHopValue(object? value)
+    {
+        if (value is null || ReferenceEquals(value, System.Management.Automation.Internal.AutomationNull.Value))
+            return null;
+        if (value is not PSObject wrapper)
+            return value;
+        return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
     }
 
     private object? BoundCommonParameter(string name)

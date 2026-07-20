@@ -74,20 +74,20 @@ public sealed class SetDbaDbRecoveryModelCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, RecoveryModel, Database, ExcludeDatabase,
-            AllDatabases.ToBool(), EnableException.ToBool(), InputObject, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, RecoveryModel, Database, ExcludeDatabase,
+            AllDatabases.ToBool(), EnableException.ToBool(), InputObject, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -176,7 +176,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($__realCmdlet.ShouldProcess("$db on $instance", "ALTER DATABASE $db SET RECOVERY $RecoveryModel")) {
                 $db.RecoveryModel = $RecoveryModel
                 $db.Alter()
-                Write-Message -Level Verbose -Message "Recovery Model set to $RecoveryModel for database $db" -FunctionName Set-DbaDbRecoveryModel
+                Write-Message -Level Verbose -Message "Recovery Model set to $RecoveryModel for database $db" -FunctionName Set-DbaDbRecoveryModel -ModuleName "dbatools"
             }
         }
         Get-DbaDbRecoveryModel -SqlInstance $db.Parent -Database $db.name

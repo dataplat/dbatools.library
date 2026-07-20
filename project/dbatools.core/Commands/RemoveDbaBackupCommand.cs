@@ -131,7 +131,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     # Ensure BackupFileExtension does not begin with a .
     if ($BackupFileExtension -match "^[.]") {
-        Write-Message -Level Warning -Message "Parameter -BackupFileExtension begins with a period '$BackupFileExtension'. A period is automatically prepended to -BackupFileExtension and need not be passed in." -FunctionName Remove-DbaBackup
+        Write-Message -Level Warning -Message "Parameter -BackupFileExtension begins with a period '$BackupFileExtension'. A period is automatically prepended to -BackupFileExtension and need not be passed in." -FunctionName Remove-DbaBackup -ModuleName "dbatools"
     }
 } $BackupFileExtension $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
@@ -154,7 +154,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # Process stuff
-    Write-Message -Message "Removing backups from $Path" -Level Verbose -FunctionName Remove-DbaBackup
+    Write-Message -Message "Removing backups from $Path" -Level Verbose -FunctionName Remove-DbaBackup -ModuleName "dbatools"
     Find-DbaBackup -Path $Path -BackupFileExtension $BackupFileExtension -RetentionPeriod $RetentionPeriod -CheckArchiveBit:$CheckArchiveBit -EnableException |
         ForEach-Object {
             $file = $_
@@ -162,14 +162,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     $file | Remove-Item -Force -EA Stop
                 } catch {
-                    Write-Message -Message "Failed to remove $file." -Level Warning -ErrorRecord $_ -FunctionName Remove-DbaBackup
+                    Write-Message -Message "Failed to remove $file." -Level Warning -ErrorRecord $_ -FunctionName Remove-DbaBackup -ModuleName "dbatools"
                 }
             }
         }
-    Write-Message -Message "File Cleaning ended." -Level Verbose -FunctionName Remove-DbaBackup
+    Write-Message -Message "File Cleaning ended." -Level Verbose -FunctionName Remove-DbaBackup -ModuleName "dbatools"
     # Cleanup empty backup folders.
     if ($RemoveEmptyBackupFolder) {
-        Write-Message -Message "Removing empty folders." -Level Verbose -FunctionName Remove-DbaBackup
+        Write-Message -Message "Removing empty folders." -Level Verbose -FunctionName Remove-DbaBackup -ModuleName "dbatools"
         (Get-ChildItem -Directory -Path $Path -Recurse -ErrorAction SilentlyContinue -ErrorVariable EnumErrors).FullName |
             Sort-Object -Descending |
             ForEach-Object {
@@ -177,7 +177,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     $Contents = @(Get-ChildItem -Force $OrigPath -ErrorAction Stop)
                 } catch {
-                    Write-Message -Message "Can't enumerate $OrigPath." -Level Warning -ErrorRecord $_ -FunctionName Remove-DbaBackup
+                    Write-Message -Message "Can't enumerate $OrigPath." -Level Warning -ErrorRecord $_ -FunctionName Remove-DbaBackup -ModuleName "dbatools"
                 }
                 if ($Contents.Count -eq 0) {
                     return $_
@@ -189,14 +189,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     try {
                         $FolderPath | Remove-Item -ErrorAction Stop
                     } catch {
-                        Write-Message -Message "Failed to remove $FolderPath." -Level Warning -ErrorRecord $_ -FunctionName Remove-DbaBackup
+                        Write-Message -Message "Failed to remove $FolderPath." -Level Warning -ErrorRecord $_ -FunctionName Remove-DbaBackup -ModuleName "dbatools"
                     }
                 }
             }
         if ($EnumErrors) {
-            Write-Message "Errors encountered enumerating folders." -Level Warning -ErrorRecord $EnumErrors -FunctionName Remove-DbaBackup
+            Write-Message "Errors encountered enumerating folders." -Level Warning -ErrorRecord $EnumErrors -FunctionName Remove-DbaBackup -ModuleName "dbatools"
         }
-        Write-Message -Message "Removed empty folders." -Level Verbose -FunctionName Remove-DbaBackup
+        Write-Message -Message "Removed empty folders." -Level Verbose -FunctionName Remove-DbaBackup -ModuleName "dbatools"
     }
 } $Path $BackupFileExtension $RetentionPeriod $CheckArchiveBit $RemoveEmptyBackupFolder $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;

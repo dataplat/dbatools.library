@@ -108,13 +108,7 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             }
 
             object serverValue = connection.RawServerValue ?? connection.Server!;
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-                serverValue, instance, WorkloadGroup, ResourcePool, ResourcePoolType,
-                Importance, RequestMaximumMemoryGrantPercentage,
-                RequestMaximumCpuTimeInSeconds, RequestMemoryGrantTimeoutInSeconds,
-                MaximumDegreeOfParallelism, GroupMaximumRequests,
-                SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
-                this, BoundVerbose(), pipelineItem))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
@@ -125,7 +119,13 @@ public sealed class NewDbaRgWorkloadGroupCommand : DbaBaseCmdlet
                 {
                     WriteObject(item);
                 }
-            }
+            }, BodyScript,
+            serverValue, instance, WorkloadGroup, ResourcePool, ResourcePoolType,
+                Importance, RequestMaximumMemoryGrantPercentage,
+                RequestMaximumCpuTimeInSeconds, RequestMemoryGrantTimeoutInSeconds,
+                MaximumDegreeOfParallelism, GroupMaximumRequests,
+                SkipReconfigure.ToBool(), Force.ToBool(), EnableException.ToBool(),
+                this, BoundVerbose(), pipelineItem);
         }
     }
 
@@ -204,7 +204,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 #Reconfigure Resource Governor
                 if ($SkipReconfigure) {
-                    Write-Message -Level Warning -Message "Not reconfiguring the Resource Governor after creating a new workload group may create problems." -FunctionName New-DbaRgWorkloadGroup
+                    Write-Message -Level Warning -Message "Not reconfiguring the Resource Governor after creating a new workload group may create problems." -FunctionName New-DbaRgWorkloadGroup -ModuleName "dbatools"
                 } elseif ($__realCmdlet.ShouldProcess($instance, "Reconfiguring the Resource Governor")) {
                     $server.ResourceGovernor.Alter()
                 }

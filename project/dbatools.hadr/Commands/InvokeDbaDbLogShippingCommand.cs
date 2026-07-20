@@ -63,17 +63,20 @@ public sealed partial class InvokeDbaDbLogShippingCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            BuildParameterTable(), _state,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+        // capture (documented observability change, not behaviour); the parity runner strips the
+        // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (DrainSentinelOrError(item))
             {
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            BuildParameterTable(), _state,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
@@ -169,7 +172,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-        Write-Message -Message "Finished setting up log shipping." -Level Verbose -FunctionName Invoke-DbaDbLogShipping
+        Write-Message -Message "Finished setting up log shipping." -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
 } $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 

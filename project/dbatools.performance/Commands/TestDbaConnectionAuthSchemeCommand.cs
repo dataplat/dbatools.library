@@ -40,9 +40,7 @@ public sealed class TestDbaConnectionAuthSchemeCommand : DbaInstanceCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            SqlInstance, SqlCredential, Kerberos.ToBool(), Ntlm.ToBool(),
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -53,7 +51,9 @@ public sealed class TestDbaConnectionAuthSchemeCommand : DbaInstanceCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            SqlInstance, SqlCredential, Kerberos.ToBool(), Ntlm.ToBool(),
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
@@ -115,7 +115,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Test-DbaConnectionAuthScheme
         }
 
-        Write-Message -Level Verbose -Message "Getting results for the following query: $sql." -FunctionName Test-DbaConnectionAuthScheme
+        Write-Message -Level Verbose -Message "Getting results for the following query: $sql." -FunctionName Test-DbaConnectionAuthScheme -ModuleName "dbatools"
         try {
             $results = $server.Query($sql)
         } catch {

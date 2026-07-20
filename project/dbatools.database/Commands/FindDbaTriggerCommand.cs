@@ -77,23 +77,23 @@ public sealed class FindDbaTriggerCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            IncludeSystemObjects.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaTriggerBegin"))
             {
                 _state = sentinel["__findDbaTriggerBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            IncludeSystemObjects.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -101,10 +101,7 @@ public sealed class FindDbaTriggerCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern, TriggerLevel,
-            IncludeSystemDatabases.ToBool(), EnableException.ToBool(), _state,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__findDbaTriggerProcess"))
             {
@@ -112,16 +109,19 @@ public sealed class FindDbaTriggerCommand : DbaBaseCmdlet
                 {
                     _state = state["State"] as Hashtable ?? _state;
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern, TriggerLevel,
+            IncludeSystemDatabases.ToBool(), EnableException.ToBool(), _state,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void EndProcessing()
@@ -129,17 +129,17 @@ public sealed class FindDbaTriggerCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, EndScript,
+            _state, EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -221,7 +221,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.versionMajor -lt 9) {
-                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaTrigger
+                Write-Message -Level Warning -Message "This command only supports SQL Server 2005 and above." -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                 Continue
             }
 
@@ -229,7 +229,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ((-Not $Database) -and ($TriggerLevel -in @('All', 'Server'))) {
                 foreach ($trigger in $server.Triggers) {
                     $everyserverstcount++; $triggercount++
-                    Write-Message -Level Debug -Message "Looking in Trigger: $trigger TextBody for $pattern" -FunctionName Find-DbaTrigger
+                    Write-Message -Level Debug -Message "Looking in Trigger: $trigger TextBody for $pattern" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                     if ($trigger.TextBody -match $Pattern) {
 
                         $triggerText = $trigger.TextBody.split($eol)
@@ -252,7 +252,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         } | Select-DefaultView -ExcludeProperty Trigger, TriggerFullText
                     }
                 }
-                Write-Message -Level Verbose -Message "Evaluated $triggercount triggers in $server" -FunctionName Find-DbaTrigger
+                Write-Message -Level Verbose -Message "Evaluated $triggercount triggers in $server" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
             }
 
             if ($IncludeSystemDatabases) {
@@ -275,7 +275,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($TriggerLevel -in @('All', 'Database', 'Object')) {
                 foreach ($db in $dbs) {
 
-                    Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaTrigger
+                    Write-Message -Level Verbose -Message "Searching on database $db" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
 
                     # If system objects aren't needed, find trigger text using SQL
                     # This prevents SMO from having to enumerate
@@ -283,7 +283,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if (!$IncludeSystemObjects) {
                         if ($TriggerLevel -in @('All', 'Database')) {
                             #Get Database Level triggers (DDL)
-                            Write-Message -Level Debug -Message $sqlDatabaseTriggers -FunctionName Find-DbaTrigger
+                            Write-Message -Level Debug -Message $sqlDatabaseTriggers -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                             $rows = $db.ExecuteWithResults($sqlDatabaseTriggers).Tables.Rows
                             $triggercount = 0
 
@@ -292,7 +292,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                                 $trigger = $row.name
 
-                                Write-Message -Level Verbose -Message "Looking in trigger $trigger for textBody with pattern $pattern on database $db" -FunctionName Find-DbaTrigger
+                                Write-Message -Level Verbose -Message "Looking in trigger $trigger for textBody with pattern $pattern on database $db" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                                 if ($row.TextBody -match $Pattern) {
                                     $tr = $db.Triggers | Where-Object name -eq $row.name
 
@@ -320,7 +320,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                         if ($TriggerLevel -in @('All', 'Object')) {
                             #Get Object Level triggers (DML)
-                            Write-Message -Level Debug -Message $sqlTableTriggers -FunctionName Find-DbaTrigger
+                            Write-Message -Level Debug -Message $sqlTableTriggers -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                             $rows = $db.ExecuteWithResults($sqlTableTriggers).Tables.Rows
                             $triggercount = 0
 
@@ -331,12 +331,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $triggerParentSchema = $row.TableSchema
                                 $triggerParent = $row.TableName
 
-                                Write-Message -Level Verbose -Message "Looking in trigger $trigger for textBody with pattern $pattern in object $triggerParentSchema.$triggerParent at database $db" -FunctionName Find-DbaTrigger
+                                Write-Message -Level Verbose -Message "Looking in trigger $trigger for textBody with pattern $pattern in object $triggerParentSchema.$triggerParent at database $db" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                                 if ($row.TextBody -match $Pattern) {
 
                                     $tr = ($db.Tables | Where-Object { $_.Name -eq $triggerParent -and $_.Schema -eq $triggerParentSchema }).Triggers | Where-Object name -eq $row.name
                                     if ($null -eq $tr) {
-                                        Write-Message -Level Verbose -Message "Could not find table named $($row.Name). Will try to find on Views." -FunctionName Find-DbaTrigger
+                                        Write-Message -Level Verbose -Message "Could not find table named $($row.Name). Will try to find on Views." -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                                         $tr = ($db.Views | Where-Object { $_.Name -eq $triggerParent -and $_.Schema -eq $triggerParentSchema }).Triggers | Where-Object name -eq $row.name
                                     }
 
@@ -372,7 +372,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $totalcount++; $triggercount++; $everyserverstcount++
                                 $trigger = $tr.Name
 
-                                Write-Message -Level Verbose -Message "Looking in trigger $trigger for textBody with pattern $pattern on database $db" -FunctionName Find-DbaTrigger
+                                Write-Message -Level Verbose -Message "Looking in trigger $trigger for textBody with pattern $pattern on database $db" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                                 if ($tr.TextBody -match $Pattern) {
 
                                     $triggerText = $tr.TextBody.split($eol)
@@ -408,7 +408,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 $totalcount++; $triggercount++; $everyserverstcount++
                                 $trigger = $tr.Name
 
-                                Write-Message -Level Verbose -Message "Looking in trigger $trigger for textBody with pattern $pattern in object $($tr.Parent) at database $db" -FunctionName Find-DbaTrigger
+                                Write-Message -Level Verbose -Message "Looking in trigger $trigger for textBody with pattern $pattern in object $($tr.Parent) at database $db" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                                 if ($tr.TextBody -match $Pattern) {
 
                                     $triggerText = $tr.TextBody.split($eol)
@@ -433,10 +433,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         }
                     }
-                    Write-Message -Level Verbose -Message "Evaluated $triggercount triggers in $db" -FunctionName Find-DbaTrigger
+                    Write-Message -Level Verbose -Message "Evaluated $triggercount triggers in $db" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
                 }
             }
-            Write-Message -Level Verbose -Message "Evaluated $totalcount total triggers in $dbcount databases" -FunctionName Find-DbaTrigger
+            Write-Message -Level Verbose -Message "Evaluated $totalcount total triggers in $dbcount databases" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
         }
 
     $__state.EveryServerStCount = $everyserverstcount
@@ -459,7 +459,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $everyserverstcount = $__state.EveryServerStCount
 
-        Write-Message -Level Verbose -Message "Evaluated $everyserverstcount total triggers" -FunctionName Find-DbaTrigger
+        Write-Message -Level Verbose -Message "Evaluated $everyserverstcount total triggers" -FunctionName Find-DbaTrigger -ModuleName "dbatools"
 } $__state $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

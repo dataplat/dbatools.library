@@ -232,7 +232,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         try {
-            Write-Message -Level Verbose -Message "Registering $($Config.FullName) for $Scope" -Tag "Config" -Target $Config -FunctionName $FunctionName
+            Write-Message -Level Verbose -Message "Registering $($Config.FullName) for $Scope" -Tag "Config" -Target $Config -FunctionName $FunctionName -ModuleName "dbatools"
             #region User Default
             if (1 -band $Scope) {
                 Ensure-RegistryPath -Path $script:path_RegistryUserDefault -ErrorAction Stop

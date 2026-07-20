@@ -98,9 +98,7 @@ public sealed class NewDbaDbDataGeneratorConfigCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Path, Force.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__newDbaDbDataGeneratorConfigBegin"))
             {
@@ -109,16 +107,18 @@ public sealed class NewDbaDbDataGeneratorConfigCommand : DbaBaseCmdlet
                     _beginState = state;
                     _interrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            Path, Force.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -126,21 +126,21 @@ public sealed class NewDbaDbDataGeneratorConfigCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, Table, ResetIdentity.ToBool(),
-            TruncateTable.ToBool(), Rows, Path, Force.ToBool(), EnableException.ToBool(),
-            _beginState, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, Table, ResetIdentity.ToBool(),
+            TruncateTable.ToBool(), Rows, Path, Force.ToBool(), EnableException.ToBool(),
+            _beginState, this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -266,7 +266,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # Loop through the tables
             foreach ($tableobject in $tablecollection) {
-                Write-Message -Message "Processing table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig
+                Write-Message -Message "Processing table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
 
                 $hasUniqueIndex = $false
 
@@ -281,23 +281,23 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 foreach ($columnobject in $columncollection) {
                     if ($columnobject.Computed) {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a computed column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a computed column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
                     if ($columnobject.DataType.Name -eq 'hierarchyid') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a hierarchyid column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a hierarchyid column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
                     if ($columnobject.DataType.Name -eq 'geography') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a geography column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a geography column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
                     if ($columnobject.DataType.Name -eq 'geometry') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a geometry column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a geometry column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
                     if ($columnobject.DataType.SqlDataType.ToString().ToLowerInvariant() -eq 'xml') {
-                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a xml column" -FunctionName New-DbaDbDataGeneratorConfig
+                        Write-Message -Level Verbose -Message "Skipping $columnobject because it is a xml column" -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                         continue
                     }
 
@@ -428,7 +428,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         Rows           = $Rows
                     }
                 } else {
-                    Write-Message -Message "No columns match for data generation in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig
+                    Write-Message -Message "No columns match for data generation in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
                 }
             }
 
@@ -440,7 +440,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Tables = $tables
                 }
             } else {
-                Write-Message -Message "No columns match for data generation in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig
+                Write-Message -Message "No columns match for data generation in table $($tableobject.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
             }
         }
 
@@ -459,7 +459,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Something went wrong writing the results to the Path" -Target $Path -Continue -ErrorRecord $_ -FunctionName New-DbaDbDataGeneratorConfig
             }
         } else {
-            Write-Message -Message "No tables to save for database $($db.Name) on $($server.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig
+            Write-Message -Message "No tables to save for database $($db.Name) on $($server.Name)" -Level Verbose -FunctionName New-DbaDbDataGeneratorConfig -ModuleName "dbatools"
         }
     }
 } $SqlInstance $SqlCredential $Database $Table $ResetIdentity $TruncateTable $Rows $Path $Force $EnableException $__beginState $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1

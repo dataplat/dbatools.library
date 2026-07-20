@@ -119,6 +119,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [System.Management.Automation.PSCredential]$SqlCredential, [string[]]$Database, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $NoEncryptionKeyDrop, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    # Named-wrapper shim: the body runs inside a function carrying the command's name so that
+    # call-stack-deriving helpers see Disable-DbaDbEncryption as they do in the function world.
+    # Write-ProgressHelper builds its Activity string from (Get-PSCallStack)[1].Command, which from an
+    # anonymous scriptblock frame reads '<ScriptBlock>'. This row's single call DOES pass -TotalSteps,
+    # so the percentage was safe, but the Activity label diverged on every record it emits.
+    function Disable-DbaDbEncryption {
     if ($SqlInstance) {
         if (-not $Database) {
             Stop-Function -Message "You must specify Database or ExcludeDatabase when using SqlInstance" -FunctionName Disable-DbaDbEncryption
@@ -147,7 +153,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($stepCounter -eq 100) {
                         $stepCounter = 0
                     }
-                    Write-Message -Level Verbose -Message "Database state for $($db.Name) on $($server.Name): $($db.DatabaseEncryptionKey.EncryptionState)" -FunctionName Disable-DbaDbEncryption
+                    Write-Message -Level Verbose -Message "Database state for $($db.Name) on $($server.Name): $($db.DatabaseEncryptionKey.EncryptionState)" -FunctionName Disable-DbaDbEncryption -ModuleName "dbatools"
                 }
                 while ($db.DatabaseEncryptionKey.EncryptionState -notin "Unencrypted", "None")
 
@@ -161,6 +167,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
+    }
+    . Disable-DbaDbEncryption
 } $SqlInstance $SqlCredential $Database $InputObject $NoEncryptionKeyDrop $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

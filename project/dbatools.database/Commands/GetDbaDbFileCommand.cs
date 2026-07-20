@@ -61,22 +61,22 @@ public sealed class GetDbaDbFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__getDbaDbFileBegin"))
             {
                 _state = sentinel["__getDbaDbFileBegin"] as Hashtable;
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, BeginScript,
+            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     protected override void ProcessRecord()
@@ -84,19 +84,19 @@ public sealed class GetDbaDbFileCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, ExcludeDatabase, FileGroup, InputObject, EnableException.ToBool(),
-            _state, TestBound(nameof(FileGroup)),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, ExcludeDatabase, FileGroup, InputObject, EnableException.ToBool(),
+            _state, TestBound(nameof(FileGroup)),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -232,7 +232,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         foreach ($db in $InputObject) {
             $server = $db.Parent
 
-            Write-Message -Level Verbose -Message "Querying database $db" -FunctionName Get-DbaDbFile
+            Write-Message -Level Verbose -Message "Querying database $db" -FunctionName Get-DbaDbFile -ModuleName "dbatools"
 
             try {
                 $version = $server.Query("SELECT compatibility_level FROM sys.databases WHERE name = '$($db.Name)'")
@@ -249,7 +249,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $query = $sql2000
             }
 
-            Write-Message -Level Debug -Message "SQL Statement: $query" -FunctionName Get-DbaDbFile
+            Write-Message -Level Debug -Message "SQL Statement: $query" -FunctionName Get-DbaDbFile -ModuleName "dbatools"
 
             try {
                 $results = $server.Query($query, $db.Name)
@@ -258,7 +258,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($__boundFileGroup) {
-                Write-Message -Message "Results will be filtered to FileGroup specified" -Level Verbose -FunctionName Get-DbaDbFile
+                Write-Message -Message "Results will be filtered to FileGroup specified" -Level Verbose -FunctionName Get-DbaDbFile -ModuleName "dbatools"
                 $results = $results | Where-Object { $_.FileGroupName -eq $FileGroup }
             }
 

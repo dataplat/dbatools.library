@@ -184,25 +184,25 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "$db is a system database and cannot be detached using this method." -Target $db -Continue -FunctionName Dismount-DbaDatabase
             }
 
-            Write-Message -Level Verbose -Message "Checking replication status." -FunctionName Dismount-DbaDatabase
+            Write-Message -Level Verbose -Message "Checking replication status." -FunctionName Dismount-DbaDatabase -ModuleName "dbatools"
             if ($db.ReplicationOptions -ne "None") {
                 Stop-Function -Message "Skipping $db  on $server because it is replicated." -Target $db -Continue -FunctionName Dismount-DbaDatabase
             }
 
             # repeat because different servers could be piped in
             $snapshots = (Get-DbaDbSnapshot -SqlInstance $server).SnapshotOf
-            Write-Message -Level Verbose -Message "Checking for snaps" -FunctionName Dismount-DbaDatabase
+            Write-Message -Level Verbose -Message "Checking for snaps" -FunctionName Dismount-DbaDatabase -ModuleName "dbatools"
             if ($db.Name -in $snapshots) {
-                Write-Message -Level Warning -Message "Database $db has snapshots, you need to drop them before detaching. Skipping $db on $server." -FunctionName Dismount-DbaDatabase
+                Write-Message -Level Warning -Message "Database $db has snapshots, you need to drop them before detaching. Skipping $db on $server." -FunctionName Dismount-DbaDatabase -ModuleName "dbatools"
                 Continue
             }
 
-            Write-Message -Level Verbose -Message "Checking mirror status" -FunctionName Dismount-DbaDatabase
+            Write-Message -Level Verbose -Message "Checking mirror status" -FunctionName Dismount-DbaDatabase -ModuleName "dbatools"
             if ($db.IsMirroringEnabled -and !$Force) {
                 Stop-Function -Message "$db on $server is being mirrored. Use -Force to break mirror or use the safer backup/restore method." -Target $db -Continue -FunctionName Dismount-DbaDatabase
             }
 
-            Write-Message -Level Verbose -Message "Checking Availability Group status" -FunctionName Dismount-DbaDatabase
+            Write-Message -Level Verbose -Message "Checking Availability Group status" -FunctionName Dismount-DbaDatabase -ModuleName "dbatools"
 
             if ($db.AvailabilityGroupName -and !$Force) {
                 $ag = $db.AvailabilityGroupName
@@ -226,7 +226,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($db.IsMirroringEnabled) {
                     If ($__realCmdlet.ShouldProcess($server, "Breaking mirror for $db on $server")) {
                         try {
-                            Write-Message -Level Warning -Message "Breaking mirror for $db on $server." -FunctionName Dismount-DbaDatabase
+                            Write-Message -Level Warning -Message "Breaking mirror for $db on $server." -FunctionName Dismount-DbaDatabase -ModuleName "dbatools"
                             $db.ChangeMirroringState([Microsoft.SqlServer.Management.Smo.MirroringOption]::Off)
                             $db.Alter()
                             $db.Refresh()
@@ -241,7 +241,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     If ($__realCmdlet.ShouldProcess($server, "Attempting remove $db on $server from Availability Group $ag")) {
                         try {
                             $server.AvailabilityGroups[$ag].AvailabilityDatabases[$db.name].Drop()
-                            Write-Message -Level Verbose -Message "Successfully removed $db from  detach from $ag on $server." -FunctionName Dismount-DbaDatabase
+                            Write-Message -Level Verbose -Message "Successfully removed $db from  detach from $ag on $server." -FunctionName Dismount-DbaDatabase -ModuleName "dbatools"
                         } catch {
                             if ($_.Exception.InnerException) {
                                 $exception = $_.Exception.InnerException.ToString() -Split "Microsoft.Data.SqlClient.SqlException: "

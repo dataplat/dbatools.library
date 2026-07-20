@@ -250,7 +250,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             } else {
                 $message += "This module can't tell you why the snapshot creation failed. Feel free to report back to dbatools what happened"
             }
-            Write-Message -Level Warning -Message $message -FunctionName New-DbaDbSnapshot
+            Write-Message -Level Warning -Message $message -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
         }
     }
 
@@ -329,15 +329,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 if ($db.IsMirroringEnabled) {
                     $InputObject += $db
                 } elseif ($db.IsDatabaseSnapshot) {
-                    Write-Message -Level Warning -Message "$($db.name) is a snapshot, skipping" -FunctionName New-DbaDbSnapshot
+                    Write-Message -Level Warning -Message "$($db.name) is a snapshot, skipping" -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
                 } elseif ($db.name -in $NoSupportForSnap) {
-                    Write-Message -Level Warning -Message "$($db.name) snapshots are prohibited" -FunctionName New-DbaDbSnapshot
+                    Write-Message -Level Warning -Message "$($db.name) snapshots are prohibited" -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
                 } elseif ($db.IsAccessible -ne $true -and ($server.AvailabilityGroups | Where-Object Name -eq $db.AvailabilityGroupName).LocalReplicaRole -eq 'Secondary') {
                     # Readable secondaries are considered accessible.
                     # This accounts for every other valid state of an AG (e.g. a database in a Basic Availability Group is a valid target).
                     $InputObject += $db
                 } elseif ($db.IsAccessible -ne $true) {
-                    Write-Message -Level Verbose -Message "$($db.name) is not accessible, skipping" -FunctionName New-DbaDbSnapshot
+                    Write-Message -Level Verbose -Message "$($db.name) is not accessible, skipping" -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
                 } else {
                     $InputObject += $db
                 }
@@ -368,7 +368,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $SnapName = "{0}_{1}" -f $db.Name, $DefaultSuffix
             }
             if ($SnapName -in $server.Databases.Name) {
-                Write-Message -Level Warning -Message "A database named $SnapName already exists, skipping" -FunctionName New-DbaDbSnapshot
+                Write-Message -Level Warning -Message "A database named $SnapName already exists, skipping" -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
                 continue
             }
             # Refresh database and FileGroups collection to ensure SMO has populated data
@@ -380,11 +380,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $has_FSD = $all_FSD.Count -gt 0
             $has_MMO = $all_MMO.Count -gt 0
             if ($has_MMO) {
-                Write-Message -Level Warning -Message "MEMORY_OPTIMIZED_DATA detected, snapshots are not possible" -FunctionName New-DbaDbSnapshot
+                Write-Message -Level Warning -Message "MEMORY_OPTIMIZED_DATA detected, snapshots are not possible" -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
                 continue
             }
             if ($has_FSD -and $Force -eq $false) {
-                Write-Message -Level Warning -Message "Filestream detected, skipping. You need to specify -Force. See Get-Help for details" -FunctionName New-DbaDbSnapshot
+                Write-Message -Level Warning -Message "Filestream detected, skipping. You need to specify -Force. See Get-Help for details" -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
                 continue
             }
             $snapType = "db snapshot"
@@ -414,7 +414,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $fName = [IO.Path]::Combine($basePath, ("{0}_{1}_{2:0000}_{3:000}{4}" -f $basename, $DefaultSuffix, (Get-Date).MilliSecond, $counter, $originalExtension))
                         # fixed extension is hardcoded as "ss", which seems a "de-facto" standard
                         $fName = [IO.Path]::ChangeExtension($fName, "ss")
-                        Write-Message -Level Debug -Message "$fName" -FunctionName New-DbaDbSnapshot
+                        Write-Message -Level Debug -Message "$fName" -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
 
                         # change slashes for Linux, change slashes for Windows
                         if ($server.HostPlatform -eq 'Linux') {
@@ -476,7 +476,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $hints += $stmt
                         }
 
-                        Write-Message -Level Debug -Message ($hints -Join "`n") -FunctionName New-DbaDbSnapshot
+                        Write-Message -Level Debug -Message ($hints -Join "`n") -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
 
                         $SnapDB
                     } catch {
@@ -485,7 +485,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         foreach ($stmt in $sql) {
                             $hints += $stmt
                         }
-                        Write-Message -Level Debug -Message ($hints -Join "`n") -FunctionName New-DbaDbSnapshot
+                        Write-Message -Level Debug -Message ($hints -Join "`n") -FunctionName New-DbaDbSnapshot -ModuleName "dbatools"
 
                         Stop-Function -Message "Failure" -ErrorRecord $_ -Target $SnapDB -Continue -FunctionName New-DbaDbSnapshot
                     }

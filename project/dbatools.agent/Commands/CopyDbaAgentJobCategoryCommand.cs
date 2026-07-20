@@ -60,11 +60,7 @@ public sealed class CopyDbaAgentJobCategoryCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript,
-            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
-            CategoryType, JobCategory, AgentCategory, OperatorCategory,
-            Force.ToBool(), EnableException.ToBool(), this,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -75,7 +71,11 @@ public sealed class CopyDbaAgentJobCategoryCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, BodyScript,
+            Source, SourceSqlCredential, Destination, DestinationSqlCredential,
+            CategoryType, JobCategory, AgentCategory, OperatorCategory,
+            Force.ToBool(), EnableException.ToBool(), this,
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -141,18 +141,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyJobCategoryStatus.Status = "Skipped"
                             $copyJobCategoryStatus.Notes = "Already exists on destination"
                             $copyJobCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Job category $categoryName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Verbose -Message "Job category $categoryName exists at destination. Use -Force to drop and migrate."
                         }
                         continue
                     } else {
                         if ($__realCmdlet.ShouldProcess($destinstance, "Dropping job category $categoryName")) {
                             try {
-                                Write-Message -Level Verbose -Message "Dropping Job category $categoryName" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Verbose -Message "Dropping Job category $categoryName"
                                 $destServer.JobServer.JobCategories[$categoryName].Drop()
                             } catch {
                                 $copyJobCategoryStatus.Status = "Failed"
                                 $copyJobCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                Write-Message -Level Verbose -Message "Issue dropping job category $categoryName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Verbose -Message "Issue dropping job category $categoryName on $destinstance | $PSItem"
                                 continue
                             }
                         }
@@ -161,16 +161,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
                 if ($__realCmdlet.ShouldProcess($destinstance, "Creating Job category $categoryName")) {
                     try {
-                        Write-Message -Level Verbose -Message "Copying Job category $categoryName" -FunctionName Copy-DbaAgentJobCategory
+                        Write-Message -Level Verbose -Message "Copying Job category $categoryName"
                         $sql = $jobCategory.Script() | Out-String
-                        Write-Message -Level Debug -Message "SQL Statement: $sql" -FunctionName Copy-DbaAgentJobCategory
+                        Write-Message -Level Debug -Message "SQL Statement: $sql"
                         $destServer.Query($sql)
                         $copyJobCategoryStatus.Status = "Successful"
                         $copyJobCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                     } catch {
                         $copyJobCategoryStatus.Status = "Failed"
                         $copyJobCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                        Write-Message -Level Verbose -Message "Issue copying job category $categoryName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJobCategory
+                        Write-Message -Level Verbose -Message "Issue copying job category $categoryName on $destinstance | $PSItem"
                         continue
                     }
                 }
@@ -205,22 +205,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyOperatorCategoryStatus.Status = "Skipped"
                             $copyOperatorCategoryStatus.Notes = "Already exists on destination"
                             $copyOperatorCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Operator category $categoryName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Verbose -Message "Operator category $categoryName exists at destination. Use -Force to drop and migrate."
                         }
                         continue
                     } else {
                         if ($__realCmdlet.ShouldProcess($destinstance, "Dropping operator category $categoryName and recreating")) {
                             try {
-                                Write-Message -Level Verbose -Message "Dropping Operator category $categoryName" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Verbose -Message "Dropping Operator category $categoryName"
                                 $destServer.JobServer.OperatorCategories[$categoryName].Drop()
-                                Write-Message -Level Verbose -Message "Copying Operator category $categoryName" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Verbose -Message "Copying Operator category $categoryName"
                                 $sql = $operatorCategory.Script() | Out-String
-                                Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Debug -Message $sql
                                 $destServer.Query($sql)
                             } catch {
                                 $copyOperatorCategoryStatus.Status = "Failed"
                                 $copyOperatorCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                Write-Message -Level Verbose -Message "Issue dropping operator category $categoryName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Verbose -Message "Issue dropping operator category $categoryName on $destinstance | $PSItem"
                                 continue
                             }
                         }
@@ -228,16 +228,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } else {
                     if ($__realCmdlet.ShouldProcess($destinstance, "Creating Operator category $categoryName")) {
                         try {
-                            Write-Message -Level Verbose -Message "Copying Operator category $categoryName" -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Verbose -Message "Copying Operator category $categoryName"
                             $sql = $operatorCategory.Script() | Out-String
-                            Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Debug -Message $sql
                             $destServer.Query($sql)
                             $copyOperatorCategoryStatus.Status = "Successful"
                             $copyOperatorCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                         } catch {
                             $copyOperatorCategoryStatus.Status = "Failed"
                             $copyOperatorCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Issue copying operator category $categoryName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Verbose -Message "Issue copying operator category $categoryName on $destinstance | $PSItem"
                             continue
                         }
                     }
@@ -277,22 +277,22 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $copyAlertCategoryStatus.Status = "Skipped"
                             $copyAlertCategoryStatus.Notes = "Already exists on destination"
                             $copyAlertCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Alert category $categoryName exists at destination. Use -Force to drop and migrate." -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Verbose -Message "Alert category $categoryName exists at destination. Use -Force to drop and migrate."
                         }
                         continue
                     } else {
                         if ($__realCmdlet.ShouldProcess($destinstance, "Dropping alert category $categoryName and recreating")) {
                             try {
-                                Write-Message -Level Verbose -Message "Dropping Alert category $categoryName" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Verbose -Message "Dropping Alert category $categoryName"
                                 $destServer.JobServer.AlertCategories[$categoryName].Drop()
-                                Write-Message -Level Verbose -Message "Copying Alert category $categoryName" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Verbose -Message "Copying Alert category $categoryName"
                                 $sql = $alertcategory.Script() | Out-String
-                                Write-Message -Level Debug -Message "SQL Statement: $sql" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Debug -Message "SQL Statement: $sql"
                                 $destServer.Query($sql)
                             } catch {
                                 $copyAlertCategoryStatus.Status = "Failed"
                                 $copyAlertCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                                Write-Message -Level Verbose -Message "Issue dropping alert category $categoryName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJobCategory
+                                Write-Message -Level Verbose -Message "Issue dropping alert category $categoryName on $destinstance | $PSItem"
                                 continue
                             }
                         }
@@ -300,16 +300,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 } else {
                     if ($__realCmdlet.ShouldProcess($destinstance, "Creating Alert category $categoryName")) {
                         try {
-                            Write-Message -Level Verbose -Message "Copying Alert category $categoryName" -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Verbose -Message "Copying Alert category $categoryName"
                             $sql = $alertCategory.Script() | Out-String
-                            Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Debug -Message $sql
                             $destServer.Query($sql)
                             $copyAlertCategoryStatus.Status = "Successful"
                             $copyAlertCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                         } catch {
                             $copyAlertCategoryStatus.Status = "Failed"
                             $copyAlertCategoryStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
-                            Write-Message -Level Verbose -Message "Issue creating alert category $categoryName on $destinstance | $PSItem" -FunctionName Copy-DbaAgentJobCategory
+                            Write-Message -Level Verbose -Message "Issue creating alert category $categoryName on $destinstance | $PSItem"
                             continue
                         }
                     }

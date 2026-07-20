@@ -84,6 +84,14 @@ namespace Dataplat.Dbatools.Csv.Reader
 
         // Buffer for efficient reading - using ArrayPool
         private char[] _buffer;
+        // Dispose-during-read contract (TB-012): Read() holds an active-read count; Close
+        // returns the pooled _buffer (and nulls the field) ONLY when no read is active,
+        // otherwise it defers - the array is simply left to the GC, so an in-flight read can
+        // never observe a null field, never writes through a returned array (cross-renter
+        // corruption), and terminates via the disposed inner reader's own ObjectDisposedException
+        // at its next refill. The lock orders the count check against the return.
+        private readonly object _bufferLifecycleLock = new object();
+        private int _activeReads;
         private bool _bufferFromPool;
         private int _bufferLength;
         private int _bufferPosition;

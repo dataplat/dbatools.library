@@ -51,18 +51,18 @@ public sealed class TestDbaInstanceNameCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, ExcludeSsrs.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, ExcludeSsrs.ToBool(), EnableException.ToBool(),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -117,16 +117,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($server.IsClustered) {
-                Write-Message -Level Warning -Message "$instance is a cluster. Renaming clusters is not supported by Microsoft." -FunctionName Test-DbaInstanceName
+                Write-Message -Level Warning -Message "$instance is a cluster. Renaming clusters is not supported by Microsoft." -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
             }
 
             $configuredServerName = $server.Query("SELECT @@servername AS ServerName").ServerName
-            Write-Message -Level Verbose -Message "configuredServerName from @@servername is $configuredServerName" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Verbose -Message "configuredServerName from @@servername is $configuredServerName" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
 
             $instanceName = $server.InstanceName
-            Write-Message -Level Verbose -Message "server.InstanceName is $instanceName" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Verbose -Message "server.InstanceName is $instanceName" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
             $netName = $server.NetName
-            Write-Message -Level Verbose -Message "server.NetName is $netName" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Verbose -Message "server.NetName is $netName" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
 
             if ($instanceName.Length -eq 0) {
                 $newServerName = $netName
@@ -134,15 +134,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             } else {
                 $newServerName = "$netName\$instanceName"
             }
-            Write-Message -Level Verbose -Message "newServerName is $newServerName" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Verbose -Message "newServerName is $newServerName" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
 
             # output some other properties that migth help to get the new servername
-            Write-Message -Level Debug -Message "server.ComputerName is $($server.ComputerName)" -FunctionName Test-DbaInstanceName
-            Write-Message -Level Debug -Message "server.ComputerNamePhysicalNetBIOS is $($server.ComputerNamePhysicalNetBIOS)" -FunctionName Test-DbaInstanceName
-            Write-Message -Level Debug -Message "server.DomainInstanceName is $($server.DomainInstanceName)" -FunctionName Test-DbaInstanceName
-            Write-Message -Level Debug -Message "server.Name is $($server.Name)" -FunctionName Test-DbaInstanceName
-            Write-Message -Level Debug -Message "server.NetName is $($server.NetName)" -FunctionName Test-DbaInstanceName
-            Write-Message -Level Debug -Message "server.ServiceName is $($server.ServiceName)" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Debug -Message "server.ComputerName is $($server.ComputerName)" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
+            Write-Message -Level Debug -Message "server.ComputerNamePhysicalNetBIOS is $($server.ComputerNamePhysicalNetBIOS)" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
+            Write-Message -Level Debug -Message "server.DomainInstanceName is $($server.DomainInstanceName)" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
+            Write-Message -Level Debug -Message "server.Name is $($server.Name)" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
+            Write-Message -Level Debug -Message "server.NetName is $($server.NetName)" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
+            Write-Message -Level Debug -Message "server.ServiceName is $($server.ServiceName)" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
 
             $serverInfo = [PSCustomObject]@{
                 ComputerName   = $server.ComputerName
@@ -159,13 +159,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $reasons = @()
             $ssrsService = "SQL Server Reporting Services ($instanceName)"
 
-            Write-Message -Level Verbose -Message "Checking for $serverName on $netBiosName" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Verbose -Message "Checking for $serverName on $netBiosName" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
             $rs = $null
             if ($SkipSsrs -eq $false -or $NoWarning -eq $false) {
                 try {
                     $rs = Get-DbaService -ComputerName $instance.ComputerName -InstanceName $server.ServiceName -Type SSRS -EnableException -WarningAction Stop
                 } catch {
-                    Write-Message -Level Warning -Message "Unable to pull information on $ssrsService." -ErrorRecord $_ -Target $instance -FunctionName Test-DbaInstanceName
+                    Write-Message -Level Warning -Message "Unable to pull information on $ssrsService." -ErrorRecord $_ -Target $instance -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
                 }
             }
 
@@ -183,7 +183,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             # check for mirroring
             $mirroredDb = $server.Databases | Where-Object { $_.IsMirroringEnabled -eq $true }
 
-            Write-Message -Level Debug -Message "Found the following mirrored dbs: $($mirroredDb.Name)" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Debug -Message "Found the following mirrored dbs: $($mirroredDb.Name)" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
 
             if ($mirroredDb.Length -gt 0) {
                 $dbs = $mirroredDb.Name -join ", "
@@ -192,7 +192,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # check for replication
             $sql = "SELECT name FROM sys.databases WHERE is_published = 1 OR is_subscribed = 1 OR is_distributor = 1"
-            Write-Message -Level Debug -Message "SQL Statement: $sql" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Debug -Message "SQL Statement: $sql" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
             $replicatedDb = $server.Query($sql)
 
             if ($replicatedDb.Count -gt 0) {
@@ -202,7 +202,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             # check for even more replication
             $sql = "SELECT srl.remote_name AS RemoteLoginName FROM sys.remote_logins srl JOIN sys.sysservers sss ON srl.server_id = sss.srvid"
-            Write-Message -Level Debug -Message "SQL Statement: $sql" -FunctionName Test-DbaInstanceName
+            Write-Message -Level Debug -Message "SQL Statement: $sql" -FunctionName Test-DbaInstanceName -ModuleName "dbatools"
             $results = $server.Query($sql)
 
             if ($results.RemoteLoginName.Count -gt 0) {

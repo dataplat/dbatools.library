@@ -114,7 +114,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $props = $object.ExtendedProperties
 
             if ($null -eq $props) {
-                Write-Message -Message "No extended properties exist in the $object on $instance" -Target $object -Level Verbose -FunctionName Get-DbaExtendedProperty
+                Write-Message -Message "No extended properties exist in the $object on $instance" -Target $object -Level Verbose -FunctionName Get-DbaExtendedProperty -ModuleName "dbatools"
                 continue
             }
 

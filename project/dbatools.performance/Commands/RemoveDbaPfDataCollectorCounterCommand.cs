@@ -115,9 +115,7 @@ public sealed class RemoveDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, MutationScript,
-            _accumulated.ToArray(), Counter, effectiveCredential, EnableException.ToBool(),
-            this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -128,7 +126,9 @@ public sealed class RemoveDbaPfDataCollectorCounterCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, MutationScript,
+            _accumulated.ToArray(), Counter, effectiveCredential, EnableException.ToBool(),
+            this, BoundVerbose());
     }
 
     private static bool PsTruthyList(List<object?> values)
@@ -255,7 +255,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($__realCmdlet.ShouldProcess("$computer", "Remove $countername from $collectorname with the $setname collection set")) {
             try {
                 $results = Invoke-Command2 -ComputerName $computer -Credential $Credential -ScriptBlock $setscript -ArgumentList $setname, $plainxml -ErrorAction Stop -Raw
-                Write-Message -Level Verbose -Message " $results" -FunctionName Remove-DbaPfDataCollectorCounter
+                Write-Message -Level Verbose -Message " $results" -FunctionName Remove-DbaPfDataCollectorCounter -ModuleName "dbatools"
                 [PSCustomObject]@{
                     ComputerName     = $computer
                     DataCollectorSet = $setname

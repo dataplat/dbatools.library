@@ -65,21 +65,21 @@ public sealed class SetDbaErrorLogConfigCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { instance }, SqlCredential, LogCount, LogSize,
-                TestBound(nameof(LogCount)), TestBound(nameof(LogSize)),
-                EnableException.ToBool(), this,
-                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+            new[] { instance }, SqlCredential, LogCount, LogSize,
+                TestBound(nameof(LogCount)), TestBound(nameof(LogSize)),
+                EnableException.ToBool(), this,
+                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -150,7 +150,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 Stop-Function -Message "Size is cannot be set on $instance. SQL Server 2008 R2 and below not supported." -Continue -FunctionName Set-DbaErrorLogConfig
             }
             if ($LogSize -eq $currentLogSize) {
-                Write-Message -Level Warning -Message "The provided value for LogSize is already set to $LogSize KB on $instance" -FunctionName Set-DbaErrorLogConfig
+                Write-Message -Level Warning -Message "The provided value for LogSize is already set to $LogSize KB on $instance" -FunctionName Set-DbaErrorLogConfig -ModuleName "dbatools"
             } else {
                 if ($__realCmdlet.ShouldProcess($server, "Updating log size from [$currentLogSize] to [$LogSize]")) {
                     try {
@@ -169,7 +169,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         if ($__boundLogCount) {
             if ($LogCount -eq $currentNumLogs) {
-                Write-Message -Level Warning -Message "The provided value for LogCount is already set to $LogCount on $instance" -FunctionName Set-DbaErrorLogConfig
+                Write-Message -Level Warning -Message "The provided value for LogCount is already set to $LogCount on $instance" -FunctionName Set-DbaErrorLogConfig -ModuleName "dbatools"
             } else {
                 if ($__realCmdlet.ShouldProcess($server, "Setting number of logs from [$currentNumLogs] to [$LogCount]")) {
                     try {

@@ -123,11 +123,7 @@ public sealed class MoveDbaRegServerCommand : DbaBaseCmdlet
             _bindInitialized = true;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Name, ServerName, Group, _inputObjectState,
-            EnableException.ToBool(), _state, TestBound(nameof(Group)), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3061State"))
@@ -137,16 +133,20 @@ public sealed class MoveDbaRegServerCommand : DbaBaseCmdlet
                 {
                     _inputObjectState = _state["InputObject"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Name, ServerName, Group, _inputObjectState,
+            EnableException.ToBool(), _state, TestBound(nameof(Group)), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)

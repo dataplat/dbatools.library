@@ -126,14 +126,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if (!$db.IsAccessible) {
-                Write-Message -Level Warning -Message "$db is not accessible, skipping" -FunctionName Get-DbaDbAsymmetricKey
+                Write-Message -Level Warning -Message "$db is not accessible, skipping" -FunctionName Get-DbaDbAsymmetricKey -ModuleName "dbatools"
                 continue
             }
 
             $akeys = $db.AsymmetricKeys
 
             if ($null -eq $akeys) {
-                Write-Message -Message "No Asymmetic Keys exists in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbAsymmetricKey
+                Write-Message -Message "No Asymmetic Keys exists in the $db database on $instance" -Target $db -Level Verbose -FunctionName Get-DbaDbAsymmetricKey -ModuleName "dbatools"
                 continue
             }
 

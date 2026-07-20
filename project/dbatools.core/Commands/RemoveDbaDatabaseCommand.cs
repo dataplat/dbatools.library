@@ -52,20 +52,20 @@ public sealed class RemoveDbaDatabaseCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, Database, InputObject, EnableException.ToBool(),
-            this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, Database, InputObject, EnableException.ToBool(),
+            this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     private object? BoundCommonParameter(string name)
@@ -171,7 +171,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
                     }
                 } catch {
-                    Write-Message -Level Verbose -Message "Could not drop database $db on $server" -FunctionName Remove-DbaDatabase
+                    Write-Message -Level Verbose -Message "Could not drop database $db on $server" -FunctionName Remove-DbaDatabase -ModuleName "dbatools"
 
                     [PSCustomObject]@{
                         ComputerName = $server.ComputerName

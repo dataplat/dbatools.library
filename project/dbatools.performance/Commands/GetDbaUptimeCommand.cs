@@ -87,8 +87,8 @@ public sealed class GetDbaUptimeCommand : DbaInstanceCmdlet
 
             // The whole post-connect body is VERBATIM; the only throw-through is the
             // EE Stop-Function (the function terminating path), which propagates.
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BodyScript, server, instance, _servername, _nowUtc, Credential, EnableException.ToBool(), BoundVerbose()))
-                WriteObject(item);
+            NestedCommand.InvokeScopedStreaming(this, item => WriteObject(item), BodyScript,
+                    server, instance, _servername, _nowUtc, Credential, EnableException.ToBool(), BoundVerbose());
         }
     }
 

@@ -80,11 +80,7 @@ public sealed class StopDbaProcessCommand : DbaBaseCmdlet
         if (_hopInterrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            InputObject, new Hashtable(MyInvocation.BoundParameters),
-            EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3103State"))
@@ -94,16 +90,20 @@ public sealed class StopDbaProcessCommand : DbaBaseCmdlet
                 {
                     _hopInterrupted = true;
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            InputObject, new Hashtable(MyInvocation.BoundParameters),
+            EnableException.ToBool(), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     // CROSS-RECORD LATCH (the W3-066 carry): Stop-Function's non-Continue path sets
@@ -179,7 +179,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $currentspid = $session.spid
 
             if ($sourceserver.ConnectionContext.ProcessID -eq $currentspid) {
-                Write-Message -Level Warning -Message "Skipping spid $currentspid because you cannot use KILL to kill your own process." -Target $session -FunctionName Stop-DbaProcess
+                Write-Message -Level Warning -Message "Skipping spid $currentspid because you cannot use KILL to kill your own process." -Target $session -FunctionName Stop-DbaProcess -ModuleName "dbatools"
                 Continue
             }
 

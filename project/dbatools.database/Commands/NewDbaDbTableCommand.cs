@@ -517,7 +517,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         if ($param -notin $excludeParams) {
                             # IsNode and IsEdge are only supported in SQL Server 2017+ (version 14+)
                             if ($param -in 'IsNode', 'IsEdge' -and $server.VersionMajor -lt 14) {
-                                Write-Message -Level Warning -Message "Parameter $param is only supported on SQL Server 2017 and above. Current version is $($server.VersionMajor). Skipping." -FunctionName New-DbaDbTable
+                                Write-Message -Level Warning -Message "Parameter $param is only supported on SQL Server 2017 and above. Current version is $($server.VersionMajor). Skipping." -FunctionName New-DbaDbTable -ModuleName "dbatools"
                                 continue
                             }
                             $object.$param = $PSBoundParameters[$param]
@@ -587,7 +587,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     # user has specified a schema that does not exist yet
                     $schemaObject = $null
                     if (-not ($db | Get-DbaDbSchema -Schema $Schema -IncludeSystemSchemas)) {
-                        Write-Message -Level Verbose -Message "Schema $Schema does not exist in $db and will be created." -FunctionName New-DbaDbTable
+                        Write-Message -Level Verbose -Message "Schema $Schema does not exist in $db and will be created." -FunctionName New-DbaDbTable -ModuleName "dbatools"
                         $schemaObject = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Schema $db, $Schema
                     }
 
@@ -611,7 +611,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $db | Get-DbaDbTable -Table "[$Schema].[$Name]"
                 } catch {
                     $exception = $_
-                    Write-Message -Level Verbose -Message "Failed to create table or failure while adding constraints. Will try to remove table (and schema)." -FunctionName New-DbaDbTable
+                    Write-Message -Level Verbose -Message "Failed to create table or failure while adding constraints. Will try to remove table (and schema)." -FunctionName New-DbaDbTable -ModuleName "dbatools"
                     try {
                         $object.Refresh()
                         if ($object.State -ne 'Dropped') {
@@ -624,7 +624,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         }
                     } catch {
-                        Write-Message -Level Warning -Message "Failed to drop table: $_. Maybe table still exists." -FunctionName New-DbaDbTable
+                        Write-Message -Level Warning -Message "Failed to drop table: $_. Maybe table still exists." -FunctionName New-DbaDbTable -ModuleName "dbatools"
                     }
                     Stop-Function -Message "Failure" -ErrorRecord $exception -Continue -FunctionName New-DbaDbTable
                 }

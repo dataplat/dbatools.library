@@ -54,6 +54,13 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     private object? _effectiveInputObject;
+    // The most recently OBSERVED InputObject reference: the engine only rebinds the property
+    // for records that PIPE workload groups, so a reference CHANGE from the last observation is
+    // the per-record rebind signal (codex r2/r3: a fixed first-record snapshot misclassifies
+    // later non-rebinding records after one genuine rebind - the property retains the last
+    // piped value - and BoundParameters.ContainsKey stays true for invocation-bound
+    // -InputObject, which must ACCUMULATE like the function world's process scope).
+    private object? _lastObservedInputObject;
 
     protected override void ProcessRecord()
     {
@@ -63,9 +70,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
         // The earlier _skipEnd whole-cmdlet stop diverged (opus W1-117 round 1).
         if (Interrupted) { return; }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
-            InputObject, EnableException.ToBool(), BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -81,16 +86,39 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, WorkloadGroup, ResourcePool, ResourcePoolType,
+            // DEF-011/012 (the row's confirmed P1, codex cross-vendor rounds 1+2): the
+            // function world's process scope ACCUMULATES $InputObject += across pipeline
+            // records. Only a genuine per-record PIPELINE rebind (reference transition from
+            // the invocation-time snapshot) starts fresh, exactly like the engine's VFP
+            // rebinding; otherwise the hop seeds from the accumulated carrier total (falling
+            // back to the invocation-bound value on the first record).
+            SelectProcessInputObject(),
+            EnableException.ToBool(), BoundVerbose());
+    }
+
+    protected override void BeginProcessing()
+    {
+        base.BeginProcessing();
+        // Baseline = the invocation-bound value (or null) before any pipeline record.
+        _lastObservedInputObject = InputObject;
+    }
+
+    private object? SelectProcessInputObject()
+    {
+        bool pipelineRebound = !ReferenceEquals(InputObject, _lastObservedInputObject);
+        _lastObservedInputObject = InputObject;
+        if (pipelineRebound)
+            return InputObject;
+        return _effectiveInputObject ?? InputObject;
     }
 
     protected override void EndProcessing()
     {
         if (Interrupted) { return; }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            _effectiveInputObject, SkipReconfigure.ToBool(), EnableException.ToBool(),
-            this, BoundVerbose()))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
@@ -101,7 +129,9 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             {
                 WriteObject(item);
             }
-        }
+        }, EndScript,
+            _effectiveInputObject, SkipReconfigure.ToBool(), EnableException.ToBool(),
+            this, BoundVerbose());
     }
 
     private const string CarrierMarker = "__dbatoolsW1117Carrier";
@@ -202,7 +232,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         # Reconfigure Resource Governor
         if ($SkipReconfigure) {
-            Write-Message -Level Warning -Message "Workload group changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Remove-DbaRgWorkloadGroup
+            Write-Message -Level Warning -Message "Workload group changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Remove-DbaRgWorkloadGroup -ModuleName "dbatools"
         } elseif ($__realCmdlet.ShouldProcess($server, "Reconfiguring the Resource Governor")) {
             try {
                 $server.ResourceGovernor.Alter()

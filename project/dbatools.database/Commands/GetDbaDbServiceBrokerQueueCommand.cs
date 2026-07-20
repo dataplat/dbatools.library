@@ -112,11 +112,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         foreach ($db in $InputObject) {
             if (!$db.IsAccessible) {
-                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbServiceBrokerQueue
+                Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Get-DbaDbServiceBrokerQueue -ModuleName "dbatools"
                 continue
             }
             if ($db.ServiceBroker.Queues.Count -eq 0) {
-                Write-Message -Message "No Service Broker Queues exist in the $db database on $instance" -Target $db -Level Output -FunctionName Get-DbaDbServiceBrokerQueue
+                Write-Message -Message "No Service Broker Queues exist in the $db database on $instance" -Target $db -Level Output -FunctionName Get-DbaDbServiceBrokerQueue -ModuleName "dbatools"
                 continue
             }
 

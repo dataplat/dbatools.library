@@ -278,7 +278,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             $dbStatus = (Get-DbaDbState -SqlInstance $server -Database $Database).Status
             if ($dbStatus -ne 'ONLINE') {
-                Write-Message -Level Verbose -Message "Database $Database is not ONLINE. Getting file structure from sys.master_files." -FunctionName Move-DbaDbFile
+                Write-Message -Level Verbose -Message "Database $Database is not ONLINE. Getting file structure from sys.master_files." -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                 if ($fileTypeFilter -eq -1) {
                     $DataFiles = Get-DbaDbPhysicalFile -SqlInstance $server | Where-Object Name -EQ $Database | Select-Object LogicalName, PhysicalName
                 } else {
@@ -318,7 +318,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 Stop-Function -Message "Setting database Offline failed!" -FunctionName Move-DbaDbFile
                                 return
                             } else {
-                                Write-Message -Level Verbose -Message "Database $Database was set to Offline status." -FunctionName Move-DbaDbFile
+                                Write-Message -Level Verbose -Message "Database $Database was set to Offline status." -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                             }
                         } catch {
                             Stop-Function -Message "Setting database Offline failed!" -ErrorRecord $_ -Target $SqlInstance -FunctionName Move-DbaDbFile
@@ -398,14 +398,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     Start-BitsTransfer -Source $physicalName -Destination $destination -ErrorAction Stop
                                 } catch {
                                     try {
-                                        Write-Message -Level Warning -Message "WARN: Could not copy file using Bits transfer. $_" -FunctionName Move-DbaDbFile
-                                        Write-Message -Level Verbose -Message "Trying with Copy-Item" -FunctionName Move-DbaDbFile
+                                        Write-Message -Level Warning -Message "WARN: Could not copy file using Bits transfer. $_" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
+                                        Write-Message -Level Verbose -Message "Trying with Copy-Item" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                                         Copy-Item -Path $physicalName -Destination $destination -ErrorAction Stop
 
                                     } catch {
                                         $failed = $true
 
-                                        Write-Message -Level Important -Message "ERROR: Could not copy file. $_" -FunctionName Move-DbaDbFile
+                                        Write-Message -Level Important -Message "ERROR: Could not copy file. $_" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                                     }
                                 }
                             }
@@ -439,27 +439,27 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                     if ($__realCmdlet.ShouldProcess($database, "Copying file $physicalNameUNC to $destinationUNC using UNC path for $ComputerName")) {
 
                                         try {
-                                            Write-Message -Level Verbose -Message "Try copying using Start-BitsTransfer with UNC paths." -FunctionName Move-DbaDbFile
+                                            Write-Message -Level Verbose -Message "Try copying using Start-BitsTransfer with UNC paths." -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                                             Start-BitsTransfer -Source $physicalNameUNC -Destination $destinationUNC -ErrorAction Stop
                                         } catch {
-                                            Write-Message -Level Warning -Message "Did not work using Start-BitsTransfer. ERROR: $_" -FunctionName Move-DbaDbFile
-                                            Write-Message -Level Verbose -Message "Trying using Copy-Item with UNC paths instead." -FunctionName Move-DbaDbFile
+                                            Write-Message -Level Warning -Message "Did not work using Start-BitsTransfer. ERROR: $_" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
+                                            Write-Message -Level Verbose -Message "Trying using Copy-Item with UNC paths instead." -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                                             Copy-Item -Path $physicalNameUNC -Destination $destinationUNC -ErrorAction Stop
                                         }
 
                                         # Force the copy of the file's ACL
                                         Get-Acl -Path $physicalNameUNC | Set-Acl $destinationUNC
 
-                                        Write-Message -Level Verbose -Message "File $fileName was copied successfully" -FunctionName Move-DbaDbFile
+                                        Write-Message -Level Verbose -Message "File $fileName was copied successfully" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                                     }
                                 } catch {
                                     $failed = $true
 
-                                    Write-Message -Level Important -Message "ERROR: Could not copy file. $_" -FunctionName Move-DbaDbFile
+                                    Write-Message -Level Important -Message "ERROR: Could not copy file. $_" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                                 }
                             }
 
-                            Write-Message -Level Verbose -Message "File $fileName was copied successfully" -FunctionName Move-DbaDbFile
+                            Write-Message -Level Verbose -Message "File $fileName was copied successfully" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                         }
                         # initialize the returnobject first with the values of a successful move
                         $returnObject = [PSCustomObject]@{
@@ -511,7 +511,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             $returnObject
                         }
                     } else {
-                        Write-Message -Level Verbose -Message "File $fileName already exists on $destination. Skipping." -FunctionName Move-DbaDbFile
+                        Write-Message -Level Verbose -Message "File $fileName already exists on $destination. Skipping." -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                         $returnObject.SourceFileDeleted = "N/A"
                         $returnObject.DatabaseFileMetadata = "N/A"
                         $returnObject.Result = "Already exists. Skipping"
@@ -525,14 +525,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         if ($SetState.Status -ne 'Online') {
                             Stop-Function -Message "$($SetState.Notes)! : $($dbstate.Exception.InnerException.InnerException.InnerException.InnerException)." -FunctionName Move-DbaDbFile
                         } else {
-                            Write-Message -Level Verbose -Message "Database is online!" -FunctionName Move-DbaDbFile
+                            Write-Message -Level Verbose -Message "Database is online!" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
                         }
                     } catch {
                         Stop-Function -Message "Setting database online failed! : $($_.Exception.InnerException.InnerException.InnerException.InnerException)" -ErrorRecord $_ -Target $server.DomainInstanceName -OverrideExceptionMessage -FunctionName Move-DbaDbFile
                     }
                 }
             } else {
-                Write-Message -Level Warning -Message "We could not get any files for database $Database!" -FunctionName Move-DbaDbFile
+                Write-Message -Level Warning -Message "We could not get any files for database $Database!" -FunctionName Move-DbaDbFile -ModuleName "dbatools"
             }
         } catch {
             Stop-Function -Message "ERROR:" -ErrorRecord $_ -FunctionName Move-DbaDbFile

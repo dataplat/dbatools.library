@@ -106,7 +106,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $writable_idxfile = Join-Path $DbatoolsData "dbatools-buildref-index.json"
 
         if (-not (Test-Path $orig_idxfile)) {
-            Write-Message -Level Warning -Message "Unable to read local SQL build reference file. Please check your module integrity or reinstall dbatools." -FunctionName Update-DbaBuildReference
+            Write-Message -Level Warning -Message "Unable to read local SQL build reference file. Please check your module integrity or reinstall dbatools." -FunctionName Update-DbaBuildReference -ModuleName "dbatools"
         }
 
         if ((-not (Test-Path $orig_idxfile)) -and (-not (Test-Path $writable_idxfile))) {
@@ -150,7 +150,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($null -ne $newContent) {
             $new_time = Get-Date ($newContent | ConvertFrom-Json).LastUpdated
             if ($new_time -gt $offline_time) {
-                Write-Message -Level Output -Message "Index updated correctly, last update on: $(Get-Date -Date $new_time -Format s), was $(Get-Date -Date $offline_time -Format s)" -FunctionName Update-DbaBuildReference
+                Write-Message -Level Output -Message "Index updated correctly, last update on: $(Get-Date -Date $new_time -Format s), was $(Get-Date -Date $offline_time -Format s)" -FunctionName Update-DbaBuildReference -ModuleName "dbatools"
                 $newContent | Out-File $writable_idxfile -Encoding utf8 -ErrorAction Stop
             }
         }

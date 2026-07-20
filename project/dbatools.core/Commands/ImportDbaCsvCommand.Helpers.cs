@@ -19,7 +19,7 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class ImportDbaCsvCommand
 {
     /// <summary>Result shape of the absorbed private/functions/Get-ObjectNameParts.ps1.</summary>
-    private sealed class ObjectNameParts
+    internal sealed class ObjectNameParts
     {
         public string? Database;
         public string? Schema;
@@ -285,7 +285,7 @@ public sealed partial class ImportDbaCsvCommand
 
     /// <summary>Absorbed private/functions/Get-ObjectNameParts.ps1 (only the members the
     /// caller reads); preserves the fix-char substitution quirks verbatim.</summary>
-    private static ObjectNameParts GetObjectNameParts(string objectName)
+    internal static ObjectNameParts GetObjectNameParts(string objectName)
     {
         //Object names with a ']' charcter in the name need to be handeled
         //Require charcter to be escaped by being duplicated as per T-SQL QuoteName function

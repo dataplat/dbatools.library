@@ -60,20 +60,20 @@ public sealed class RemoveDbaCustomErrorCommand : DbaBaseCmdlet
             if (Interrupted)
                 return;
 
-            foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-                new[] { instance }, SqlCredential, MessageID, Language, EnableException.ToBool(),
-                TestBound(nameof(Language)), this,
-                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.InvokeScopedStreaming(this, item =>
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     RemoveHopErrorBookkeeping(nestedError);
                     WriteError(nestedError);
-                    continue;
+                    return;
                 }
                 WriteObject(item);
-            }
+            }, ProcessScript,
+            new[] { instance }, SqlCredential, MessageID, Language, EnableException.ToBool(),
+                TestBound(nameof(Language)), this,
+                BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
         }
     }
 
@@ -142,7 +142,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($__realCmdlet.ShouldProcess($instance, "Removing server message with id $MessageID from $instance")) {
-            Write-Message -Level Verbose -Message "Removing server message with id $MessageID and language $Language from $instance" -FunctionName Remove-DbaCustomError
+            Write-Message -Level Verbose -Message "Removing server message with id $MessageID and language $Language from $instance" -FunctionName Remove-DbaCustomError -ModuleName "dbatools"
 
             # Use sp_dropmessage directly - more reliable than SMO Drop() method
             # sp_dropmessage handles the proper drop order automatically

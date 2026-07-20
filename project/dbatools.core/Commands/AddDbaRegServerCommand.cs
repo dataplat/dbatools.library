@@ -123,13 +123,7 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
             _bindInitialized = true;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, SqlCredential, _serverNameState, _nameState, Description ?? "", Group,
-            ActiveDirectoryTenant ?? "", ActiveDirectoryUserId ?? "", ConnectionString ?? "",
-            OtherParams ?? "", _inputObjectState, ServerObject, EnableException.ToBool(), _state,
-            BoundRaw("ServerName"), BoundRaw("ServerObject"), BoundRaw("Name"), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             Hashtable? sentinel = item?.BaseObject as Hashtable;
             if (sentinel is not null && sentinel.ContainsKey("__w3002State"))
@@ -141,16 +135,22 @@ public sealed class AddDbaRegServerCommand : DbaBaseCmdlet
                     _nameState = _state["Name"];
                     _serverNameState = _state["ServerName"];
                 }
-                continue;
+                return;
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
-                continue;
+                return;
             }
             WriteObject(item);
-        }
+        }, ProcessScript,
+            SqlInstance, SqlCredential, _serverNameState, _nameState, Description ?? "", Group,
+            ActiveDirectoryTenant ?? "", ActiveDirectoryUserId ?? "", ConnectionString ?? "",
+            OtherParams ?? "", _inputObjectState, ServerObject, EnableException.ToBool(), _state,
+            BoundRaw("ServerName"), BoundRaw("ServerObject"), BoundRaw("Name"), this,
+            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
+            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
     /// <summary>The raw bound value (or null when unbound) so the hop's
@@ -240,12 +240,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ((-not $SqlInstance -and -not $InputObject) -or $ServerObject) {
-            Write-Message -Level Verbose -Message "Parsing local" -FunctionName Add-DbaRegServer
+            Write-Message -Level Verbose -Message "Parsing local" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
             if (($Group)) {
                 if ($Group -is [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup]) {
                     $regServerGroup = Get-DbaRegServerGroup -Group $Group.Name
                 } else {
-                    Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer
+                    Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
                     $regServerGroup = Get-DbaRegServerGroup -Group $Group
                 }
                 if ($regServerGroup) {
@@ -255,12 +255,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($Group -is [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup]) {
                         $InputObject += Add-DbaRegServerGroup -Name $Group.Name
                     } else {
-                        Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer
+                        Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
                         $InputObject += Add-DbaRegServerGroup -Name $Group
                     }
                 }
             } else {
-                Write-Message -Level Verbose -Message "No group passed, getting root" -FunctionName Add-DbaRegServer
+                Write-Message -Level Verbose -Message "No group passed, getting root" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
                 $InputObject += Get-DbaRegServerGroup -Id 1
             }
         }
@@ -279,7 +279,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     if ($Group -is [Microsoft.SqlServer.Management.RegisteredServers.ServerGroup]) {
                         $InputObject += Add-DbaRegServerGroup -SqlInstance $instance -SqlCredential $SqlCredential -Name $Group.Name
                     } else {
-                        Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer
+                        Write-Message -Level Verbose -Message "String group provided" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
                         $InputObject += Add-DbaRegServerGroup -SqlInstance $instance -SqlCredential $SqlCredential -Name $Group
                     }
                 }
@@ -292,7 +292,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($reggroup.Source -eq "Azure Data Studio") {
                 Stop-Function -Message "You cannot use dbatools to remove or add registered servers in Azure Data Studio" -Continue -FunctionName Add-DbaRegServer
             }
-            Write-Message -Level Verbose -Message "ID: $($reggroup.ID)" -FunctionName Add-DbaRegServer
+            Write-Message -Level Verbose -Message "ID: $($reggroup.ID)" -FunctionName Add-DbaRegServer -ModuleName "dbatools"
             if ($reggroup.ID) {
                 $target = $reggroup.ParentServer.SqlInstance
             } else {
