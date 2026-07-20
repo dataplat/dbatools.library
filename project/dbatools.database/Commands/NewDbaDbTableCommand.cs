@@ -130,7 +130,7 @@ public sealed partial class NewDbaDbTableCommand : DbaBaseCmdlet
             boundParameters.ContainsKey("SqlInstance"),
             boundParameters.ContainsKey("Database"),
             boundParameters.ContainsKey("Name"),
-            boundParameters.ContainsKey("Schema"),
+            SchemaBound,
             this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));

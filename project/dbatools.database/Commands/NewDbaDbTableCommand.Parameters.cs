@@ -29,9 +29,14 @@ public sealed partial class NewDbaDbTableCommand
     public string? Name { get; set; }
 
     /// <summary>Schema.</summary>
+    private string _schema = "dbo";
+    // Boundness is tracked explicitly rather than inferred from value: the default "dbo" is a value a
+    // caller can pass, and the two-part-Name override (source :480) turns on whether -Schema was
+    // SUPPLIED, not on its value - so a value test would let a parsed schema silently beat an explicit one.
+    internal bool SchemaBound;
     [Parameter(Position = 4)]
     [PsStringCast]
-    public string Schema { get; set; } = "dbo";
+    public string Schema { get => _schema; set { _schema = value; SchemaBound = true; } }
 
     /// <summary>ColumnMap.</summary>
     [Parameter(Position = 5)]
