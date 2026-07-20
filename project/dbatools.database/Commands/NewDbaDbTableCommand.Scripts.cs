@@ -50,6 +50,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__state -and $__state.SchemaAssigned) { $Schema = $__state.Schema }
 
     . {
+        # W2-151: this `. { }` dot-source runs as its own scriptblock invocation, so the automatic
+        # $PSBoundParameters is RE-INITIALIZED to empty here (measured: populated at the preamble,
+        # empty at the projection loop below). Re-assert the caller's reconstructed table INSIDE the
+        # block so the "foreach ($param in $PSBoundParameters.Keys) { $object.$param = ... }"
+        # projection (IsNode/IsEdge/etc.) sees it. $__boundParameters is visible here (dot-source
+        # shares the parent scope's variables; only the $PSBoundParameters automatic is re-scoped).
+        $PSBoundParameters = $__boundParameters
         if (($__boundSqlInstance)) {
             if ((-not $__boundDatabase) -or (-not $__boundName)) {
                 Stop-Function -Message "You must specify one or more databases and one Name when using the SqlInstance parameter." -FunctionName New-DbaDbTable
