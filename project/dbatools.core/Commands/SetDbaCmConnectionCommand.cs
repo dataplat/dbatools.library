@@ -22,8 +22,8 @@ namespace Dataplat.Dbatools.Commands;
 /// ELEVEN Test-Bound property gates carried as flags - including the source's
 /// EnableCredentialFailover -> DisableCredentialAutoRegister assignment bug preserved
 /// verbatim (the W3-063 line-199 sibling bug) - and the CimOptions ELSEIF-null defaults
-/// (unlike the New sibling's plain else). $env:COMPUTERNAME bind-time default
-/// (W1-087 class). NO WarningAction carrier (codex W3-005 r3). Surface pinned by
+/// (unlike the New sibling's plain else). $env:COMPUTERNAME default applied in BeginProcessing,
+/// NOT at construction (DEF-007). NO WarningAction carrier (codex W3-005 r3). Surface pinned by
 /// migration/baselines/Set-DbaCmConnection.json (sets Credential {Credential,
 /// WindowsCredentialsAreBad} + Windows {UseWindowsCredentials}, default Credential,
 /// NO positions, ComputerName VFP all-sets).
@@ -38,7 +38,7 @@ public sealed class SetDbaCmConnectionCommand : DbaBaseCmdlet
     // converter mutated shared state even when -ComputerName was explicitly bound, where the PS
     // bind-time default evaluates ZERO times. This command is DEF-007's headline repro
     // (`Set-DbaCmConnection -ComputerName sql01 -ResetConfiguration` on a cold cache registered
-    // the LOCAL box). Applied in ProcessRecord instead - see the gate there.
+    // the LOCAL box). Applied in BeginProcessing instead - see the measured case table there.
     [Parameter(ValueFromPipeline = true)]
     public DbaCmConnectionParameter[]? ComputerName { get; set; }
 
@@ -123,8 +123,30 @@ public sealed class SetDbaCmConnectionCommand : DbaBaseCmdlet
     // begin-scope $disable_cache, computed once and read by every process record.
     private object? _disableCache;
 
+    // DEF-007: the invocation-scoped $env:COMPUTERNAME default (see BeginProcessing).
+    private DbaCmConnectionParameter[]? _defaultComputerName;
+
     protected override void BeginProcessing()
     {
+        // DEF-007: evaluate the $env:COMPUTERNAME default HERE, once per invocation, gated on
+        // EXPLICIT boundness - this is the shape MEASURED against the source, and it is NOT the
+        // ProcessRecord gate I first wrote (see the retraction in the commit message). A PS param
+        // default is applied at invocation start, BEFORE begin{}, and for a ValueFromPipeline
+        // parameter it is applied even when pipeline input will later overwrite it per record.
+        // Measured on the source shape ([SideEffecting[]]$ComputerName = $env:COMPUTERNAME, ctor
+        // logging): `-ComputerName sql01` -> ctor(sql01) only; `"sql01" | cmd` -> ctor(LOCALBOX)
+        // THEN ctor(sql01); no args -> ctor(LOCALBOX); `@() | cmd` -> ctor(LOCALBOX). So the piped
+        // and empty-pipeline paths DO register localhost in the source, and only the explicitly
+        // bound path does not. BoundParameters at begin time contains ComputerName ONLY when it was
+        // bound on the command line, which is exactly the discriminator needed. Held in a field,
+        // never written back to the property, so pipeline binding stays authoritative per record.
+        if (!MyInvocation.BoundParameters.ContainsKey(nameof(ComputerName)))
+        {
+            _defaultComputerName = (DbaCmConnectionParameter[])LanguagePrimitives.ConvertTo(
+                Environment.GetEnvironmentVariable("COMPUTERNAME"),
+                typeof(DbaCmConnectionParameter[]), CultureInfo.InvariantCulture);
+        }
+
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             string.Join(", ", MyInvocation.BoundParameters.Keys), EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
@@ -150,27 +172,17 @@ public sealed class SetDbaCmConnectionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
+        // DEF-007: pipeline binding wins per record; otherwise the invocation default.
+        DbaCmConnectionParameter[]? computers =
+            MyInvocation.BoundParameters.ContainsKey(nameof(ComputerName))
+                ? ComputerName
+                : _defaultComputerName;
+
         // Stream one hop PER COMPUTER: a whole-array hop batches every element's live
         // Debug/Verbose ahead of all buffered output, where the source's foreach
         // interleaves them per element (W2-010 P2A; coordinator 25a09f3 ruling). The
         // source loop body has no cross-element state.
         //
-        // DEF-007: apply the $env:COMPUTERNAME default HERE, gated on boundness, so the
-        // side-effecting converter fires only on the path where PS would evaluate the default.
-        // NOT in BeginProcessing (as DEF-007's fix note proposed): ComputerName is
-        // ValueFromPipeline, and at begin time a piped value is not yet bound - a begin-time
-        // gate would register localhost on exactly the piped path it must leave alone.
-        // BoundParameters DOES carry a pipeline-bound parameter by the time ProcessRecord runs.
-        // Kept in a LOCAL, never written back to the property, so nothing leaks across records.
-        DbaCmConnectionParameter[]? computers = ComputerName;
-        if (!MyInvocation.BoundParameters.ContainsKey(nameof(ComputerName)) &&
-            (computers is null || computers.Length == 0))
-        {
-            computers = (DbaCmConnectionParameter[])LanguagePrimitives.ConvertTo(
-                Environment.GetEnvironmentVariable("COMPUTERNAME"),
-                typeof(DbaCmConnectionParameter[]), CultureInfo.InvariantCulture);
-        }
-
         foreach (DbaCmConnectionParameter computer in computers ?? Array.Empty<DbaCmConnectionParameter>())
         {
             if (Interrupted)
