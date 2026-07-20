@@ -420,12 +420,6 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
     private void RemoteImport(DbaInstanceParameter computer)
     {
         // Export PFX, remove local, import remotely, then Get-DbaComputerCertificate.
-        if (ContainsIgnoreCase(Flag, "UserProtected"))
-        {
-            StopFunction($"UserProtected flag is only valid for localhost because it causes a prompt, skipping for {computer}", continueLoop: true);
-            return;
-        }
-
         // PS :479 `if (-not $secondaryNode) {` - the EXPORT and the local removal are gated, the
         // IMPORT below is not. DEF-008: this split is the fix. Previously export+remove+import
         // rode one scriptblock per node, so every cluster node exported ITS OWN freshly created
@@ -446,14 +440,23 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
                     param($p)
                     $data = $p.Cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::PFX, $p.Password)
                     $p.Cert | Remove-Item -ErrorAction SilentlyContinue
-                    , $data
+                    @{ Data = $data }
                 } $p 3>&1"),
                 null,
                 exportSplat);
+            // The PFX comes back inside a HASHTABLE, not as a bare byte[] and not as a comma-wrapped
+            // array (codex r1 HIGH, then measured): InvokeScript ENUMERATES a returned byte[] and a
+            // `, $data` wrap does not stop it - a 5-byte array arrives as 5 PSObjects of Byte, so the
+            // loop below would keep the LAST BYTE as the certificate. That would have broken every
+            // remote import, not just the cluster case this commit set out to fix. A Hashtable does
+            // not enumerate in the pipeline, so it survives the boundary whole.
             foreach (PSObject item in exported)
             {
                 if (item?.BaseObject is WarningRecord w) { WriteWarning(w.Message); }
-                else if (item is not null) { _certData = item.BaseObject; }
+                else if (item?.BaseObject is Hashtable exportBag && exportBag.ContainsKey("Data"))
+                {
+                    _certData = exportBag["Data"];
+                }
             }
 
             // PS :489 `if ($ClusterInstanceName) { $secondaryNode = $true }` - the latch is set
@@ -463,6 +466,16 @@ public sealed class NewDbaComputerCertificateCommand : DbaBaseCmdlet
             {
                 _secondaryNode = true;
             }
+        }
+
+        // PS :511 - the UserProtected rejection happens at IMPORT time, INSIDE the ShouldProcess
+        // gate and AFTER the export/remove/latch above (codex r1 LOW). Rejecting earlier looked
+        // equivalent but is not: on a cluster it would skip the latch, so every node would create
+        // and leave behind its own local certificate instead of creating once.
+        if (ContainsIgnoreCase(Flag, "UserProtected"))
+        {
+            StopFunction($"UserProtected flag is only valid for localhost because it causes a prompt, skipping for {computer}", continueLoop: true);
+            return;
         }
 
         // Delegated to the engine to keep the import and Get-DbaComputerCertificate surface
