@@ -56,6 +56,7 @@ public sealed class GetDbaDbRestoreHistoryCommand : DbaBaseCmdlet
 
     /// <summary>Filters to a specific restore type.</summary>
     [Parameter]
+    [PsStringCast]
     [ValidateSet("Database", "File", "Filegroup", "Differential", "Log", "Verifyonly", "Revert")]
     public string? RestoreType { get; set; }
 
