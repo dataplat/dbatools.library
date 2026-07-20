@@ -176,6 +176,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $Path = if ($null -ne $__pathBound) { $__pathBound } else { Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport' }
 
+    # Named-wrapper shim: the process body runs inside a function carrying the command's name,
+    # so call-stack-deriving helpers see Export-DbaLinkedServer exactly as in the function world -
+    # Get-ExportFilePath builds the export filename from (Get-PSCallStack)[1].Command, and the
+    # anonymous scriptblock frame otherwise put a literal <scriptblock> marker in the filename.
+    # The dot-sourced invocation keeps the body in the hop scope, so the interrupt latch and
+    # any cross-record state behave unchanged.
+    function Export-DbaLinkedServer {
     if (Test-FunctionInterrupt) { return }
 
     if ($IsLinux -or $IsMacOS) {
@@ -195,15 +202,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $dacOpened = $false
             if ($dacNeeded) {
                 if ($dacConnected) {
-                    Write-Message -Level Verbose -Message "Reusing dedicated admin connection for password retrieval."
+                    Write-Message -Level Verbose -Message "Reusing dedicated admin connection for password retrieval." -FunctionName Export-DbaLinkedServer -ModuleName "dbatools"
                     $server = $instance.InputObject
                 } else {
-                    Write-Message -Level Verbose -Message "Opening dedicated admin connection for password retrieval."
+                    Write-Message -Level Verbose -Message "Opening dedicated admin connection for password retrieval." -FunctionName Export-DbaLinkedServer -ModuleName "dbatools"
                     $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential -MinimumVersion 9 -DedicatedAdminConnection -WarningAction SilentlyContinue
                     $dacOpened = $true
                 }
             } else {
-                Write-Message -Level Verbose -Message "Opening or reusing normal connection because passwords are excluded."
+                Write-Message -Level Verbose -Message "Opening or reusing normal connection because passwords are excluded." -FunctionName Export-DbaLinkedServer -ModuleName "dbatools"
                 $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential -MinimumVersion 9
             }
             $InputObject = $server.LinkedServers
@@ -216,7 +223,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if (-not $InputObject) {
-            Write-Message -Level Verbose -Message "Nothing to export"
+            Write-Message -Level Verbose -Message "Nothing to export" -FunctionName Export-DbaLinkedServer -ModuleName "dbatools"
             continue
         }
 
@@ -272,6 +279,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $null = $server | Disconnect-DbaInstance -WhatIf:$false
         }
     }
+    }
+    . Export-DbaLinkedServer
 } $SqlInstance $LinkedServer $SqlCredential $Credential $__pathBound $__filePathBound $ExcludePassword $Append $Passthru $InputObject $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

@@ -160,6 +160,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, $__pathBound, $__filePathBound, $EnableException, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    # Named-wrapper shim: the process body runs inside a function carrying the command's name,
+    # so call-stack-deriving helpers see Export-DbaSpConfigure exactly as in the function world -
+    # Get-ExportFilePath builds the export filename from (Get-PSCallStack)[1].Command, and the
+    # anonymous scriptblock frame otherwise put a literal <scriptblock> marker in the filename.
+    # The dot-sourced invocation keeps the body in the hop scope, so the interrupt latch and
+    # any cross-record state behave unchanged.
+    function Export-DbaSpConfigure {
     if (Test-FunctionInterrupt) { return }
     foreach ($instance in $SqlInstance) {
         try {
@@ -201,6 +208,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
         Get-ChildItem -Path $FilePath
     }
+    }
+    . Export-DbaSpConfigure
 } $SqlInstance $SqlCredential $__pathBound $__filePathBound $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
@@ -216,7 +225,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    Write-Message -Level Verbose -Message "Server configuration export finished"
+    Write-Message -Level Verbose -Message "Server configuration export finished" -FunctionName Export-DbaSpConfigure -ModuleName "dbatools"
 } $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

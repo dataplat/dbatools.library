@@ -109,17 +109,17 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($server.VersionMajor -ge 9) {
-            Write-Message -Level Verbose -Message "Getting Install Date for: $instance"
+            Write-Message -Level Verbose -Message "Getting Install Date for: $instance" -FunctionName Get-DbaInstanceInstallDate -ModuleName "dbatools"
             $sql = "SELECT create_date FROM sys.server_principals WHERE sid = 0x010100000000000512000000"
             [DbaDateTime]$sqlInstallDate = $server.Query($sql, 'master', $true).create_date
         } else {
-            Write-Message -Level Verbose -Message "Getting Install Date for: $instance"
+            Write-Message -Level Verbose -Message "Getting Install Date for: $instance" -FunctionName Get-DbaInstanceInstallDate -ModuleName "dbatools"
             $sql = "SELECT schemadate FROM dbo.sysservers"
             [DbaDateTime]$sqlInstallDate = $server.Query($sql, 'master', $true).schemadate
         }
 
         if (-not $sqlInstallDate -or $sqlInstallDate -is [System.DBNull]) {
-            Write-Message -Level Verbose -Message "Trying again to get Install Date for: $instance"
+            Write-Message -Level Verbose -Message "Trying again to get Install Date for: $instance" -FunctionName Get-DbaInstanceInstallDate -ModuleName "dbatools"
             $sql = "SELECT schemadate FROM dbo.sysservers"
             [DbaDateTime]$sqlInstallDate = $server.Query($sql, 'master', $true).schemadate
         }

@@ -123,7 +123,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $computerName = (Resolve-DbaNetworkName -ComputerName $computer -Credential $Credential).FullComputerName
         }
 
-        Write-Message -Level Verbose -Message "Attempting to connect to $computer"
+        Write-Message -Level Verbose -Message "Attempting to connect to $computer" -FunctionName Get-DbaFilestream -ModuleName "dbatools"
         try {
             $ognamespace = Get-DbaCmObject -EnableException -ComputerName $computerName -Namespace root\Microsoft\SQLServer -Query "SELECT NAME FROM __NAMESPACE WHERE NAME LIKE 'ComputerManagement%'"
             $namespace = $ognamespace | Where-Object {
@@ -138,7 +138,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         if ($namespace.Name) {
             $serviceFS = Get-DbaCmObject -EnableException -ComputerName $computerName -Namespace $("root\Microsoft\SQLServer\" + $namespace.Name) -ClassName FilestreamSettings | Where-Object InstanceName -eq $instanceName | Select-Object -First 1
         } else {
-            Write-Message -Level Warning -Message "No ComputerManagement was found on $computer. Service level information may not be collected." -Target $computer
+            Write-Message -Level Warning -Message "No ComputerManagement was found on $computer. Service level information may not be collected." -Target $computer -FunctionName Get-DbaFilestream -ModuleName "dbatools"
         }
     } catch {
         Stop-Function -Message "Issue collecting service-level information on $computer for $instanceName" -Target $computer -ErrorRecord $_ -Continue -FunctionName Get-DbaFilestream
@@ -161,7 +161,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     if (($serviceFS.AccessLevel -ne 0) -and ($instanceFS.RunningValue -ne 0)) {
         if (($serviceFS.AccessLevel -eq $instanceFS.RunningValue) -and $pendingRestart) {
-            Write-Message -Level Verbose -Message "A restart of the instance is pending before Filestream is configured."
+            Write-Message -Level Verbose -Message "A restart of the instance is pending before Filestream is configured." -FunctionName Get-DbaFilestream -ModuleName "dbatools"
         }
     }
 
