@@ -54,6 +54,13 @@ public sealed class GetDbaLinkedServerLoginCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // Cross-record carrier for $ls (W3-043 DEF-012): the source's process-block $ls persists across
+    // piped records, so a record whose $obj is neither Server nor LinkedServer reads the PRIOR record's
+    // $ls. Each record runs in a fresh hop scope that loses that, so the final $ls is captured OUT via
+    // the sentinel and seeded back INTO the next record, reproducing (not sanitizing) the legacy
+    // stale-carry. PLAIN VALUE carry (null-or-object IS the state); no assigned-flag (per plan / W2-075).
+    private object? _carriedLs;
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -61,6 +68,14 @@ public sealed class GetDbaLinkedServerLoginCommand : DbaBaseCmdlet
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__getLslCarry"))
+            {
+                if (sentinel["__getLslCarry"] is Hashtable state)
+                {
+                    _carriedLs = state["Ls"];
+                }
+                return;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -70,6 +85,7 @@ public sealed class GetDbaLinkedServerLoginCommand : DbaBaseCmdlet
             WriteObject(item);
         }, ProcessScript,
             SqlInstance, SqlCredential, LinkedServer, LocalLogin, ExcludeLocalLogin, InputObject, EnableException.ToBool(),
+            _carriedLs,
             TestBound(nameof(LinkedServer)),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -105,14 +121,14 @@ public sealed class GetDbaLinkedServerLoginCommand : DbaBaseCmdlet
     // Test-Bound -Not -ParameterName LinkedServer -> the negated carried $__boundLinkedServer flag,
     // explicit -FunctionName Get-DbaLinkedServerLogin on Stop-Function (W1-090).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $LinkedServer, $LocalLogin, $ExcludeLocalLogin, $InputObject, $EnableException, $__boundLinkedServer, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $LinkedServer, $LocalLogin, $ExcludeLocalLogin, $InputObject, $EnableException, $__carriedLs, $__boundLinkedServer, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$LinkedServer, [string[]]$LocalLogin, [string[]]$ExcludeLocalLogin, [object[]]$InputObject, $EnableException, $__boundLinkedServer, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$LinkedServer, [string[]]$LocalLogin, [string[]]$ExcludeLocalLogin, [object[]]$InputObject, $EnableException, $__carriedLs, $__boundLinkedServer, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     foreach ($instance in $SqlInstance) {
@@ -123,6 +139,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         $InputObject += Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential | Get-DbaLinkedServer -LinkedServer $LinkedServer
     }
+
+    $ls = $__carriedLs
 
     foreach ($obj in $InputObject) {
 
@@ -156,6 +174,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Select-DefaultView -InputObject $lsLogin -Property ComputerName, InstanceName, SqlInstance, Name, RemoteUser, Impersonate
         }
     }
-} $SqlInstance $SqlCredential $LinkedServer $LocalLogin $ExcludeLocalLogin $InputObject $EnableException $__boundLinkedServer $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+    @{ __getLslCarry = @{ Ls = $ls } }
+} $SqlInstance $SqlCredential $LinkedServer $LocalLogin $ExcludeLocalLogin $InputObject $EnableException $__carriedLs $__boundLinkedServer $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

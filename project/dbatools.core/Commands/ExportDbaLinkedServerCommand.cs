@@ -72,6 +72,16 @@ public sealed class ExportDbaLinkedServerCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // Cross-record carriers for $rmtuser + $password (W3-015 DEF-012): the source's process-block
+    // $rmtuser/$password (assigned only under $map.Identity -isnot [dbnull], read unconditionally in the
+    // rmtpassword substitution) persist across piped records AND across maps/linked-servers/instances
+    // within a record, so a dbnull-Identity $map after a non-dbnull one substitutes the PRIOR credential.
+    // Each record runs in a fresh hop scope that loses that, so the finals are captured OUT via the
+    // sentinel and seeded back INTO the next record, reproducing (not sanitizing) the legacy stale-carry.
+    // PLAIN VALUE carry (strings, may be null); no assigned-flag (per plan / W2-075).
+    private object? _carriedRmtuser;
+    private object? _carriedPassword;
+
     protected override void BeginProcessing()
     {
         NestedCommand.InvokeScopedStreaming(this, item =>
@@ -95,6 +105,15 @@ public sealed class ExportDbaLinkedServerCommand : DbaBaseCmdlet
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__exportLsCarry"))
+            {
+                if (sentinel["__exportLsCarry"] is Hashtable state)
+                {
+                    _carriedRmtuser = state["Rmtuser"];
+                    _carriedPassword = state["Password"];
+                }
+                return;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -105,6 +124,7 @@ public sealed class ExportDbaLinkedServerCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, LinkedServer, SqlCredential, Credential, BoundValue("Path"), BoundValue("FilePath"),
             ExcludePassword.ToBool(), Append.ToBool(), Passthru.ToBool(), InputObject, EnableException.ToBool(),
+            _carriedRmtuser, _carriedPassword,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
@@ -164,14 +184,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // top; explicit -FunctionName Export-DbaLinkedServer on Stop-Function (W1-090). The password
     // decryption / rmtpassword substitution is VERBATIM (security-sensitive).
     private const string ProcessScript = """
-param($SqlInstance, $LinkedServer, $SqlCredential, $Credential, $__pathBound, $__filePathBound, $ExcludePassword, $Append, $Passthru, $InputObject, $EnableException, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $LinkedServer, $SqlCredential, $Credential, $__pathBound, $__filePathBound, $ExcludePassword, $Append, $Passthru, $InputObject, $EnableException, $__carriedRmtuser, $__carriedPassword, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [string[]]$LinkedServer, [PSCredential]$SqlCredential, [PSCredential]$Credential, $__pathBound, $__filePathBound, $ExcludePassword, $Append, $Passthru, [Microsoft.SqlServer.Management.Smo.LinkedServer[]]$InputObject, $EnableException, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [string[]]$LinkedServer, [PSCredential]$SqlCredential, [PSCredential]$Credential, $__pathBound, $__filePathBound, $ExcludePassword, $Append, $Passthru, [Microsoft.SqlServer.Management.Smo.LinkedServer[]]$InputObject, $EnableException, $__carriedRmtuser, $__carriedPassword, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $Path = if ($null -ne $__pathBound) { $__pathBound } else { Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport' }
@@ -189,6 +209,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         Stop-Function -Message "This command is not supported on Linux or macOS" -FunctionName Export-DbaLinkedServer
         return
     }
+
+    $rmtuser = $__carriedRmtuser
+    $password = $__carriedPassword
 
     foreach ($instance in $SqlInstance) {
         try {
@@ -279,8 +302,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $null = $server | Disconnect-DbaInstance -WhatIf:$false
         }
     }
+
+    @{ __exportLsCarry = @{ Rmtuser = $rmtuser; Password = $password } }
     }
     . Export-DbaLinkedServer
-} $SqlInstance $LinkedServer $SqlCredential $Credential $__pathBound $__filePathBound $ExcludePassword $Append $Passthru $InputObject $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $SqlInstance $LinkedServer $SqlCredential $Credential $__pathBound $__filePathBound $ExcludePassword $Append $Passthru $InputObject $EnableException $__carriedRmtuser $__carriedPassword $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

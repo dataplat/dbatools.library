@@ -39,6 +39,14 @@ public sealed class GetDbaFilestreamCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // Cross-record carrier for $serviceFS (W3-033 DEF-012): the source's process-block $serviceFS
+    // persists across piped records AND across instances within a record, so an instance whose WMI
+    // namespace is absent (the else-warn path, no -Continue, no assignment) reads the PRIOR $serviceFS.
+    // Each record runs in a fresh hop scope that loses that, so the final $serviceFS is captured OUT via
+    // the sentinel and seeded back INTO the next record, reproducing (not sanitizing) the legacy
+    // stale-carry. PLAIN VALUE carry; no assigned-flag (per plan / W2-075).
+    private object? _carriedServiceFS;
+
     protected override void ProcessRecord()
     {
         if (Interrupted)
@@ -46,6 +54,14 @@ public sealed class GetDbaFilestreamCommand : DbaBaseCmdlet
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__getFilestreamCarry"))
+            {
+                if (sentinel["__getFilestreamCarry"] is Hashtable state)
+                {
+                    _carriedServiceFS = state["ServiceFS"];
+                }
+                return;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -55,6 +71,7 @@ public sealed class GetDbaFilestreamCommand : DbaBaseCmdlet
             WriteObject(item);
         }, ProcessScript,
             SqlInstance, SqlCredential, Credential, EnableException.ToBool(),
+            _carriedServiceFS,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
 
@@ -89,14 +106,14 @@ public sealed class GetDbaFilestreamCommand : DbaBaseCmdlet
     // body, which is VERBATIM per record (original indentation preserved). Substitution only:
     // explicit -FunctionName Get-DbaFilestream on Stop-Function (W1-090).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Credential, $EnableException, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Credential, $EnableException, $__carriedServiceFS, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [PSCredential]$Credential, $EnableException, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [PSCredential]$Credential, $EnableException, $__carriedServiceFS, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $idServiceFS = [ordered]@{
@@ -111,6 +128,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         1 = 'T-SQL access enabled'
         2 = 'Full access enabled'
     }
+
+    $serviceFS = $__carriedServiceFS
 
     foreach ($instance in $SqlInstance) {
         $computer = $instance.ComputerName
@@ -181,6 +200,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         SqlCredential       = $SqlCredential
     } | Select-DefaultView -Property ComputerName, InstanceName, SqlInstance, InstanceAccess, ServiceAccess, ServiceShareName
     }
-} $SqlInstance $SqlCredential $Credential $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+
+    @{ __getFilestreamCarry = @{ ServiceFS = $serviceFS } }
+} $SqlInstance $SqlCredential $Credential $EnableException $__carriedServiceFS $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
