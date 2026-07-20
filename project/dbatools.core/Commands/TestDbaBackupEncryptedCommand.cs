@@ -109,9 +109,10 @@ public sealed class TestDbaBackupEncryptedCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: process body VERBATIM (single hop per record; no begin/end, no cross-record state).
-    // Substitutions only: hop-level Write-Message gain -FunctionName Test-DbaBackupEncrypted
-    // -ModuleName "dbatools"; hop-level Stop-Function gain -FunctionName Test-DbaBackupEncrypted.
+    // PS: process body per record (single hop; no begin/end). Intentional rewrites: DEF-006
+    // attribution on Write-Message + -FunctionName on Stop-Function; [CmdletBinding()] on the
+    // module hop for common-parameter propagation; and the $results cross-record carrier
+    // (seed from $__carriedResults when assigned, emit via the sentinel below).
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $FilePath, $EnableException, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug, $__carriedResults, $__carriedResultsAssigned)
 $__commonParameters = @{}
