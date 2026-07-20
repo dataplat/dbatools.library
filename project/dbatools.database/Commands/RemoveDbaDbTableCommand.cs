@@ -183,9 +183,9 @@ public sealed class RemoveDbaDbTableCommand : DbaBaseCmdlet
     }
 
     // PS: the process body VERBATIM per record. Substitutions: the two $PSBoundParameters property
-    // reads in the guard -> the carried $__boundSqlInstance / $__boundInputObject flags, and
-    // $PSBoundParameters -> the carried $__boundParams clone (the verbatim Remove lines then run
-    // against it). The accumulator restores from the carry and is emitted from a finally so it
+    // reads in the guard -> the hop's own $SqlInstance / $InputObject VALUES (truthiness parity per
+    // the class doc above - no boundness carrier), and $PSBoundParameters -> the carried
+    // $__boundParams clone (the verbatim Remove lines then run against it). The accumulator restores from the carry and is emitted from a finally so it
     // survives an exception in the body.
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Database, $Table, $InputObject, $EnableException, $__carriedTables, $__boundParams, $__boundVerbose, $__boundDebug)
