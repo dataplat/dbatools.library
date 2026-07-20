@@ -1,4 +1,4 @@
-using System;
+#nullable enable
 
 namespace Dataplat.Dbatools.Commands;
 
