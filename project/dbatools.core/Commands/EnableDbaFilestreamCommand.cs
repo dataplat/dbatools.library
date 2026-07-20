@@ -214,7 +214,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-    [pscustomobject]@{ __dbatoolsEfLevelCarrier = $true; Level = $level; Result = $result; ResultAssigned = (Test-Path variable:result) }
+    [pscustomobject]@{ __dbatoolsEfLevelCarrier = $true; Level = $level; Result = $result; ResultAssigned = [bool](Get-Variable result -Scope 0 -ErrorAction SilentlyContinue) }
 } $SqlInstance $SqlCredential $Credential $FileStreamLevel $ShareName $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedLevel $__carriedResult $__carriedResultAssigned @__commonParameters 3>&1 2>&1
 """;
 }

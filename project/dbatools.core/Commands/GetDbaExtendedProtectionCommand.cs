@@ -210,7 +210,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-    [pscustomobject]@{ __dbatoolsGepNameCarrier = $true; InstanceName = $instanceName; InstanceNameAssigned = (Test-Path variable:instanceName) }
+    [pscustomobject]@{ __dbatoolsGepNameCarrier = $true; InstanceName = $instanceName; InstanceNameAssigned = [bool](Get-Variable instanceName -Scope 0 -ErrorAction SilentlyContinue) }
 } $SqlInstance $Credential $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedInstanceName $__carriedInstanceNameAssigned @__commonParameters 3>&1 2>&1
 """;
 }

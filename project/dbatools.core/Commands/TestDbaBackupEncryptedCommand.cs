@@ -192,7 +192,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Compressed          = ($results | Select-Object -First 1).Compressed -eq $true
         }
     }
-    [pscustomobject]@{ __dbatoolsTbeResultsCarrier = $true; Results = $results; ResultsAssigned = (Test-Path variable:results) }
+    [pscustomobject]@{ __dbatoolsTbeResultsCarrier = $true; Results = $results; ResultsAssigned = [bool](Get-Variable results -Scope 0 -ErrorAction SilentlyContinue) }
 } $SqlInstance $SqlCredential $FilePath $EnableException $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug $__carriedResults $__carriedResultsAssigned @__commonParameters 3>&1 2>&1
 """;
 }

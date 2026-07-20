@@ -11,8 +11,11 @@ namespace Dataplat.Dbatools.Commands;
 /// Gets the last full, differential, and log backup dates for databases. Port of
 /// public/Get-DbaLastBackup.ps1 (W3-041). A READ-ONLY getter (queries backup history via
 /// Get-DbaDbBackupHistory and emits a status object per database; no mutation). The begin block
-/// defines the nested Get-DbaDateOrNull function and the $StartOfTime constant, both read-only and
-/// deterministic, consumed inside the same process body - so they inline into the process script
+/// defines the nested Get-DbaDateOrNull function (read-only, deterministic) and $StartOfTime -
+/// which is NOT deterministic per record: New-TimeSpan's implicit now-end means recomputation
+/// drifts across records, so the FIRST hop computes it and later hops seed the carried value via
+/// the __dbatoolsGlbTimeCarrier sentinel (an intentional rewrite; codex). Both inline into the
+/// process script
 /// (recomputed identically per pipeline record; no cross-record state, no sentinel). DEF-001
 /// cond1+cond2: the process foreach EMITS a decorated result per database (Select-DefaultView) AND has
 /// a reachable Stop-Function -Continue at Connect-DbaInstance, so the hop STREAMS via
