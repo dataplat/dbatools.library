@@ -35,6 +35,7 @@ public sealed class InvokeDbaCycleErrorLogCommand : DbaBaseCmdlet
 
     /// <summary>Which error log to cycle: 'instance', 'agent', or both when omitted.</summary>
     [Parameter(Position = 2)]
+    [PsStringCast]
     [ValidateSet("instance", "agent")]
     public string? Type { get; set; }
 
