@@ -25,6 +25,15 @@ namespace Dataplat.Dbatools.Commands;
 /// -FunctionName Get-DbaDbBackupHistory on the 3 Stop-Function (sibling convention); Write-Message
 /// verbatim (DEF-006 -ModuleName is the fleet sweep). Since is [psobject] with the epoch computed-default
 /// resolved in C#; LsnSort scalar-ValidateSet -> [PsStringCast], Type array-ValidateSet no cast.
+/// codex r1 dispositions: #1 (TimeSpan Since cross-record) FIXED via the cached _resolvedSince field; #2
+/// (explicit null RecoveryFork) FIXED via [AllowNull]. DISCLOSED BOUNDS (contrived, near-unreachable):
+/// #3 explicit "-LastLsn $null" (source [bigint]$null->0; the compiled non-nullable BigInteger rejects
+/// null; making it nullable risks the reflected-surface parity, and unbound already defaults to 0);
+/// #4 a null element inside -Type (both reject the call, only the error text differs); #5/#6 the two
+/// (Get-PSCallStack)[1].Command guards diverge ONLY for absurd callers - a function literally named
+/// "{ScriptBlock}" (curly) or one whose name begins with a leading space - which no realistic code emits,
+/// and the recursion indirection means even a caller carrier could not fix the recursive leg. Same
+/// disclosed-bound class as the accepted W2-206 alias-precedence P2.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaDbBackupHistory", DefaultParameterSetName = "Default")]
 public sealed class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
@@ -58,7 +67,10 @@ public sealed class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
     public PSObject? Since { get; set; }
 
     /// <summary>Restrict to a specific recovery fork GUID (or empty).</summary>
+    // [AllowNull] (codex r1 #2): the source's [string] cast coerces an explicit -RecoveryFork $null to
+    // "" which its ValidateScript accepts; without AllowNull the compiled ValidatePattern rejects null.
     [Parameter]
+    [AllowNull]
     [ValidatePattern(@"^(\{)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(\})?$|^$")]
     public string? RecoveryFork { get; set; }
 
@@ -115,6 +127,13 @@ public sealed class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
+    // codex r1 #1: the source mutates $Since from TimeSpan to DateTime on the FIRST process() call
+    // (via (Get-Date).Add) and that DateTime PERSISTS across subsequent pipeline records. Resolving it
+    // per-record would recompute (Get-Date) each record -> a different cutoff per piped instance. Resolve
+    // ONCE here (cached), reproducing the function's first-record-computes-then-persists semantics.
+    private object? _resolvedSince;
+    private bool _sinceResolved;
+
     protected override void BeginProcessing()
     {
         NestedCommand.InvokeScoped(this, BeginScript,
@@ -128,11 +147,21 @@ public sealed class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // PS bind-time default:  = epoch DateTime. Resolve in C# and pass the unwrapped value into
-        // the untyped hop param so the body's [TimeSpan]/[DateTime] type checks behave as in the function.
-        object sinceValue = MyInvocation.BoundParameters.ContainsKey("Since")
-            ? (Since is null ? null! : Since.BaseObject)
-            : DateTime.ParseExact("1970-01-01", "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        // PS bind-time default: $Since = epoch DateTime. Resolve ONCE (first record) and cache: the raw
+        // bound/default value, and if it is a TimeSpan, the source's (Get-Date).Add() to a fixed DateTime
+        // that persists across records. A non-TimeSpan value passes through raw so the hop's
+        // "-isnot [DateTime]" Stop-Function still fires for a bad type, exactly as the function.
+        if (!_sinceResolved)
+        {
+            object raw = MyInvocation.BoundParameters.ContainsKey("Since")
+                ? (Since is null ? null! : Since.BaseObject)
+                : DateTime.ParseExact("1970-01-01", "yyyy-MM-dd", CultureInfo.InvariantCulture);
+            if (raw is TimeSpan ts)
+                raw = DateTime.Now.Add(ts);
+            _resolvedSince = raw;
+            _sinceResolved = true;
+        }
+        object sinceValue = _resolvedSince!;
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
