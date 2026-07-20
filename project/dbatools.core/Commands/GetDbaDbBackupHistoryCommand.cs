@@ -70,10 +70,11 @@ public sealed partial class GetDbaDbBackupHistoryCommand : DbaBaseCmdlet
     public PSObject? Since { get; set; }
 
     /// <summary>Restrict to a specific recovery fork GUID (or empty).</summary>
-    // [AllowNull] (codex r1 #2): the source's [string] cast coerces an explicit -RecoveryFork $null to
-    // "" which its ValidateScript accepts; without AllowNull the compiled ValidatePattern rejects null.
+    // codex r3 (supersedes r1 #2's [AllowNull]): [AllowNull] does not bypass [ValidatePattern] for
+    // $null - [PsStringCast] coerces the bound $null to "" at bind time exactly as the source's
+    // [string] cast does, and the pattern's ^$ alternative then accepts it.
     [Parameter]
-    [AllowNull]
+    [PsStringCast]
     [ValidatePattern(@"^(\{)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(\})?$|^$")]
     public string? RecoveryFork { get; set; }
 
