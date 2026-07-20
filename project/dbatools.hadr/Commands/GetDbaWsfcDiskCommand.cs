@@ -310,6 +310,16 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
             return null;
         }
 
+        // PS `switch ($state)` treats a [char] like its 1-char string (probed: [char]'0'..'4'
+        // match cases 0..4 - e.g. [char]'2' -> "Online" - via the char's string form, NOT its
+        // code point). LanguagePrimitives.Equals(char, int) would instead cast the int label to a
+        // NUL char and miss, so normalize a char to its string form to match PS. (Unreachable for
+        // the live WMI uint State, but faithful - cross-model return-sweep r2.)
+        if (state is char stateChar)
+        {
+            state = stateChar.ToString();
+        }
+
         foreach ((int value, string name) in ResourceStateLabels)
         {
             if (LanguagePrimitives.Equals(state, value, ignoreCase: true, CultureInfo.InvariantCulture))

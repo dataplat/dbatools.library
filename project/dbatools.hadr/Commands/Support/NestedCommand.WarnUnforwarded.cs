@@ -43,5 +43,37 @@ internal static partial class NestedCommand
         request.File = host.MyInvocation?.ScriptName;
         request.Line = host.MyInvocation?.ScriptLineNumber ?? 0;
         MessageService.Write(host, request);
+
+        // The source's non-EnableException Stop-Function ALSO bookkeeps the record in $error
+        // ($null = Write-Error ... 2>&1 - the DEF-013 hidden-record mechanism): the warning
+        // displays, and the ErrorRecord lands in $error WITHOUT riding the error stream.
+        // MessageService.Write logs to Get-DbatoolsLog but does NOT touch $error, so insert it
+        // here to match. Mirrors DbaBaseCmdlet.InsertGlobalError (private): Insert at 0, trim to
+        // $MaximumErrorCount; best-effort (a constrained runspace may deny $error access, and
+        // failing the command over bookkeeping would be worse than the PS behavior it mirrors).
+        if (exception is not null)
+        {
+            try
+            {
+                if (host.SessionState.PSVariable.GetValue("Error") is System.Collections.ArrayList errorList)
+                {
+                    ErrorRecord record = new ErrorRecord(exception, $"dbatools_{functionName}", ErrorCategory.NotSpecified, target);
+                    errorList.Insert(0, record);
+
+                    int maximumErrorCount = 256;
+                    if (host.SessionState.PSVariable.GetValue("MaximumErrorCount") is object maximumRaw)
+                    {
+                        try { maximumErrorCount = Convert.ToInt32(maximumRaw); }
+                        catch { /* keep the engine default when the variable is malformed */ }
+                    }
+                    while (errorList.Count > maximumErrorCount)
+                        errorList.RemoveAt(errorList.Count - 1);
+                }
+            }
+            catch
+            {
+                // $error decoration is best-effort, exactly as DbaBaseCmdlet.InsertGlobalError.
+            }
+        }
     }
 }
