@@ -123,28 +123,42 @@ public sealed class SetDbaCmConnectionCommand : DbaBaseCmdlet
     // begin-scope $disable_cache, computed once and read by every process record.
     private object? _disableCache;
 
-    // DEF-007: the invocation-scoped $env:COMPUTERNAME default (see BeginProcessing).
+    // DEF-007: the $env:COMPUTERNAME default. MEASURED source semantics (ctor-logging probe on
+    // the source shape [SideEffecting[]]$ComputerName = $env:COMPUTERNAME):
+    //   -ComputerName sql01     -> sql01                                   (default NOT evaluated)
+    //   "sql01" | cmd           -> LOCALBOX, sql01
+    //   "sql01","sql02" | cmd   -> LOCALBOX, sql01, LOCALBOX, sql02
+    //   <no args>               -> LOCALBOX
+    //   @() | cmd               -> LOCALBOX                                (process never runs)
+    // i.e. PS applies the typed default at invocation start AND RE-APPLIES it before every
+    // subsequent pipeline record, so the number of default conversions is max(1, recordCount) -
+    // and it is skipped entirely only when the parameter was bound on the COMMAND LINE.
+    // That is why _boundOnCommandLine is snapshotted in BeginProcessing: by ProcessRecord,
+    // BoundParameters also carries pipeline-bound values and can no longer tell the two apart.
+    // RESIDUAL, deliberate: for records after the first, PS converts the default BEFORE binding
+    // the record's own value; a compiled cmdlet binds before ProcessRecord runs, so the port
+    // converts in the other order. Unobservable here - the ctor's effect is
+    // ConnectionHost.Connections[name] = connection keyed BY NAME, and for two different names
+    // order does not change the resulting cache; for the same name (piping the local box) the
+    // first call registers and the second finds the existing entry in either order.
     private DbaCmConnectionParameter[]? _defaultComputerName;
+    private bool _boundOnCommandLine;
+    private bool _seenFirstRecord;
+
+    private static DbaCmConnectionParameter[]? ConvertComputerNameDefault() =>
+        (DbaCmConnectionParameter[])LanguagePrimitives.ConvertTo(
+            Environment.GetEnvironmentVariable("COMPUTERNAME"),
+            typeof(DbaCmConnectionParameter[]), CultureInfo.InvariantCulture);
 
     protected override void BeginProcessing()
     {
-        // DEF-007: evaluate the $env:COMPUTERNAME default HERE, once per invocation, gated on
-        // EXPLICIT boundness - this is the shape MEASURED against the source, and it is NOT the
-        // ProcessRecord gate I first wrote (see the retraction in the commit message). A PS param
-        // default is applied at invocation start, BEFORE begin{}, and for a ValueFromPipeline
-        // parameter it is applied even when pipeline input will later overwrite it per record.
-        // Measured on the source shape ([SideEffecting[]]$ComputerName = $env:COMPUTERNAME, ctor
-        // logging): `-ComputerName sql01` -> ctor(sql01) only; `"sql01" | cmd` -> ctor(LOCALBOX)
-        // THEN ctor(sql01); no args -> ctor(LOCALBOX); `@() | cmd` -> ctor(LOCALBOX). So the piped
-        // and empty-pipeline paths DO register localhost in the source, and only the explicitly
-        // bound path does not. BoundParameters at begin time contains ComputerName ONLY when it was
-        // bound on the command line, which is exactly the discriminator needed. Held in a field,
-        // never written back to the property, so pipeline binding stays authoritative per record.
-        if (!MyInvocation.BoundParameters.ContainsKey(nameof(ComputerName)))
+        // DEF-007: snapshot command-line boundness and apply the default once for the
+        // invocation (this is also the ONLY conversion an empty pipeline gets, matching the
+        // source, whose process block never runs but whose default has already been applied).
+        _boundOnCommandLine = MyInvocation.BoundParameters.ContainsKey(nameof(ComputerName));
+        if (!_boundOnCommandLine)
         {
-            _defaultComputerName = (DbaCmConnectionParameter[])LanguagePrimitives.ConvertTo(
-                Environment.GetEnvironmentVariable("COMPUTERNAME"),
-                typeof(DbaCmConnectionParameter[]), CultureInfo.InvariantCulture);
+            _defaultComputerName = ConvertComputerNameDefault();
         }
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
@@ -172,7 +186,14 @@ public sealed class SetDbaCmConnectionCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // DEF-007: pipeline binding wins per record; otherwise the invocation default.
+        // DEF-007: PS re-applies the typed default before every record after the first.
+        if (!_boundOnCommandLine && _seenFirstRecord)
+        {
+            _defaultComputerName = ConvertComputerNameDefault();
+        }
+        _seenFirstRecord = true;
+
+        // Pipeline binding wins for this record; otherwise the freshly-applied default.
         DbaCmConnectionParameter[]? computers =
             MyInvocation.BoundParameters.ContainsKey(nameof(ComputerName))
                 ? ComputerName
