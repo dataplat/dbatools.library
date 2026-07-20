@@ -104,22 +104,20 @@ public sealed class TestDbaWindowsLoginCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // DEF-001: STREAMING the end-hop. Collect-then-end is faithful (the source has an end block), but
-        // within that single end-hop the body emits one object per Windows login per INSTANCE in a loop,
-        // and a later instance's connection Stop-Function throws under -EnableException - discarding every
-        // earlier instance's already-emitted logins from a buffered call. Streaming delivers them first.
-        // (B's cond1 flag; coordinator 16:26 re-check - loop-iteration reachability confirmed.)
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
+                return;
             }
-            else if (item is not null)
-            {
+            if (item is not null)
                 WriteObject(item);
-            }
         }, ProcessScript,
             _batches.ToArray(), SqlCredential, Login, ExcludeLogin, FilterBy, IgnoreDomains, EnableException.ToBool(),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));

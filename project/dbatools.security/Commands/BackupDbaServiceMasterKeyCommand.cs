@@ -66,21 +66,20 @@ public sealed class BackupDbaServiceMasterKeyCommand : DbaBaseCmdlet
         // SecureString is passed on as-is; it is not converted here.
         System.Security.SecureString? effectivePassword = KeyCredential != null ? KeyCredential.Password : SecurePassword;
 
-        // DEF-001: STREAMING, not buffered InvokeScoped. The body emits one service-master-key object per
-        // instance in a loop and a later instance can hit a hard Stop-Function that throws under
-        // -EnableException; a buffered call discards earlier already-emitted results when that throw
-        // terminates the nested script. (B's cond1 flag; coordinator 16:26 re-check.)
+        // [DEF-001] streamed via InvokeScopedStreaming: the body loops $SqlInstance emitting one
+        // key object per instance (Select-DefaultView) and carries loop-local -Continue
+        // Stop-Functions that throw terminating under -EnableException; a buffered InvokeScoped
+        // would lose an earlier instance's already-emitted key object when a later instance throws.
+        // Streaming yields each record as produced, so earlier emits survive. No state carry.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
+                return;
             }
-            else if (item is not null)
-            {
-                WriteObject(item);
-            }
+            WriteObject(item);
         }, ProcessScript,
             SqlInstance, SqlCredential, KeyCredential, effectivePassword, Path, FileBaseName,
             EnableException.ToBool(), this,
@@ -192,7 +191,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $status = "Success"
             } catch {
                 $status = "Failure"
-                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaServiceMasterKey
+                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaServiceMasterKey -ModuleName "dbatools"
             }
 
             Add-Member -Force -InputObject $masterkey -MemberType NoteProperty -Name ComputerName -value $server.ComputerName

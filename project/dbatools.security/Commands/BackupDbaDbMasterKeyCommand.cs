@@ -78,22 +78,19 @@ public sealed class BackupDbaDbMasterKeyCommand : DbaBaseCmdlet
         // passed on as-is; it is not converted here.
         System.Security.SecureString? effectivePassword = Credential != null ? Credential.Password : SecurePassword;
 
-        // DEF-001: STREAMING, not buffered InvokeScoped. The body emits one master-key object per database
-        // in a loop and a LATER database can hit a hard Stop-Function (no -Continue: the "cannot access
-        // $actualPath" check) that throws under -EnableException. A buffered call discards every already-
-        // emitted earlier database when that throw terminates the nested script; streaming has already
-        // delivered them. (B's Find-BufferedPortHop cond1 flag; coordinator 16:26 re-check.)
+        // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
+        // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
+        // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
+        // yields each record as produced; no state carry on this row.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
                 WriteError(nestedError);
+                return;
             }
-            else if (item is not null)
-            {
-                WriteObject(item);
-            }
+            WriteObject(item);
         }, ProcessScript,
             SqlInstance, SqlCredential, Credential, Database, ExcludeDatabase, effectivePassword,
             Path, FileBaseName, InputObject, EnableException.ToBool(), this,
@@ -173,14 +170,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $actualPath = "$Path".TrimEnd('\').TrimEnd('/')
 
         if (-not $db.IsAccessible) {
-            Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Backup-DbaDbMasterKey
+            Write-Message -Level Warning -Message "Database $db is not accessible. Skipping." -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             continue
         }
 
         $masterkey = $db.MasterKey
 
         if (-not $masterkey) {
-            Write-Message -Message "No master key exists in the $dbname database on $instance" -Target $db -Level Verbose -FunctionName Backup-DbaDbMasterKey
+            Write-Message -Message "No master key exists in the $dbname database on $instance" -Target $db -Level Verbose -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             continue
         }
 
@@ -221,7 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $status = "Success"
             } catch {
                 $status = "Failure"
-                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaDbMasterKey
+                Write-Message -Level Warning -Message "Backup failure: $($_.Exception.InnerException)" -FunctionName Backup-DbaDbMasterKey -ModuleName "dbatools"
             }
 
             Add-Member -Force -InputObject $masterkey -MemberType NoteProperty -Name ComputerName -value $server.ComputerName
