@@ -71,9 +71,23 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
                 failureValue = wrappedFailure.BaseObject;
             if (failureValue is ErrorRecord hopError)
             {
-                PersistHopWarnings(item?.Properties["__dbatoolsHopWarnings"]?.Value);
-                RemoveHopErrorBookkeeping(hopError);
-                _ = NestedCommand.InvokeScoped(this, RethrowScript, hopError);
+                // DEFER to the host frame - do NOT act here. onOutput is invoked from the
+                // nested pipeline's DataAdded handler (Support/NestedCommand.cs:247), so this
+                // code runs on the nested pipeline's thread, inside a transient scope that is
+                // discarded on unwind. Doing the work inline broke both regression tests:
+                //   * PersistSuppressedWarnings' Set-Variable (:152) dot-sources into the
+                //     engine's CURRENT scope, which here is the nested pipeline's, not the
+                //     caller's - so the caller's -WarningVariable was never set.
+                //   * the rethrow was raised INTO the pipeline still being drained, escaping
+                //     DataAdded (which only catches PipelineStoppedException) into
+                //     InvokeScopedStreaming's own wrapper catch, which emits a termination
+                //     marker that re-enters DataAdded - a re-entrant loop that walks the script
+                //     call depth to the 1000-frame limit ("call depth overflow").
+                // Capture here, act after Invoke returns. Same shape Export-DbaDiagnosticQuery
+                // uses (:84-94) and the one InvokeScopedStreaming itself uses for its own
+                // terminating error (marker -> post-Invoke rethrow on the host frame).
+                _hopFailure = hopError;
+                _hopWarningPayload = item?.Properties["__dbatoolsHopWarnings"]?.Value;
                 return;
             }
             else if (item?.BaseObject is ErrorRecord nestedError)
@@ -89,7 +103,27 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Database, Table, SqlCms, ServersFromFile, InputObject,
             EnableException.ToBool(), TestBound("SqlCms"), TestBound("ServersFromFile"),
             TestBound("InputObject"), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+
+        // The nested pipeline has fully unwound; we are back on the host frame, where
+        // Set-Variable reaches the caller's scope and a throw is not re-entrant.
+        if (_hopFailure is not null)
+        {
+            ErrorRecord hopError = _hopFailure;
+            _hopFailure = null;
+            PersistHopWarnings(_hopWarningPayload);
+            _hopWarningPayload = null;
+            RemoveHopErrorBookkeeping(hopError);
+            // Keep RethrowScript/InvokeScoped rather than ThrowTerminatingError: `throw $record`
+            // preserves the record's FullyQualifiedErrorId verbatim, which the suite asserts
+            // exactly (tests/Watch-DbaDbLogin.Tests.ps1:113 wants "dbatools_Watch-DbaDbLogin");
+            // ThrowTerminatingError would append the cmdlet identity and break it.
+            _ = NestedCommand.InvokeScoped(this, RethrowScript, hopError);
+        }
     }
+
+    // Set only from inside the streaming callback, consumed only on the host frame.
+    private ErrorRecord? _hopFailure;
+    private object? _hopWarningPayload;
 
     private void PersistHopWarnings(object? warnings)
     {
