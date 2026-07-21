@@ -90,5 +90,76 @@ namespace Dataplat.Dbatools.Commands.Test
                 File.Delete(file);
             }
         }
+
+        /// <summary>
+        /// Friendly mode (no -EnableException) against an existing FILE must WARN AND CONTINUE,
+        /// not stop. Stop-Function writes its flag with Set-Variable -Scope 1 — the scope of
+        /// Test-ExportDirectory, the helper — while Test-FunctionInterrupt reads -Scope 1 from
+        /// Export-DbaScript's scope. The flag is therefore written where nobody reads it and
+        /// dies with the helper, so begin finishes and process runs. Absorbing the helper into
+        /// a C# method erased that scope boundary and the instance-level flag halted the
+        /// command (the bug this pins). The distinguishing signal is the SECOND warning: the
+        /// non-SMO 'x' can only reach the "not a SQL Management Object" branch in the process
+        /// block if the command survived begin. A latched interrupt yields only the first.
+        /// </summary>
+        [TestMethod]
+        public void TestExportDirectory_ExistingFileFriendlyModeWarnsAndContinues()
+        {
+            string file = Path.Combine(Path.GetTempPath(), "ted-" + Guid.NewGuid().ToString("N") + ".txt");
+            File.WriteAllText(file, "x");
+            try
+            {
+                using (System.Management.Automation.Runspaces.Runspace runspace = NewRunspace())
+                using (PowerShell shell = PowerShell.Create())
+                {
+                    shell.Runspace = runspace;
+                    shell.AddScript("'x' | Export-DbaScript -Path $args[0]").AddArgument(file);
+                    shell.Invoke();
+
+                    string warnings = string.Join("\n", shell.Streams.Warning);
+                    StringAssert.Contains(warnings, "must be a directory",
+                        "friendly mode still reports the directory requirement");
+                    StringAssert.Contains(warnings, "not a SQL Management Object",
+                        "process MUST run: the helper's stop flag dies in the helper's scope, so " +
+                        "the command continues past begin and reaches the non-SMO branch");
+                }
+            }
+            finally
+            {
+                File.Delete(file);
+            }
+        }
+
+        /// <summary>
+        /// -WhatIf must create NOTHING. The source creates the directory with New-Item, which
+        /// supports ShouldProcess, and $WhatIfPreference propagates from the SupportsShouldProcess
+        /// caller into the helper's scope — so under -WhatIf New-Item only reports. The port used
+        /// a bare Directory.CreateDirectory, which has no such gate and created the directory the
+        /// source merely described (the bug this pins). Asserted as the ABSENCE of the side
+        /// effect, not as an output string.
+        /// </summary>
+        [TestMethod]
+        public void TestExportDirectory_WhatIfCreatesNothing()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "ted-" + Guid.NewGuid().ToString("N"));
+            Assert.IsFalse(Directory.Exists(dir), "precondition: path does not exist");
+            try
+            {
+                using (System.Management.Automation.Runspaces.Runspace runspace = NewRunspace())
+                using (PowerShell shell = PowerShell.Create())
+                {
+                    shell.Runspace = runspace;
+                    shell.AddScript("'x' | Export-DbaScript -Path $args[0] -WhatIf").AddArgument(dir);
+                    shell.Invoke();
+                }
+                Assert.IsFalse(Directory.Exists(dir),
+                    "-WhatIf must not create the export directory; New-Item honors WhatIfPreference");
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+            }
+        }
     }
 }

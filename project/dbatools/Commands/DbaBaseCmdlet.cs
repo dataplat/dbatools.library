@@ -136,6 +136,16 @@ namespace Dataplat.Dbatools.Commands
         /// <param name="silentlyContinue">The -SilentlyContinue translation; see truth table</param>
         /// <param name="overrideExceptionMessage">Disables appending exception text to the message</param>
         /// <param name="tag">Message tags</param>
+        /// <param name="interruptCallerScope">
+        /// False when the PS source calls Stop-Function from inside an ABSORBED PRIVATE HELPER
+        /// rather than from the command body. Stop-Function sets its stop flag with
+        /// Set-Variable -Scope 1, which is the HELPER's scope; Test-FunctionInterrupt reads
+        /// -Scope 1 from the COMMAND's scope. When a helper stops, the flag is written to a
+        /// scope nobody reads and dies with the helper — so in non-EnableException mode the
+        /// command continues through begin AND process. Absorbing the helper into a private
+        /// C# method loses that scope boundary, and the instance-level flag would wrongly
+        /// halt the command. EnableException is unaffected: it throws terminating either way.
+        /// </param>
         protected void StopFunction(string message,
             object target = null,
             ErrorRecord errorRecord = null,
@@ -144,7 +154,8 @@ namespace Dataplat.Dbatools.Commands
             bool continueLoop = false,
             bool silentlyContinue = false,
             bool overrideExceptionMessage = false,
-            string[] tag = null)
+            string[] tag = null,
+            bool interruptCallerScope = true)
         {
             string functionName = GetCommandName();
             // Stop-Function hardcodes the module name for Get-DbatoolsLog parity.
@@ -262,6 +273,11 @@ namespace Dataplat.Dbatools.Commands
                 InsertGlobalError(record);
 
             if (continueLoop)
+                return;
+
+            // A Stop-Function inside an absorbed helper writes its flag to the helper's scope,
+            // which the command never reads — warn-and-continue, not stop. See the parameter doc.
+            if (!interruptCallerScope)
                 return;
 
             // Make sure the function knows it should be stopping

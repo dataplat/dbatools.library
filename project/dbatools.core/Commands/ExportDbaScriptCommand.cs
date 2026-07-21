@@ -90,11 +90,11 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
         }
 
         // PS: $null = Test-ExportDirectory -Path $Path (absorbed helper).
+        // NO interrupt check here, deliberately: the source has none, and it could not work if
+        // it did. Test-ExportDirectory's Stop-Function writes its flag with Set-Variable
+        // -Scope 1 (the HELPER's scope), while Test-FunctionInterrupt reads -Scope 1 from the
+        // COMMAND's scope — so the flag dies with the helper and begin continues.
         TestExportDirectory(Path);
-        if (Interrupted)
-        {
-            return;
-        }
 
         // PS: $executingUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name (the
         // $IsLinux/$IsMacOs branch reads $env:USER).
@@ -508,6 +508,14 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
         }
         if (!ProviderPathExists(path))
         {
+            // PS: New-Item -ItemType Directory supports ShouldProcess, and $WhatIfPreference
+            // propagates from the SupportsShouldProcess caller into the helper's scope — so
+            // -WhatIf creates nothing. Directory.CreateDirectory has no such gate; without
+            // this the port creates the directory the source only reported.
+            if (!ShouldProcess(resolved, "Create Directory"))
+            {
+                return;
+            }
             try
             {
                 Directory.CreateDirectory(resolved);
@@ -536,7 +544,9 @@ public sealed class ExportDbaScriptCommand : DbaBaseCmdlet
             }
             if (!isDirectory)
             {
-                StopFunction($"Path ({path}) must be a directory");
+                // interruptCallerScope: false — the source's stop flag lands in the helper's
+                // scope, so friendly mode is warn-and-continue; EnableException still throws.
+                StopFunction($"Path ({path}) must be a directory", interruptCallerScope: false);
             }
         }
     }
