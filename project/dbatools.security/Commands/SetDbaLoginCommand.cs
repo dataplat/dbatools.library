@@ -323,8 +323,12 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
     private const string BeginScript = """
 param($Login, $SecurePassword, $PasswordHash, $NewName, $EnableException, $__sqlInstanceBound, $__loginBound, $__securePasswordBound, $__passwordHashBound, $__defaultDatabaseBound, $__unlockBound, $__passwordMustChangeBound, $__newNameBound, $__disableBound, $__enableBound, $__denyLoginBound, $__grantLoginBound, $__passwordPolicyEnforcedBound, $__passwordExpirationEnabledBound, $__forceBound, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
-if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
-if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
+# No WhatIf/Confirm here: this begin hop is never handed $__realCmdlet, so it has no
+# ShouldProcess gate, and its inner scriptblock is [CmdletBinding()] without
+# SupportsShouldProcess. Reading $__boundWhatIf/$__boundConfirm - which this param()
+# block does NOT declare - picked them up by dynamic scoping from an ENCLOSING hop
+# (Sync-DbaLoginPassword calls Set-DbaLogin from inside its own hop), and splatting
+# them then threw "A parameter cannot be found that matches parameter name 'Confirm'".
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
