@@ -28,19 +28,26 @@ public sealed class ExportDbaDiagnosticQueryCommand : DbaBaseCmdlet
 {
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    // Position 0-3 mirror the source's IMPLICIT positional binding: an advanced function
+    // assigns positions to its non-switch parameters in declaration order unless
+    // PositionalBinding is disabled, so the source surface is InputObject 0, ConvertTo 1,
+    // Path 2, Suffix 3. A compiled cmdlet grants NO position unless it is declared, so
+    // omitting these is a BREAKING surface change - the gate caught exactly that
+    // (surfaceDiffPs7: "Position ... 1 -> (null)" on all four). Switch parameters take no
+    // position in either world. Same class as the Backup family regression (#12).
+    [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
     public object[] InputObject { get; set; } = null!;
 
-    [Parameter]
+    [Parameter(Position = 1)]
     [PsStringCast]
     [ValidateSet("Excel", "Csv")]
     public string ConvertTo { get; set; } = "Csv";
 
     // No file path because this needs a directory
-    [Parameter]
+    [Parameter(Position = 2)]
     public FileInfo? Path { get; set; }
 
-    [Parameter]
+    [Parameter(Position = 3)]
     [PsStringCast]
     public string? Suffix { get; set; }
 
