@@ -20,6 +20,30 @@
             "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-file-length.sh",
             "timeout": 15,
             "statusMessage": "Checking file lengths (400-line limit)..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-no-deflection.sh",
+            "timeout": 30,
+            "statusMessage": "Checking for deflected bug ownership..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-verify.sh",
+            "timeout": 30,
+            "statusMessage": "Quality gate: parity traps, both TFMs, cross-record legs..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-jscpd-ratchet.sh",
+            "timeout": 180,
+            "statusMessage": "Checking duplication ratchet (jscpd)..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-codex-review.sh",
+            "timeout": 900,
+            "statusMessage": "Codex cross-model review of changed C#..."
           }
         ]
       }
