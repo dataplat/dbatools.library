@@ -261,6 +261,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($Since) {
+            #$Since = $Since.ToString("yyyy-MM-dd HH:mm:ss")
             Write-Message -Level Verbose -Message "Getting only jobs whose LastRunDate is greater than or equal to $since" -FunctionName Find-DbaAgentJob -ModuleName "dbatools"
             $output = $output | Where-Object { $_.LastRunDate -ge $since }
         }
