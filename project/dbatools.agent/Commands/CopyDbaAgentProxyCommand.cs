@@ -143,6 +143,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $copyAgentProxyAccountStatus.Name = $proxyName
             $copyAgentProxyAccountStatus.Type = "Credential"
 
+            # Proxy accounts rely on Credential accounts
             if (-not $CredentialName) {
                 if ($__realCmdlet.ShouldProcess($destinstance, "Skipping migration of $proxyName due to misconfigured (empty) credential name")) {
                     $copyAgentProxyAccountStatus.Status = "Skipped"
@@ -156,6 +157,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             try {
                 $credentialtest = $destServer.Credentials[$CredentialName]
             } catch {
+                #here to avoid an empty catch
                 $null = 1
             }
 
@@ -207,6 +209,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     Write-Message -Level Debug -Message $sql -FunctionName Copy-DbaAgentProxy -ModuleName "dbatools"
                     $destServer.Query($sql)
 
+                    # Will fixing this misspelled status cause problems downstream?
                     $copyAgentProxyAccountStatus.Status = "Successful"
                     $copyAgentProxyAccountStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                 } catch {
