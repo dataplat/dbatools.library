@@ -57,6 +57,13 @@ public sealed class CopyDbaAgentScheduleCommand : DbaBaseCmdlet
     private bool _beginInterrupted;
     private bool _inputObjectBoundAtBegin;
 
+    // DEF-011/T22: the process-block validation Stop-Function ("You must specify either Source or
+    // pipe...") sets the function-scope interrupt latch in the source, which spans the pipeline so a
+    // later record's Test-FunctionInterrupt short-circuits it silently. The per-record hop starts with
+    // a fresh scope and drops that latch, so a >=2-record pipe of null/falsy elements would emit one
+    // warning per record instead of one total. Harvest the latch from each process hop and carry it.
+    private bool _interrupted;
+
     protected override void BeginProcessing()
     {
         _inputObjectBoundAtBegin = TestBound("InputObject");
@@ -90,7 +97,7 @@ public sealed class CopyDbaAgentScheduleCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        if (_beginInterrupted)
+        if (_beginInterrupted || _interrupted)
             return;
 
         // TRUTHINESS, not boundness, and the distinction is the source's not a preference. The guard
@@ -108,6 +115,12 @@ public sealed class CopyDbaAgentScheduleCommand : DbaBaseCmdlet
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__copyDbaAgentScheduleProcess"))
+            {
+                if (sentinel["__copyDbaAgentScheduleProcess"] is Hashtable state)
+                    _interrupted = _interrupted || LanguagePrimitives.IsTrue(state["Interrupted"]);
+                return;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 RemoveHopErrorBookkeeping(nestedError);
@@ -188,6 +201,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $DestinationSqlCredential, [string[]]$Schedule, [Microsoft.SqlServer.Management.Smo.Agent.JobSchedule[]]$InputObject, $Force, $EnableException, $__realCmdlet, $__boundSource, $__boundInputObject, $__boundVerbose, $__boundDebug)
     if ($Force) { $ConfirmPreference = 'none' }
 
+    # Body is dot-sourced so the validation Stop-Function's early return still reaches the interrupt
+    # harvest below; the harvested latch is carried across records by the C# guard (DEF-011/T22).
+    . {
     if (Test-FunctionInterrupt) { return }
 
     if (-not $__boundSource -and -not $__boundInputObject) {
@@ -202,6 +218,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $destinstance -Continue -FunctionName Copy-DbaAgentSchedule
         }
 
+        # Refresh the cache before checking existing schedules
         $destServer.JobServer.SharedSchedules.Refresh()
         $destSchedules = Get-DbaAgentSchedule -SqlInstance $destServer -Schedule $Schedule
 
@@ -271,6 +288,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
+    }
+    $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
+    @{ __copyDbaAgentScheduleProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
 } $Destination $DestinationSqlCredential $Schedule $InputObject $Force $EnableException $__realCmdlet $__boundSource $__boundInputObject $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
