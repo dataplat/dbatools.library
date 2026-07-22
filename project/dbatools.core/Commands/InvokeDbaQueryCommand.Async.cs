@@ -71,6 +71,16 @@ public sealed partial class InvokeDbaQueryCommand
                 else
                 {
                     //Following EventHandler is used for PRINT and RAISERROR T-SQL statements. Executed when -Verbose parameter specified by caller and no -MessageToOutput
+                    // PS uses raw Write-Verbose here (private/functions/Invoke-DbaAsync.ps1:290), NOT
+                    // Write-Message -Level Verbose, so this DELIBERATELY bypasses the WriteMessage seam:
+                    // PRINT/RAISERROR text must reach the verbose stream unprefixed and unattributed the
+                    // way the PS source emits it. Routing it through WriteMessage would add the message
+                    // system's function/timestamp prefix and a message-log entry - an observable
+                    // divergence, so faithfulness (code wins) keeps the raw WriteVerbose. da.Fill below
+                    // is SYNCHRONOUS on the pipeline thread, so this handler fires inline on that same
+                    // thread - no cross-thread WriteVerbose. (The -MessagesToOutput path instead fills on
+                    // a worker thread and queues to a ConcurrentQueue drained on the pipeline thread; see
+                    // FillStreamingMessages.)
                     SqlInfoMessageEventHandler? handler = null;
                     if (_verboseRequested)
                     {
