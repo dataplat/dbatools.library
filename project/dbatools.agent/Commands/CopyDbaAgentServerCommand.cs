@@ -130,7 +130,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         } catch {
             Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $destinstance -Continue -FunctionName Copy-DbaAgentServer
         }
-
+        # All of these support whatif inside of them
         Copy-DbaAgentJobCategory -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
 
         $destServer.Refresh()
@@ -144,6 +144,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $destServer.JobServer.Refresh()
         $destServer.JobServer.Operators.Refresh()
 
+        # extra reconnect to force refresh
         $destServer = Connect-DbaInstance -SqlInstance $destinstance -SqlCredential $DestinationSqlCredential
 
         Copy-DbaAgentProxy -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
@@ -154,11 +155,20 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
         $destServer.JobServer.Refresh()
         $destServer.Refresh()
+        # Copy jobs BEFORE alerts to ensure jobs exist when alerts with job associations are created
         Copy-DbaAgentJob -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force -DisableOnDestination:$DisableJobsOnDestination -DisableOnSource:$DisableJobsOnSource
 
         Copy-DbaAgentAlert -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force -IncludeDefaults
         $destServer.JobServer.Alerts.Refresh()
 
+        # To do
+        <#
+        Copy-DbaAgentMasterServer -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
+        Copy-DbaAgentTargetServer -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
+        Copy-DbaAgentTargetServerGroup -Source $sourceServer -Destination $destinstance -DestinationSqlCredentia $DestinationSqlCredential -Force:$force
+        #>
+
+        <# Here are the properties which must be migrated separately #>
         $copyAgentPropStatus = [PSCustomObject]@{
             SourceServer      = $sourceServer.Name
             DestinationServer = $destServer.Name
@@ -170,13 +180,13 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($ExcludeServerProperties) {
-            if ($PSCmdlet.ShouldProcess($destinstance, "Skipping Agent Server property copy")) {
+            if ($__realCmdlet.ShouldProcess($destinstance, "Skipping Agent Server property copy")) {
                 $copyAgentPropStatus.Status = "Skipped"
                 $copyAgentPropStatus.Notes = $null
                 $copyAgentPropStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
             }
         } else {
-            if ($PSCmdlet.ShouldProcess($destinstance, "Copying Agent Properties")) {
+            if ($__realCmdlet.ShouldProcess($destinstance, "Copying Agent Properties")) {
                 try {
                     Write-Message -Level Verbose -Message "Copying SQL Agent Properties" -FunctionName Copy-DbaAgentServer -ModuleName "dbatools"
                     $sql = $sourceAgent.Script() | Out-String
@@ -199,6 +209,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $DisableJobsOnDestination $DisableJobsOnSource $ExcludeServerProperties $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 2>&1
+} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $DisableJobsOnDestination $DisableJobsOnSource $ExcludeServerProperties $Force $EnableException $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
