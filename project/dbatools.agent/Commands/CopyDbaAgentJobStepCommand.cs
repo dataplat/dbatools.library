@@ -231,6 +231,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 continue
             }
 
+            # Filter source steps if Step parameter is specified
             $sourceSteps = $sourceJob.JobSteps
             if ($__boundStep) {
                 $sourceSteps = $sourceSteps | Where-Object Name -in $Step
@@ -243,6 +244,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($__realCmdlet.ShouldProcess($destinstance, "Synchronizing steps for job $jobName")) {
                 try {
                     $destJob = $destServer.JobServer.Jobs[$jobName]
+                    # Remove existing steps - copy to array first to avoid collection modification during enumeration
                     $stepsToRemove = @($destJob.JobSteps | ForEach-Object { $_ })
                     if ($__boundStep) {
                         $stepsToRemove = $stepsToRemove | Where-Object Name -in $Step
@@ -259,6 +261,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     foreach ($sourceStep in $sourceSteps) {
                         Write-Message -Message "Creating step $($sourceStep.Name) in $jobName on $destinstance" -Level Verbose -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                         $sql = $sourceStep.Script() | Out-String
+                        # Replace @job_id with @job_name since the destination job has a different GUID
                         $sql = $sql -replace "@job_id=N'[0-9a-fA-F-]+'", "@job_name=N'$($jobName -replace "'", "''")'"
                         Write-Message -Message $sql -Level Debug -FunctionName Copy-DbaAgentJobStep -ModuleName "dbatools"
                         $destServer.Query($sql)
