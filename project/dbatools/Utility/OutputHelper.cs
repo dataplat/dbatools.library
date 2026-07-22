@@ -119,7 +119,15 @@ namespace Dataplat.Dbatools.Utility
                 throw new ArgumentNullException("server");
 
             obj.Properties.Add(new PSNoteProperty("ComputerName", Connection.SmoServerExtensions.GetComputerName(server)));
-            obj.Properties.Add(new PSNoteProperty("InstanceName", server.ServiceName));
+            // server.ServiceName is a live SMO read, so guard it the same way the sibling reads in
+            // this triple already guard theirs (GetComputerName wraps NetName, GetDomainInstanceName
+            // wraps InstanceName). A connected server always reports its ServiceName, so this is
+            // behavior-identical in production; the guard only affects an unconnected server (used by
+            // the offline unit test), yielding a null InstanceName instead of a "Failed to connect" throw.
+            string instanceName = null;
+            try { instanceName = server.ServiceName; }
+            catch { /* an unconnected server cannot report ServiceName - the PS decoration surfaces nothing there either */ }
+            obj.Properties.Add(new PSNoteProperty("InstanceName", instanceName));
             obj.Properties.Add(new PSNoteProperty("SqlInstance", Connection.SmoServerExtensions.GetDomainInstanceName(server)));
         }
     }

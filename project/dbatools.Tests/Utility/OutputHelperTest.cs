@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Management.Automation;
 using Dataplat.Dbatools.Utility;
+using Microsoft.SqlServer.Management.Smo;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Dataplat.Dbatools.Utility.Test
@@ -84,6 +85,83 @@ namespace Dataplat.Dbatools.Utility.Test
             PSObject obj = BuildObject();
             OutputHelper.AddAliasProperty(obj, "Memory", "Total");
             Assert.AreEqual(4096, obj.Properties["Memory"].Value);
+        }
+
+        // Facet (c): the ComputerName/InstanceName/SqlInstance instance-property triple.
+        // AddInstanceProperties reads through SmoServerExtensions, which prefer the ETS note
+        // properties Connect-DbaInstance attaches to the SMO Server (ComputerName,
+        // DomainInstanceName) over live SMO reads - so a DISCONNECTED server carrying those notes
+        // exercises the triple offline, no live instance required. server.ServiceName has no note
+        // fallback and is unavailable on an unconnected server, so InstanceName lands null here,
+        // which is exactly what distinguishes it from the two note-backed members.
+        private static Server BuildDisconnectedServer(string name, string computerNameNote, string domainInstanceNote)
+        {
+            Server server = new Server(name);
+            PSObject wrapped = PSObject.AsPSObject(server);
+            if (computerNameNote != null)
+                wrapped.Properties.Add(new PSNoteProperty("ComputerName", computerNameNote));
+            if (domainInstanceNote != null)
+                wrapped.Properties.Add(new PSNoteProperty("DomainInstanceName", domainInstanceNote));
+            return server;
+        }
+
+        [TestMethod]
+        public void AddInstanceProperties_AppendsTripleInOrder()
+        {
+            Server server = BuildDisconnectedServer("SQLPROD01", "SQLPROD01-NB", "SQLPROD01-NB\\INSTX");
+            PSObject obj = new PSObject();
+            OutputHelper.AddInstanceProperties(obj, server);
+
+            string[] names = obj.Properties.Select(p => p.Name).ToArray();
+            CollectionAssert.AreEqual(new[] { "ComputerName", "InstanceName", "SqlInstance" }, names,
+                "AddInstanceProperties appends exactly ComputerName, InstanceName, SqlInstance in that order");
+        }
+
+        [TestMethod]
+        public void AddInstanceProperties_ComputerNameHonorsNotePreference()
+        {
+            Server server = BuildDisconnectedServer("SQLPROD01", "SQLPROD01-NB", "SQLPROD01-NB\\INSTX");
+            PSObject obj = new PSObject();
+            OutputHelper.AddInstanceProperties(obj, server);
+            // GetComputerName returns the ComputerName note ahead of server.Name/NetName.
+            Assert.AreEqual("SQLPROD01-NB", obj.Properties["ComputerName"].Value);
+        }
+
+        [TestMethod]
+        public void AddInstanceProperties_SqlInstanceHonorsDomainInstanceNote()
+        {
+            Server server = BuildDisconnectedServer("SQLPROD01", "SQLPROD01-NB", "SQLPROD01-NB\\INSTX");
+            PSObject obj = new PSObject();
+            OutputHelper.AddInstanceProperties(obj, server);
+            // GetDomainInstanceName returns the DomainInstanceName note ahead of the composed fallback.
+            Assert.AreEqual("SQLPROD01-NB\\INSTX", obj.Properties["SqlInstance"].Value);
+        }
+
+        [TestMethod]
+        public void AddInstanceProperties_InstanceNameSourcedFromServiceName()
+        {
+            Server server = BuildDisconnectedServer("SQLPROD01", "SQLPROD01-NB", "SQLPROD01-NB\\INSTX");
+            PSObject obj = new PSObject();
+            OutputHelper.AddInstanceProperties(obj, server);
+            // InstanceName is sourced from server.ServiceName, a distinct source from the two
+            // note-backed members. An unconnected server reports no ServiceName, so it is null -
+            // proving InstanceName is not being copied from ComputerName or SqlInstance.
+            Assert.IsNull(obj.Properties["InstanceName"].Value);
+            Assert.AreNotEqual(obj.Properties["ComputerName"].Value, obj.Properties["InstanceName"].Value);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void AddInstanceProperties_NullObjectThrows()
+        {
+            OutputHelper.AddInstanceProperties(null, new Server("SQLPROD01"));
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void AddInstanceProperties_NullServerThrows()
+        {
+            OutputHelper.AddInstanceProperties(new PSObject(), null);
         }
     }
 }
