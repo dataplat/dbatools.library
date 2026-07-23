@@ -60,8 +60,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
             $object
         }
+    $__psbpForBody = $PSBoundParameters
     # Dot-sourced so the plain Stop-Function + return sites still reach the sentinel (W1-108).
     . {
+    $PSBoundParameters = $__psbpForBody
         if (Test-FunctionInterrupt) { return }
         if ($IsMacOS -or $IsLinux) {
             $nonwindows = $true
@@ -238,7 +240,5 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ('' -ne $StorageCredential) {
-                    Write-Message -Message "Storage credential name passed in, will proceed assuming it's valid" -Level Verbose -FunctionName Backup-DbaDatabase
-                    if (-not $isS3Backup) {
 """;
 }

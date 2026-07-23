@@ -8,6 +8,8 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class BackupDbaDatabaseCommand
 {
     private const string ProcessScriptTail = """
+            } elseif ($FinalBackupPath[0] -ne 'NUL:') {
+                $FinalBackupPath[0] = $FinalBackupPath[0] + $slash + $BackupFinalName
             }
 
             # Auto-detect dbname token in the directory path to prevent duplication when using CreateFolder + ReplaceInName

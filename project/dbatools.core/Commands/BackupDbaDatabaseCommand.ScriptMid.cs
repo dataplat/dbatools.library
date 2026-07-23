@@ -8,6 +8,8 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class BackupDbaDatabaseCommand
 {
     private const string ProcessScriptMid = """
+                    Write-Message -Message "Storage credential name passed in, will proceed assuming it's valid" -Level Verbose -FunctionName Backup-DbaDatabase
+                    if (-not $isS3Backup) {
                         # Azure page blob with credential = single file only
                         $FileCount = 1
                     }
@@ -238,7 +240,5 @@ public sealed partial class BackupDbaDatabaseCommand
                 for ($i = 0; $i -lt $FinalBackupPath.Count; $i++) {
                     $FinalBackupPath[$i] = $FinalBackupPath[$i] + $slash + ("$($i+1)-" * $IncrementPrefix.ToBool() ) + $($File.BaseName) + "-$($i+1)-of-$FileCount.$suffix"
                 }
-            } elseif ($FinalBackupPath[0] -ne 'NUL:') {
-                $FinalBackupPath[0] = $FinalBackupPath[0] + $slash + $BackupFinalName
 """;
 }

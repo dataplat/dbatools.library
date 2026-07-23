@@ -21,8 +21,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     # bound; prune to the caller's real set so Test-Bound, ContainsKey('CompressBackup') and
     # the $PSBoundParameters.Path/.FilePath reads/writes run verbatim.
     foreach ($__k in @($PSBoundParameters.Keys)) { if (-not $__realBoundParameters.ContainsKey($__k)) { $null = $PSBoundParameters.Remove($__k) } }
+    $__psbpForBody = $PSBoundParameters
     # Dot-sourced so the five plain Stop-Function + return sites still reach the sentinel (W1-108).
     . {
+    $PSBoundParameters = $__psbpForBody
         # This is here ready to go when get EKM working so we can do encrption with asymmetric encryption.
         $EncryptionKey = $null
 
