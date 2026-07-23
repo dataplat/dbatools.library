@@ -73,7 +73,7 @@ public sealed class GetDbaXESessionTemplateCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 continue;
             }
@@ -100,7 +100,7 @@ public sealed class GetDbaXESessionTemplateCommand : DbaBaseCmdlet
             {
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
-                    RemoveHopErrorBookkeeping(nestedError);
+                    NestedCommand.RemoveDuplicateError(this, nestedError);
                     WriteError(nestedError);
                 }
                 else
@@ -109,17 +109,8 @@ public sealed class GetDbaXESessionTemplateCommand : DbaBaseCmdlet
                 }
             }, DirectoryProjectionScript,
                 directory, Template, _pattern, _metadata, EnableException.ToBool(),
-                BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+                NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
         }
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-        {
-            return LanguagePrimitives.IsTrue(value);
-        }
-        return null;
     }
 
     /// <summary>PS string interpolation via LanguagePrimitives (invariant).</summary>
@@ -130,30 +121,6 @@ public sealed class GetDbaXESessionTemplateCommand : DbaBaseCmdlet
             return "";
         }
         return (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-            {
-                return;
-            }
-            if (errorList[0] is not ErrorRecord first)
-            {
-                return;
-            }
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     // PS: the begin block's module-root + metadata Import-Clixml, returned via a sentinel. The

@@ -124,7 +124,7 @@ public sealed class CompareDbaDbSchemaCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 continue;
             }
@@ -153,7 +153,7 @@ public sealed class CompareDbaDbSchemaCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 continue;
             }
@@ -181,28 +181,6 @@ public sealed class CompareDbaDbSchemaCommand : DbaBaseCmdlet
             return name is "Verbose" or "Debug" ? LanguagePrimitives.IsTrue(value) : true;
         }
         return null;
-    }
-
-    /// <summary>Removes the silent $error copy the nested pipeline bagged for a merged-back
-    /// non-terminating record, so the caller sees one entry per error as the function did.</summary>
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     // PS: the begin block VERBATIM, dot-sourced so its early returns exit only the block. Edits:

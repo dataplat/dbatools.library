@@ -56,7 +56,7 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
@@ -75,7 +75,7 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
             }
         }, ProcessScript,
             SqlInstance, SqlCredential, InputObject, _server, EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     protected override void EndProcessing()
@@ -85,12 +85,12 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
             InputObject, Job, ExcludeJob, ExcludeDisabledJobs.ToBool(), _server,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"),
-            BoundCommonParameter("Debug")))
+            EnableException.ToBool(), NestedCommand.BoundCommonParameter(this, "Verbose"),
+            NestedCommand.BoundCommonParameter(this, "Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else
@@ -109,33 +109,6 @@ public sealed class GetDbaAgentJobStepCommand : DbaBaseCmdlet
         if (value is not PSObject wrapper)
             return value;
         return wrapper.BaseObject is PSCustomObject ? wrapper : wrapper.BaseObject;
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     private const string ProcessScript = """

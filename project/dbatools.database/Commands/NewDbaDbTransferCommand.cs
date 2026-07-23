@@ -154,13 +154,13 @@ public sealed partial class NewDbaDbTransferCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
             WriteObject(item);
         }, BeginScript,
-            EnableException, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            EnableException, NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     protected override void ProcessRecord()
@@ -177,7 +177,7 @@ public sealed partial class NewDbaDbTransferCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
@@ -186,7 +186,7 @@ public sealed partial class NewDbaDbTransferCommand : DbaBaseCmdlet
             SqlInstance, Database, InputObject, EnableException, _state,
             MyInvocation.BoundParameters.ContainsKey("SqlInstance"),
             MyInvocation.BoundParameters.ContainsKey("Database"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     protected override void EndProcessing()
@@ -201,7 +201,7 @@ public sealed partial class NewDbaDbTransferCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
@@ -213,33 +213,6 @@ public sealed partial class NewDbaDbTransferCommand : DbaBaseCmdlet
             MyInvocation.BoundParameters.ContainsKey("DestinationDatabase"),
             MyInvocation.BoundParameters.ContainsKey("SchemaOnly"),
             MyInvocation.BoundParameters.ContainsKey("DataOnly"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 }

@@ -191,7 +191,7 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
@@ -216,8 +216,8 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
             _resolvedStartDate, _resolvedExpirationDate,
             CertificateActiveForServiceBrokerDialog.ToBool(), BackupSecurePassword, AllUserDatabases.ToBool(), Force.ToBool(), Parallel.ToBool(), EnableException.ToBool(),
             _carryState,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     /// <summary>Unwraps a value the hop carried out through its sentinel.</summary>
@@ -233,33 +233,6 @@ public sealed class StartDbaDbEncryptionCommand : DbaBaseCmdlet
                 return wrapper;
         }
         return wrapper.BaseObject;
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     // PS: a per-batch dot-sourced replay of the process body, all in one scope. Substitutions only:

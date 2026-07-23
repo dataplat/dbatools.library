@@ -106,7 +106,7 @@ public sealed class SetDbaDbOwnerCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
@@ -114,41 +114,14 @@ public sealed class SetDbaDbOwnerCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, ExcludeDatabase, effectiveInputObject,
             TargetLogin, EnableException.ToBool(), _state, this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
 
         // Engine restore semantics: after a record where InputObject was PIPELINE-bound,
         // the fn-scope variable snaps back to its pre-pipeline value - any accumulation
         // from earlier records is discarded. Mirror that by resetting the carried value.
         if (inputObjectPipedThisRecord && _state is not null)
             _state["InputObject"] = _inputObjectPrePipeline;
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     // PS: the ENTIRE process body VERBATIM per record inside a dot-sourced block.

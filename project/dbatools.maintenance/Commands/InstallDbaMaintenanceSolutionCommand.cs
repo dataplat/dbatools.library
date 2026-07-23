@@ -150,7 +150,7 @@ public sealed class InstallDbaMaintenanceSolutionCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
@@ -169,8 +169,8 @@ public sealed class InstallDbaMaintenanceSolutionCommand : DbaBaseCmdlet
             Force.ToBool(), Solution, InstallJobs.ToBool(), BackupLocation, Verify, AutoScheduleJobs,
             ReplaceExisting.ToBool(), LocalFile, EnableException.ToBool(), this,
             WasBound("CleanupTime"), WasBound("AutoScheduleJobs"),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
         if (!completed)
             _interrupted = true;
     }
@@ -186,7 +186,7 @@ public sealed class InstallDbaMaintenanceSolutionCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (item is not null && string.Equals(
@@ -205,8 +205,8 @@ public sealed class InstallDbaMaintenanceSolutionCommand : DbaBaseCmdlet
             AutoScheduleJobs, StartTime, ChangeBackupType.ToBool(), ModificationLevel, Compress, CopyOnly.ToBool(),
             Verify, CheckSum, _localCachedCopy, EnableException.ToBool(), this, _processToken, _carriedSql,
             WasBound("ReplaceExisting"), WasBound("BackupLocation"),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
@@ -223,33 +223,6 @@ public sealed class InstallDbaMaintenanceSolutionCommand : DbaBaseCmdlet
     private bool WasBound(string name)
     {
         return MyInvocation.BoundParameters.ContainsKey(name);
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     private const string BeginScript = """

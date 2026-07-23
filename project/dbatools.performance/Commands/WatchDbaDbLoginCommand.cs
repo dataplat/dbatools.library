@@ -92,7 +92,7 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
             }
             else if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else
@@ -102,7 +102,7 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, Table, SqlCms, ServersFromFile, InputObject,
             EnableException.ToBool(), TestBound("SqlCms"), TestBound("ServersFromFile"),
-            TestBound("InputObject"), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            TestBound("InputObject"), NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
 
         // The nested pipeline has fully unwound; we are back on the host frame, where
         // Set-Variable reaches the caller's scope and a throw is not re-entrant.
@@ -112,7 +112,7 @@ public sealed class WatchDbaDbLoginCommand : DbaBaseCmdlet
             _hopFailure = null;
             PersistHopWarnings(_hopWarningPayload);
             _hopWarningPayload = null;
-            RemoveHopErrorBookkeeping(hopError);
+            NestedCommand.RemoveDuplicateError(this, hopError);
             // Keep RethrowScript/InvokeScoped rather than ThrowTerminatingError: `throw $record`
             // preserves the record's FullyQualifiedErrorId verbatim, which the suite asserts
             // exactly (tests/Watch-DbaDbLogin.Tests.ps1:113 wants "dbatools_Watch-DbaDbLogin");
@@ -184,33 +184,6 @@ $__items += @($__warnings)
 Set-Variable -Name $__name -Value $__items
 """);
         _ = InvokeCommand.InvokeScript(false, persistScript, null, variableName, (object)warnings, append);
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     private const string RethrowScript = """

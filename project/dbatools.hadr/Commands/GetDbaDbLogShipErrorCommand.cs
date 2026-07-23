@@ -74,7 +74,7 @@ public sealed class GetDbaDbLogShipErrorCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
@@ -84,36 +84,7 @@ public sealed class GetDbaDbLogShipErrorCommand : DbaBaseCmdlet
             TestBound(nameof(DateTimeFrom)) ? (object?)DateTimeFrom : null,
             TestBound(nameof(DateTimeTo)) ? (object?)DateTimeTo : null,
             Primary.ToBool(), Secondary.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-        {
-            return LanguagePrimitives.IsTrue(value);
-        }
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     // PS: the source process block VERBATIM - and for the first time in this lane,

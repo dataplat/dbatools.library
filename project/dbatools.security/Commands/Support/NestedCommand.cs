@@ -312,22 +312,9 @@ internal static partial class NestedCommand
     /// <param name="record">The terminating record captured from the nested run.</param>
     private static void RemoveCapturedErrorBookkeeping(PSCmdlet host, ErrorRecord record)
     {
-        try
-        {
-            if (host.SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // The caller's ThrowTerminatingError records the final failure; this de-dup is best-effort only.
-        }
+        // ThrowTerminatingError will add the final outer record; de-dup is best effort only.
+        // The match rule is shared with every hop cmdlet's RemoveHopErrorBookkeeping.
+        RemoveDuplicateError(host, record);
     }
 
     /// <summary>

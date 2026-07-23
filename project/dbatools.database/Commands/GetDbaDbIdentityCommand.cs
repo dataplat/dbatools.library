@@ -64,13 +64,13 @@ public sealed class GetDbaDbIdentityCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
             WriteObject(item);
         }, BeginScript,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            EnableException.ToBool(), NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     protected override void ProcessRecord()
@@ -82,41 +82,14 @@ public sealed class GetDbaDbIdentityCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
             WriteObject(item);
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, Table, EnableException.ToBool(), _state, this,
-            TestBound(nameof(Table)), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
+            TestBound(nameof(Table)), NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
     // PS: the begin block VERBATIM (builds the DBCC-template StringBuilder) plus a sentinel carrying it to
     // the process hop. begin has no Stop-Function/Write-Message.

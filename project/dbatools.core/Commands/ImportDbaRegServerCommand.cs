@@ -70,7 +70,7 @@ public sealed class ImportDbaRegServerCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else
@@ -80,42 +80,13 @@ public sealed class ImportDbaRegServerCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Path, InputObject, Group, EnableException.ToBool(),
             BoundPresence("Path"), BoundPresence("Group"),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     /// <summary>Carries a Test-Bound -ParameterName X guard (W2-071 class): BOUNDNESS of the
     /// parameter (ContainsKey), NOT the truthiness of its value.</summary>
     private object BoundPresence(string name) => MyInvocation.BoundParameters.ContainsKey(name);
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    /// <summary>Removes the silent $error copy the nested pipeline bagged for a merged-back
-    /// non-terminating record (the W1-045 compensation).</summary>
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
-    }
 
     // PS: process body VERBATIM (single hop per record; no begin/end). Substitutions only: the
     // Test-Bound Path/Group guards become the carried $__boundPath / $__boundGroup ContainsKey

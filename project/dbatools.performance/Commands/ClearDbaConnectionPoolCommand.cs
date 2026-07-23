@@ -85,7 +85,7 @@ public sealed class ClearDbaConnectionPoolCommand : DbaBaseCmdlet
                     // is removed before the visible re-emit (the W1-044 compensation).
                     if (item?.BaseObject is ErrorRecord nestedError)
                     {
-                        RemoveHopErrorBookkeeping(nestedError);
+                        NestedCommand.RemoveDuplicateError(this, nestedError);
                         WriteError(nestedError);
                     }
                     else
@@ -147,29 +147,6 @@ public sealed class ClearDbaConnectionPoolCommand : DbaBaseCmdlet
         if (inner is not null)
             return new ErrorRecord(ex, FirstErrorIdComponent(inner.FullyQualifiedErrorId), inner.CategoryInfo.Category, inner.TargetObject);
         return new ErrorRecord(ex, "Clear-DbaConnectionPool", ErrorCategory.NotSpecified, null);
-    }
-
-    /// <summary>Removes the silent $error copy the nested pipeline bagged for a merged-back
-    /// non-terminating record, so the visible WriteError re-emit nets exactly one entry
-    /// like the function world. Best-effort, like InsertGlobalError.</summary>
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not System.Collections.ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // $error compensation is best-effort: constrained runspaces may deny access.
-        }
     }
 
     private static string FirstErrorIdComponent(string? fullyQualifiedErrorId)

@@ -58,15 +58,7 @@ public sealed class GetDbaReplSubscriptionCommand : DbaBaseCmdlet
     {
         NestedCommand.InvokeScopedStreaming(this, item => WriteObject(item), BodyScript,
             SqlInstance, SqlCredential, Database, PublicationName, SubscriberName, SubscriptionDatabase, Type,
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
-    }
-
-    /// <summary>A bound common-parameter carrier for the hop scopes (Verbose+Debug forwarding).</summary>
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
+            EnableException.ToBool(), NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     // The whole process body VERBATIM in the dbatools module scope: the per-instance foreach, the

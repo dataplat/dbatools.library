@@ -103,7 +103,7 @@ public sealed partial class GetDbaCmObjectCommand : DbaBaseCmdlet
     {
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             EnableException, ParameterSetName,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug")))
         {
             if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__getDbaCmObjectBegin"))
             {
@@ -112,7 +112,7 @@ public sealed partial class GetDbaCmObjectCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 continue;
             }
@@ -131,7 +131,7 @@ public sealed partial class GetDbaCmObjectCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
@@ -140,33 +140,6 @@ public sealed partial class GetDbaCmObjectCommand : DbaBaseCmdlet
             ClassName, Query, ComputerName, Credential, Namespace, DoNotUse, Force, SilentlyContinue,
             EnableException, _beginState,
             MyInvocation.BoundParameters.ContainsKey("Namespace"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 }

@@ -109,11 +109,11 @@ public sealed class NewDbaDbAsymmetricKeyCommand : DbaBaseCmdlet
         bool interrupted = false;
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             TestBound(nameof(KeySource)), TestBound(nameof(KeySourceType)), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
@@ -140,7 +140,7 @@ public sealed class NewDbaDbAsymmetricKeyCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             // The sentinel is always a [pscustomobject]; a real payload never is. Without the
@@ -158,8 +158,8 @@ public sealed class NewDbaDbAsymmetricKeyCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, _nameState, Database, SecurePassword, Owner, KeySource, KeySourceType,
             InputObject, Algorithm, EnableException.ToBool(), this,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     /// <summary>
@@ -183,33 +183,6 @@ public sealed class NewDbaDbAsymmetricKeyCommand : DbaBaseCmdlet
                 return wrapper;
         }
         return wrapper.BaseObject;
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     // PS: the begin block VERBATIM, with its two Test-Bound reads mapped to the carried by-name flags.

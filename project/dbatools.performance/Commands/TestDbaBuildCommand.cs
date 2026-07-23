@@ -73,7 +73,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (IsCarrier(item, BeginCarrierMarker))
@@ -90,7 +90,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             MaxBehind, MaxTimeBehind,
             TestBound("MinimumBuild"), TestBound("MaxBehind"),
             TestBound("MaxTimeBehind"), TestBound("Latest"),
-            EnableException.ToBool(), BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            EnableException.ToBool(), NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     protected override void ProcessRecord()
@@ -102,11 +102,11 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             Build, MinimumBuild, MaxBehind, MaxTimeBehind, Latest.ToBool(),
             SqlInstance, SqlCredential, Update.ToBool(), Quiet.ToBool(),
             EnableException.ToBool(), _parsedMaxBehind, _parsedMaxTimeBehind,
-            _indexReference, _buildVersions, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            _indexReference, _buildVersions, NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (IsCarrier(item, ProcessCarrierMarker))
@@ -125,35 +125,6 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
     {
         return item?.Properties[marker] is not null &&
                LanguagePrimitives.IsTrue(item.Properties[marker].Value);
-    }
-
-    /// <summary>A bound common-parameter carrier for the hop scopes (W1-044 convention;
-    /// Verbose+Debug per the W1-112/W1-124..128 Debug-forwarding class fix).</summary>
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     private const string BeginCarrierMarker = "__dbatoolsW1124BeginCarrier";

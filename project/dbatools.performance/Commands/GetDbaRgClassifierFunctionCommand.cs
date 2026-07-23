@@ -78,7 +78,7 @@ public sealed class GetDbaRgClassifierFunctionCommand : DbaBaseCmdlet
                 {
                     if (item?.BaseObject is ErrorRecord nestedError)
                     {
-                        RemoveHopErrorBookkeeping(nestedError);
+                        NestedCommand.RemoveDuplicateError(this, nestedError);
                         WriteError(nestedError);
                     }
                     else
@@ -95,28 +95,6 @@ public sealed class GetDbaRgClassifierFunctionCommand : DbaBaseCmdlet
             {
                 StatementFault.Surface(this, ex, "Get-DbaRgClassifierFunction");
             }
-        }
-    }
-
-    /// <summary>Removes the silent $error copy the nested pipeline bagged for a merged-back
-    /// non-terminating record (the W1-045 compensation).</summary>
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // best-effort bookkeeping
         }
     }
 

@@ -64,7 +64,7 @@ public sealed class StopDbaExternalProcessCommand : DbaBaseCmdlet
             }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
@@ -72,8 +72,8 @@ public sealed class StopDbaExternalProcessCommand : DbaBaseCmdlet
         }, ProcessScript,
             ComputerName, Credential, ProcessId, EnableException.ToBool(), this,
             continueMarker,
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
 
         // CONTINUE RELAY, C# half: the hop completed (output drained, warnings
         // replayed); now let the source's escaped `continue` leave this cmdlet exactly
@@ -91,33 +91,6 @@ public sealed class StopDbaExternalProcessCommand : DbaBaseCmdlet
     private const string ContinueRelayScript = """
 continue
 """;
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
-    }
 
     // PS: the ENTIRE process body VERBATIM per record. Substitutions only:
     // $Pscmdlet -> $__realCmdlet on the gate and explicit -FunctionName

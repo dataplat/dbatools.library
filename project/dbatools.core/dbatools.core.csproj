@@ -17,6 +17,12 @@
     <ProjectReference Include="..\dbatools\dbatools.csproj" />
   </ItemGroup>
 
+  <!-- MSTest covers NestedCommand's hop-support helpers (the $error de-dup rule) directly;
+       they stay internal so the same type name in ten satellites never collides. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="dbatools.Tests" />
+  </ItemGroup>
+
   <!-- System.Management for WMI registry access (StdRegProv) in Get-DbaNetworkConfiguration and similar -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
     <Reference Include="System.Management" />

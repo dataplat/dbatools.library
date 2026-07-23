@@ -59,11 +59,11 @@ public sealed class GetDbaDbccStatisticCommand : DbaBaseCmdlet
     protected override void BeginProcessing()
     {
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            Option, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            Option, NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
@@ -88,7 +88,7 @@ public sealed class GetDbaDbccStatisticCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else
@@ -98,7 +98,7 @@ public sealed class GetDbaDbccStatisticCommand : DbaBaseCmdlet
         }, ProcessScript,
             _stringBuilder, _statList, SqlInstance, SqlCredential, Database, Object, Target, Option,
             EnableException.ToBool(), TestBound(nameof(Object)), TestBound(nameof(Target)),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
@@ -108,33 +108,6 @@ public sealed class GetDbaDbccStatisticCommand : DbaBaseCmdlet
         if (value is PSObject wrapper && wrapper.BaseObject is not PSCustomObject)
             return wrapper.BaseObject;
         return value;
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     private const string BeginScript = """

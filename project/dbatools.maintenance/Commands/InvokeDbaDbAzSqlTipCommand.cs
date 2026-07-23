@@ -117,11 +117,11 @@ public sealed class InvokeDbaDbAzSqlTipCommand : DbaBaseCmdlet
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             Database, ExcludeDatabase, AllUserDatabases.ToBool(), Force.ToBool(), LocalFile,
             Compat100.ToBool(), ReturnAllTips.ToBool(), EnableException.ToBool(),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug")))
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
@@ -148,7 +148,7 @@ public sealed class InvokeDbaDbAzSqlTipCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
             }
             else if (item is not null && string.Equals(
@@ -164,7 +164,7 @@ public sealed class InvokeDbaDbAzSqlTipCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, AzureDomain, Tenant, StatementTimeout, _databaseState,
             AllUserDatabases.ToBool(), _azTipsQuery, EnableException.ToBool(), _failedInstConn, _processToken,
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     // Carried hop state arrives PSObject-wrapped. A PSCustomObject carries its content on the
@@ -174,33 +174,6 @@ public sealed class InvokeDbaDbAzSqlTipCommand : DbaBaseCmdlet
         if (value is PSObject wrapper && wrapper.BaseObject is not PSCustomObject)
             return wrapper.BaseObject;
         return value;
-    }
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
     }
 
     private const string BeginScript = """

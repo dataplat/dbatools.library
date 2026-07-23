@@ -55,7 +55,7 @@ public sealed class DisableDbaStartupProcedureCommand : DbaBaseCmdlet
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
-                RemoveHopErrorBookkeeping(nestedError);
+                NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
                 return;
             }
@@ -75,8 +75,8 @@ public sealed class DisableDbaStartupProcedureCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, StartupProcedure, InputObject, EnableException.ToBool(), this,
             TestBound(nameof(InputObject)), TestBound(nameof(SqlInstance)), TestBound(nameof(StartupProcedure)),
-            BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
-            BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"),
             _carrierState, _carrierToken);
     }
 
@@ -87,33 +87,6 @@ public sealed class DisableDbaStartupProcedureCommand : DbaBaseCmdlet
     // record 1 (nothing carried yet, legacy still unassigned) diverge in the opposite direction.
     private object? _carrierState;
     private readonly string _carrierToken = Guid.NewGuid().ToString("N");
-
-    private object? BoundCommonParameter(string name)
-    {
-        if (MyInvocation.BoundParameters.TryGetValue(name, out object? value))
-            return LanguagePrimitives.IsTrue(value);
-        return null;
-    }
-
-    private void RemoveHopErrorBookkeeping(ErrorRecord record)
-    {
-        try
-        {
-            if (SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
-                return;
-            if (errorList[0] is not ErrorRecord first)
-                return;
-            if (ReferenceEquals(first, record) || ReferenceEquals(first.Exception, record.Exception) ||
-                string.Equals(first.Exception?.Message, record.Exception?.Message, StringComparison.Ordinal))
-            {
-                errorList.RemoveAt(0);
-            }
-        }
-        catch
-        {
-            // Best-effort bookkeeping only.
-        }
-    }
 
     // PS: the begin constants ($action / $startup) inline ahead of the process body, which is
     // VERBATIM per record. Substitutions only: Test-Bound -> carried $__bound* flags, $Pscmdlet
