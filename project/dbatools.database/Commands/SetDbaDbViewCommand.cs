@@ -29,9 +29,12 @@ namespace Dataplat.Dbatools.Commands;
 /// SAFETY: the sole Alter runs only inside a passed $__realCmdlet.ShouldProcess gate, so a -WhatIf run never
 /// touches the server. IsSystemObject targets are refused unconditionally (no -Force) because rewriting a system
 /// view is not something dbatools should make easy. Either -SqlInstance or a piped view (the Test-Bound duality,
-/// no parameter sets). No cross-record state is carried, so each record runs an independent hop.
+/// no parameter sets). A target must be explicit: with -SqlInstance you must also name views with -View, or pipe
+/// them in as -InputObject - an unfiltered instance-wide alter that would silently rewrite every view is refused,
+/// and ConfirmImpact is High to match Remove-DbaDbView, since replacing N view bodies is as destructive as a drop.
+/// No cross-record state is carried, so each record runs an independent hop.
 /// </remarks>
-[Cmdlet(VerbsCommon.Set, "DbaDbView", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
+[Cmdlet(VerbsCommon.Set, "DbaDbView", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(SmoView))]
 public sealed class SetDbaDbViewCommand : DbaBaseCmdlet
 {
@@ -84,7 +87,7 @@ public sealed class SetDbaDbViewCommand : DbaBaseCmdlet
         }, BodyScript,
             SqlInstance, SqlCredential, Database, Schema, View, Definition,
             InputObject, EnableException.ToBool(), this,
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)), TestBound(nameof(View)),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -123,12 +126,14 @@ public sealed class SetDbaDbViewCommand : DbaBaseCmdlet
     }
 
     // PS: the module-scoped body. Views come from -SqlInstance (resolved live via Get-DbaDbView, filtered by
-    // -Database/-View/-Schema) or piped -InputObject. System views are refused; the alter assigns only TextBody
+    // -Database/-View/-Schema) or piped -InputObject. A target must be explicit - with -SqlInstance the caller
+    // must also name views with -View, otherwise the unfiltered instance-wide alter is refused. System views are
+    // refused; the alter assigns only TextBody
     // with TextMode false so SMO rebuilds the header, and runs inside a passed ShouldProcess so -WhatIf never
     // touches the server. Each altered view is re-emitted via Get-DbaDbView (Refresh first) so its decoration
     // matches exactly and DateLastModified reflects the alter.
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Database, $Schema, $View, $Definition, $InputObject, $EnableException, $__realCmdlet, $__boundSqlInstance, $__boundInputObject, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $Schema, $View, $Definition, $InputObject, $EnableException, $__realCmdlet, $__boundSqlInstance, $__boundInputObject, $__boundView, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -136,11 +141,16 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$Schema, [string[]]$View, [string]$Definition, [Microsoft.SqlServer.Management.Smo.View[]]$InputObject, $EnableException, $__realCmdlet, $__boundSqlInstance, $__boundInputObject)
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string[]]$Schema, [string[]]$View, [string]$Definition, [Microsoft.SqlServer.Management.Smo.View[]]$InputObject, $EnableException, $__realCmdlet, $__boundSqlInstance, $__boundInputObject, $__boundView)
 
     if (-not $__boundSqlInstance -and -not $__boundInputObject) {
         Stop-Function -Message "You must supply either -SqlInstance or an Input Object" -FunctionName Set-DbaDbView
+        return
+    }
+
+    if (-not $__boundView -and -not $__boundInputObject) {
+        Stop-Function -Message "You must specify the target view(s) to alter with -View, or pipe them in as -InputObject. An unfiltered instance-wide alter is not permitted." -FunctionName Set-DbaDbView
         return
     }
 
@@ -190,6 +200,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Get-DbaDbView -SqlInstance $server -Database $db.Name -View "$($currentView.Schema).$($currentView.Name)"
         }
     }
-} $SqlInstance $SqlCredential $Database $Schema $View $Definition $InputObject $EnableException $__realCmdlet $__boundSqlInstance $__boundInputObject @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $Schema $View $Definition $InputObject $EnableException $__realCmdlet $__boundSqlInstance $__boundInputObject $__boundView @__commonParameters 3>&1 2>&1
 """;
 }
