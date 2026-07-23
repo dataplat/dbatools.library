@@ -30,8 +30,9 @@ namespace Dataplat.Dbatools.Commands;
 /// exit only the block and the state sentinel is still emitted, keeping the carry consistent. Output streams:
 /// each altered operator is emitted before a later one may fail under -EnableException (DEF-001).
 ///
-/// This cmdlet supplies the real ShouldProcess runtime (ConfirmImpact Medium, no -Force). Surface pinned by
-/// migration/baselines/Set-DbaAgentOperator.json.
+/// This cmdlet declares the ShouldProcess surface (ConfirmImpact Medium, no -Force), but the actual
+/// ShouldProcess calls run against the inner advanced function's own $PSCmdlet inside the module-scoped hop.
+/// Surface pinned by migration/baselines/Set-DbaAgentOperator.json.
 /// </remarks>
 [Cmdlet(VerbsCommon.Set, "DbaAgentOperator", DefaultParameterSetName = "Default", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class SetDbaAgentOperatorCommand : DbaBaseCmdlet
@@ -199,13 +200,18 @@ public sealed class SetDbaAgentOperatorCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the process block VERBATIM apart from $Pscmdlet.ShouldProcess -> $__realCmdlet.ShouldProcess and
-    // -FunctionName Set-DbaAgentOperator on the direct Stop-Function/Write-Message sites. The six time
-    // parameters are seeded from the carried values at the top and re-emitted in a sentinel at the end so the
-    // source's in-place reformat leak across records is reproduced. The $PSBoundParameters.<name> value reads
-    // work verbatim: the inner scriptblock's $PSBoundParameters holds the passed values, which equal the real
-    // ones (bound-null and unbound both read as null). The body is dot-sourced so the early returns still emit
-    // the sentinel.
+    // PS: the process block VERBATIM apart from $Pscmdlet.ShouldProcess -> $PSCmdlet.ShouldProcess and
+    // -FunctionName Set-DbaAgentOperator on the direct Stop-Function/Write-Message sites. ShouldProcess routes
+    // through the inner advanced function's OWN $PSCmdlet (declared SupportsShouldProcess + ConfirmImpact
+    // Medium, driven by the splatted WhatIf/Confirm), never the host cmdlet - the host cmdlet's confirm-impact
+    // read faults inside the nested pipeline at Medium, and uniform inner-$PSCmdlet routing at every level
+    // matches what the source did. The six time parameters are seeded from the carried values at the top and
+    // re-emitted in a sentinel at the end so the source's in-place reformat leak across records is reproduced.
+    // The source's two $PSBoundParameters.<name> guard reads are rewritten to the plain parameter variables:
+    // inside the dot-sourced (. { }) block $PSBoundParameters is a fresh empty automatic (dot-sourcing does not
+    // inherit the enclosing function's bound set), and these are VALUE reads where bound-null and unbound-null
+    // are indistinguishable and the params carry no defaults, so $EmailAddress etc. are exactly equivalent. The
+    // body is dot-sourced so the early returns still emit the sentinel.
     private const string BodyScript = """
 param($SqlInstance, $SqlCredential, $Operator, $Name, $EmailAddress, $NetSendAddress, $PagerAddress, $PagerDay, $SaturdayStartTime, $SaturdayEndTime, $SundayStartTime, $SundayEndTime, $WeekdayStartTime, $WeekdayEndTime, $IsFailsafeOperator, $FailsafeNotificationMethod, $InputObject, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -218,12 +224,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess, ConfirmImpact = "Medium")]
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Operator, [string]$Name, [string]$EmailAddress, [string]$NetSendAddress, [string]$PagerAddress, [string]$PagerDay, [string]$SaturdayStartTime, [string]$SaturdayEndTime, [string]$SundayStartTime, [string]$SundayEndTime, [string]$WeekdayStartTime, [string]$WeekdayEndTime, $IsFailsafeOperator, [string[]]$FailsafeNotificationMethod, [Microsoft.SqlServer.Management.Smo.Agent.Operator[]]$InputObject, $EnableException, $__realCmdlet)
     . {
-        if (-not $PSBoundParameters.EmailAddress -and -not $PSBoundParameters.NetSendAddress -and -not $PSBoundParameters.PagerAddress) {
+        if (-not $EmailAddress -and -not $NetSendAddress -and -not $PagerAddress) {
             Stop-Function -Message "You must specify either an EmailAddress, NetSendAddress, or a PagerAddress to be able to create an operator." -FunctionName Set-DbaAgentOperator
             return
         }
 
-        if (-not $PSBoundParameters.InputObject -and -not $PSBoundParameters.Operator) {
+        if (-not $InputObject -and -not $Operator) {
             Stop-Function -Message "You must specify either operator or pipe in a list of operators" -FunctionName Set-DbaAgentOperator
             return
         }
@@ -379,7 +385,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $server = $op | Get-ConnectionParent
             try {
                 if ($Name) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) Name to $Name")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) Name to $Name")) {
                         # instead of using .Rename(), we will execute a sql script to avoid enumeration problems when piping
                         $sql = "EXEC msdb.dbo.sp_update_operator @name = N'$($op.Name)', @new_name = N'$Name'"
                         try {
@@ -393,74 +399,74 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
 
                 if ($EmailAddress) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) EmailAddress to $EmailAddress")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) EmailAddress to $EmailAddress")) {
                         $op.EmailAddress = $EmailAddress
                     }
                 }
 
                 if ($NetSendAddress) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) NetSendAddress to $NetSendAddress")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) NetSendAddress to $NetSendAddress")) {
                         $op.NetSendAddress = $NetSendAddress
                     }
                 }
 
                 if ($PagerAddress) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) PagerAddress to $PagerAddress")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) PagerAddress to $PagerAddress")) {
                         $op.PagerAddress = $PagerAddress
                     }
                 }
 
                 if ($Interval) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) PagerDays to $Interval")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) PagerDays to $Interval")) {
                         $op.PagerDays = $Interval
                     }
                 }
 
                 if ($SaturdayStartTime) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) SaturdayPagerStartTime to $SaturdayStartTime")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) SaturdayPagerStartTime to $SaturdayStartTime")) {
                         $op.SaturdayPagerStartTime = $SaturdayStartTime
                     }
                 }
 
                 if ($SaturdayEndTime) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) SaturdayPagerEndTime to $SaturdayEndTime")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) SaturdayPagerEndTime to $SaturdayEndTime")) {
                         $op.SaturdayPagerEndTime = $SaturdayEndTime
                     }
                 }
 
                 if ($SundayStartTime) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) SundayPagerStartTime to $SundayStartTime")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) SundayPagerStartTime to $SundayStartTime")) {
                         $op.SundayPagerStartTime = $SundayStartTime
                     }
                 }
 
                 if ($SundayEndTime) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) SundayPagerEndTime to $SundayEndTime")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) SundayPagerEndTime to $SundayEndTime")) {
                         $op.SundayPagerEndTime = $SundayEndTime
                     }
                 }
 
                 if ($WeekdayStartTime) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) WeekdayPagerStartTime to $WeekdayStartTime")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) WeekdayPagerStartTime to $WeekdayStartTime")) {
                         $op.WeekdayPagerStartTime = $WeekdayStartTime
                     }
                 }
 
                 if ($WeekdayEndTime) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) WeekdayPagerEndTime to $WeekdayEndTime")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating Operator $($op.Name) WeekdayPagerEndTime to $WeekdayEndTime")) {
                         $op.WeekdayPagerEndTime = $WeekdayEndTime
                     }
                 }
 
                 if ($IsFailsafeOperator) {
-                    if ($__realCmdlet.ShouldProcess($server, "Updating FailSafe Operator to $operator")) {
+                    if ($PSCmdlet.ShouldProcess($server, "Updating FailSafe Operator to $operator")) {
                         $server.JobServer.AlertSystem.FailSafeOperator = $Operator
                         $server.JobServer.AlertSystem.NotificationMethod = $failsafeNotificationMethodEnumerated
                         $server.JobServer.AlertSystem.Alter()
                     }
                 }
 
-                if ($__realCmdlet.ShouldProcess($server, "Committing changes for Operator $($op.Name)")) {
+                if ($PSCmdlet.ShouldProcess($server, "Committing changes for Operator $($op.Name)")) {
                     $op.Alter()
                     $op
                 }
