@@ -133,7 +133,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 return
             }
 
-            Write-Message -Message "Fetching SSIS Catalog and its folders" -Level Verbose -FunctionName Get-DbaSsisEnvironmentVariable
+            Write-Message -Message "Fetching SSIS Catalog and its folders" -Level Verbose -FunctionName Get-DbaSsisEnvironmentVariable -ModuleName "dbatools"
             $catalog = $ssis.Catalogs | Where-Object { $_.Name -eq "SSISDB" }
 
             # get all folders names if none provided
@@ -149,7 +149,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($null -eq $searchFolders) {
-                Write-Message -Message "Instance: $instance > -Folder and -FolderExclude filters return an empty collection. Skipping" -Level Warning -FunctionName Get-DbaSsisEnvironmentVariable
+                Write-Message -Message "Instance: $instance > -Folder and -FolderExclude filters return an empty collection. Skipping" -Level Warning -FunctionName Get-DbaSsisEnvironmentVariable -ModuleName "dbatools"
             } else {
                 foreach ($f in $searchFolders) {
                     # get all environments names if none provided
@@ -165,7 +165,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
 
                     if ($null -eq $searchEnvironments) {
-                        Write-Message -Message "Instance: $instance / Folder: $f > -Environment and -EnvironmentExclude filters return an empty collection. Skipping." -Level Warning -FunctionName Get-DbaSsisEnvironmentVariable
+                        Write-Message -Message "Instance: $instance / Folder: $f > -Environment and -EnvironmentExclude filters return an empty collection. Skipping." -Level Warning -FunctionName Get-DbaSsisEnvironmentVariable -ModuleName "dbatools"
                     } else {
                         $Environments = $catalog.Folders[$f].Environments | Where-Object { $_.Name -in $searchEnvironments }
 

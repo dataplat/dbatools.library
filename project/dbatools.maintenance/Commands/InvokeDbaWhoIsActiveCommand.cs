@@ -248,11 +248,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Help               = '@help'
         }
 
-        Write-Message -Level Verbose -Message "Collecting sp_whoisactive data from server: $instance" -FunctionName Invoke-DbaWhoIsActive
+        Write-Message -Level Verbose -Message "Collecting sp_whoisactive data from server: $instance" -FunctionName Invoke-DbaWhoIsActive -ModuleName "dbatools"
         try {
             $sqlParameter = @{ }
             foreach ($param in $passedParams) {
-                Write-Message -Level Verbose -Message "Check parameter '$param'" -FunctionName Invoke-DbaWhoIsActive
+                Write-Message -Level Verbose -Message "Check parameter '$param'" -FunctionName Invoke-DbaWhoIsActive -ModuleName "dbatools"
                 $sqlParam = $paramDictionary[$param]
                 if ($sqlParam) {
                     $value = $localParams[$param]
@@ -260,7 +260,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $true { $value = 1 }
                         $false { $value = 0 }
                     }
-                    Write-Message -Level Verbose -Message "Adding parameter '$sqlParam' with value '$value'" -FunctionName Invoke-DbaWhoIsActive
+                    Write-Message -Level Verbose -Message "Adding parameter '$sqlParam' with value '$value'" -FunctionName Invoke-DbaWhoIsActive -ModuleName "dbatools"
                     $sqlParameter[$sqlParam] = $value
                 }
             }

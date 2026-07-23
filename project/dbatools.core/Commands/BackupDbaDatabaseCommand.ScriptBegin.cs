@@ -29,7 +29,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $EncryptionKey = $null
 
         if (-not (Test-Bound 'TimeStampFormat')) {
-            Write-Message -Message 'Setting Default timestampformat' -Level Verbose -FunctionName Backup-DbaDatabase
+            Write-Message -Message 'Setting Default timestampformat' -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
             $TimeStampFormat = "yyyyMMddHHmm"
         }
 
@@ -42,12 +42,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $isS3Backup = (Test-Bound 'StorageBaseUrl') -and ($StorageBaseUrl | Where-Object { $_ -match "^s3://" })
 
         if ((Test-Bound 'StorageCredential') -and (Test-Bound 'BlockSize') -and -not $isS3Backup) {
-            Write-Message -Level Warning -Message 'BlockSize cannot be specified when backing up to an Azure page blob, ignoring' -FunctionName Backup-DbaDatabase
+            Write-Message -Level Warning -Message 'BlockSize cannot be specified when backing up to an Azure page blob, ignoring' -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
             $BlockSize = $null
         }
 
         if ((Test-Bound 'StorageCredential') -and (Test-Bound 'MaxTransferSize') -and -not $isS3Backup) {
-            Write-Message -Level Warning -Message 'MaxTransferSize cannot be specified when backing up to an Azure page blob, ignoring' -FunctionName Backup-DbaDatabase
+            Write-Message -Level Warning -Message 'MaxTransferSize cannot be specified when backing up to an Azure page blob, ignoring' -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
             $MaxTransferSize = $null
         }
 
@@ -72,14 +72,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($FilePath -and -not $Path) {
                 try {
                     # cl gave a bad example in dbatools in a month of lunches, accommodate it
-                    Write-Message -Level Verbose -Message "Checking to see if FilePath is a directory" -FunctionName Backup-DbaDatabase
+                    Write-Message -Level Verbose -Message "Checking to see if FilePath is a directory" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     $isdir = ($server.Query("EXEC master.dbo.xp_fileexist '$FilePath'")).Item(1)
                 } catch {
                     # ignore
                 }
 
                 if ($isdir) {
-                    Write-Message -Level Verbose -Message "Ooops, FilePath is a directory, using it as the backup path" -FunctionName Backup-DbaDatabase
+                    Write-Message -Level Verbose -Message "Ooops, FilePath is a directory, using it as the backup path" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     $PSBoundParameters.Path = $FilePath
                     $Path = $FilePath
                     $PSBoundParameters.FilePath = $null
@@ -98,7 +98,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
 
             if ($Path.Count -gt 1) {
-                Write-Message -Level Verbose -Message "Multiple Backup Directories, striping" -FunctionName Backup-DbaDatabase
+                Write-Message -Level Verbose -Message "Multiple Backup Directories, striping" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $FileCount = $Path.Count
             }
 

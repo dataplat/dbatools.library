@@ -238,7 +238,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     foreach ($instance in $SqlInstance) {
         try {
-            Write-Message -Message ('Connecting to {0}' -f $instance) -FunctionName Invoke-DbaDbAzSqlTip
+            Write-Message -Message ('Connecting to {0}' -f $instance) -FunctionName Invoke-DbaDbAzSqlTip -ModuleName "dbatools"
 
             $connSplat = @{
                 SqlInstance      = $instance
@@ -273,10 +273,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
             try {
 
-                Write-Message -Message ('Running Azure SQL Tips against {0}' -f $db) -FunctionName Invoke-DbaDbAzSqlTip
+                Write-Message -Message ('Running Azure SQL Tips against {0}' -f $db) -FunctionName Invoke-DbaDbAzSqlTip -ModuleName "dbatools"
 
                 if ($failedInstConn) {
-                    Write-Message -Message ('Connecting to {0}.{1}' -f $instance, $db) -FunctionName Invoke-DbaDbAzSqlTip
+                    Write-Message -Message ('Connecting to {0}.{1}' -f $instance, $db) -FunctionName Invoke-DbaDbAzSqlTip -ModuleName "dbatools"
                     $connection = Connect-DbaInstance @connSplat -Database $db
                 }
 

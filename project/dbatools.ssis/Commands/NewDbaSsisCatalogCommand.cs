@@ -200,7 +200,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $_.ServiceType -eq "SSIS" -and $_.State -eq "Running"
                 }
             } catch {
-                Write-Message -Level Verbose "Could not connect using Get-DbaService ($PSItem). Trying Get-Service." -FunctionName New-DbaSsisCatalog
+                Write-Message -Level Verbose "Could not connect using Get-DbaService ($PSItem). Trying Get-Service." -FunctionName New-DbaSsisCatalog -ModuleName "dbatools"
             }
 
             if (-not $ssisservice) {

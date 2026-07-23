@@ -157,9 +157,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 #$running = $false
                 foreach ($service in $result) {
                     if (!$service.State -eq "Running") {
-                        Write-Message -Level Warning -Message "Service $($service.DisplayName) was found on the destination, but is currently not running." -FunctionName Copy-DbaSsisCatalog
+                        Write-Message -Level Warning -Message "Service $($service.DisplayName) was found on the destination, but is currently not running." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                     } else {
-                        Write-Message -Level Verbose -Message "Service $($service.DisplayName) was found running on the destination." -FunctionName Copy-DbaSsisCatalog
+                        Write-Message -Level Verbose -Message "Service $($service.DisplayName) was found running on the destination." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                         #$running = $true
                     }
                 }
@@ -178,7 +178,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $sqlConn.Open()
             }
             try {
-                Write-Message -Level Verbose -Message "Deploying project $Project from folder $Folder." -FunctionName Copy-DbaSsisCatalog
+                Write-Message -Level Verbose -Message "Deploying project $Project from folder $Folder." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                 $cmd = New-Object Microsoft.Data.SqlClient.SqlCommand
                 $cmd.CommandType = "StoredProcedure"
                 $cmd.connection = $sqlConn
@@ -229,7 +229,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     $destinationCatalog.Alter()
                     $destinationCatalog.Refresh()
                 }
-                Write-Message -Level Verbose -Message "Creating folder $Folder." -FunctionName Copy-DbaSsisCatalog
+                Write-Message -Level Verbose -Message "Creating folder $Folder." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                 $destFolder = New-Object "$ISNamespace.CatalogFolder" ($destinationCatalog, $Folder, $Description)
                 $destFolder.Create()
                 $destFolder.Alter()
@@ -264,7 +264,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                     $targetEnv.Variables.Add($var.Name, $var.Type, $finalValue, $var.Sensitive, $var.Description)
                 }
-                Write-Message -Level Verbose -Message "Creating environment $Environment." -FunctionName Copy-DbaSsisCatalog
+                Write-Message -Level Verbose -Message "Creating environment $Environment." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                 $targetEnv.Create()
                 $targetEnv.Alter()
                 $targetEnv.Refresh()
@@ -277,7 +277,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             )
             if ($Pscmdlet.ShouldProcess("Creating New SSISDB Catalog")) {
                 if (!$Password) {
-                    Write-Message -Level Verbose -Message "SSISDB Catalog requires a password." -FunctionName Copy-DbaSsisCatalog
+                    Write-Message -Level Verbose -Message "SSISDB Catalog requires a password." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                     $pass1 = Read-Host "Enter a password" -AsSecureString
                     $plainTextPass1 = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($pass1))
                     $pass2 = Read-Host "Re-enter password" -AsSecureString
@@ -368,7 +368,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                                 }
                             }
                         }
-                        Write-Message -Level Verbose -Message "Enabling SQL CLR configuration option at the destination." -FunctionName Copy-DbaSsisCatalog
+                        Write-Message -Level Verbose -Message "Enabling SQL CLR configuration option at the destination." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                         if ($destinationConnection.Configuration.ShowAdvancedOptions.ConfigValue -eq $false) {
                             $destinationConnection.Configuration.ShowAdvancedOptions.ConfigValue = $true
                             $changeback = $true
@@ -382,7 +382,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $destinationConnection.Configuration.Alter()
                     }
                 } else {
-                    Write-Message -Level Verbose -Message "SQL CLR configuration option is already enabled at the destination." -FunctionName Copy-DbaSsisCatalog
+                    Write-Message -Level Verbose -Message "SQL CLR configuration option is already enabled at the destination." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                 }
                 if ($__realCmdlet.ShouldProcess($destinstance, "Create destination SSISDB Catalog")) {
                     if (!$CreateCatalogPassword) {
@@ -428,7 +428,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     }
                     if ($destinationFolders.Name -contains $folder) {
                         if (!$force) {
-                            Write-Message -Level Warning -Message "Integration services catalog folder $folder exists at destination. Use -Force to drop and recreate." -FunctionName Copy-DbaSsisCatalog
+                            Write-Message -Level Warning -Message "Integration services catalog folder $folder exists at destination. Use -Force to drop and recreate." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                             $copyFolderStatus.Status = "Skipped"
                             $copyFolderStatus.Notes = "Integration services catalog folder exists at destination. Use -Force to drop and recreate."
                             $copyFolderStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
@@ -486,7 +486,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         }
                     } else {
                         if (!$force) {
-                            Write-Message -Level Warning -Message "Integration services catalog folder $($srcFolder.Name) exists at destination. Use -Force to drop and recreate." -FunctionName Copy-DbaSsisCatalog
+                            Write-Message -Level Warning -Message "Integration services catalog folder $($srcFolder.Name) exists at destination. Use -Force to drop and recreate." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                             $copyFolderStatus.Status = "Skipped"
                             $copyFolderStatus.Notes = "Integration services catalog folder exists at destination. Use -Force to drop and recreate."
                             $copyFolderStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
@@ -616,7 +616,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         } else {
                             if (!$force) {
-                                Write-Message -Level Warning -Message "Integration services catalog environment $environment exists in folder $($f.Name) at destination. Use -Force to drop and recreate." -FunctionName Copy-DbaSsisCatalog
+                                Write-Message -Level Warning -Message "Integration services catalog environment $environment exists in folder $($f.Name) at destination. Use -Force to drop and recreate." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                                 $copyEnvStatus.Status = "Skipped"
                                 $copyEnvStatus.Notes = "Integration services catalog environment exists in folder $($f.Name) at destination. Use -Force to drop and recreate."
                                 $copyEnvStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
@@ -662,7 +662,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             }
                         } else {
                             if (!$force) {
-                                Write-Message -Level Warning -Message "Integration services catalog environment $($env.Name) exists in folder $($curFolder.Name) at destination. Use -Force to drop and recreate." -FunctionName Copy-DbaSsisCatalog
+                                Write-Message -Level Warning -Message "Integration services catalog environment $($env.Name) exists in folder $($curFolder.Name) at destination. Use -Force to drop and recreate." -FunctionName Copy-DbaSsisCatalog -ModuleName "dbatools"
                                 $copyEnvStatus.Status = "Skipped"
                                 $copyEnvStatus.Notes = "Integration services catalog environment $($env.Name) exists in folder $($curFolder.Name) at destination. Use -Force to drop and recreate."
                                 $copyEnvStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject

@@ -8,7 +8,7 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class BackupDbaDatabaseCommand
 {
     private const string ProcessScriptMid = """
-                    Write-Message -Message "Storage credential name passed in, will proceed assuming it's valid" -Level Verbose -FunctionName Backup-DbaDatabase
+                    Write-Message -Message "Storage credential name passed in, will proceed assuming it's valid" -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     if (-not $isS3Backup) {
                         # Azure page blob with credential = single file only
                         $FileCount = 1
@@ -18,21 +18,21 @@ public sealed partial class BackupDbaDatabaseCommand
                         if ($isS3Backup) {
                             # S3 credential name should match the S3 URL path
                             $credentialName = $baseUrl
-                            Write-Message -Message "S3 URL detected, testing for S3 credential" -Level Verbose -FunctionName Backup-DbaDatabase
+                            Write-Message -Message "S3 URL detected, testing for S3 credential" -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                         } else {
                             # Azure SAS credential logic
                             $base = $baseUrl -split "/"
                             if ( $base.Count -gt 4) {
-                                Write-Message "Storage URL contains a folder" -FunctionName Backup-DbaDatabase
+                                Write-Message "Storage URL contains a folder" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                                 $credentialName = $base[0] + "//" + $base[2] + "/" + $base[3]
                             } else {
                                 # URL is just the container, use it as-is for credential name
                                 $credentialName = $baseUrl
                             }
-                            Write-Message -Message "Azure URL and no credential, testing for SAS credential" -Level Verbose -FunctionName Backup-DbaDatabase
+                            Write-Message -Message "Azure URL and no credential, testing for SAS credential" -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                         }
                         if (Get-DbaCredential -SqlInstance $server -Name $credentialName) {
-                            Write-Message -Message "Found a matching backup credential" -Level Verbose -FunctionName Backup-DbaDatabase
+                            Write-Message -Message "Found a matching backup credential" -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                         } else {
                             Write-Progress -Id $topProgressId -Activity 'Backup' -Completed
                             if ($isS3Backup) {
@@ -55,7 +55,7 @@ public sealed partial class BackupDbaDatabaseCommand
             }
 
             if ($null -eq $PSBoundParameters.Path -and $PSBoundParameters.FilePath -ne 'NUL' -and $server.VersionMajor -eq 8) {
-                Write-Message -Message 'No backup folder passed in, setting it to instance default' -Level Verbose -FunctionName Backup-DbaDatabase
+                Write-Message -Message 'No backup folder passed in, setting it to instance default' -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $Path = (Get-DbaDefaultPath -SqlInstance $server).Backup
             }
 
@@ -79,11 +79,11 @@ public sealed partial class BackupDbaDatabaseCommand
                 Stop-Function -Message "Backing up snapshots not supported. $dbName skipped." -Continue -FunctionName Backup-DbaDatabase
             }
 
-            Write-Message -Level Verbose -Message "Backup database $db" -FunctionName Backup-DbaDatabase
+            Write-Message -Level Verbose -Message "Backup database $db" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
 
             if ($null -eq $db.RecoveryModel) {
                 $db.RecoveryModel = $server.Databases[$db.Name].RecoveryModel
-                Write-Message -Level Verbose -Message "$dbName is in $($db.RecoveryModel) recovery model" -FunctionName Backup-DbaDatabase
+                Write-Message -Level Verbose -Message "$dbName is in $($db.RecoveryModel) recovery model" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
             }
 
             # Fixes one-off cases of StackOverflowException crashes, see issue 1481
@@ -114,7 +114,7 @@ public sealed partial class BackupDbaDatabaseCommand
             $backup.Database = $db.Name
             if (Test-Bound -ParameterName Description) {
                 if ($Description.Length -gt 255) {
-                    Write-Message -Level Warning -Message 'Description is too long and will be truncated to 255 characters' -FunctionName Backup-DbaDatabase
+                    Write-Message -Level Warning -Message 'Description is too long and will be truncated to 255 characters' -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     $Description = $Description.Substring(0, 255)
                 }
                 $backup.BackupSetDescription = $Description
@@ -137,25 +137,25 @@ public sealed partial class BackupDbaDatabaseCommand
                         }
                         $flagCorrectMaxTransferSize = ($MaxTransferSize -gt 64kb)
                         if ($flagTDESQLVersion -and $flagCorrectMaxTransferSize) {
-                            Write-Message -Level Verbose -Message "$dbName is enabled for encryption but will compress" -FunctionName Backup-DbaDatabase
+                            Write-Message -Level Verbose -Message "$dbName is enabled for encryption but will compress" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                             $backup.CompressionOption = [Microsoft.SqlServer.Management.Smo.BackupCompressionOptions]::On
                         } else {
-                            Write-Message -Level Warning -Message "$dbName is enabled for encryption, will not compress" -FunctionName Backup-DbaDatabase
+                            Write-Message -Level Warning -Message "$dbName is enabled for encryption, will not compress" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                             $backup.CompressionOption = [Microsoft.SqlServer.Management.Smo.BackupCompressionOptions]::Off
                         }
                     } elseif ($server.Edition -like 'Express*' -or ($server.VersionMajor -eq 10 -and $server.VersionMinor -eq 0 -and $server.Edition -notlike '*enterprise*') -or $server.VersionMajor -lt 10) {
                         Write-Progress -Id $topProgressId -Activity 'Backup' -Completed
                         Stop-Function -Message "Compression is not supported with this version/edition of Sql Server" -Continue -Target $db -FunctionName Backup-DbaDatabase
                     } else {
-                        Write-Message -Level Verbose -Message "Compression enabled" -FunctionName Backup-DbaDatabase
+                        Write-Message -Level Verbose -Message "Compression enabled" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                         $backup.CompressionOption = [Microsoft.SqlServer.Management.Smo.BackupCompressionOptions]::On
                     }
                 } else {
-                    Write-Message -Level Verbose -Message "Compression disabled" -FunctionName Backup-DbaDatabase
+                    Write-Message -Level Verbose -Message "Compression disabled" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     $backup.CompressionOption = [Microsoft.SqlServer.Management.Smo.BackupCompressionOptions]::Off
                 }
             } else {
-                Write-Message -Level Verbose -Message "Using instance default backup compression setting" -FunctionName Backup-DbaDatabase
+                Write-Message -Level Verbose -Message "Using instance default backup compression setting" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $backup.CompressionOption = [Microsoft.SqlServer.Management.Smo.BackupCompressionOptions]::Default
             }
 
@@ -164,7 +164,7 @@ public sealed partial class BackupDbaDatabaseCommand
             }
 
             if ($Type -in 'Diff', 'Differential') {
-                Write-Message -Level VeryVerbose -Message "Creating differential backup" -FunctionName Backup-DbaDatabase
+                Write-Message -Level VeryVerbose -Message "Creating differential backup" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $SMOBackuptype = "Database"
                 $backup.Incremental = $true
                 $outputType = 'Differential'
@@ -172,7 +172,7 @@ public sealed partial class BackupDbaDatabaseCommand
             }
             $Backup.NoRecovery = $false
             if ($Type -eq "Log") {
-                Write-Message -Level VeryVerbose -Message "Creating log backup" -FunctionName Backup-DbaDatabase
+                Write-Message -Level VeryVerbose -Message "Creating log backup" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $Suffix = "trn"
                 $OutputType = 'Log'
                 $SMOBackupType = 'Log'
@@ -181,7 +181,7 @@ public sealed partial class BackupDbaDatabaseCommand
             }
 
             if ($Type -in 'Full', 'Database') {
-                Write-Message -Level VeryVerbose -Message "Creating full backup" -FunctionName Backup-DbaDatabase
+                Write-Message -Level VeryVerbose -Message "Creating full backup" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $SMOBackupType = "Database"
                 $OutputType = 'Full'
                 $gbhSwitch = @{'LastFull' = $true }
@@ -193,7 +193,7 @@ public sealed partial class BackupDbaDatabaseCommand
                 $backup.CredentialName = $StorageCredential
             }
 
-            Write-Message -Level Verbose -Message "Building file name" -FunctionName Backup-DbaDatabase
+            Write-Message -Level Verbose -Message "Building file name" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
             $BackupFinalName = ''
             $FinalBackupPath = @()
             $timestamp = Get-Date -Format $TimeStampFormat
@@ -205,7 +205,7 @@ public sealed partial class BackupDbaDatabaseCommand
                 $BackupFinalName = $file.Name
                 $suffix = $file.extension -Replace '^\.', ''
                 if ( '' -ne (Split-Path $FilePath)) {
-                    Write-Message -Level Verbose -Message "Fully qualified path passed in" -FunctionName Backup-DbaDatabase
+                    Write-Message -Level Verbose -Message "Fully qualified path passed in" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     # Because of #7860, don't use [IO.Path]::GetFullPath on MacOS
                     if ($nonwindows -or $isdestlinux) {
                         $FinalBackupPath += $file.DirectoryName
@@ -214,11 +214,11 @@ public sealed partial class BackupDbaDatabaseCommand
                     }
                 }
             } else {
-                Write-Message -Level VeryVerbose -Message "Setting filename - $timestamp" -FunctionName Backup-DbaDatabase
+                Write-Message -Level VeryVerbose -Message "Setting filename - $timestamp" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $BackupFinalName = "$($dbName)_$timestamp.$suffix"
             }
 
-            Write-Message -Level Verbose -Message "Building backup path" -FunctionName Backup-DbaDatabase
+            Write-Message -Level Verbose -Message "Building backup path" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
             if ($FinalBackupPath.Count -eq 0) {
                 $FinalBackupPath += $Path
             }

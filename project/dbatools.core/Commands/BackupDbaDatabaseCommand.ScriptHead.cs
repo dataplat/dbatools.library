@@ -73,7 +73,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             return
         }
 
-        Write-Message -Level Verbose -Message "$($InputObject.Count) database to backup" -FunctionName Backup-DbaDatabase
+        Write-Message -Level Verbose -Message "$($InputObject.Count) database to backup" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
 
         if ($Database) {
             $InputObject = $InputObject | Where-Object Name -in $Database
@@ -84,7 +84,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
         if ($InputObject.count -eq 0) {
-            Write-Message -Level Warning -Message "No databases match the request for backups" -FunctionName Backup-DbaDatabase
+            Write-Message -Level Warning -Message "No databases match the request for backups" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
         }
 
         $topProgressId = Get-Random
@@ -94,14 +94,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if ($FilePath -and -not $Path) {
                 try {
                     # cl gave a bad example in dbatools in a month of lunches, accommodate it
-                    Write-Message -Level Verbose -Message "Checking to see if FilePath is a directory" -FunctionName Backup-DbaDatabase
+                    Write-Message -Level Verbose -Message "Checking to see if FilePath is a directory" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     $isdir = ($db.Query("EXEC master.dbo.xp_fileexist '$FilePath'")).Item(1)
                 } catch {
                     # ignore
                 }
 
                 if ($isdir) {
-                    Write-Message -Level Verbose -Message "Ooops, FilePath is a directory, using it as the backup path" -FunctionName Backup-DbaDatabase
+                    Write-Message -Level Verbose -Message "Ooops, FilePath is a directory, using it as the backup path" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     $PSBoundParameters.Path = $FilePath
                     $Path = $FilePath
                     $PSBoundParameters.FilePath = $null
@@ -163,7 +163,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
 
             if ( (Test-Bound StorageBaseUrl -Not) -and (Test-Bound Path -Not) -and $FilePath -ne 'NUL') {
-                Write-Message -Message 'No backup folder passed in, setting it to instance default' -Level Verbose -FunctionName Backup-DbaDatabase
+                Write-Message -Message 'No backup folder passed in, setting it to instance default' -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $Path = (Get-DbaDefaultPath -SqlInstance $server).Backup
                 if ($Path) {
                     # it's very picky, don't cut corners
@@ -215,7 +215,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                     } else {
                         # Set default MaxTransferSize for S3 if not specified (10MB is a good default)
                         $MaxTransferSize = 10mb
-                        Write-Message -Level Verbose -Message "S3 backup detected, setting default MaxTransferSize to 10MB" -FunctionName Backup-DbaDatabase
+                        Write-Message -Level Verbose -Message "S3 backup detected, setting default MaxTransferSize to 10MB" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     }
 
                     # Validate StorageRegion if specified with non-S3 URL

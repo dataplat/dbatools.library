@@ -23,7 +23,7 @@ public sealed partial class BackupDbaDatabaseCommand
                     }
                 }
                 if ($containsDbNameToken) {
-                    Write-Message -Level Verbose -Message "Directory path contains 'dbname' token with ReplaceInName. Automatically skipping database folder creation to prevent duplication." -FunctionName Backup-DbaDatabase
+                    Write-Message -Level Verbose -Message "Directory path contains 'dbname' token with ReplaceInName. Automatically skipping database folder creation to prevent duplication." -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     $NoAppendDbNameInPath = $true
                 }
             }
@@ -61,7 +61,7 @@ public sealed partial class BackupDbaDatabaseCommand
                         } else {
                             $failreason += "SQL Server cannot check if $parentPath exists. You can try disabling this check with -IgnoreFileChecks"
                             $failures += $failreason
-                            Write-Message -Level Warning -Message "$failreason" -FunctionName Backup-DbaDatabase
+                            Write-Message -Level Warning -Message "$failreason" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                         }
                     }
                 }
@@ -88,7 +88,7 @@ public sealed partial class BackupDbaDatabaseCommand
                     }
 
                     if ($WithFormat) {
-                        Write-Message -Message "WithFormat specified. Ensuring Initialize and SkipTapeHeader are set to true." -Level Verbose -FunctionName Backup-DbaDatabase
+                        Write-Message -Message "WithFormat specified. Ensuring Initialize and SkipTapeHeader are set to true." -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                         $Initialize = $true
                         $SkipTapeHeader = $true
                     }
@@ -100,7 +100,7 @@ public sealed partial class BackupDbaDatabaseCommand
                     $backup.Devices.Add($device)
                 }
                 $humanBackupFile = $FinalBackupPath -Join ','
-                Write-Message -Level Verbose -Message "Devices added" -FunctionName Backup-DbaDatabase
+                Write-Message -Level Verbose -Message "Devices added" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                 $percent = [Microsoft.SqlServer.Management.Smo.PercentCompleteEventHandler] {
                     Write-Progress -Id $ProgressId -Activity "Backing up database $dbName to $humanBackupFile" -PercentComplete $_.Percent -Status ([System.String]::Format("Progress: {0} %", $_.Percent))
                 }
@@ -129,7 +129,7 @@ public sealed partial class BackupDbaDatabaseCommand
                                 $script = $backup.Script($server)
                                 $backupOptionsJson = "{`"s3`": {`"region`":`"$StorageRegion`"}}"
                                 $script += ", BACKUP_OPTIONS = '$backupOptionsJson'"
-                                Write-Message -Level Verbose -Message "Executing S3 backup with BACKUP_OPTIONS for region: $StorageRegion" -FunctionName Backup-DbaDatabase
+                                Write-Message -Level Verbose -Message "Executing S3 backup with BACKUP_OPTIONS for region: $StorageRegion" -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                                 $null = $server.ConnectionContext.ExecuteNonQuery($script)
                             } else {
                                 $backup.SqlBackup($server)
@@ -214,7 +214,7 @@ public sealed partial class BackupDbaDatabaseCommand
                     }
                 } catch {
                     if ($NoRecovery -and ($_.Exception.InnerException.InnerException.InnerException -like '*cannot be opened. It is in the middle of a restore.')) {
-                        Write-Message -Message "Exception thrown by db going into restoring mode due to recovery" -Level Verbose -FunctionName Backup-DbaDatabase
+                        Write-Message -Message "Exception thrown by db going into restoring mode due to recovery" -Level Verbose -FunctionName Backup-DbaDatabase -ModuleName "dbatools"
                     } else {
                         Write-Progress -Id $ProgressId -Activity "Backup" -Completed
                         Write-Progress -Id $topProgressId -Activity "Backup" -Completed
