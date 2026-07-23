@@ -59,9 +59,25 @@
           BeforeTargets="XmlDoc2CmdletDoc">
     <PropertyGroup>
       <_HelpDepsDir>$(MSBuildThisFileDirectory)..\artifacts\dbatools.library\core\lib</_HelpDepsDir>
+      <_HelpVendoredDir>$(MSBuildThisFileDirectory)..\var\misc\both</_HelpVendoredDir>
     </PropertyGroup>
     <ItemGroup Condition="Exists('$(_HelpDepsDir)')">
       <_HelpDep Include="$(_HelpDepsDir)\*.dll" />
+    </ItemGroup>
+    <!--
+      RMO and the other closed-source replication assemblies ship VENDORED at var/misc/both,
+      not via the artifacts drop - and the drop is repopulated mid-run by build.ps1, so at the
+      point the satellite loop builds dbatools.replication the staged closure can exist while
+      still lacking them (see the Reference comment in dbatools.replication.csproj). Without
+      this second seed the generator's GetTypes() dies with PS100 FileNotFoundException on
+      Microsoft.SqlServer.Rmo, failing the whole satellite build - which broke every gate on
+      2026-07-23 (first seen: Restore-DbaDbSnapshot verdict 080852). var/misc/both exists at
+      every phase of build.ps1, so this seed is stable where the drop is not.
+    -->
+    <ItemGroup Condition="Exists('$(_HelpVendoredDir)')">
+      <_HelpDep Include="$(_HelpVendoredDir)\*.dll" />
+    </ItemGroup>
+    <ItemGroup>
       <_HelpDep Remove="@(_HelpDep)" Condition="Exists('$(TargetDir)%(Filename)%(Extension)')" />
     </ItemGroup>
     <Copy Condition="'@(_HelpDep)' != ''"
