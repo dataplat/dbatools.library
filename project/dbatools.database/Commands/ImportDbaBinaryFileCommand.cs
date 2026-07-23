@@ -91,6 +91,18 @@ public sealed class ImportDbaBinaryFileCommand : DbaBaseCmdlet
     // Carried across records: the process interrupt (a validation Stop-Function without -Continue stops all records).
     private bool _processInterrupted;
 
+    // Carried across records: the source guards its whole column-detect + $Statement-build block with
+    // if (-not $Statement) - a VALUE check on a NON-pipeline param, so once $Statement (and the detected
+    // $FileNameColumn/$BinaryColumn) are built on the first piped table they PERSIST to every later record and the
+    // block is skipped, reusing table-1's INSERT for table-2 (the source's actual behaviour). The hop re-binds
+    // $Statement to the null property each ProcessRecord, so without this carry it would rebuild per-record and
+    // DIVERGE (insert into the right table where the source uses the wrong one). Set once, never cleared - a value
+    // that has become non-null in the source never goes back to null.
+    private bool _carryAssigned;
+    private string? _carryStatement;
+    private string? _carryFileNameColumn;
+    private string? _carryBinaryColumn;
+
     protected override void ProcessRecord()
     {
         // Replicates the source process block's opening if (Test-FunctionInterrupt) { return } across records.
@@ -104,6 +116,14 @@ public sealed class ImportDbaBinaryFileCommand : DbaBaseCmdlet
                 if (sentinel["__ibfProcess"] is Hashtable state)
                 {
                     _processInterrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
+                    // Capture the persisted $Statement/columns so the NEXT record reproduces the source's skip.
+                    if (LanguagePrimitives.IsTrue(state["CarryAssigned"]))
+                    {
+                        _carryAssigned = true;
+                        _carryStatement = state["Statement"] as string;
+                        _carryFileNameColumn = state["FileNameColumn"] as string;
+                        _carryBinaryColumn = state["BinaryColumn"] as string;
+                    }
                 }
                 return;
             }
@@ -117,7 +137,8 @@ public sealed class ImportDbaBinaryFileCommand : DbaBaseCmdlet
         }, ProcessScript,
             SqlInstance, SqlCredential, Database, Table, Schema, Statement, FileNameColumn, BinaryColumn,
             NoFileNameColumn.ToBool(), InputObject, FilePath, Path, EnableException.ToBool(),
-            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
+            this, BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"),
+            _carryAssigned, _carryStatement, _carryFileNameColumn, _carryBinaryColumn);
     }
 
     private object? BoundCommonParameter(string name)
@@ -151,17 +172,26 @@ public sealed class ImportDbaBinaryFileCommand : DbaBaseCmdlet
     // ShouldProcess -> $__realCmdlet.ShouldProcess; $PSBoundParameters.FileNameColumn/BinaryColumn -> captured
     // originals $__psbpFileNameColumn/$__psbpBinaryColumn (snapshot before the body reassigns $FileNameColumn/$BinaryColumn).
     private const string ProcessScript = """
-param($SqlInstance, $SqlCredential, $Database, $Table, $Schema, $Statement, $FileNameColumn, $BinaryColumn, $NoFileNameColumn, $InputObject, $FilePath, $Path, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $Table, $Schema, $Statement, $FileNameColumn, $BinaryColumn, $NoFileNameColumn, $InputObject, $FilePath, $Path, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug, $__carryAssigned, $__carryStatement, $__carryFileNameColumn, $__carryBinaryColumn)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Database, [string]$Table, [string]$Schema, [string]$Statement, [string]$FileNameColumn, [string]$BinaryColumn, $NoFileNameColumn, [Microsoft.SqlServer.Management.Smo.Table[]]$InputObject, [System.IO.FileInfo[]]$FilePath, [System.IO.FileInfo[]]$Path, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string]$Database, [string]$Table, [string]$Schema, [string]$Statement, [string]$FileNameColumn, [string]$BinaryColumn, $NoFileNameColumn, [Microsoft.SqlServer.Management.Smo.Table[]]$InputObject, [System.IO.FileInfo[]]$FilePath, [System.IO.FileInfo[]]$Path, $EnableException, $__realCmdlet, $__boundVerbose, $__boundDebug, $__carryAssigned, $__carryStatement, $__carryFileNameColumn, $__carryBinaryColumn)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     $__psbpFileNameColumn = $FileNameColumn
     $__psbpBinaryColumn = $BinaryColumn
+    # Cross-record carry: restore the persisted $Statement + detected columns from the previous record
+    # BEFORE the build blocks (and AFTER the boundness snapshot above, so $__psbp* still reflects the caller's
+    # ORIGINAL binding, not the carried value). This makes if (-not $Statement) skip on record 2+, reusing
+    # table-1's INSERT + columns exactly as the source's persisted param does.
+    if ($__carryAssigned) {
+        $Statement = $__carryStatement
+        $FileNameColumn = $__carryFileNameColumn
+        $BinaryColumn = $__carryBinaryColumn
+    }
     . {
         foreach ($__continueGuard in @(1)) {
         # can't be in begin because it's piped in
@@ -310,7 +340,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
-    @{ __ibfProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
-} $SqlInstance $SqlCredential $Database $Table $Schema $Statement $FileNameColumn $BinaryColumn $NoFileNameColumn $InputObject $FilePath $Path $EnableException $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+    # Emit the persisted $Statement/columns so the next record reproduces the source's if(-not $Statement) skip.
+    # CarryAssigned tracks "$Statement has become non-null" - once true the source never rebuilds it, so we forward it.
+    @{ __ibfProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value); CarryAssigned = [bool]$Statement; Statement = $Statement; FileNameColumn = $FileNameColumn; BinaryColumn = $BinaryColumn } }
+} $SqlInstance $SqlCredential $Database $Table $Schema $Statement $FileNameColumn $BinaryColumn $NoFileNameColumn $InputObject $FilePath $Path $EnableException $__realCmdlet $__boundVerbose $__boundDebug $__carryAssigned $__carryStatement $__carryFileNameColumn $__carryBinaryColumn @__commonParameters 3>&1 2>&1
 """;
 }
