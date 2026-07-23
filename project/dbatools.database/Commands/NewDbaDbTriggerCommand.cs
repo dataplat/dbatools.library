@@ -23,11 +23,11 @@ namespace Dataplat.Dbatools.Commands;
 /// SCOPE: database-scoped DDL triggers only (the scope Get-DbaDbTrigger enumerates, Database.Triggers). INSTEAD
 /// OF and DML table triggers are out of v1, and DDL triggers are not schema-scoped so there is no -Schema.
 ///
-/// TEXT HAZARD: the trigger is created with TextMode FALSE and only TextBody assigned (via the four-argument
-/// DatabaseDdlTrigger constructor, which sets the event set, the body and ImplementationType TransactSql while
-/// leaving TextMode false). SMO then synthesises the CREATE header from the name plus the DDL event set.
-/// Assigning TextHeader outside text mode throws, and text mode with a body but no header throws at script time,
-/// so the leave-TextMode-false-assign-only-TextBody pattern is the safe one. -Definition carries the trigger
+/// TEXT HAZARD: the trigger is created from the two-argument DatabaseDdlTrigger(database, name) constructor, then
+/// its DdlTriggerEvents set, TextMode (left FALSE) and TextBody are assigned as separate properties before
+/// Create(). Only TextBody is assigned with TextMode false, so SMO synthesises the CREATE header from the name
+/// plus the DDL event set. Assigning TextHeader outside text mode throws, and text mode with a body but no header
+/// throws at script time, so the leave-TextMode-false-assign-only-TextBody pattern is the safe one. -Definition carries the trigger
 /// body only, not a full CREATE statement; it is raw DDL executed verbatim (the same trust class as
 /// Invoke-DbaQuery -Query) while every identifier flows through SMO which brackets and quotes it.
 ///
@@ -38,10 +38,13 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// SAFETY: the sole Create runs only inside a passed $__realCmdlet.ShouldProcess gate, so a -WhatIf run never
 /// touches the server. An existing trigger is refused with a pointer at Set-DbaDbTrigger rather than silently
-/// altered. Either -SqlInstance or a piped database (the Test-Bound duality, no parameter sets). No cross-record
-/// state is carried, so each record runs an independent hop.
+/// altered. Either -SqlInstance or a piped database (the Test-Bound duality, no parameter sets). Scope must be
+/// explicit: with -SqlInstance the caller must also name databases with -Database, or pipe them in as
+/// -InputObject - an unscoped instance-wide create that would deploy the trigger into every database (including
+/// model, propagating to all future databases) is refused. ConfirmImpact is High because that create walks
+/// system databases. No cross-record state is carried, so each record runs an independent hop.
 /// </remarks>
-[Cmdlet(VerbsCommon.New, "DbaDbTrigger", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
+[Cmdlet(VerbsCommon.New, "DbaDbTrigger", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(SmoDatabaseDdlTrigger))]
 public sealed class NewDbaDbTriggerCommand : DbaBaseCmdlet
 {
@@ -98,7 +101,7 @@ public sealed class NewDbaDbTriggerCommand : DbaBaseCmdlet
         }, BodyScript,
             SqlInstance, SqlCredential, Database, Name, Definition, DdlEvent,
             IsEnabled.ToBool(), InputObject, EnableException.ToBool(), this,
-            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)), TestBound(nameof(IsEnabled)),
+            TestBound(nameof(SqlInstance)), TestBound(nameof(InputObject)), TestBound(nameof(IsEnabled)), TestBound(nameof(Database)),
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug"));
     }
@@ -136,14 +139,16 @@ public sealed class NewDbaDbTriggerCommand : DbaBaseCmdlet
         }
     }
 
-    // PS: the module-scoped body. Databases come from -SqlInstance (resolved via Get-DbaDatabase) or piped
-    // -InputObject. The -DdlEvent names are validated against the DatabaseDdlTriggerEventSet writable boolean
-    // members and mapped onto a fresh set per database. An existing trigger is refused (pointing at
-    // Set-DbaDbTrigger); creation uses the four-arg constructor (event set + body, TextMode false) so SMO builds
-    // the header, and runs inside a passed ShouldProcess so -WhatIf never touches the server. The created trigger
-    // is re-emitted via Get-DbaDbTrigger (filtered by name) so its decoration matches exactly.
+    // PS: the module-scoped body. Databases come from -SqlInstance (resolved via Get-DbaDatabase, filtered by
+    // -Database) or piped -InputObject. Scope must be explicit - with -SqlInstance the caller must also name
+    // databases with -Database, otherwise the unscoped instance-wide create is refused. The -DdlEvent names are
+    // validated against the DatabaseDdlTriggerEventSet writable boolean members and mapped onto a fresh set per
+    // database. An existing trigger is refused (pointing at Set-DbaDbTrigger); creation uses the two-arg
+    // constructor then assigns DdlTriggerEvents, TextMode false and TextBody so SMO builds the header, and runs
+    // inside a passed ShouldProcess so -WhatIf never touches the server. The created trigger is re-emitted via
+    // Get-DbaDbTrigger (filtered by name) so its decoration matches exactly.
     private const string BodyScript = """
-param($SqlInstance, $SqlCredential, $Database, $Name, $Definition, $DdlEvent, $IsEnabled, $InputObject, $EnableException, $__realCmdlet, $__boundSqlInstance, $__boundInputObject, $__boundIsEnabled, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $Name, $Definition, $DdlEvent, $IsEnabled, $InputObject, $EnableException, $__realCmdlet, $__boundSqlInstance, $__boundInputObject, $__boundIsEnabled, $__boundDatabase, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -151,11 +156,16 @@ if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVer
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string]$Name, [string]$Definition, [string[]]$DdlEvent, $IsEnabled, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__realCmdlet, $__boundSqlInstance, $__boundInputObject, $__boundIsEnabled)
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, [string[]]$Database, [string]$Name, [string]$Definition, [string[]]$DdlEvent, $IsEnabled, [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $EnableException, $__realCmdlet, $__boundSqlInstance, $__boundInputObject, $__boundIsEnabled, $__boundDatabase)
 
     if (-not $__boundSqlInstance -and -not $__boundInputObject) {
         Stop-Function -Message "You must supply either -SqlInstance or an Input Object" -FunctionName New-DbaDbTrigger
+        return
+    }
+
+    if (-not $__boundDatabase -and -not $__boundInputObject) {
+        Stop-Function -Message "You must specify the target database(s) with -Database, or pipe them in as -InputObject. An unscoped instance-wide create is not permitted." -FunctionName New-DbaDbTrigger
         return
     }
 
@@ -192,7 +202,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         try {
             $InputObject = Get-DbaDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $Database -EnableException
         } catch {
-            Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $SqlInstance -Continue -FunctionName New-DbaDbTrigger
+            Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $SqlInstance -FunctionName New-DbaDbTrigger
             return
         }
     }
@@ -233,6 +243,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Get-DbaDbTrigger -SqlInstance $server -Database $db.Name | Where-Object { $_.Name -eq $Name }
         }
     }
-} $SqlInstance $SqlCredential $Database $Name $Definition $DdlEvent $IsEnabled $InputObject $EnableException $__realCmdlet $__boundSqlInstance $__boundInputObject $__boundIsEnabled @__commonParameters 3>&1 2>&1
+} $SqlInstance $SqlCredential $Database $Name $Definition $DdlEvent $IsEnabled $InputObject $EnableException $__realCmdlet $__boundSqlInstance $__boundInputObject $__boundIsEnabled $__boundDatabase @__commonParameters 3>&1 2>&1
 """;
 }
