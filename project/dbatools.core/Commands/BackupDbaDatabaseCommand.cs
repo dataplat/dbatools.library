@@ -179,13 +179,16 @@ public sealed partial class BackupDbaDatabaseCommand : DbaBaseCmdlet
     // Stop-Function latch (Test-FunctionInterrupt cannot cross hops - Rename precedent).
     private Hashtable? _state;
     private bool _hopInterrupted;
-    private string[] _realBoundNames = Array.Empty<string>();
+    private Hashtable? _realBoundParameters;
 
     protected override void BeginProcessing()
     {
-        // Bound names are invocation-stable: captured ONCE, no LINQ (satellite hot-loop rule).
-        _realBoundNames = new string[MyInvocation.BoundParameters.Count];
-        MyInvocation.BoundParameters.Keys.CopyTo(_realBoundNames, 0);
+        // The caller's real bound set is invocation-stable: copied ONCE into a Hashtable. A
+        // Hashtable survives the InvokeScoped arg-relay intact (a string[] carrier gets
+        // unrolled crossing the splatted hop boundary, which emptied the prune's name list and
+        // discarded every Test-Bound); the hop prunes its positional-bound superset against
+        // this via ContainsKey.
+        _realBoundParameters = new Hashtable(MyInvocation.BoundParameters);
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
             SqlInstance, SqlCredential, Database, ExcludeDatabase, Path, FilePath,
@@ -195,7 +198,7 @@ public sealed partial class BackupDbaDatabaseCommand : DbaBaseCmdlet
             NoRecovery, BuildPath, WithFormat, Initialize, SkipTapeHeader, TimeStampFormat,
             IgnoreFileChecks, OutputScriptOnly, EncryptionAlgorithm, EncryptionCertificate,
             Description, InputObject, EnableException.ToBool(),
-            _realBoundNames, this,
+            _realBoundParameters, this,
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {
             if (ConsumeSentinel(item))
@@ -220,7 +223,7 @@ public sealed partial class BackupDbaDatabaseCommand : DbaBaseCmdlet
             NoRecovery, BuildPath, WithFormat, Initialize, SkipTapeHeader, TimeStampFormat,
             IgnoreFileChecks, OutputScriptOnly, EncryptionAlgorithm, EncryptionCertificate,
             Description, InputObject, EnableException.ToBool(),
-            _state, _hopInterrupted, _realBoundNames, this,
+            _state, _hopInterrupted, _realBoundParameters, this,
             BoundCommonParameter("WhatIf"), BoundCommonParameter("Confirm"),
             BoundCommonParameter("Verbose"), BoundCommonParameter("Debug")))
         {

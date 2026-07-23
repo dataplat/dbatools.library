@@ -8,7 +8,7 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class BackupDbaDatabaseCommand
 {
     private const string ProcessScriptHead = """
-param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $Path, $FilePath, $IncrementPrefix, $ReplaceInName, $NoAppendDbNameInPath, $CopyOnly, $Type, $CreateFolder, $FileCount, $CompressBackup, $Checksum, $Verify, $MaxTransferSize, $BlockSize, $BufferCount, $StorageBaseUrl, $StorageCredential, $StorageRegion, $NoRecovery, $BuildPath, $WithFormat, $Initialize, $SkipTapeHeader, $TimeStampFormat, $IgnoreFileChecks, $OutputScriptOnly, $EncryptionAlgorithm, $EncryptionCertificate, $Description, $InputObject, $EnableException, $__state, $__hopInterrupted, $__realBoundNames, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($SqlInstance, $SqlCredential, $Database, $ExcludeDatabase, $Path, $FilePath, $IncrementPrefix, $ReplaceInName, $NoAppendDbNameInPath, $CopyOnly, $Type, $CreateFolder, $FileCount, $CompressBackup, $Checksum, $Verify, $MaxTransferSize, $BlockSize, $BufferCount, $StorageBaseUrl, $StorageCredential, $StorageRegion, $NoRecovery, $BuildPath, $WithFormat, $Initialize, $SkipTapeHeader, $TimeStampFormat, $IgnoreFileChecks, $OutputScriptOnly, $EncryptionAlgorithm, $EncryptionCertificate, $Description, $InputObject, $EnableException, $__state, $__hopInterrupted, $__realBoundParameters, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -17,13 +17,13 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param($SqlInstance, $SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, [string[]]$Path, [string]$FilePath, $IncrementPrefix, $ReplaceInName, $NoAppendDbNameInPath, $CopyOnly, [string]$Type, $CreateFolder, [int]$FileCount, $CompressBackup, $Checksum, $Verify, [int]$MaxTransferSize, [int]$BlockSize, [int]$BufferCount, [string[]]$StorageBaseUrl, [string]$StorageCredential, [string]$StorageRegion, $NoRecovery, $BuildPath, $WithFormat, $Initialize, $SkipTapeHeader, [string]$TimeStampFormat, $IgnoreFileChecks, $OutputScriptOnly, [string]$EncryptionAlgorithm, [string]$EncryptionCertificate, [string]$Description, [object[]]$InputObject, $EnableException, $__state, $__hopInterrupted, $__realBoundNames, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param($SqlInstance, $SqlCredential, [object[]]$Database, [object[]]$ExcludeDatabase, [string[]]$Path, [string]$FilePath, $IncrementPrefix, $ReplaceInName, $NoAppendDbNameInPath, $CopyOnly, [string]$Type, $CreateFolder, [int]$FileCount, $CompressBackup, $Checksum, $Verify, [int]$MaxTransferSize, [int]$BlockSize, [int]$BufferCount, [string[]]$StorageBaseUrl, [string]$StorageCredential, [string]$StorageRegion, $NoRecovery, $BuildPath, $WithFormat, $Initialize, $SkipTapeHeader, [string]$TimeStampFormat, $IgnoreFileChecks, $OutputScriptOnly, [string]$EncryptionAlgorithm, [string]$EncryptionCertificate, [string]$Description, [object[]]$InputObject, $EnableException, $__state, $__hopInterrupted, $__realBoundParameters, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
     if ($__hopInterrupted) { return }
     # $PSBoundParameters fidelity (plan item 3): positional hop binding marks EVERYTHING
     # bound; prune to the caller's real set so Test-Bound, ContainsKey('CompressBackup') and
     # the $PSBoundParameters.Path/.FilePath reads/writes run verbatim.
-    foreach ($__k in @($PSBoundParameters.Keys)) { if ($__k -notin $__realBoundNames) { $null = $PSBoundParameters.Remove($__k) } }
+    foreach ($__k in @($PSBoundParameters.Keys)) { if (-not $__realBoundParameters.ContainsKey($__k)) { $null = $PSBoundParameters.Remove($__k) } }
     # Re-apply the begin/prior-record $PSBoundParameters.Path/.FilePath rewires with KEY-PRESENCE
     # fidelity (codex r3): a null-valued-but-present key restores as present, an absent key stays absent.
     if ($__state.psbpHasPath) { $PSBoundParameters["Path"] = $__state.psbpPath } else { $null = $PSBoundParameters.Remove("Path") }
@@ -48,7 +48,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $HeaderInfo = $__state.HeaderInfo
     # InputObject: begin builds the batch ONLY in the Pipe set (SqlInstance bound); piped
     # NoPipe records bind their own value per record exactly like the engine (source 431/465).
-    if ("SqlInstance" -in $__realBoundNames) { $InputObject = $__state.InputObject }
+    if ($__realBoundParameters.ContainsKey("SqlInstance")) { $InputObject = $__state.InputObject }
         # this had to be a function. making it a variable killed something. I'm guessing scoping issues
         Function Convert-BackupPath ($object) {
             if ($object -match "/|\\") {
