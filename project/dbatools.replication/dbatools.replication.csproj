@@ -46,4 +46,6 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
     <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.15" PrivateAssets="all" />
   </ItemGroup>
+  <!-- SMA 3.0.0.0 banned-API floor (compat-matrix.md section 4); scoped to cmdlet assemblies -->
+  <Import Project="..\BannedApis.props" />
 </Project>

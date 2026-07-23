@@ -270,12 +270,14 @@ internal static partial class NestedCommand
                     {
                         host.WriteDebug(debug.Message);
                     }
+#pragma warning disable RS0030 // SMA 3.0.0.0 floor: transparent relay of a nested pipeline's information-stream record. InformationRecord and Cmdlet.WriteInformation exist only on PS 5+, so this branch is reachable only there; faithful forwarding requires the real API. A PS 3/4-safe relay is tracked in the campaign defect register.
                     else if (item?.BaseObject is InformationRecord information)
                     {
                         host.WriteInformation(
                             information.MessageData,
                             new List<string>(information.Tags).ToArray());
                     }
+#pragma warning restore RS0030
                     else if (item?.BaseObject is ErrorRecord nonTerminating)
                     {
                         // Same channel correction as the item-form branches above.
