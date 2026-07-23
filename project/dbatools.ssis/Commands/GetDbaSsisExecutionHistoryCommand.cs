@@ -15,11 +15,21 @@ using Microsoft.SqlServer.Management.Smo;
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Retrieves SSIS package execution history from the SSISDB catalog.
+/// <para type="synopsis">Retrieves SSIS package execution history from the SSIS catalog database (SSISDB).</para>
+/// <para type="description">Retrieves detailed execution history for SSIS packages from the SSIS catalog database, including execution status, timing, and environment details. This command queries the catalog.executions view in SSISDB to provide comprehensive execution information for troubleshooting failed packages, monitoring performance, and analyzing SSIS workloads.</para>
+/// <para type="description">Useful for identifying failed or long-running packages, tracking execution patterns over time, and investigating SSIS deployment issues. Results can be filtered by project, folder, environment, execution status, or date range to focus on specific troubleshooting scenarios.</para>
 /// Port of public/Get-DbaSsisExecutionHistory.ps1 with Invoke-DbaQuery inlined as a
 /// parameterized SqlCommand against SSISDB; surface pinned by
 /// migration/baselines/Get-DbaSsisExecutionHistory.json.
 /// </summary>
+/// <example>
+///   <code>PS C:\&gt; Get-DbaSsisExecutionHistory -SqlInstance SMTQ01 -Folder SMTQ_PRC</code>
+///   <para>Get all history items for SMTQ01 in folder SMTQ_PRC.</para>
+/// </example>
+/// <example>
+///   <code>PS C:\&gt; Get-DbaSsisExecutionHistory -SqlInstance SMTQ01 -Status Failed,Cancelled</code>
+///   <para>Gets all failed or canceled executions for SMTQ01.</para>
+/// </example>
 [Cmdlet(VerbsCommon.Get, "DbaSsisExecutionHistory")]
 [OutputType(typeof(PSObject))]
 public sealed class GetDbaSsisExecutionHistoryCommand : DbaInstanceCmdlet

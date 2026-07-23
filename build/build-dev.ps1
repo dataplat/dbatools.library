@@ -106,6 +106,15 @@ try {
                 $null = New-Item -ItemType Directory -Path $editionStage -Force
                 Copy-Item -Path $builtSat -Destination $editionStage -Force
             }
+            # dll-Help.xml (MAML) is generated only from the net8.0 build (CmdletHelp.props) but
+            # is target-framework independent, so the one file is staged beside the assembly in
+            # every edition. Mirrors the same step in build/build.ps1.
+            $helpFile = Join-Path -Path $projectRoot -ChildPath "$satelliteName/bin/Debug/net8.0/$satelliteName.dll-Help.xml"
+            if (Test-Path -LiteralPath $helpFile) {
+                foreach ($edition in $editions) {
+                    Copy-Item -Path $helpFile -Destination (Join-Path -Path $moduleStage -ChildPath $edition.Name) -Force
+                }
+            }
             Write-Host "Staged satellite: $satelliteName" -ForegroundColor Green
         }
     }

@@ -41,4 +41,6 @@
   </ItemGroup>
   <!-- SMA 3.0.0.0 banned-API floor (compat-matrix.md section 4); scoped to cmdlet assemblies -->
   <Import Project="..\BannedApis.props" />
+  <!-- dll-Help.xml MAML generation from XML doc-comments (net8.0 only, staged for both editions) -->
+  <Import Project="..\CmdletHelp.props" />
 </Project>

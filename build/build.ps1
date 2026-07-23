@@ -167,7 +167,18 @@ foreach ($satellite in $satelliteProjects) {
     $null = New-Item -ItemType Directory -Path (Join-Path $moduleStage "core") -Force
     Copy-Item "$satelliteName/bin/release/net472/$satelliteName.dll" -Destination (Join-Path $moduleStage "desktop") -Force
     Copy-Item "$satelliteName/bin/release/net8.0/$satelliteName.dll" -Destination (Join-Path $moduleStage "core") -Force
-    Write-Host "Staged satellite: $satelliteName (desktop + core)" -ForegroundColor Green
+    # dll-Help.xml (MAML) is generated only from the net8.0 build (CmdletHelp.props) but is
+    # target-framework independent - the same cmdlets carry the same help on both editions - so
+    # the one file is staged beside the assembly in BOTH desktop and core.
+    $helpFile = "$satelliteName/bin/release/net8.0/$satelliteName.dll-Help.xml"
+    if (Test-Path $helpFile) {
+        Copy-Item $helpFile -Destination (Join-Path $moduleStage "desktop") -Force
+        Copy-Item $helpFile -Destination (Join-Path $moduleStage "core") -Force
+        Write-Host "Staged satellite: $satelliteName (desktop + core + help)" -ForegroundColor Green
+    } else {
+        Write-Host "WARNING: no dll-Help.xml generated for $satelliteName" -ForegroundColor Yellow
+        Write-Host "Staged satellite: $satelliteName (desktop + core)" -ForegroundColor Green
+    }
 }
 
 if ($CoreOnly) {
