@@ -184,6 +184,14 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
     private bool _notifiedUnsecure;
     private object? _components;
 
+    // PS: $SaCredential and $PerformVolumeMaintenanceTasks are function-scope variables the source
+    // reassigns mid-run, so each mutation outlives the record - and the computer - that made it.
+    // Seeded from the parameter once per invocation, then mutated, to reproduce that.
+    private PSCredential? _saCredential;
+    private bool _saCredentialSeeded;
+    private bool _performVmt;
+    private bool _performVmtSeeded;
+
     protected override void BeginProcessing()
     {
         base.BeginProcessing();
@@ -288,14 +296,28 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
         }
 
 
-        // PS: auto-generate sa password for Mixed mode without a credential.
-        PSCredential? saCredential = SaCredential;
-        if (string.Equals(AuthenticationMode, "Mixed", StringComparison.OrdinalIgnoreCase) && saCredential is null)
+        // PS: auto-generate sa password for Mixed mode without a credential. The source generates it
+        // ONCE - $SaCredential is truthy for every later record - so the whole call installs with the
+        // same password.
+        if (!_saCredentialSeeded)
+        {
+            _saCredential = SaCredential;
+            _saCredentialSeeded = true;
+        }
+        if (string.Equals(AuthenticationMode, "Mixed", StringComparison.OrdinalIgnoreCase) && _saCredential is null)
         {
             object? secpasswd = ScalarInModuleScope("Get-RandomPassword", new Hashtable { { "Length", 128 } });
+            // ScalarInModuleScope hands back the raw pipeline PSObject, so the SecureString arrives
+            // wrapped and a direct type test never matches - which left the credential null and the
+            // whole Mixed-mode branch a no-op. The source has no such gate: it passes whatever
+            // Get-RandomPassword returned straight to New-Object PSCredential.
+            if (secpasswd is PSObject wrapped)
+            {
+                secpasswd = wrapped.BaseObject;
+            }
             if (secpasswd is System.Security.SecureString ss)
             {
-                saCredential = new PSCredential("sa", ss);
+                _saCredential = new PSCredential("sa", ss);
             }
         }
 
@@ -337,6 +359,15 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
             {
                 // PS empty-catch: failed local access is ignored.
             }
+        }
+
+        // Seeded outside the computer loop: the source's $PerformVolumeMaintenanceTasks persists
+        // across the computers of one call as well as across records, so once a >= 13.0 install has
+        // moved it into the config file it stays off for everything that follows.
+        if (!_performVmtSeeded)
+        {
+            _performVmt = PerformVolumeMaintenanceTasks.ToBool();
+            _performVmtSeeded = true;
         }
 
         List<Hashtable> actionPlan = new();
@@ -595,11 +626,10 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
                 if (cores != 0) { configNode["SQLTEMPDBFILECOUNT"] = cores; }
             }
 
-            bool performVmt = PerformVolumeMaintenanceTasks.ToBool();
-            if (canonicVersion >= new Version("13.0") && performVmt)
+            if (canonicVersion >= new Version("13.0") && _performVmt)
             {
                 configNode["SQLSVCINSTANTFILEINIT"] = "True";
-                performVmt = false;
+                _performVmt = false;
             }
             if (canonicVersion >= new Version("16.0"))
             {
@@ -635,7 +665,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
             AddCred(execParams, configNode, RSCredential, "RSSVCACCOUNT", null);
             AddCred(execParams, configNode, FTCredential, "FTSVCACCOUNT", null);
             AddCred(execParams, configNode, PBEngineCredential, "PBENGSVCACCOUNT", "PBDMSSVCPASSWORD");
-            AddCred(execParams, null, saCredential, null, "SAPWD");
+            AddCred(execParams, null, _saCredential, null, "SAPWD");
 
             if (TestBound("InstancePath"))
             {
@@ -690,8 +720,8 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
                     { "Version", canonicVersion },
                     { "Configuration", config },
                     { "SaveConfiguration", SaveConfiguration },
-                    { "SaCredential", saCredential },
-                    { "PerformVolumeMaintenanceTasks", performVmt },
+                    { "SaCredential", _saCredential },
+                    { "PerformVolumeMaintenanceTasks", _performVmt },
                     { "Credential", Credential },
                     { "NoPendingRenameCheck", NoPendingRenameCheck },
                     { "EnableException", EnableException }
