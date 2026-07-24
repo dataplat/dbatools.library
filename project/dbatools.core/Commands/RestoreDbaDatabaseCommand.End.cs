@@ -287,18 +287,19 @@ public sealed partial class RestoreDbaDatabaseCommand
             _tailBackup.Add(item);
     }
 
-    // PS relied on $WhatIfPreference/$ConfirmPreference propagating into nested calls; the
-    // compiled boundary forwards the caller's bound switch VALUES explicitly instead (accepted
-    // deviation; cross-model review 2026-07-07 finding B4 made all nested sites consistent).
+    // Deliberate deviation from the retired function, on a destructive path - NOT a parity fix.
+    // Forwarding the caller's EFFECTIVE WhatIf/Confirm state into nested calls is deliberately
+    // safer than the behavior it replaces, and the comment used to claim the opposite.
     //
-    // Bound-only forwarding is NOT sufficient, which a side-effect measurement of the page
-    // restore paths settled: preference propagation reaches a nested command run on a steppable
-    // pipeline, but not one run on a fresh InvokeScript pipeline. So with an ambient
-    // $WhatIfPreference = $true, or from inside a SupportsShouldProcess wrapper invoked with
-    // -WhatIf, the two restore sites announced themselves and did nothing while the tail-log
-    // backup ran FOR REAL - writing a backup file and, because it backs up WITH NORECOVERY,
-    // taking the database offline in the middle of what the caller asked to be a dry run.
-    // Forwarding the EFFECTIVE dry-run state rather than only the bound switch closes that.
+    // Measured 2026-07-24: a module script function resolves $WhatIfPreference through its own
+    // module scope chain, so a caller-local ambient value never reached the retired function's
+    // nested calls at all. During -PageRestore the retired function therefore wrote a REAL
+    // tail-log backup WITH NORECOVERY - a backup file on disk and the database left RESTORING -
+    // in the middle of what the caller asked to be a dry run, under both an ambient
+    // $WhatIfPreference = $true and a SupportsShouldProcess wrapper invoked with -WhatIf.
+    // A bound -WhatIf was honored in both worlds; only the ambient and wrapper cases diverge.
+    // Forwarding the effective dry-run state prevents that preview-time mutation here. The
+    // source-side defect is registered upstream as U-24 and is not repaired by this deviation.
     private void ForwardShouldProcessSwitches(Hashtable parms)
     {
         if (TestBound("WhatIf"))
@@ -316,10 +317,11 @@ public sealed partial class RestoreDbaDatabaseCommand
         }
         else
         {
-            // Only the SUPPRESSING direction is inherited. An ambient ConfirmPreference of None
-            // is what -Confirm:$false leaves in a caller's scope, and the source's nested calls
-            // saw it; synthesizing -Confirm from any other ambient value would instead add
-            // prompts the source never issued.
+            // Inheritance here is suppressing-only. An ambient ConfirmPreference of None is what
+            // -Confirm:$false leaves in a caller's scope, so forwarding Confirm:$false prevents
+            // nested prompts. Positive ambient values are deliberately not synthesized, because
+            // that would ADD prompts. No claim is made about what the retired function's nested
+            // calls observed.
             object? ambientConfirm = GetVariableValue("ConfirmPreference", null);
             if (ambientConfirm is PSObject wrapped)
             {
