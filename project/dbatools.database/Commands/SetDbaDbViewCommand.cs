@@ -164,7 +164,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 continue
             }
 
-            Get-DbaDbView -SqlInstance $server -Database $db.Name -View "$($currentView.Schema).$($currentView.Name)"
+            # Filter the re-emit client-side rather than passing a rebuilt "schema.name" string back through
+            # Get-DbaDbView's -View parser: that parser splits on dots and requires [ ] wrapping for special
+            # characters, so a schema or view name containing a dot or a bracket would resolve to the wrong
+            # object or to nothing at all - the alter would succeed but the command would emit garbage.
+            Get-DbaDbView -SqlInstance $server -Database $db.Name |
+                Where-Object { $_.Schema -eq $currentView.Schema -and $_.Name -eq $currentView.Name }
         }
     }
 } $SqlInstance $SqlCredential $Database $Schema $View $Definition $InputObject $EnableException $__realCmdlet $__boundSqlInstance $__boundInputObject $__boundView @__commonParameters 3>&1 2>&1
