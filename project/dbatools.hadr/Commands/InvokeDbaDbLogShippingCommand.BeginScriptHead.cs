@@ -11,9 +11,9 @@ public sealed partial class InvokeDbaDbLogShippingCommand
     // minus engine commons - the typed inner params supply function-world defaults for
     // everything unbound). Two sites are bound-ness-sensitive and depend on that
     // contract: the source line-627 $PSBoundParameters.ContainsKey("AzureBaseUrl")
-    // read, truthful only because unbound params never enter the table, and the
-    // Test-Bound count-window, which rides the carried $__boundSharedAzureExactlyOne
-    // flag. Plus the W3-102 continue-relay
+    // read, which needs the splatted set RE-SEEDED into the dot-sourced body because
+    // that body opens a fresh empty automatic, and the Test-Bound count-window, which
+    // rides the carried $__boundSharedAzureExactlyOne flag. Plus the W3-102 continue-relay
     // guard for the loop-less line-692 -Continue. Substitutions across both halves:
     // 75 -FunctionName appends + the one Test-Bound count-window rewrite (SOURCE
     // comment); stripping reproduces the source bytes cmp-exact.
@@ -28,9 +28,23 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SourceSqlInstance, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$DestinationSqlInstance, [System.Management.Automation.PSCredential]$SourceSqlCredential, [System.Management.Automation.PSCredential]$SourceCredential, [System.Management.Automation.PSCredential]$DestinationSqlCredential, [System.Management.Automation.PSCredential]$DestinationCredential, [object[]]$Database, [string]$SharedPath, [string]$LocalPath, [string]$AzureBaseUrl, [string]$AzureCredential, [string]$BackupJob, [int]$BackupRetention, [string]$BackupSchedule, $BackupScheduleFrequencyType, [object[]]$BackupScheduleFrequencyInterval, $BackupScheduleFrequencySubdayType, [int]$BackupScheduleFrequencySubdayInterval, $BackupScheduleFrequencyRelativeInterval, [int]$BackupScheduleFrequencyRecurrenceFactor, [string]$BackupScheduleStartDate, [string]$BackupScheduleEndDate, [string]$BackupScheduleStartTime, [string]$BackupScheduleEndTime, [int]$BackupThreshold, [string]$CopyDestinationFolder, [string]$CopyJob, [int]$CopyRetention, [string]$CopySchedule, $CopyScheduleFrequencyType, [object[]]$CopyScheduleFrequencyInterval, $CopyScheduleFrequencySubdayType, [int]$CopyScheduleFrequencySubdayInterval, $CopyScheduleFrequencyRelativeInterval, [int]$CopyScheduleFrequencyRecurrenceFactor, [string]$CopyScheduleStartDate, [string]$CopyScheduleEndDate, [string]$CopyScheduleStartTime, [string]$CopyScheduleEndTime, [string]$FullBackupPath, [int]$HistoryRetention, [string]$PrimaryMonitorServer, [System.Management.Automation.PSCredential]$PrimaryMonitorCredential, $PrimaryMonitorServerSecurityMode, [string]$RestoreDataFolder, [string]$RestoreLogFolder, [int]$RestoreDelay, [int]$RestoreAlertThreshold, [string]$RestoreJob, [int]$RestoreRetention, [string]$RestoreSchedule, $RestoreScheduleFrequencyType, [object[]]$RestoreScheduleFrequencyInterval, $RestoreScheduleFrequencySubdayType, [int]$RestoreScheduleFrequencySubdayInterval, $RestoreScheduleFrequencyRelativeInterval, [int]$RestoreScheduleFrequencyRecurrenceFactor, [string]$RestoreScheduleStartDate, [string]$RestoreScheduleEndDate, [string]$RestoreScheduleStartTime, [string]$RestoreScheduleEndTime, [int]$RestoreThreshold, [string]$SecondaryDatabasePrefix, [string]$SecondaryDatabaseSuffix, [string]$SecondaryMonitorServer, [System.Management.Automation.PSCredential]$SecondaryMonitorCredential, $SecondaryMonitorServerSecurityMode, [string]$StandbyDirectory, [string]$UseBackupFolder, [switch]$BackupScheduleDisabled, [switch]$CompressBackup, [switch]$CopyScheduleDisabled, [switch]$DisconnectUsers, [switch]$Force, [switch]$GenerateFullBackup, [switch]$IgnoreFileChecks, [switch]$NoInitialization, [switch]$NoRecovery, [switch]$PrimaryThresholdAlertEnabled, [switch]$RestoreScheduleDisabled, [switch]$SecondaryThresholdAlertEnabled, [switch]$Standby, [switch]$UseExistingFullBackup, [switch]$EnableException, $__boundSharedAzureExactlyOne, $__continueMarker, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
+    # This scope's $PSBoundParameters IS faithful - the caller's real bound set is splatted in, so only
+    # the parameters the caller passed are marked bound. The dot-sourced body below gets a FRESH EMPTY
+    # automatic instead (measured on 7.6.3 and 5.1.26100), which silently inverted the
+    # ContainsKey("AzureBaseUrl") read that decides the Azure-vs-file-share path. Capture it here and
+    # re-seed it there, minus the four plumbing arguments that are passed by name and were never part
+    # of the caller's set.
+    $__realBoundParameters = @{}
+    foreach ($__realBoundKey in $PSBoundParameters.Keys) {
+        if ($__realBoundKey -notin @("__boundSharedAzureExactlyOne", "__continueMarker", "__boundVerbose", "__boundDebug")) {
+            $__realBoundParameters[$__realBoundKey] = $PSBoundParameters[$__realBoundKey]
+        }
+    }
+
     $__continueEscaped = $true
     foreach ($__continueRelayGuard in @(1)) {
         . {
+        $PSBoundParameters = $__realBoundParameters
         if ($Force) { $ConfirmPreference = 'none' }
 
         Write-Message -Message "Started log shipping for $SourceSqlInstance to $DestinationSqlInstance" -Level Verbose -FunctionName Invoke-DbaDbLogShipping -ModuleName "dbatools"
