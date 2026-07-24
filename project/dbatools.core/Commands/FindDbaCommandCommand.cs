@@ -95,8 +95,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     function Get-DbaIndex() {
         if ($__realCmdlet.ShouldProcess($dest, "Recreating index")) {
-            $dbamodule = Get-Module -Name dbatools
-            $allCommands = $dbamodule.ExportedCommands.Values | Where-Object CommandType -In 'Function', 'Cmdlet' | Where-Object Name -NotIn 'Write-Message' | Sort-Object -Property Name | Select-Object -Unique
+            $dbamodules = Get-Module -Name 'dbatools*'
+            $allCommands = $dbamodules.ExportedCommands.Values | Where-Object CommandType -In 'Function', 'Cmdlet' | Where-Object Name -NotIn 'Write-Message' | Sort-Object -Property Name -Unique
             #Had to add Unique because Select-DbaObject was getting populated twice once written to the index file
 
             $helpcoll = New-Object System.Collections.Generic.List[System.Object]
