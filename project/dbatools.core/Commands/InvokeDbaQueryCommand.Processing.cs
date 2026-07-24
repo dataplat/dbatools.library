@@ -203,6 +203,13 @@ public sealed partial class InvokeDbaQueryCommand
                 // Close non-pooled connection as this is not done automatically. If it is a reused Server SMO, connection will be opened again automatically on next request.
                 Hashtable disconnectParams = new();
                 disconnectParams["Verbose"] = false;
+                // This closes the non-pooled connection THIS command opened for itself - the port's
+                // own resource, not the caller's. The retired function's nested call resolved
+                // $WhatIfPreference and $ConfirmPreference in module scope and so never saw a
+                // caller-local dry run; a cmdlet's hop does, and a suppressed disconnect leaks a
+                // real server session that nothing else closes.
+                disconnectParams["WhatIf"] = new SwitchParameter(false);
+                disconnectParams["Confirm"] = new SwitchParameter(false);
                 NestedCommand.Invoke(this, "Disconnect-DbaInstance", disconnectParams, server);
             }
         }

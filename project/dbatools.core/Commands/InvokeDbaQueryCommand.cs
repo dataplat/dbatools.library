@@ -258,6 +258,13 @@ public sealed partial class InvokeDbaQueryCommand : DbaInstanceCmdlet
                 exportParams["InputObject"] = sqlObject;
                 exportParams["Passthru"] = new SwitchParameter(true);
                 exportParams["EnableException"] = new SwitchParameter(true);
+                // Scripting the object is the PORT'S OWN scratch step, not a user-facing side effect,
+                // which is why the retired function never gated it: a module script function resolved
+                // $WhatIfPreference and $ConfirmPreference through the MODULE scope chain, so a
+                // caller-local or wrapper-inherited value never reached its nested calls. A cmdlet's
+                // hop reads the CALLER'S scope, so without these the script is never generated.
+                exportParams["WhatIf"] = new SwitchParameter(false);
+                exportParams["Confirm"] = new SwitchParameter(false);
                 Collection<PSObject> code = InvokeNestedPreservingWarnings("Export-DbaScript", exportParams, null, out ErrorRecord? exportFailure);
                 if (exportFailure is not null)
                 {
@@ -274,6 +281,12 @@ public sealed partial class InvokeDbaQueryCommand : DbaInstanceCmdlet
                     setContentParams["Force"] = new SwitchParameter(true);
                     setContentParams["ErrorAction"] = "Stop";
                     setContentParams["Encoding"] = "UTF8";
+                    // The temp .sql file is the PORT'S OWN scratch state, not a user-facing side
+                    // effect, which is why the retired function never gated it - see the note at the
+                    // Export-DbaScript hop above. Without these the file is never written and the
+                    // command fails on the file it is about to execute.
+                    setContentParams["WhatIf"] = new SwitchParameter(false);
+                    setContentParams["Confirm"] = new SwitchParameter(false);
                     NestedCommand.Invoke(this, "Set-Content", setContentParams);
                     _files.Add(newfile);
                     temporaryFilesCount++;
@@ -304,6 +317,10 @@ public sealed partial class InvokeDbaQueryCommand : DbaInstanceCmdlet
                 Hashtable removeParams = new();
                 removeParams["Path"] = item;
                 removeParams["ErrorAction"] = "Ignore";
+                // Cleanup of the port's own scratch files - see the note at the Export-DbaScript hop.
+                // A caller's dry run must not strand them on disk when the command itself ran.
+                removeParams["WhatIf"] = new SwitchParameter(false);
+                removeParams["Confirm"] = new SwitchParameter(false);
                 try
                 {
                     NestedCommand.Invoke(this, "Remove-Item", removeParams);
