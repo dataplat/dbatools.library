@@ -1,6 +1,7 @@
 using System;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
+using Microsoft.Data.SqlClient;
 
 namespace Dataplat.Dbatools.Connection
 {
@@ -196,6 +197,16 @@ namespace Dataplat.Dbatools.Connection
         /// Builds the "Authentication=Active Directory Service Principal" connection string
         /// that carries a client id and secret to an Azure SQL target. The Database segment is
         /// emitted only when a database was requested.
+        ///
+        /// The values are placed through <see cref="SqlConnectionStringBuilder"/> rather than
+        /// concatenated, so a value carrying a keyword separator is quoted instead of ending
+        /// its own segment. A client secret containing a semicolon used to make the whole
+        /// string unparseable, surfacing as "Format of the initialization string does not
+        /// conform to specification at index N" - an error that names neither the secret nor
+        /// the parameter it came from. The builder's canonical spelling of the keywords
+        /// ("Data Source", "Initial Catalog", "User ID") differs from the hand-written one,
+        /// but the consumer re-parses this string with the same builder, so only the parsed
+        /// values are observable.
         /// </summary>
         /// <param name="azureServer">The Azure SQL server name</param>
         /// <param name="database">The database to connect to, or null/empty for none</param>
@@ -204,9 +215,14 @@ namespace Dataplat.Dbatools.Connection
         /// <returns>The connection string</returns>
         public static string BuildServicePrincipalConnectionString(string azureServer, string database, string userId, string password)
         {
+            SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+            builder.DataSource = azureServer;
+            builder.Authentication = SqlAuthenticationMethod.ActiveDirectoryServicePrincipal;
             if (!String.IsNullOrEmpty(database))
-                return String.Format("Server={0}; Authentication=Active Directory Service Principal; Database={1}; User Id={2}; Password={3}", azureServer, database, userId, password);
-            return String.Format("Server={0}; Authentication=Active Directory Service Principal; User Id={1}; Password={2}", azureServer, userId, password);
+                builder.InitialCatalog = database;
+            builder.UserID = userId;
+            builder.Password = password;
+            return builder.ConnectionString;
         }
 
         #endregion Entra ID authentication

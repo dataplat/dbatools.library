@@ -172,7 +172,8 @@ namespace Dataplat.Dbatools.Connection.Test
         {
             string built = ConnectionService.BuildServicePrincipalConnectionString(
                 "myserver.database.windows.net", null, ClientId, Secret);
-            Assert.IsFalse(built.Contains("Database="), "a database segment appeared for a request that named no database");
+            Assert.IsFalse(built.Contains("Database=") || built.Contains("Initial Catalog="),
+                "a database segment appeared for a request that named no database");
 
             SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(built);
             Assert.AreEqual(SqlAuthenticationMethod.ActiveDirectoryServicePrincipal, builder.Authentication);
@@ -182,6 +183,59 @@ namespace Dataplat.Dbatools.Connection.Test
             string emptyDatabase = ConnectionService.BuildServicePrincipalConnectionString(
                 "myserver.database.windows.net", "", ClientId, Secret);
             Assert.AreEqual(built, emptyDatabase, "an empty database must be treated as none, like the request default");
+        }
+
+        /// <summary>
+        /// A client secret is arbitrary text: it can hold the very characters a connection
+        /// string uses as syntax. A semicolon is the one that used to be fatal - it ended the
+        /// Password segment early and the whole string stopped parsing, with an error naming
+        /// only a character index. Every one of these secrets must arrive at the driver
+        /// byte-identical to what the caller supplied.
+        /// </summary>
+        [TestMethod]
+        public void BuildServicePrincipalConnectionString_CarriesASecretHoldingConnectionStringSyntax()
+        {
+            string[] awkwardSecrets = new string[]
+            {
+                "ab;cd",            // the keyword separator - unparseable before this was escaped
+                "ab=cd",            // the key/value separator
+                "ab'cd",            // single quote
+                "ab\"cd",           // double quote
+                "a;b='c\"d;",       // all of them at once, with a trailing separator
+                "Ab8Q~xY.z-K_1",    // the shape Azure actually mints
+            };
+
+            foreach (string secret in awkwardSecrets)
+            {
+                string built = ConnectionService.BuildServicePrincipalConnectionString(
+                    "myserver.database.windows.net", "AdventureWorks", ClientId, secret);
+
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(built);
+                Assert.AreEqual(secret, builder.Password, "the secret did not survive the round trip: " + secret);
+                Assert.AreEqual(ClientId, builder.UserID, "the user id was disturbed by the secret: " + secret);
+                Assert.AreEqual("AdventureWorks", builder.InitialCatalog, "the database was disturbed by the secret: " + secret);
+                Assert.AreEqual("myserver.database.windows.net", builder.DataSource, "the server was disturbed by the secret: " + secret);
+                Assert.AreEqual(SqlAuthenticationMethod.ActiveDirectoryServicePrincipal, builder.Authentication,
+                    "the authentication method was disturbed by the secret: " + secret);
+            }
+        }
+
+        /// <summary>
+        /// The same escaping has to hold for the other three values. They are hostname-, GUID-
+        /// and identifier-shaped in this flow, so this is a guard against the concatenation
+        /// coming back rather than a bug seen in the field.
+        /// </summary>
+        [TestMethod]
+        public void BuildServicePrincipalConnectionString_CarriesAServerDatabaseAndUserIdHoldingSeparators()
+        {
+            string built = ConnectionService.BuildServicePrincipalConnectionString(
+                "my;server", "Adventure;Works", "client;id", Secret);
+
+            SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(built);
+            Assert.AreEqual("my;server", builder.DataSource);
+            Assert.AreEqual("Adventure;Works", builder.InitialCatalog);
+            Assert.AreEqual("client;id", builder.UserID);
+            Assert.AreEqual(Secret, builder.Password);
         }
     }
 }
