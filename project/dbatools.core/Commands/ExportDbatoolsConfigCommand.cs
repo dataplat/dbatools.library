@@ -18,9 +18,10 @@ namespace Dataplat.Dbatools.Commands;
 /// ConfigurationHost, while Write-DbatoolsConfigFile keeps every provider and serializer touch
 /// (Split-Path/Test-Path/New-Item/Get-Content/ConvertFrom-Json/ConvertTo-Json/Set-Content) on
 /// the REAL engine cmdlets through NestedCommand, so per-edition json formatting, provider
-/// wildcard semantics, binding errors and ambient WhatIf behavior match the function
-/// byte-for-byte. Surface pinned by migration/baselines/Export-DbatoolsConfig.json (4 named
-/// sets, default FullName).
+/// wildcard semantics and binding errors match the function byte-for-byte. Surface pinned by
+/// migration/baselines/Export-DbatoolsConfig.json (4 named sets, default FullName).
+/// Ambient dry-run does NOT match, and this is the one place it cannot: see the note on
+/// WriteConfigFile.
 /// </summary>
 [Cmdlet(VerbsData.Export, "DbatoolsConfig", DefaultParameterSetName = "FullName")]
 public sealed class ExportDbatoolsConfigCommand : DbaBaseCmdlet
@@ -232,9 +233,20 @@ public sealed class ExportDbatoolsConfigCommand : DbaBaseCmdlet
     /// survive verbatim: the bare-filename Test-Path "" binding failure, New-Item's
     /// non-terminating drive errors, wildcard-char path semantics, per-edition
     /// Get-Content/Set-Content -Encoding UTF8 handling, per-edition ConvertTo-Json formatting
-    /// and depth warnings, the empty-pipe empty-file write, and ambient WhatIfPreference.
+    /// and depth warnings, and the empty-pipe empty-file write.
     /// Only the property-bag construction is native: edition-comparer hashtables reproduce the
-    /// [pscustomobject]$datum bucket order (the W5-014/W5-030 bag-parity convention).
+    /// [pscustomobject]$datum bucket order (the bag-parity convention).
+    ///
+    /// One edge does NOT survive, and running the statements on the real cmdlets is what causes
+    /// it. This command has no ShouldProcess of its own, so nothing here was ever gated except
+    /// by whatever dry-run state the nested New-Item/Set-Content resolved for themselves. In the
+    /// function world they resolved it through the MODULE's scope chain, where a caller-local or
+    /// wrapper-inherited $WhatIfPreference does not exist - so an ambient dry run wrote the file
+    /// for real. NestedCommand runs them in the CALLER's scope instead, so they see it and
+    /// suppress. Measured both editions, both worlds, 2026-07-24: control writes, ambient and
+    /// wrapper write in the function world and do not here. Deviating toward doing nothing under
+    /// a dry run, on a command whose entire purpose is to write that one file, is the safe side
+    /// of this divergence; forcing parity would mean defeating a dry run the user asked for.
     /// </summary>
     private void WriteConfigFile(List<Config?> configs, string? path, bool replace)
     {
