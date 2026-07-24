@@ -13,12 +13,11 @@ namespace Dataplat.Dbatools.Commands;
 /// <summary>
 /// Returns SQL Server instances currently cached in the dbatools connection pool. Port of
 /// public/Get-DbaConnectedInstance.ps1: reads the process-wide
-/// ConnectionHost.ActiveConnections registry (the P0-010c unified store the compiled
+/// ConnectionHost.ActiveConnections registry (the unified store the compiled
 /// Connect-DbaInstance and the PS functions share), with the two Select-Object statements
 /// riding the REAL engine cmdlet through NestedCommand so -First/-ExpandProperty semantics
 /// (missing-property and null-value error records included) match the function exactly, and
-/// Hide-ConnectionString absorbed. Surface pinned by
-/// migration/baselines/Get-DbaConnectedInstance.json (parameterless, single set).
+/// Hide-ConnectionString absorbed. The surface is parameterless with a single parameter set.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaConnectedInstance")]
 [OutputType(typeof(PSObject))]
@@ -45,8 +44,8 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         {
             // PS re-reads $connections[$key] at EVERY occurrence (four sites) - keep the
             // per-site indexer reads so a side-effecting member that swaps the stored list
-            // is observed exactly like the function observed it (the W1-004 per-site
-            // re-read convention; codex W1-010 r4 finding 1).
+            // is observed exactly like the function observed it (the per-site
+            // re-read convention).
 
             // PS: if ($connections[$key].DataSource) - member-access enumeration over the
             // list, PS truthiness on the collected projection.
@@ -104,7 +103,7 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         Collection<PSObject> output = NestedCommand.Invoke(this, "Select-Object", splatSelect, pipelineInput: list);
         // An array-valued property MULTI-EMITS through -ExpandProperty (lab-proven both
         // editions), so the assignment takes the PS pipeline shape: empty -> null, one ->
-        // the scalar, many -> object[] (codex W1-010 r1 finding 2).
+        // the scalar, many -> object[].
         return ShapePipelineAssignment(output);
     }
 
@@ -146,7 +145,7 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         {
             // Plain RuntimeException, not PSInvalidOperationException: the engine's
             // method-on-null record carries RuntimeException, and $Error[0].Exception type +
-            // CategoryInfo.Reason are observable (codex W1-010 r2 finding 1).
+            // CategoryInfo.Reason are observable.
             throw new RuntimeException("You cannot call a method on a null-valued expression.");
         }
         return value is PSObject wrapped ? wrapped.BaseObject.GetType() : value.GetType();
@@ -170,7 +169,7 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
             try
             {
                 // Returned as-is (PSObject wrapper kept): chained access must still see
-                // instance ETS members on a decorated value (codex W1-010 r3 finding 3).
+                // instance ETS members on a decorated value.
                 return direct.Value;
             }
             catch
@@ -181,7 +180,7 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
         object? baseValue = wrapped.BaseObject;
         if (baseValue is not string && LanguagePrimitives.GetEnumerable(baseValue) is IEnumerable elements)
         {
-            // Lab-proven both editions (codex W1-010 r1 finding 1 + r3 finding 2):
+            // Lab-proven both editions:
             // member-access enumeration has PIPELINE-WRITE semantics per element - a found
             // value that is enumerable (non-string) flattens ONE level, an empty array
             // contributes nothing, a null value contributes null; a property-bag element
@@ -212,7 +211,7 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
                     {
                         // A no-output property (empty ScriptProperty body) yields
                         // AutomationNull, which a pipeline write DROPS - unlike an explicit
-                        // $null, which it emits (codex W1-010 r4 finding 2).
+                        // $null, which it emits.
                         continue;
                     }
                     object? elementBase = elementValue is PSObject valueWrapped ? valueWrapped.BaseObject : elementValue;

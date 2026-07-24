@@ -9,7 +9,7 @@ namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
 /// Gets registered-server groups from Central Management Servers. Port of
-/// public/Get-DbaRegServerGroup.ps1 (W3-048, WAVE-3 remnant); the workflow remains a module-scoped
+/// public/Get-DbaRegServerGroup.ps1; the workflow remains a module-scoped
 /// PowerShell compatibility hop. READ-ONLY (no mutating verbs, no SupportsShouldProcess).
 ///
 /// BEGIN+PROCESS. -SqlInstance is ValueFromPipeline, so process fires per piped instance. Emission is
@@ -28,7 +28,7 @@ namespace Dataplat.Dbatools.Commands;
 ///     :176) - and is never reset between serverstores, so it too persists.
 /// Both ride a state sentinel restored from the process carry (or begin's @() seed on the first
 /// record). The sentinel uses PLAIN ASSIGNMENT, never a $() subexpression - a subexpression
-/// enumerates a collection away (the W2-152 defect), and these are arrays.
+/// enumerates a collection away (a known defect), and these are arrays.
 ///
 /// NO INTERRUPT BRIDGE (no Test-FunctionInterrupt; the :109 Stop-Function carries -Continue). NO
 /// Test-Bound, no $PSBoundParameters reads, no .IsPresent - the body tests -Group/-ExcludeGroup/-Id/
@@ -36,9 +36,9 @@ namespace Dataplat.Dbatools.Commands;
 /// crosses as a SwitchParameter OBJECT received untyped.
 ///
 /// In-hop Stop-Function/Write-Message calls carry -FunctionName. Implicit positions 0-4 are made
-/// explicit per the W2-071 law and confirmed against the exported baseline; SqlInstance is position 0
-/// and ValueFromPipeline. Streaming (DEF-001): each group is emitted via Select-DefaultView as it is
-/// found. Surface pinned by migration/baselines/Get-DbaRegServerGroup.json.
+/// explicit and confirmed against the exported baseline; SqlInstance is position 0
+/// and ValueFromPipeline. Streaming: each group is emitted via Select-DefaultView as it is
+/// found. Surface pinned by the captured surface baseline.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaRegServerGroup")]
 public sealed class GetDbaRegServerGroupCommand : DbaBaseCmdlet
@@ -95,7 +95,7 @@ public sealed class GetDbaRegServerGroupCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // Streaming, not buffered (DEF-001): each group is emitted as it is found, so a buffered hop
+        // Streaming, not buffered: each group is emitted as it is found, so a buffered hop
         // would discard results already produced when a later instance's failure terminated the hop.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {

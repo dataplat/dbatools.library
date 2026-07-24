@@ -8,8 +8,8 @@ using Dataplat.Dbatools.Parameter;
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Exports registered servers and server groups to XML. Port of public/Export-DbaRegServer.ps1
-/// (W3-016, WAVE-3 hard remnant); the workflow remains a module-scoped PowerShell compatibility hop.
+/// Exports registered servers and server groups to XML. Port of public/Export-DbaRegServer.ps1;
+/// the workflow remains a module-scoped PowerShell compatibility hop.
 ///
 /// BEGIN+PROCESS lifecycle-split. $InputObject is ValueFromPipeline, so process fires per piped
 /// object. No SupportsShouldProcess (plain CmdletBinding), so no gate and no $__realCmdlet.
@@ -24,7 +24,7 @@ namespace Dataplat.Dbatools.Commands;
 /// process runs, so it rides the begin sentinel; recomputing per record would stamp files from one
 /// pipeline with different timestamps.
 ///
-/// $Path DEF-007 BIND-TIME DEFAULT. The source default "(Get-DbatoolsConfigValue -FullName
+/// $Path BIND-TIME DEFAULT. The source default "(Get-DbatoolsConfigValue -FullName
 /// 'Path.DbatoolsExport')" cannot be expressed by a C# initializer. It is resolved ONCE in the begin
 /// hop when the caller omitted -Path (begin uses it at :119 for Test-ExportDirectory) and the
 /// resolved value carries to process (used at Join-DbaPath). Bind-once, matching the source.
@@ -38,7 +38,7 @@ namespace Dataplat.Dbatools.Commands;
 ///     runs on (the source's own behaviour), but the NEXT record's :140 Test-FunctionInterrupt must
 ///     then return. The hop scope dies per record, so the process hop reads the latch at
 ///     Get-Variable -Scope 0 after its body and carries it; the C# _interrupted field persists it
-///     across ProcessRecord calls. Mechanism measured in migration/logs/probe-20260718-latch-sentinel.
+///     across ProcessRecord calls. Mechanism measured in a dedicated probe run.
 ///
 /// $Overwrite CROSSES AS A SwitchParameter OBJECT received untyped. begin :133 reads
 /// "$Overwrite.IsPresent"; marshaling as .ToBool() would make .IsPresent falsy and silently disable
@@ -58,11 +58,11 @@ namespace Dataplat.Dbatools.Commands;
 ///
 /// FilePath carries Alias("FileName"/"OutFile"). In-hop Stop-Function/Write-Message calls carry
 /// -FunctionName. The :199 "not a registered server" Stop-Function keeps -Continue. Implicit
-/// positions 0-7 are made explicit per the W2-071 law and confirmed against the exported baseline;
-/// InputObject is position 2 and ValueFromPipeline. Streaming (DEF-001): the command writes an XML
+/// positions 0-7 are made explicit and confirmed against the exported baseline;
+/// InputObject is position 2 and ValueFromPipeline. Streaming: the command writes an XML
 /// file and emits Get-ChildItem per object, so a buffered hop would discard the record of files
 /// already written when a later object's failure terminated the hop under -EnableException. Surface
-/// pinned by migration/baselines/Export-DbaRegServer.json.
+/// pinned by the captured surface baseline.
 /// </summary>
 [Cmdlet(VerbsData.Export, "DbaRegServer")]
 public sealed class ExportDbaRegServerCommand : DbaBaseCmdlet
@@ -149,7 +149,7 @@ public sealed class ExportDbaRegServerCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
-        // Streaming, not buffered (DEF-001): an XML file is written and emitted per object, so a
+        // Streaming, not buffered: an XML file is written and emitted per object, so a
         // buffered hop would discard the record of files already written.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
@@ -176,7 +176,7 @@ public sealed class ExportDbaRegServerCommand : DbaBaseCmdlet
     }
 
     // PS: the begin block VERBATIM, dot-sourced. Edits: the FilePath boundness probe becomes
-    // $__boundFilePath, plus -FunctionName stamps. The DEF-007 $Path default is resolved first when
+    // $__boundFilePath, plus -FunctionName stamps. The $Path default is resolved first when
     // omitted; the sentinel carries $timeNow, the resolved $Path, and the interrupt latch. The
     // one-time Set-Content side-effect runs here, once.
     private const string BeginScript = """
@@ -190,7 +190,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param([string]$Path, [System.IO.FileInfo]$FilePath, $Overwrite, $EnableException, $__boundFilePath, $__boundPath, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
-    # DEF-007: the source's "[string]$Path = (Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport')"
+    # The source's "[string]$Path = (Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport')"
     if (-not $__boundPath) { $Path = Get-DbatoolsConfigValue -FullName 'Path.DbatoolsExport' }
 
     . {

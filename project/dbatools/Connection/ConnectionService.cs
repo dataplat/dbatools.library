@@ -10,8 +10,7 @@ namespace Dataplat.Dbatools.Connection
 {
     /// <summary>
     /// The C# resolution of Connect-DbaInstance, written fresh from
-    /// public/Connect-DbaInstance.ps1 (migration/specs/architecture.md section 4). W1-001
-    /// completes the P0-010a skeleton: the full input resolution matrix (live Server
+    /// public/Connect-DbaInstance.ps1: the full input resolution matrix (live Server
     /// passthrough and context copy, SqlConnection, RegisteredServer, connection string,
     /// String), the full auth matrix including the Entra flows and AccessToken shapes, the
     /// dedicated admin connection rewrite, the verify query with the

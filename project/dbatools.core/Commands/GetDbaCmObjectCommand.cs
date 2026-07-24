@@ -10,7 +10,7 @@ namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
 /// Retrieves WMI/CIM management information from a computer, with protocol fallback. Port of
-/// public/Get-DbaCmObject.ps1 (W3-024, WAVE-3 hard remnant); the workflow remains a module-scoped
+/// public/Get-DbaCmObject.ps1; the workflow remains a module-scoped
 /// PowerShell compatibility hop. READ-ONLY (no SupportsShouldProcess).
 ///
 /// BEGIN+PROCESS. -ComputerName is ValueFromPipeline, so process fires per piped target. TWO
@@ -23,10 +23,10 @@ namespace Dataplat.Dbatools.Commands;
 ///   $ParSet (:244, "$PSCmdlet.ParameterSetName") - CANNOT ride a hop: inside a hop $PSCmdlet is the
 ///     HOP scriptblock's own cmdlet, so it would report the hop's set, not the caller's. The real
 ///     cmdlet's ParameterSetName is passed in and the body uses the carried value (read at :304/:335/
-///     :366 to branch Class vs Query). Same class handled on W2-153.
+///     :366 to branch Class vs Query).
 ///   Resolve-CimError - a ~128-line utility FUNCTION defined in begin (:114-241) and CALLED in
 ///     process (:314/:345/...). Begin's scope dies before process, so it is recreated verbatim at
-///     the top of the process hop (the New-DbaDacProfile / W3-016 / W3-047 helper-recreation pattern).
+///     the top of the process hop (the New-DbaDacProfile helper-recreation pattern).
 ///   $excluded (accumulator detector hit) does NOT carry: it is reset to @() at :289 INSIDE the
 ///     ":main foreach ($connectionObject in $ComputerName)" loop, so it is per-connectionObject, not
 ///     cross-record. Recorded so a reviewer does not re-add it.
@@ -38,16 +38,16 @@ namespace Dataplat.Dbatools.Commands;
 /// loops live in the dot-sourced body, so the labels resolve correctly inside the hop.
 ///
 /// ONE Test-Bound ("Namespace" at :374/:384) becomes a carried boundness flag. ComputerName's source
-/// default is $env:COMPUTERNAME (a DEF-007 runtime default); because it is ValueFromPipeline the
+/// default is $env:COMPUTERNAME (a runtime default); because it is ValueFromPipeline the
 /// piped/passed value wins and the env default applies only when nothing was supplied, resolved in
 /// the hop by "if (-not $ComputerName) { $ComputerName = $env:COMPUTERNAME }".
 ///
 /// -ClassName carries Alias("Class"). The three switches (Force, SilentlyContinue) and inherited
 /// EnableException cross as SwitchParameter OBJECTS received untyped. In-hop Stop-Function/
 /// Write-Message calls carry -FunctionName. NO interrupt (no Test-FunctionInterrupt), NO
-/// $PSBoundParameters iteration, NO .IsPresent. Streaming (DEF-001): emits per target as each
+/// $PSBoundParameters iteration, NO .IsPresent. Streaming: emits per target as each
 /// connects. Only -ClassName is positional (0), confirmed against the exported baseline. Surface
-/// pinned by migration/baselines/Get-DbaCmObject.json.
+/// pinned by the captured surface baseline.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaCmObject", DefaultParameterSetName = "Class")]
 public sealed partial class GetDbaCmObjectCommand : DbaBaseCmdlet
@@ -125,7 +125,7 @@ public sealed partial class GetDbaCmObjectCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // Streaming, not buffered (DEF-001): each target's objects are emitted as it connects, so a
+        // Streaming, not buffered: each target's objects are emitted as it connects, so a
         // buffered hop would discard results already produced when a later target failed.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {

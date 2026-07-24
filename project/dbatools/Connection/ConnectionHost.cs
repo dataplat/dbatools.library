@@ -16,16 +16,14 @@ namespace Dataplat.Dbatools.Connection
 
         /// <summary>
         /// SMO Server reuse cache for ConnectionService. Key:
-        /// lower(FullSmoName) + "|" + database + "|" + authority + "|" + applicationIntent
-        /// (migration/specs/architecture.md section 4.5). DAC, NonPooled and AccessToken
-        /// connections are never cached.
+        /// lower(FullSmoName) + "|" + database + "|" + authority + "|" + applicationIntent.
+        /// DAC, NonPooled and AccessToken connections are never cached.
         /// </summary>
         public static Dictionary<string, Microsoft.SqlServer.Management.Smo.Server> SmoServerCache = new Dictionary<string, Microsoft.SqlServer.Management.Smo.Server>();
 
         /// <summary>
         /// The registry behind Get-DbaConnectedInstance / Disconnect-DbaInstance, keyed by
-        /// connection string. During the hybrid period the PS functions unify onto this store
-        /// (P0-010c parallel change).
+        /// connection string. During the hybrid period the PS functions unify onto this store.
         /// </summary>
         public static Dictionary<string, List<object>> ActiveConnections = new Dictionary<string, List<object>>(StringComparer.OrdinalIgnoreCase);
 

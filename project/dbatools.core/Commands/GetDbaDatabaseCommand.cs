@@ -9,7 +9,7 @@ namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
 /// Gets databases from one or more SQL Server instances, with rich filtering. Port of
-/// public/Get-DbaDatabase.ps1 (W3-027, WAVE-3 remnant); the workflow remains a module-scoped
+/// public/Get-DbaDatabase.ps1; the workflow remains a module-scoped
 /// PowerShell compatibility hop. READ-ONLY (no SupportsShouldProcess).
 ///
 /// BEGIN+PROCESS. -SqlInstance is Mandatory ValueFromPipeline, so process fires per piped instance.
@@ -26,17 +26,17 @@ namespace Dataplat.Dbatools.Commands;
 ///   $hasCopyOnly - assigned at :421 inside "if ($NoFullBackup -or $NoFullBackupSince)" (:413) and
 ///     read at :506 inside the SAME "if ($NoFullBackup -or $NoFullBackupSince)"; both are non-pipeline
 ///     parameters, constant across records, so it is always-assigned-before-read or never-read - the
-///     W2-155 $deploymentReport constant-gate pattern. No carry.
-///   $server (codex r1 raised it; REFUTED) - assigned in the connection try (:256), whose catch
+///     $deploymentReport constant-gate pattern. No carry.
+///   $server (raised in review; REFUTED) - assigned in the connection try (:256), whose catch
 ///     (:258) is Stop-Function -Continue. The "foreach ($instance in $SqlInstance)" loop opens at
 ///     :254 and CLOSES at :537, wrapping the whole body, so every $server read (:298/:327/.../:355
 ///     Invoke-QueryRawDatabases) is a STATEMENT AFTER that catch, inside the loop. The catch's
 ///     -Continue issues "continue", which is dynamically scoped and unwinds that foreach, so on a
 ///     connection failure those reads are UNREACHABLE - no stale cross-record $server is observed.
 ///     The settled continue-in-catch class (read AFTER a -Continue catch is unreachable on failure);
-///     measured in migration/logs/probe-20260718-continue-propagation.
+///     measured in a dedicated probe run.
 ///
-/// UNBOUND [datetime] SEMANTICS (codex r1, real fix). The source's -NoFullBackupSince and
+/// UNBOUND [datetime] SEMANTICS. The source's -NoFullBackupSince and
 /// -NoLogBackupSince are $null when the caller omits them; a non-nullable C# DateTime property is
 /// MinValue instead, which is TRUTHY in PowerShell - it would wrongly enable the :413 backup filter
 /// and defeat the :426 "if (!$NoLogBackupSince)" default init. So the property stays DateTime (the
@@ -56,16 +56,15 @@ namespace Dataplat.Dbatools.Commands;
 /// and process opens with "if (Test-FunctionInterrupt) { return }" at :252, so a Failure on one
 /// record silences later records. The begin hop and each process hop read the latch at
 /// Get-Variable -Scope 0 and carry it; a persisted C# _interrupted field bridges it across records.
-/// Mechanism measured in migration/logs/probe-20260718-latch-sentinel.
+/// Mechanism measured in a dedicated probe run.
 ///
 /// ONE Test-Bound ("Encrypted" at :321, "$Encrypt = switch (Test-Bound -Parameter 'Encrypted')")
 /// becomes a carried boundness flag $__boundEncrypted. The nine switches (ExcludeUser, ExcludeSystem,
 /// Encrypted, NoFullBackup, NoLogBackup, IncludeLastUsed, OnlyAccessible) and inherited
 /// EnableException cross as SwitchParameter OBJECTS received untyped. -ExcludeUser and -ExcludeSystem
 /// carry their aliases. In-hop Stop-Function/Write-Message calls carry -FunctionName. Positions 0-10
-/// are made explicit per the W2-071 law and confirmed against the exported baseline; SqlInstance is
-/// Mandatory VFP at 0. Streaming (DEF-001): emits per database. Surface pinned by
-/// migration/baselines/Get-DbaDatabase.json.
+/// are made explicit and confirmed against the exported baseline; SqlInstance is
+/// Mandatory VFP at 0. Streaming: emits per database. Surface pinned by the captured surface baseline.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaDatabase", DefaultParameterSetName = "Default")]
 public sealed partial class GetDbaDatabaseCommand : DbaBaseCmdlet
@@ -189,7 +188,7 @@ public sealed partial class GetDbaDatabaseCommand : DbaBaseCmdlet
         if (Interrupted || _interrupted)
             return;
 
-        // Streaming, not buffered (DEF-001): databases are emitted per instance as found, so a
+        // Streaming, not buffered: databases are emitted per instance as found, so a
         // buffered hop would discard results already produced when a later instance failed.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
@@ -210,7 +209,7 @@ public sealed partial class GetDbaDatabaseCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Database, ExcludeDatabase, Pattern, ExcludeUser, ExcludeSystem,
             Owner, Encrypted, Status, Access, RecoveryModel, NoFullBackup,
             // The source's [datetime] params are $null when UNBOUND; a non-nullable DateTime property
-            // defaults to MinValue, which is TRUTHY in PowerShell and would (codex r1) wrongly enable
+            // defaults to MinValue, which is TRUTHY in PowerShell and would wrongly enable
             // the :413 backup filter and defeat the :426 "if (!$NoLogBackupSince)" default. Pass null
             // when the caller did not bind them (the inner hop params are untyped so $null survives),
             // and the actual value - including an explicit MinValue - when they did.

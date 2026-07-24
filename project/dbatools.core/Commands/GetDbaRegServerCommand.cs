@@ -9,7 +9,7 @@ namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
 /// Gets registered servers from Central Management Servers and local stores. Port of
-/// public/Get-DbaRegServer.ps1 (W3-047, WAVE-3 remnant); the workflow remains a module-scoped
+/// public/Get-DbaRegServer.ps1; the workflow remains a module-scoped
 /// PowerShell compatibility hop. READ-ONLY (no mutating verbs, no SupportsShouldProcess).
 ///
 /// BEGIN+PROCESS. -SqlInstance is ValueFromPipeline, so process fires per piped instance.
@@ -23,10 +23,10 @@ namespace Dataplat.Dbatools.Commands;
 /// TWO begin HELPERS RECREATED IN THE PROCESS HOP. begin defines Unprotect-String (a function,
 /// :182) and $matchesPattern (a scriptblock, :186) but CALLS neither; process calls them at :335 and
 /// :294. Begin's scope dies before process, so both are recreated verbatim at the top of the process
-/// hop - the same treatment New-DbaDacProfile's helpers and W3-016's Get-ServerName needed. Neither
+/// hop - the same treatment New-DbaDacProfile's begin-defined helpers needed. Neither
 /// closes over carried state (both are pure over their arguments), so recreation is faithful.
 ///
-/// TWO DEF-007 CONFIG DEFAULTS resolved in the process hop:
+/// TWO CONFIG DEFAULTS resolved in the process hop:
 ///   -SqlInstance defaults to Get-DbatoolsConfigValue 'commands.get-dbaregserver.defaultcms'. Because
 ///     it is ValueFromPipeline, the piped/passed value wins per record and the CMS default applies
 ///     only when nothing was supplied - reproduced by "if (-not $PSBoundParameters.ContainsKey('SqlInstance')) { $SqlInstance = ... }".
@@ -37,14 +37,14 @@ namespace Dataplat.Dbatools.Commands;
 /// (:197/:232), .IncludeLocal (:232), .Group (:378) and .ExcludeGroup (:379) as VALUES - these
 /// distinguish an EXPLICIT caller pass from a default and drive the local-store and group-filter
 /// logic. Inside a hop $PSBoundParameters is the hop's own bindings, so the caller's real
-/// BoundParameters dictionary is passed in and substituted for $PSBoundParameters before the body
-/// (the W2-151 approach), which keeps every value read faithful. It is only ever indexed by key,
+/// BoundParameters dictionary is passed in and substituted for $PSBoundParameters before the body,
+/// which keeps every value read faithful. It is only ever indexed by key,
 /// never iterated.
 ///
 /// NO INTERRUPT BRIDGE: no Test-FunctionInterrupt in the source; its Stop-Function calls carry
 /// -Continue (:210) or terminate a single object.
 ///
-/// ONE CROSS-RECORD STATE CARRY - $azureids (codex r1, DO NOT REMOVE). It is initialized to @() ONLY
+/// ONE CROSS-RECORD STATE CARRY - $azureids (DO NOT REMOVE). It is initialized to @() ONLY
 /// inside the local-store path (:244, gated by :232 "-not $PSBoundParameters.SqlInstance -or
 /// $PSBoundParameters.IncludeLocal"), but READ at :308 in the UNCONDITIONAL "foreach ($server in
 /// $servers)" loop. On a record that does not take the local-store path, the source's persistent
@@ -59,9 +59,9 @@ namespace Dataplat.Dbatools.Commands;
 /// -ExcludeServerName carries Alias("ExcludeServer"). The three switches (IncludeSelf,
 /// ResolveNetworkName, IncludeLocal) and inherited EnableException cross as SwitchParameter OBJECTS
 /// received untyped. In-hop Stop-Function/Write-Message calls carry -FunctionName. Implicit positions
-/// 0-8 are made explicit per the W2-071 law and confirmed against the exported baseline; SqlInstance
-/// is position 0 and ValueFromPipeline. Streaming (DEF-001): emits per registered server via
-/// Select-DefaultView. Surface pinned by migration/baselines/Get-DbaRegServer.json.
+/// 0-8 are made explicit and confirmed against the exported baseline; SqlInstance
+/// is position 0 and ValueFromPipeline. Streaming: emits per registered server via
+/// Select-DefaultView. Surface pinned by the captured surface baseline.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "DbaRegServer")]
 public sealed partial class GetDbaRegServerCommand : DbaBaseCmdlet
@@ -125,7 +125,7 @@ public sealed partial class GetDbaRegServerCommand : DbaBaseCmdlet
 
     // begin's $defaults column set; opaque to C#.
     private Hashtable? _beginState;
-    // $azureids carried record-to-record (codex r1); opaque to C#.
+    // $azureids carried record-to-record; opaque to C#.
     private Hashtable? _state;
 
     protected override void BeginProcessing()
@@ -154,7 +154,7 @@ public sealed partial class GetDbaRegServerCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        // Streaming, not buffered (DEF-001): each registered server is emitted as it is found, so a
+        // Streaming, not buffered: each registered server is emitted as it is found, so a
         // buffered hop would discard results already produced when a later instance's failure
         // terminated the hop under -EnableException.
         NestedCommand.InvokeScopedStreaming(this, item =>
