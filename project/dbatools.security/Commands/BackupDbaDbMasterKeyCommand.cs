@@ -64,6 +64,8 @@ public sealed class BackupDbaDbMasterKeyCommand : DbaBaseCmdlet
     [Parameter(ValueFromPipeline = true, Position = 8)]
     public Microsoft.SqlServer.Management.Smo.Database[]? InputObject { get; set; }
 
+    private System.Security.SecureString? _promptedSecurePassword;
+
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
     /// <summary>Exports the master keys for one pipeline record.</summary>
@@ -76,14 +78,26 @@ public sealed class BackupDbaDbMasterKeyCommand : DbaBaseCmdlet
         // replaces SecurePassword outright, even if its password is empty - so this is a ternary on
         // whether Credential was supplied, never a null-coalesce on the value. The SecureString is
         // passed on as-is; it is not converted here.
-        System.Security.SecureString? effectivePassword = Credential != null ? Credential.Password : SecurePassword;
+        System.Security.SecureString? effectivePassword = Credential != null
+            ? Credential.Password
+            : SecurePassword ?? _promptedSecurePassword;
 
         // [DEF-001] streamed via InvokeScopedStreaming: the hop body loops emitting per-item and
         // carries reachable terminating throws (-Continue Stop-Function under -EnableException), so a
         // buffered InvokeScoped would lose an earlier item's emit when a later item throws. Streaming
-        // yields each record as produced; no state carry on this row.
+        // yields each record as produced. The command-specific sentinel carries a password entered
+        // interactively in the hop so later pipeline records reuse the source function's answer.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
+            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__backupDbaDbMasterKeyProcess"))
+            {
+                if (sentinel["__backupDbaDbMasterKeyProcess"] is Hashtable state &&
+                    state["SecurePassword"] is System.Security.SecureString promptedSecurePassword)
+                {
+                    _promptedSecurePassword = promptedSecurePassword;
+                }
+                return;
+            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
@@ -205,7 +219,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Select-DefaultView -InputObject $masterkey -Property ComputerName, InstanceName, SqlInstance, Database, 'Filename as Path', Status
         }
     }
+    @{ __backupDbaDbMasterKeyProcess = @{ SecurePassword = $SecurePassword } }
 } $SqlInstance $SqlCredential $Credential $Database $ExcludeDatabase $SecurePassword $Path $FileBaseName $InputObject $EnableException $__realCmdlet $__boundPath $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
-
