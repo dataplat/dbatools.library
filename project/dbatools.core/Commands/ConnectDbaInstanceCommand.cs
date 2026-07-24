@@ -151,7 +151,13 @@ public sealed partial class ConnectDbaInstanceCommand : DbaInstanceCmdlet
     /// <summary>Specifies the authentication method for connecting to Azure SQL or Entra ID-protected SQL Server instances.</summary>
     [Parameter(Position = 22)]
     [PsStringCast]
-    [ValidateSet("ActiveDirectoryIntegrated", "ActiveDirectoryInteractive", "ActiveDirectoryPassword", "ActiveDirectoryServicePrincipal", "ActiveDirectoryManagedIdentity", "ActiveDirectoryDeviceCodeFlow")]
+    [ValidateSet(
+        ConnectionService.EntraAuthentication.Integrated,
+        ConnectionService.EntraAuthentication.Interactive,
+        ConnectionService.EntraAuthentication.Password,
+        ConnectionService.EntraAuthentication.ServicePrincipal,
+        ConnectionService.EntraAuthentication.ManagedIdentity,
+        ConnectionService.EntraAuthentication.DeviceCodeFlow)]
     public string? AuthenticationType { get; set; }
 
     /// <summary>Creates a dedicated administrator connection (DAC) for emergency access to SQL Server.</summary>

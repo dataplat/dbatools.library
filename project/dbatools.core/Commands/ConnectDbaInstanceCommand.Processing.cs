@@ -15,8 +15,8 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class ConnectDbaInstanceCommand
 {
     private SmoConnectionRequest? _request;
-    // Each of these is assigned on only one TFM of the Core/Desktop token split, so both
-    // carry explicit initializers to keep CS0649 quiet under warnings-as-errors.
+    // Only one of these is reachable per framework - the service decides which - so both carry
+    // explicit initializers to keep CS0649 quiet under warnings-as-errors.
     private bool _tryConnString = false;
     private bool _syntheticAccessTokenBound = false;
 
@@ -29,7 +29,7 @@ public sealed partial class ConnectDbaInstanceCommand
 
         // PS: -in is case-insensitive and ValidateSet passes the user's casing through
         // (cross-model review 2026-07-07 finding 1).
-        if ((string.Equals(AuthenticationType, "ActiveDirectoryPassword", StringComparison.OrdinalIgnoreCase) || string.Equals(AuthenticationType, "ActiveDirectoryServicePrincipal", StringComparison.OrdinalIgnoreCase)) && SqlCredential is null)
+        if (ConnectionService.RequiresSqlCredential(AuthenticationType) && SqlCredential is null)
         {
             StopFunction($"AuthenticationType {AuthenticationType} requires SqlCredential.");
             return;
@@ -38,27 +38,31 @@ public sealed partial class ConnectDbaInstanceCommand
         // if tenant is specified with a GUID username such as 21f5633f-6776-4bab-b878-bbd5e3e5ed72 (for clientid)
         // PS: -not $AccessToken is truthiness, so an empty-string token counts as absent
         // (cross-model review 2026-07-07 finding 3).
-        if (!string.IsNullOrEmpty(Tenant) && !LanguagePrimitives.IsTrue(AccessToken) && SqlCredential is not null && Regex.IsMatch(SqlCredential.UserName, "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))
+        // Which strategy this framework supports is the service's call, not the command's.
+        ServicePrincipalPlan? servicePrincipalPlan = ConnectionService.PlanServicePrincipalConnection(Tenant, AccessToken, SqlCredential);
+        if (servicePrincipalPlan is not null)
         {
             try
             {
-#if NET8_0
-                WriteMessage(MessageLevel.Verbose, "Generating access tokens is not supported on Core. Will try connection string with Active Directory Service Principal instead. See https://github.com/dataplat/dbatools/pull/7610 for more information.");
-                _tryConnString = true;
-#else
-                WriteMessage(MessageLevel.Verbose, "Tenant detected, getting access token");
-                // New-DbaAzAccessToken is still a PS function during the hybrid; the nested
-                // invocation runs in this cmdlet's session state, exactly like the PS call did.
-                Collection<PSObject> tokenResults = InvokeCommand.InvokeScript(
-                    "param($Tenant, $Credential) (New-DbaAzAccessToken -Type RenewableServicePrincipal -Subtype AzureSqlDb -Tenant $Tenant -Credential $Credential -ErrorAction Stop).GetAccessToken()",
-                    Tenant, SqlCredential);
-                AccessToken = tokenResults.Count > 0 ? tokenResults[0] : null;
-                // PS: $PSBoundParameters.Tenant = $Tenant = $null; $PSBoundParameters.SqlCredential = $SqlCredential = $null;
-                //     $PSBoundParameters.AccessToken = $AccessToken
-                Tenant = null;
-                SqlCredential = null;
-                _syntheticAccessTokenBound = true;
-#endif
+                WriteMessage(MessageLevel.Verbose, servicePrincipalPlan.VerboseMessage);
+                if (servicePrincipalPlan.Strategy == ServicePrincipalStrategy.ConnectionStringRewrite)
+                {
+                    _tryConnString = true;
+                }
+                else
+                {
+                    // New-DbaAzAccessToken is still a PS function during the hybrid; the nested
+                    // invocation runs in this cmdlet's session state, exactly like the PS call did.
+                    Collection<PSObject> tokenResults = InvokeCommand.InvokeScript(
+                        servicePrincipalPlan.TokenScript,
+                        Tenant, SqlCredential);
+                    AccessToken = tokenResults.Count > 0 ? tokenResults[0] : null;
+                    // PS: $PSBoundParameters.Tenant = $Tenant = $null; $PSBoundParameters.SqlCredential = $SqlCredential = $null;
+                    //     $PSBoundParameters.AccessToken = $AccessToken
+                    Tenant = null;
+                    SqlCredential = null;
+                    _syntheticAccessTokenBound = true;
+                }
             }
             catch (Exception ex)
             {
@@ -81,19 +85,11 @@ public sealed partial class ConnectDbaInstanceCommand
 
             if (_tryConnString)
             {
-                // Core rewrites the instance into an Active Directory Service Principal
-                // connection string (PR #7610); the plain-text unwrap at this boundary matches
-                // the PS source.
+                // The instance becomes an Active Directory Service Principal connection string
+                // (PR #7610); the plain-text unwrap at this boundary matches the PS source.
                 string azureserver = instance.InputObject.ToString()!;
                 string clientSecret = SqlCredential!.GetNetworkCredential().Password;
-                if (!string.IsNullOrEmpty(_request.Database))
-                {
-                    instance = new DbaInstanceParameter($"Server={azureserver}; Authentication=Active Directory Service Principal; Database={_request.Database}; User Id={SqlCredential.UserName}; Password={clientSecret}");
-                }
-                else
-                {
-                    instance = new DbaInstanceParameter($"Server={azureserver}; Authentication=Active Directory Service Principal; User Id={SqlCredential.UserName}; Password={clientSecret}");
-                }
+                instance = new DbaInstanceParameter(ConnectionService.BuildServicePrincipalConnectionString(azureserver, _request.Database, SqlCredential.UserName, clientSecret));
             }
 
             _request.Instance = instance;
