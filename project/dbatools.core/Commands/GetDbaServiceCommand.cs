@@ -85,7 +85,13 @@ public sealed partial class GetDbaServiceCommand : DbaBaseCmdlet
     // null means "skip SQL WMI query" (only reporting types were requested)
     private string? _searchClause;
     private bool _includeReportingServices;
-    private ConnectionOptions _wmiOptions = new();
+    // Assigned in BeginProcessing from BuildConnectionOptions - never constructed in the field
+    // initializer. System.Management types throw PlatformNotSupportedException from their
+    // constructor on non-Windows, and a field initializer runs during instantiation, so an eager
+    // new() takes down anything that merely creates the cmdlet object before a single parameter
+    // is bound - including the MAML help generator, which reflects over every cmdlet and calls
+    // Activator.CreateInstance to read parameter default values.
+    private ConnectionOptions _wmiOptions = null!;
 
     protected override void BeginProcessing()
     {

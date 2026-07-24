@@ -33,6 +33,10 @@
       shared runtime, so their doc-comments live in dbatools.xml, not the satellite's XML doc
       file the generator reads. Without this flag the generator's PS002 fires and - because
       TreatWarningsAsErrors is on - fails the build for a doc it structurally cannot see.
+
+      Note that TreatWarningsAsErrors also makes the generator's own targets prepend -strict to
+      whatever is set here, so the run is strict regardless: -ignoreMissing lowers the missing-doc
+      warnings rather than turning off failure-on-warning.
     -->
     <XmlDoc2CmdletDocArguments>-ignoreMissing</XmlDoc2CmdletDocArguments>
   </PropertyGroup>
