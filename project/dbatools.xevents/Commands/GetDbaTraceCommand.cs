@@ -147,6 +147,16 @@ public sealed class GetDbaTraceCommand : DbaInstanceCmdlet
             return filepath;
         }
         string host = (servername ?? "").Split('\\')[0];
-        return "\\\\" + host + "\\" + filepath.Replace(':', '$');
+        // The PS source is Join-Path "\\server\" (filepath with : -> $), and Join-Path does two
+        // things a raw concat does not: it normalizes forward slashes to backslashes and it
+        // collapses the single duplicate separator at the parent/child boundary. Replicate both so
+        // a root-relative ("\logs\x") or forward-slash ("/logs/x") path yields "\\server\logs\x"
+        // rather than a malformed "\\server\\logs\x" / "\\server\/logs/x".
+        string child = filepath.Replace(':', '$').Replace('/', '\\');
+        if (child.Length > 0 && child[0] == '\\')
+        {
+            child = child.Substring(1);
+        }
+        return "\\\\" + host + "\\" + child;
     }
 }

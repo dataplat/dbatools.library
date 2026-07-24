@@ -110,7 +110,16 @@ public sealed class GetDbaAgentJobOutputFileCommand : DbaInstanceCmdlet
             return filePath;
 
         string host = (serverName ?? string.Empty).Split('\\')[0];
-        return "\\\\" + host + "\\" + filePath.Replace(':', '$');
+        // The PS source is Join-Path "\\server\" (filePath with : -> $), which normalizes forward
+        // slashes to backslashes and collapses the single duplicate separator at the parent/child
+        // boundary. Replicate both so a root-relative ("\logs\x") or forward-slash ("/logs/x")
+        // output-file path yields "\\server\logs\x" rather than a malformed UNC.
+        string child = filePath.Replace(':', '$').Replace('/', '\\');
+        if (child.Length > 0 && child[0] == '\\')
+        {
+            child = child.Substring(1);
+        }
+        return "\\\\" + host + "\\" + child;
     }
 }
 

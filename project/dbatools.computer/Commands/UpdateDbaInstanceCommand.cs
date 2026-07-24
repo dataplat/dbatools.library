@@ -581,7 +581,17 @@ public sealed class UpdateDbaInstanceCommand : DbaBaseCmdlet
     {
         if (path.StartsWith("\\\\", StringComparison.Ordinal)) { return null; }
         string server = computerName.ComputerName;
-        return System.IO.Path.Combine($"\\\\{server}\\", path.Replace(":", "$"));
+        // The PS source is Join-Path "\\server\" (path with : -> $). Path.Combine is NOT a faithful
+        // stand-in: given a rooted child ("\logs\x" or "/logs/x") it discards the parent entirely
+        // and returns the bare child, losing the server. Join-Path instead normalizes forward
+        // slashes to backslashes and collapses the single duplicate boundary separator, yielding
+        // "\\server\logs\x". Replicate that.
+        string child = path.Replace(':', '$').Replace('/', '\\');
+        if (child.Length > 0 && child[0] == '\\')
+        {
+            child = child.Substring(1);
+        }
+        return "\\\\" + server + "\\" + child;
     }
 
     // PS Copy-UncFile: the localhost checks read the ORIGINATING computer name (the PS source reads
