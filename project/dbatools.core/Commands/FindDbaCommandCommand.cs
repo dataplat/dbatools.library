@@ -7,18 +7,26 @@ using System.Management.Automation;
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Finds dbatools commands via the help index. Port of public/Find-DbaCommand.ps1 (W3-019).
+/// Finds dbatools commands via the help index. Port of public/Find-DbaCommand.ps1.
 /// The command takes NO pipeline input, so the process block runs exactly once - and the begin
 /// block only DEFINES the nested Get-DbaIndex function and sets $moduleDirectory (both consumed
 /// in process), with no side effect of its own. Because process runs once and begin is pure
 /// setup, begin and process fold into a SINGLE process hop (the begin function definition and
 /// $moduleDirectory assignment lead the process body verbatim) - splitting them would strand the
 /// nested function and variable across separate scriptblock scopes. There is a single terminal
-/// emit (Select-DefaultView) and no Stop-Function anywhere, so DEF-001's buffered-emit-then-throw
-/// shape cannot arise; the hop still runs through InvokeScopedStreaming for uniformity. The only
-/// substitution is $Pscmdlet.ShouldProcess -> $__realCmdlet.ShouldProcess (ConfirmImpact MEDIUM,
-/// the SupportsShouldProcess default, mirrored); the body is otherwise verbatim. Surface pinned by
-/// migration/baselines/Find-DbaCommand.json.
+/// emit (Select-DefaultView) and no Stop-Function anywhere, so the buffered-emit-then-throw shape
+/// (records held back, then discarded by a terminating error) cannot arise; the hop still runs
+/// through InvokeScopedStreaming for uniformity. The only substitution is
+/// $Pscmdlet.ShouldProcess -> $__realCmdlet.ShouldProcess (ConfirmImpact MEDIUM, the
+/// SupportsShouldProcess default, mirrored); the body is otherwise verbatim.
+///
+/// -FunctionName/-ModuleName inside the hop belong to Write-Message ONLY. Running inside the
+/// module scriptblock, Write-Message would otherwise infer the hop as its caller and label the
+/// message with the scriptblock instead of this command, so both are pinned there. They are NOT a
+/// blanket decoration for the hop body: Get-DbaIndex's Select-Object -Unique takes neither, and
+/// appending them there is a parameter-binding error that kills the index rebuild - which runs on
+/// the DEFAULT path, not just under -Rebuild, because the rebuild is also what populates a missing
+/// index file on a fresh install.
 /// </summary>
 [Cmdlet(VerbsCommon.Find, "DbaCommand", SupportsShouldProcess = true)]
 public sealed class FindDbaCommandCommand : DbaBaseCmdlet
@@ -88,7 +96,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     function Get-DbaIndex() {
         if ($__realCmdlet.ShouldProcess($dest, "Recreating index")) {
             $dbamodule = Get-Module -Name dbatools
-            $allCommands = $dbamodule.ExportedCommands.Values | Where-Object CommandType -In 'Function', 'Cmdlet' | Where-Object Name -NotIn 'Write-Message' | Sort-Object -Property Name | Select-Object -Unique -FunctionName Find-DbaCommand -ModuleName "dbatools"
+            $allCommands = $dbamodule.ExportedCommands.Values | Where-Object CommandType -In 'Function', 'Cmdlet' | Where-Object Name -NotIn 'Write-Message' | Sort-Object -Property Name | Select-Object -Unique
             #Had to add Unique because Select-DbaObject was getting populated twice once written to the index file
 
             $helpcoll = New-Object System.Collections.Generic.List[System.Object]
