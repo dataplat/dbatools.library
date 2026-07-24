@@ -312,6 +312,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
     param($sourceserver, $destserver, $source, $destination, $jobowner, $Database, [Dataplat.Dbatools.Parameter.DbaInstanceParameter]$SqlInstance, $SqlCredential, $DestinationSqlCredential, [string]$BackupFolder, [string]$CategoryName, [string]$BackupCompression, $NoDbccCheckDb, $Force, $EnableException, $__realCmdlet, $__processToken)
 
+    # -Force sets function-scoped $ConfirmPreference='none' in the SOURCE begin, persisting across process
+    # records; separate hops don't share that scope, so re-establish it here (carried via $Force).
+    if ($Force) { $ConfirmPreference = 'none' }
+
     # Dot-source so the process body's early returns exit only this block and the trailing sentinel
     # (carrying $start and the interrupt latch) still runs.
     . {
