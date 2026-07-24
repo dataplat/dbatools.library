@@ -290,15 +290,45 @@ public sealed partial class RestoreDbaDatabaseCommand
     // PS relied on $WhatIfPreference/$ConfirmPreference propagating into nested calls; the
     // compiled boundary forwards the caller's bound switch VALUES explicitly instead (accepted
     // deviation; cross-model review 2026-07-07 finding B4 made all nested sites consistent).
+    //
+    // Bound-only forwarding is NOT sufficient, which a side-effect measurement of the page
+    // restore paths settled: preference propagation reaches a nested command run on a steppable
+    // pipeline, but not one run on a fresh InvokeScript pipeline. So with an ambient
+    // $WhatIfPreference = $true, or from inside a SupportsShouldProcess wrapper invoked with
+    // -WhatIf, the two restore sites announced themselves and did nothing while the tail-log
+    // backup ran FOR REAL - writing a backup file and, because it backs up WITH NORECOVERY,
+    // taking the database offline in the middle of what the caller asked to be a dry run.
+    // Forwarding the EFFECTIVE dry-run state rather than only the bound switch closes that.
     private void ForwardShouldProcessSwitches(Hashtable parms)
     {
         if (TestBound("WhatIf"))
         {
             parms["WhatIf"] = MyInvocation.BoundParameters["WhatIf"];
         }
+        else if (PsOps.IsTrue(GetVariableValue("WhatIfPreference", false)))
+        {
+            parms["WhatIf"] = new SwitchParameter(true);
+        }
+
         if (TestBound("Confirm"))
         {
             parms["Confirm"] = MyInvocation.BoundParameters["Confirm"];
+        }
+        else
+        {
+            // Only the SUPPRESSING direction is inherited. An ambient ConfirmPreference of None
+            // is what -Confirm:$false leaves in a caller's scope, and the source's nested calls
+            // saw it; synthesizing -Confirm from any other ambient value would instead add
+            // prompts the source never issued.
+            object? ambientConfirm = GetVariableValue("ConfirmPreference", null);
+            if (ambientConfirm is PSObject wrapped)
+            {
+                ambientConfirm = wrapped.BaseObject;
+            }
+            if (ambientConfirm is ConfirmImpact impact && impact == ConfirmImpact.None)
+            {
+                parms["Confirm"] = new SwitchParameter(false);
+            }
         }
     }
 
