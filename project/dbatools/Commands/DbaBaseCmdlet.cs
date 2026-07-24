@@ -16,7 +16,7 @@ namespace Dataplat.Dbatools.Commands
     /// exact Stop-Function parity, TestBound helpers and cooperative Ctrl-C cancellation.
     /// Contract: migration/specs/architecture.md section 2.
     /// </summary>
-    public abstract class DbaBaseCmdlet : PSCmdlet
+    public abstract class DbaBaseCmdlet : PSCmdlet, INestedCommandInterruptHost
     {
         /// <summary>By default, dbatools handles errors as friendly warnings. This switch enables terminating exceptions instead.
         /// Virtual so a port whose PS function declares EnableException PER PARAMETER SET can override
@@ -27,6 +27,11 @@ namespace Dataplat.Dbatools.Commands
 
         /// <summary>Set when StopFunction decided the cmdlet must stop. Guard ProcessRecord/EndProcessing with it. Never reset.</summary>
         protected bool Interrupted { get; private set; }
+
+        void INestedCommandInterruptHost.InterruptFromNestedCommand()
+        {
+            Interrupted = true;
+        }
 
         private readonly CancellationTokenSource _cancellationSource = new CancellationTokenSource();
 

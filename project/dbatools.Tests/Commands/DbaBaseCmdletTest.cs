@@ -233,6 +233,20 @@ namespace Dataplat.Dbatools.Commands.Test
         }
 
         [TestMethod]
+        public void StopFunction_DirectAndAbsorbedHelperScopesLatchDifferently()
+        {
+            RunResult direct = Invoke(typeof(TestDbaBaseStopCommand), "Test-DbaBaseStop",
+                new Dictionary<string, object> { { "Mode", "plain" } });
+            RunResult absorbed = Invoke(typeof(TestDbaBaseStopCommand), "Test-DbaBaseStop",
+                new Dictionary<string, object> { { "Mode", "absorbed" } });
+
+            Assert.IsTrue(direct.HasRecord("Interrupted=True"),
+                "a direct StopFunction call must latch the command");
+            Assert.IsTrue(absorbed.HasRecord("Interrupted=False"),
+                "interruptCallerScope:false must preserve the absorbed-helper boundary");
+        }
+
+        [TestMethod]
         public void StopFunction_EnableException_Terminates()
         {
             RunResult result = Invoke(typeof(TestDbaBaseStopCommand), "Test-DbaBaseStop",

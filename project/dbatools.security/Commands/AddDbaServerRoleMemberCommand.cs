@@ -23,10 +23,8 @@ namespace Dataplat.Dbatools.Commands;
 /// disambiguates the result; that behavior is reproduced here rather than corrected.
 /// </para>
 /// <para>
-/// Two pieces of state that a PowerShell function kept in its function scope for the whole pipeline
-/// are held here as fields instead, because each record's hop gets a fresh scope that cannot see
-/// the previous record's: the InputObject value the begin block derived from SqlInstance, and the
-/// interrupt latch that Stop-Function sets. See the field comments.
+/// The InputObject value the begin block derived from SqlInstance is held as a field because each
+/// record's hop gets a fresh scope that cannot see the previous record.
 /// </para>
 /// </remarks>
 [Cmdlet(VerbsCommon.Add, "DbaServerRoleMember", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
@@ -71,19 +69,6 @@ public sealed class AddDbaServerRoleMemberCommand : DbaBaseCmdlet
     /// The value the begin block assigned to InputObject from SqlInstance, held across records.
     /// </summary>
     private object[]? _beginInputObject;
-
-    /// <summary>
-    /// The interrupt latch Stop-Function sets when it is called without -Continue.
-    /// </summary>
-    /// <remarks>
-    /// In the script implementation that latch lived in the function scope, which spanned the whole
-    /// pipeline: a failure on one record left it set, so every later record returned immediately at
-    /// its Test-FunctionInterrupt guard. Each record here runs in its own scope, so the latch would
-    /// otherwise be forgotten and later records would keep processing after a stop. The hop reports
-    /// the latch through its completion sentinel and it is held here to reproduce the original
-    /// pipeline-wide behavior.
-    /// </remarks>
-    private bool _interruptLatched;
 
     /// <summary>Validates the parameter combination once, before any pipeline record is processed.</summary>
     protected override void BeginProcessing()
@@ -131,7 +116,7 @@ public sealed class AddDbaServerRoleMemberCommand : DbaBaseCmdlet
     /// <summary>Adds the requested members for one pipeline record.</summary>
     protected override void ProcessRecord()
     {
-        if (_beginInterrupted || _interruptLatched || Interrupted)
+        if (_beginInterrupted || Interrupted)
             return;
 
         // Reproduces what $InputObject actually held when the script's process block ran. The
@@ -159,20 +144,12 @@ public sealed class AddDbaServerRoleMemberCommand : DbaBaseCmdlet
         // [DEF-001] streamed via InvokeScopedStreaming: the body loops the members emitting per-add and
         // carries reachable terminating throws (-Continue Stop-Function under -EnableException); a
         // buffered InvokeScoped would lose an earlier member's emit when a later one throws. The
-        // interrupt-latch sentinel (__AddDbaServerRoleMemberProcessComplete) still rides the callback as
-        // the last emitted item, harvested into _interruptLatched exactly as before.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(nestedError);
-                return;
-            }
-            if (item is not null && LanguagePrimitives.IsTrue(
-                item.Properties["__AddDbaServerRoleMemberProcessComplete"]?.Value))
-            {
-                _interruptLatched = LanguagePrimitives.IsTrue(item.Properties["Interrupted"]?.Value);
                 return;
             }
             WriteObject(item);
@@ -311,8 +288,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-
-    [pscustomobject]@{ __AddDbaServerRoleMemberProcessComplete = $true; Interrupted = [bool](Test-FunctionInterrupt) }
 } $InputObject $SqlCredential $ServerRole $Login $Role $EnableException $__realCmdlet $__boundServerRole $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }

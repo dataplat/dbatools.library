@@ -1,9 +1,81 @@
 #nullable enable
 
+using System;
+using System.Collections;
+using System.Management.Automation;
+
 namespace Dataplat.Dbatools.Commands;
 
 internal static partial class NestedCommand
 {
+    private const string InterruptBeaconVariable = "__dbatools_nested_interrupt_beacon_q7N4v2";
+
+    private sealed class InterruptBeacon : IDisposable
+    {
+        private readonly PSCmdlet _host;
+        private bool _disposed;
+
+        internal InterruptBeacon(PSCmdlet host)
+        {
+            _host = host;
+            State = new Hashtable
+            {
+                ["Interrupted"] = false,
+                ["CallerCommand"] = null,
+                ["CallerHasBoundParameters"] = false,
+                ["CommandName"] = host.MyInvocation?.MyCommand?.Name
+            };
+        }
+
+        internal Hashtable State { get; }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+
+            if (!LanguagePrimitives.IsTrue(State["Interrupted"]) ||
+                !LanguagePrimitives.IsTrue(State["CallerHasBoundParameters"]))
+                return;
+
+            string? caller = LanguagePrimitives.ConvertTo<string>(State["CallerCommand"]);
+            string? commandName = LanguagePrimitives.ConvertTo<string>(State["CommandName"]);
+            if (!string.Equals(caller, "<ScriptBlock>", StringComparison.Ordinal) &&
+                !string.Equals(caller, commandName, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (_host is INestedCommandInterruptHost interruptHost)
+                interruptHost.InterruptFromNestedCommand();
+        }
+    }
+
+    private static string InterruptBeaconSeedProlog(string seedToken)
+    {
+        string module = "$__dbatoolsInterruptModule_" + seedToken;
+        string prior = "$__dbatoolsPriorInterruptBeacon_" + seedToken;
+        string priorValue = "$__dbatoolsPriorInterruptBeaconValue_" + seedToken;
+        return
+            module + " = Get-Module -Name dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1\n" +
+            prior + " = if ($null -ne " + module + ") { & " + module + " { Get-Variable -Name " + InterruptBeaconVariable + " -Scope Script -ErrorAction Ignore } } else { $null }\n" +
+            priorValue + " = if ($null -ne " + prior + ") { " + prior + ".Value } else { $null }\n" +
+            "if ($null -ne " + module + ") { & " + module + " { param($__beacon) Set-Variable -Name " + InterruptBeaconVariable + " -Scope Script -Value $__beacon -Force -WhatIf:$false -Confirm:$false -ErrorAction Ignore } $__nestedInterruptBeacon }\n" +
+            "try {\n";
+    }
+
+    private static string InterruptBeaconSeedEpilog(string seedToken)
+    {
+        string module = "$__dbatoolsInterruptModule_" + seedToken;
+        string prior = "$__dbatoolsPriorInterruptBeacon_" + seedToken;
+        string priorValue = "$__dbatoolsPriorInterruptBeaconValue_" + seedToken;
+        return
+            "\n} finally { " +
+            "if ($null -ne " + module + ") { " +
+            "if ($null -ne " + prior + ") { & " + module + " { param($__beacon) Set-Variable -Name " + InterruptBeaconVariable + " -Scope Script -Value $__beacon -Force -WhatIf:$false -Confirm:$false -ErrorAction Ignore } " + priorValue + " } " +
+            "else { & " + module + " { Remove-Variable -Name " + InterruptBeaconVariable + " -Scope Script -Force -WhatIf:$false -Confirm:$false -ErrorAction Ignore } } } " +
+            "Remove-Variable -Name __dbatoolsInterruptModule_" + seedToken + ", __dbatoolsPriorInterruptBeacon_" + seedToken + ", __dbatoolsPriorInterruptBeaconValue_" + seedToken + " -Force -WhatIf:$false -Confirm:$false -ErrorAction Ignore }";
+    }
+
     // U-4 randomizer/PSModuleRoot cluster, INFRA fix. Retired bodies resolve module-relative
     // assets via "$script:PSModuleRoot\bin\..." - in the function world that hit the dbatools
     // module's script scope. A body-carrying hop executes in the CALLER'S session state, where

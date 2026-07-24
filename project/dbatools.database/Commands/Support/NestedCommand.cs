@@ -144,10 +144,11 @@ internal static partial class NestedCommand
             // The carrier param is the ONLY name bound in the caller's scope; the args
             // array travels as a single element so null elements survive the InvokeScript
             // object[]-unpacking (W5-016), then splats positionally into the real scope.
+            using InterruptBeacon interruptBeacon = new InterruptBeacon(host);
             string __seedToken = Guid.NewGuid().ToString("N");
             ScriptBlock script = ScriptBlock.Create(
-                "param($__nestedCommandArguments)\n" + ModuleRootSeedProlog(__seedToken) + "& {\n" + scriptText + "\n} @__nestedCommandArguments" + ModuleRootSeedEpilog(__seedToken));
-            Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, script, null, new object?[] { scriptArgs });
+                "param($__nestedCommandArguments, $__nestedInterruptBeacon)\n" + ModuleRootSeedProlog(__seedToken) + InterruptBeaconSeedProlog(__seedToken) + "& {\n" + scriptText + "\n} @__nestedCommandArguments" + InterruptBeaconSeedEpilog(__seedToken) + ModuleRootSeedEpilog(__seedToken));
+            Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, script, null, new object?[] { scriptArgs, interruptBeacon.State });
             Collection<PSObject> output = new Collection<PSObject>();
             foreach (PSObject item in raw)
             {
@@ -245,12 +246,13 @@ internal static partial class NestedCommand
             using ErrorVariableBridge bridge = new ErrorVariableBridge(host);
             Hashtable termination = new Hashtable { ["ErrorRecord"] = null };
             string terminationMarker = "__dbatoolsNestedTermination_" + Guid.NewGuid().ToString("N");
+            using InterruptBeacon interruptBeacon = new InterruptBeacon(host);
             string __seedToken = Guid.NewGuid().ToString("N");
             string wrapper =
-                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker)\n" + ModuleRootSeedProlog(__seedToken) + "try { & {\n" + scriptText +
+                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker, $__nestedInterruptBeacon)\n" + ModuleRootSeedProlog(__seedToken) + InterruptBeaconSeedProlog(__seedToken) + "try { & {\n" + scriptText +
                 "\n} @__nestedCommandArguments 6>&1 5>&1 4>&1 3>&1 2>&1 } catch { " +
                 "$__nestedTermination.ErrorRecord = $PSItem; " +
-                "Write-Output $__nestedTerminationMarker }" + ModuleRootSeedEpilog(__seedToken);
+                "Write-Output $__nestedTerminationMarker }" + InterruptBeaconSeedEpilog(__seedToken) + ModuleRootSeedEpilog(__seedToken);
 
             ErrorRecord? terminatingError = null;
             // Pipeline-stop parity (DEF-001 tail, W2-030): a downstream early stop -
@@ -320,7 +322,8 @@ internal static partial class NestedCommand
             nested.AddScript(wrapper, useLocalScope: false)
                 .AddArgument(scriptArgs)
                 .AddArgument(termination)
-                .AddArgument(terminationMarker);
+                .AddArgument(terminationMarker)
+                .AddArgument(interruptBeacon.State);
             try
             {
                 nested.Invoke<PSObject>(null, output, null);
