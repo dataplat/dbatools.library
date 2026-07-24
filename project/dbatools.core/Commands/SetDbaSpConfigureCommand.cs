@@ -38,6 +38,22 @@ namespace Dataplat.Dbatools.Commands;
 /// 0-4, Value Alias NewValue/NewConfig, Name Alias Config/ConfigName, InputObject
 /// object[] pos4 sole VFP, ConfirmImpact default Medium).
 /// </summary>
+/// <remarks>
+/// Scope of the dangling -ContinueLabel main noted above, stated precisely. In the script world
+/// an unmatched labeled continue does not merely end the process block: it unwinds past every
+/// enclosing loop, past the function, and past the CALLER's own loops, silently terminating the
+/// whole invocation (no exception, no error record, exit 0). So when the alter throws on one
+/// PIPED InputObject record, the source swallows every later record, skips the end block, and
+/// abandons the caller's remaining statements. In this compiled cmdlet each pipeline record runs
+/// its own hop invocation, which CONTAINS the unwind: within one record the remaining
+/// configuration items are skipped exactly like the source, but later piped records still
+/// process. That containment matches the evident intent of the source ("skip to the next item");
+/// the whole-invocation abort is a source bug not replicated here, because the escape leaves no
+/// detectable signal in the wrapper and adding the missing label would change the script world's
+/// behavior. The difference exists only on the default warning path: under -EnableException,
+/// Stop-Function throws a terminating error before any labeled continue is reached, and both
+/// worlds abort the invocation identically.
+/// </remarks>
 [Cmdlet(VerbsCommon.Set, "DbaSpConfigure", SupportsShouldProcess = true)]
 public sealed class SetDbaSpConfigureCommand : DbaBaseCmdlet
 {

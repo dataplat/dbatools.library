@@ -22,6 +22,24 @@ namespace Dataplat.Dbatools.Commands;
 /// Stop-Function is -Continue, which does not latch). Surface pinned by
 /// migration/baselines/Disable-DbaReplPublishing.json.
 /// </summary>
+/// <remarks>
+/// Known behavioral note, preserved deliberately: the non-publisher guard calls
+/// Stop-Function -Continue -ContinueLabel main, but NO enclosing loop carries a :main label -
+/// the label is dangling in the original source and is kept verbatim here. In the script world
+/// an unmatched labeled continue unwinds past every enclosing loop AND the function itself,
+/// silently terminating the whole invocation (no exception, no error record, exit 0). With
+/// several instances PIPED in, a non-publisher on one record therefore kills every later record
+/// and skips the end block; the unwind even escapes the CALLER's own loops, so the statement
+/// after the call never runs either. In this compiled cmdlet each pipeline record runs its own
+/// hop invocation, which CONTAINS the unwind: within one record (array-valued -SqlInstance) the
+/// remaining items are skipped exactly like the source, but later piped records still process.
+/// That containment matches the evident intent of the source ("skip to the next instance"); the
+/// whole-invocation abort is a source bug not replicated here, because the escape leaves no
+/// detectable signal in the wrapper and adding the missing label would change the script world's
+/// behavior. The difference exists only on the default warning path: under -EnableException,
+/// Stop-Function throws a terminating error before any labeled continue is reached, and both
+/// worlds abort the invocation identically.
+/// </remarks>
 [Cmdlet(VerbsLifecycle.Disable, "DbaReplPublishing", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public sealed class DisableDbaReplPublishingCommand : DbaBaseCmdlet
 {

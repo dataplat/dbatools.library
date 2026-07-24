@@ -25,7 +25,9 @@ namespace Dataplat.Dbatools.Commands;
 /// label is dangling in the original source and is kept verbatim here. In the script world an
 /// unmatched labeled continue unwinds past every enclosing loop and the function itself, silently
 /// terminating the whole invocation: with several instances PIPED in, a missing job or step on one
-/// record also kills every later record and skips the end block. In this compiled cmdlet each
+/// record also kills every later record and skips the end block. The unwind does not stop at the
+/// call site either - it escapes the CALLER's own loops as well, so the statement after the call
+/// never runs and the script exits 0 with no error record. In this compiled cmdlet each
 /// pipeline record runs its own hop invocation, which CONTAINS the unwind: within one record
 /// (array-valued -SqlInstance or -Job) the remaining items are skipped exactly like the source, but
 /// later piped records still process and the end block's closing verbose message still appears. That
