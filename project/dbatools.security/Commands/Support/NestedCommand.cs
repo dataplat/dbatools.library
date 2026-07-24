@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 
 namespace Dataplat.Dbatools.Commands;
 
@@ -238,14 +240,10 @@ internal static partial class NestedCommand
                     {
                         host.WriteDebug(debug.Message);
                     }
-#pragma warning disable RS0030 // SMA 3.0.0.0 floor: transparent relay of a nested pipeline's information-stream record. InformationRecord and Cmdlet.WriteInformation exist only on PS 5+, so this branch is reachable only there; faithful forwarding requires the real API. A PS 3/4-safe relay is tracked in the campaign defect register.
-                    else if (item?.BaseObject is InformationRecord information)
+                    else if (IsInformationStreamRecord(item?.BaseObject))
                     {
-                        host.WriteInformation(
-                            information.MessageData,
-                            new List<string>(information.Tags).ToArray());
+                        RelayInformationStreamRecord(host, item!.BaseObject);
                     }
-#pragma warning restore RS0030
                     else if (item?.BaseObject is ErrorRecord nonTerminating)
                     {
                         // Same channel correction as the item-form branches above.
@@ -301,6 +299,61 @@ internal static partial class NestedCommand
                     new object?[] { terminatingError });
                 throw new InvalidOperationException("Nested terminating ErrorRecord unexpectedly returned.");
             }
+        }
+    }
+
+    // The information stream is probed by type NAME and relayed by reflection, never by a
+    // typed reference. System.Management.Automation.InformationRecord and Cmdlet.WriteInformation
+    // both arrived in PowerShell 5.0 and are absent from the System.Management.Automation 3.0.0.0
+    // surface this net472 assembly is compiled against. A typed reference would sit inside the
+    // DataAdded handler above, and the CLR jits a method body whole: on a Windows PowerShell 3.0
+    // or 4.0 host the FIRST output record of ANY hopped command would fail to jit the handler and
+    // throw, whether or not an information record ever appeared. Probing by name keeps every
+    // token in this file resolvable on the floor while preserving the PS 5+ relay exactly.
+    private static bool IsInformationStreamRecord(object? value)
+    {
+        for (Type? candidate = value?.GetType(); candidate is not null; candidate = candidate.BaseType)
+        {
+            if (string.Equals(candidate.FullName, "System.Management.Automation.InformationRecord", StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void RelayInformationStreamRecord(PSCmdlet host, object record)
+    {
+        MethodInfo? writeInformation = typeof(Cmdlet).GetMethod(
+            "WriteInformation",
+            new Type[] { typeof(object), typeof(string[]) });
+        if (writeInformation is null)
+        {
+            // No information stream on this engine, so the nested pipeline cannot have merged a
+            // record into 6>&1 in the first place. Drop it rather than fail the whole relay.
+            return;
+        }
+
+        Type recordType = record.GetType();
+        object? messageData = recordType.GetProperty("MessageData")?.GetValue(record, null);
+        List<string> tags = new List<string>();
+        if (recordType.GetProperty("Tags")?.GetValue(record, null) is IEnumerable rawTags)
+        {
+            foreach (object? tag in rawTags)
+            {
+                if (tag is string text)
+                    tags.Add(text);
+            }
+        }
+
+        try
+        {
+            writeInformation.Invoke(host, new object?[] { messageData, tags.ToArray() });
+        }
+        catch (TargetInvocationException invocation) when (invocation.InnerException is not null)
+        {
+            // Reflection wraps whatever the real call throws. The caller's stop guard matches
+            // PipelineStoppedException by type, so the original has to come back out unwrapped.
+            ExceptionDispatchInfo.Capture(invocation.InnerException).Throw();
         }
     }
 
