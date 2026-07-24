@@ -332,20 +332,14 @@ public sealed class GetDbaOperatingSystemCommand : DbaBaseCmdlet
 
     private CultureInfo? GetLanguage(PSObject? os)
     {
-        // PS: Get-Language $os.OSLanguage - CultureInfo.GetCultureInfo over the OS LCID.
+        // PS: Get-Language $os.OSLanguage - a bare CultureInfo.GetCultureInfo over the OS LCID
+        // with no try/catch, and its call sits outside the caller's try. So an absent OSLanguage
+        // ([int]$null binds to 0) or an unmapped LCID throws a statement-terminating error and
+        // the record fails loudly rather than emitting empty Language fields. Match that: no
+        // early null return and no catch. Convert.ToInt32(null) yields 0 exactly as the [int]
+        // parameter binder does, so the null and unmapped cases both reach the throw as in PS.
         object? rawLanguage = os?.Properties["OSLanguage"]?.Value;
-        if (rawLanguage is null)
-        {
-            return null;
-        }
-        try
-        {
-            return CultureInfo.GetCultureInfo(Convert.ToInt32(rawLanguage, CultureInfo.InvariantCulture));
-        }
-        catch
-        {
-            return null;
-        }
+        return CultureInfo.GetCultureInfo(Convert.ToInt32(rawLanguage, CultureInfo.InvariantCulture));
     }
 
     private static string GetPropertyValue(PSObject? instance, string name)
