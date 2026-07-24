@@ -262,17 +262,35 @@ public sealed partial class InvokeDbaQueryCommand
         string preference = GetEffectiveErrorActionPreference();
         bool swallow = string.Equals(preference, "SilentlyContinue", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(preference, "Ignore", StringComparison.OrdinalIgnoreCase);
-        // The PS method-invocation RAISE landed one record in the caller's -ErrorVariable/
-        // $error even when Resolve-SqlError swallows it (lab: evCount=1 under
-        // SilentlyContinue). One WriteError reproduces that semantic core; the additional
-        // frame-rethrow copies PS accumulates under Continue (lab: 12) are engine
-        // bookkeeping - accepted-class, see the r2 disposition. Stop/Default skip the
-        // write: WriteError would itself convert to the terminating preference exception
-        // and replace the record chain the outer catch must observe.
-        if (swallow || string.Equals(preference, "Continue", StringComparison.OrdinalIgnoreCase))
-            WriteError(RecordFrom(err));
         if (swallow)
+        {
+            // The PS method-invocation RAISE landed one record in the caller's -ErrorVariable/
+            // $error even though Resolve-SqlError swallows it (lab: both 1, both worlds).
+            // WriteError reproduces that, and under SilentlyContinue/Ignore it does not
+            // display, so the record is bookkeeping only - exactly like the source.
+            WriteError(RecordFrom(err));
             return;
+        }
+        if (string.Equals(preference, "Continue", StringComparison.OrdinalIgnoreCase))
+        {
+            // Under Continue - the DEFAULT - WriteError would DISPLAY the record, and the PS
+            // Resolve-SqlError never wrote to the error stream on any branch: it swallowed or
+            // threw, and the throw came back as the caller's Stop-Function warning. Lab, a
+            // malformed query under default preferences: the function printed the warning
+            // alone, WriteError printed a red block on top of it. So the record goes straight
+            // into $error instead, the way Stop-Function's own non-EnableException branch
+            // does it ($null = Write-Error ... 2>&1) - $error keeps both records in the
+            // source's order, and nothing is displayed.
+            //
+            // The caller's -ErrorVariable is the one thing this cannot carry: there is no
+            // "error stream without display", and the source's own count comes from PS
+            // copying the record per frame as the throw unwinds (lab: 12), which a single C#
+            // catch frame accumulates none of. It was already divergent at 1-vs-12 and is
+            // ledgered accepted-class; the visible half is the half a user sees.
+            InnerCommand.InsertGlobalError(this, RecordFrom(err));
+        }
+        // Stop/Default skip both: WriteError would itself convert to the terminating
+        // preference exception and replace the record chain the outer catch must observe.
         throw err;
     }
 

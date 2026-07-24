@@ -164,7 +164,11 @@ internal static class InnerCommand
         return !continueLoop;
     }
 
-    private static void InsertGlobalError(PSCmdlet host, ErrorRecord record)
+    /// <summary>Lands a record in $error without displaying it - the source's
+    /// `$null = Write-Error ... 2>&amp;1`. Callable by a cmdlet that has to record an error the
+    /// PS original never put on the error stream, since WriteError would display it under the
+    /// default preference.</summary>
+    internal static void InsertGlobalError(PSCmdlet host, ErrorRecord record)
     {
         try
         {
