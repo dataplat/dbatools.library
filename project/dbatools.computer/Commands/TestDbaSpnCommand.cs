@@ -405,11 +405,13 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
     private Collection<PSObject> InvokeModuleScoped(string scriptText, object payload)
     {
         object? effective = SessionState.PSVariable.GetValue("PSDefaultParameterValues");
-        object? globalValue = SessionState.PSVariable.GetValue("global:PSDefaultParameterValues");
-        bool swapped = effective is not null && !ReferenceEquals(effective, globalValue);
+        // Module-internal calls resolve $PSDefaultParameterValues from the MODULE session state,
+        // where none is defined - neither caller-LOCAL nor GLOBAL defaults ever reached the retired
+        // functions' nested calls, so the faithful shield is an EMPTY table, not the global one.
+        bool swapped = effective is not null;
         if (swapped)
         {
-            SessionState.PSVariable.Set("PSDefaultParameterValues", globalValue);
+            SessionState.PSVariable.Set("PSDefaultParameterValues", new System.Management.Automation.DefaultParameterDictionary());
         }
         try
         {

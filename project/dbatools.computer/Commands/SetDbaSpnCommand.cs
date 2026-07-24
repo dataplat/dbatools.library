@@ -223,17 +223,19 @@ public sealed class SetDbaSpnCommand : DbaBaseCmdlet
         return 1;
     }
 
-    // The module-scoped private-helper invocation (W5-044/W5-024 pattern): swap the caller-local
-    // $PSDefaultParameterValues for the GLOBAL dict during the nested window (the PSDPV shield)
-    // and re-emit 3>&1-merged WarningRecords through the outer cmdlet.
+    // The module-scoped private-helper invocation: shield $PSDefaultParameterValues with an empty
+    // table for the duration of the nested window (the PSDPV shield) and re-emit 3>&1-merged
+    // WarningRecords through the outer cmdlet.
     private Collection<PSObject> InvokeModuleScoped(string scriptText, object payload)
     {
         object? effective = SessionState.PSVariable.GetValue("PSDefaultParameterValues");
-        object? globalValue = SessionState.PSVariable.GetValue("global:PSDefaultParameterValues");
-        bool swapped = effective is not null && !ReferenceEquals(effective, globalValue);
+        // Module-internal calls resolve $PSDefaultParameterValues from the MODULE session state,
+        // where none is defined - neither caller-LOCAL nor GLOBAL defaults ever reached the retired
+        // functions' nested calls, so the faithful shield is an EMPTY table, not the global one.
+        bool swapped = effective is not null;
         if (swapped)
         {
-            SessionState.PSVariable.Set("PSDefaultParameterValues", globalValue);
+            SessionState.PSVariable.Set("PSDefaultParameterValues", new System.Management.Automation.DefaultParameterDictionary());
         }
         try
         {
