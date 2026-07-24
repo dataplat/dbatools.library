@@ -156,6 +156,15 @@ internal static partial class NestedCommand
     /// Streamed counterpart of the buffered warning re-emit: merged-back warning records
     /// route through the host's warning stream as they arrive, everything else stays
     /// pipeline output.
+    ///
+    /// Because they arrive as produced, a warning survives an unwind here that the buffered
+    /// path would have discarded - but the unwind itself does NOT reach the caller. The hop
+    /// runs in a nested pipeline, so an engine continue/break with no enclosing loop inside
+    /// the hop has nowhere to propagate and is absorbed at that boundary: the caller's
+    /// post-statement runs where the retired function skipped it. Measured both editions,
+    /// A/B'd against the same command running as its retired function. The two invoke shapes
+    /// therefore diverge from the function world in opposite directions, and neither is a
+    /// superset of the other.
     /// </summary>
     private static void ForwardStreamedItem(PSCmdlet host, object? item)
     {

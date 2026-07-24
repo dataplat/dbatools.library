@@ -129,7 +129,14 @@ internal static partial class NestedCommand
     /// <remarks>
     /// Merged warning records re-emit through the host's warning stream for -WarningVariable
     /// parity. Engine flow control raised by a helper (a continue or break that PowerShell
-    /// try/catch cannot intercept) and terminating errors propagate to the caller.
+    /// try/catch cannot intercept) and terminating errors propagate to the caller, but nothing
+    /// this invocation already produced survives that unwind: InvokeScript hands back its
+    /// Collection only on normal completion, so a guard that warns and then unwinds loses its
+    /// warning and the caller's statement dies with no diagnostic at all. Measured both
+    /// editions, A/B'd against the same command running as its retired function. A guard at hop
+    /// top level (outside any loop) is the shape that hits this; inside a loop the continue
+    /// binds to that loop and never reaches the boundary. Contrast InvokeScopedStreaming, which
+    /// keeps the warning and loses the flow control instead.
     /// The script is wrapped in an "&amp; { ... } @args" block because the invocation dot-sources
     /// the text: a bare script's param() would bind IN THE CALLER'S SCOPE and fail with "Cannot
     /// overwrite variable X because the variable has been optimized" whenever the calling function

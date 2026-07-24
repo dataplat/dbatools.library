@@ -119,7 +119,14 @@ internal static partial class NestedCommand
     /// -WarningVariable parity, matching how a function-internal call's warnings bubbled)
     /// and returning the remaining output. Engine flow control (a Stop-Function-style
     /// helper's continue/break — PS try/catch cannot intercept those and neither does
-    /// this) and terminating errors propagate to the caller.
+    /// this) and terminating errors propagate to the caller, but NOTHING THIS INVOCATION
+    /// ALREADY PRODUCED SURVIVES THAT UNWIND: InvokeScript hands back its Collection only on
+    /// normal completion, so a guard that warns and then unwinds loses its warning and the
+    /// caller's statement dies with no diagnostic at all. Measured both editions, A/B'd
+    /// against the same command running as its retired function. A guard at hop TOP LEVEL
+    /// (outside any loop) is the shape that hits this; inside a loop the continue binds to
+    /// that loop and never reaches the boundary. Contrast InvokeScopedStreaming, which keeps
+    /// the warning and loses the flow control instead.
     /// The script is wrapped in an `&amp; {{ ... }} @args` block: InvokeScript's
     /// useLocalScope:false DOT-SOURCES the text, so a bare script's param() would BIND IN
     /// THE CALLER'S SCOPE and die "Cannot overwrite variable X because the variable has
@@ -201,6 +208,15 @@ internal static partial class NestedCommand
     /// Streamed counterpart of the buffered warning re-emit: merged-back warning records
     /// route through the host's warning stream as they arrive, everything else stays
     /// pipeline output.
+    ///
+    /// Because they arrive as produced, a warning survives an unwind here that the buffered
+    /// path would have discarded - but the unwind itself does NOT reach the caller. The hop
+    /// runs in a nested pipeline, so an engine continue/break with no enclosing loop inside
+    /// the hop has nowhere to propagate and is absorbed at that boundary: the caller's
+    /// post-statement runs where the retired function skipped it. Measured both editions,
+    /// A/B'd against the same command running as its retired function. The two invoke shapes
+    /// therefore diverge from the function world in opposite directions, and neither is a
+    /// superset of the other.
     /// </summary>
     private static void ForwardStreamedItem(PSCmdlet host, object? item)
     {
