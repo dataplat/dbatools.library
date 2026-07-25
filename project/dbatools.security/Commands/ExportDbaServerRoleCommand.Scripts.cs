@@ -180,8 +180,8 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                             Instance = $role.SqlInstance
                             Sql      = $outsql
                         }
+                        $roleCollection.Add($roleObject) | Out-Null
                     }
-                    $roleCollection.Add($roleObject) | Out-Null
                     $outsql = @()
                 } catch {
                     $outsql = @()
