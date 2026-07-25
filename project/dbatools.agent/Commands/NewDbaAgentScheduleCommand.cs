@@ -33,12 +33,10 @@ namespace Dataplat.Dbatools.Commands;
 /// sentinel into C# fields and threaded into every process record. None of them is mutated by the
 /// process body, so they are plain constants (no per-record re-emit).
 ///
-/// $jobschedule DOES need a cross-record carry: it is created inside the process ShouldProcess block
-/// but read afterwards (the job-attach branch and the trailing output) OUTSIDE that block, so on a
-/// record whose creation ShouldProcess is declined the source reuses the PREVIOUS record's function-
-/// scope $jobschedule. The hop reproduces this: $jobschedule is seeded from _jobschedule, re-emitted
-/// in the process sentinel, and fed to the next record. The process body is dot-sourced so any early
-/// exit still reaches that sentinel.
+/// $jobschedule deliberately starts null for each process record. The source creates it inside the
+/// schedule ShouldProcess gate but reads it afterwards in the independent job-attachment gate and
+/// trailing output. Reusing a previous record's schedule there can attach and emit the wrong
+/// schedule, so the native command keeps those actions scoped to the record that created it.
 ///
 /// The begin block's "if (\$Force) { \$ConfirmPreference = 'none' }" is folded to the top of the
 /// process hop with \$__gate = if (\$Force) { \$PSCmdlet } else { \$__realCmdlet }; both ShouldProcess
@@ -155,10 +153,6 @@ public sealed class NewDbaAgentScheduleCommand : DbaBaseCmdlet
     private object? _activeStartTimeOfDay;
     private object? _activeEndTimeOfDay;
 
-    // $jobschedule persists across pipeline records via function scope in the source (created inside
-    // the ShouldProcess block but read outside it), so it is carried record-to-record.
-    private object? _jobschedule;
-
     protected override void BeginProcessing()
     {
         if (Interrupted)
@@ -214,14 +208,6 @@ public sealed class NewDbaAgentScheduleCommand : DbaBaseCmdlet
 
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
-            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__newDbaAgentScheduleProcess"))
-            {
-                if (sentinel["__newDbaAgentScheduleProcess"] is Hashtable state)
-                {
-                    _jobschedule = state["JobSchedule"];
-                }
-                return;
-            }
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
@@ -235,7 +221,7 @@ public sealed class NewDbaAgentScheduleCommand : DbaBaseCmdlet
             SqlInstance, SqlCredential, Job, Disabled.ToBool(), Owner, _schedule, _interval,
             _frequencyType, _frequencySubdayType, _frequencySubdayInterval, _frequencyRelativeInterval,
             _frequencyRecurrenceFactor, _startDate, _endDate, _startTime, _endTime, _activeStartDate,
-            _activeEndDate, _activeStartTimeOfDay, _activeEndTimeOfDay, _jobschedule, Force.ToBool(),
+            _activeEndDate, _activeStartTimeOfDay, _activeEndTimeOfDay, null, Force.ToBool(),
             EnableException.ToBool(), this,
             NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
             NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
@@ -584,9 +570,9 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     // PS: the process block VERBATIM apart from $PSCmdlet.ShouldProcess -> $__gate.ShouldProcess and
     // -FunctionName New-DbaAgentSchedule on the direct Stop-Function/Write-Message sites. The begin
-    // Force/ConfirmPreference line + gate selection are prepended (using the USER -Force). The body is
-    // dot-sourced so any early exit still reaches the $jobschedule sentinel. Test-FunctionInterrupt is
-    // preserved verbatim but inert (the C# guard already short-circuits an interrupted record).
+    // Force/ConfirmPreference line + gate selection are prepended (using the USER -Force).
+    // Test-FunctionInterrupt is preserved verbatim but inert (the C# guard already short-circuits an
+    // interrupted record).
     private const string ProcessScript = """
 param($SqlInstance, $SqlCredential, $Job, $Disabled, $Owner, $Schedule, $interval, $FrequencyType, $FrequencySubdayType, $FrequencySubdayInterval, $FrequencyRelativeInterval, $FrequencyRecurrenceFactor, $StartDate, $EndDate, $StartTime, $EndTime, $activeStartDate, $activeEndDate, $activeStartTimeOfDay, $activeEndTimeOfDay, $jobschedule, $Force, $EnableException, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -692,7 +678,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $null = $server.JobServer.SharedSchedules.Refresh()
                 Add-TeppCacheItem -SqlInstance $server -Type schedule -Name $Schedule
             }
-            if ($Job) {
+            if ($Job -and $jobschedule) {
                 $jobs = Get-DbaAgentJob -SqlInstance $server -Job $Job
                 foreach ($j in $jobs) {
                     if ($__gate.ShouldProcess($instance, "Adding the schedule $schedule to job $($j.Name)")) {
@@ -708,7 +694,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
     }
-    @{ __newDbaAgentScheduleProcess = @{ JobSchedule = $jobschedule } }
 } $SqlInstance $SqlCredential $Job $Disabled $Owner $Schedule $interval $FrequencyType $FrequencySubdayType $FrequencySubdayInterval $FrequencyRelativeInterval $FrequencyRecurrenceFactor $StartDate $EndDate $StartTime $EndTime $activeStartDate $activeEndDate $activeStartTimeOfDay $activeEndTimeOfDay $jobschedule $Force $EnableException $__realCmdlet @__commonParameters 3>&1 2>&1
 """;
 
