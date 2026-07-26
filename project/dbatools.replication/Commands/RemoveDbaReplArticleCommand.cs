@@ -114,9 +114,11 @@ public sealed class RemoveDbaReplArticleCommand : DbaBaseCmdlet
     }
 
     // PS: the process block. The source's manual precondition guard runs first (reading the bound
-    // hashtable), then the block EMITS the articles (bound InputObject, or a Get-DbaReplArticle
-    // lookup that splats the caller's bound parameters minus InputObject/WhatIf/Confirm exactly as
-    // the source's $PSBoundParameters re-splat did) and the C# accumulates them across the pipeline.
+    // hashtable). A compiled-cmdlet safety guard then refuses a direct lookup unless Database,
+    // Publication, or Name supplies scope; InputObject remains exempt. The block EMITS the articles
+    // (bound InputObject, or a Get-DbaReplArticle lookup that splats the caller's bound parameters
+    // minus InputObject/WhatIf/Confirm exactly as the source's $PSBoundParameters re-splat did) and
+    // the C# accumulates them across the pipeline.
     private const string ProcessScript = """
 param($SqlInstance, $InputObject, $__bound, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
@@ -129,6 +131,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     if (-not $__bound.SqlInstance -and -not $__bound.InputObject) {
         Stop-Function -Message "You must specify either SqlInstance or InputObject" -FunctionName Remove-DbaReplArticle
+        return
+    }
+
+    if (-not $__bound.InputObject -and -not ($__bound.Database -or $__bound.Publication -or $__bound.Name)) {
+        Stop-Function -Message "You must specify at least one of Database, Publication, or Name when using SqlInstance" -FunctionName Remove-DbaReplArticle
         return
     }
 
