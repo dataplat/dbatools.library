@@ -62,6 +62,57 @@ internal static partial class NestedCommand
     }
 
     /// <summary>
+    /// Removes one matching record from the hop-era portion of $error. The boundary is the same
+    /// pre-hop head used by ErrorVariableBridge; scanning past it could delete session history
+    /// and make the bridge misclassify that history as hop output.
+    /// </summary>
+    internal static void RemoveHopEraDuplicateError(PSCmdlet host, ErrorRecord record, object? hopEraBaselineHead)
+    {
+        if (host is null || record is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (host.SessionState.PSVariable.GetValue("Error") is not ArrayList errorList || errorList.Count == 0)
+            {
+                return;
+            }
+
+            int limit = HopEraLimit(errorList, hopEraBaselineHead);
+            for (int i = 0; i < limit; i++)
+            {
+                if (errorList[i] is ErrorRecord candidate && IsSameFailure(candidate, record))
+                {
+                    errorList.RemoveAt(i);
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort bookkeeping only.
+        }
+    }
+
+    private static int HopEraLimit(ArrayList errorList, object? hopEraBaselineHead)
+    {
+        if (hopEraBaselineHead is null)
+        {
+            return errorList.Count;
+        }
+        for (int i = 0; i < errorList.Count; i++)
+        {
+            if (ReferenceEquals(errorList[i], hopEraBaselineHead))
+            {
+                return i;
+            }
+        }
+        return errorList.Count;
+    }
+
+    /// <summary>
     /// Whether the record sitting on top of $error is the hop's own copy of the record the host
     /// is about to re-emit. Every arm is anchored to OBJECT IDENTITY.
     ///

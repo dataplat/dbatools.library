@@ -55,6 +55,11 @@ internal static partial class NestedCommand
             _targetBaseline = _target?.Count ?? 0;
         }
 
+        /// <summary>
+        /// The pre-hop $error head used to bound this bridge's hop-era region.
+        /// </summary>
+        internal object? HopEraBaselineHead => _baselineHead;
+
         public void Dispose()
         {
             Complete(null);

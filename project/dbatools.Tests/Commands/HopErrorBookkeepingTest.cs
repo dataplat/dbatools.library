@@ -32,6 +32,14 @@ namespace Dataplat.Dbatools.Commands.Test
 
             switch (Mode)
             {
+                case "streamingReal":
+                    NestedCommand.InvokeScopedStreaming(
+                        this,
+                        item => WriteObject(item),
+                        "Write-Error 'STREAM-A'; Write-Error 'STREAM-B'; Write-Error 'STREAM-C'");
+                    WriteObject("InnerErrorCount=" + errorList.Count);
+                    break;
+
                 case "unrelated":
                     // The hop produced NOTHING for this record, so $error[0] belongs to somebody
                     // else. Removing it would silently destroy an unrelated diagnostic.
@@ -58,6 +66,47 @@ namespace Dataplat.Dbatools.Commands.Test
                     break;
 
                 case "empty":
+                    NestedCommand.RemoveDuplicateError(this, incoming);
+                    break;
+
+                case "boundedEarlierRecord":
+                    object boundary = new object();
+                    errorList.Insert(0, boundary);
+                    errorList.Insert(0, incoming);
+                    errorList.Insert(0, bystander);
+                    NestedCommand.RemoveHopEraDuplicateError(this, incoming, boundary);
+                    break;
+
+                case "boundedStopsAtBoundary":
+                    ErrorRecord boundaryRecord = new ErrorRecord(incoming.Exception, "boundary", ErrorCategory.NotSpecified, null);
+                    errorList.Insert(0, boundaryRecord);
+                    errorList.Insert(0, bystander);
+                    NestedCommand.RemoveHopEraDuplicateError(this, incoming, boundaryRecord);
+                    break;
+
+                case "boundedNullBaselineScansAll":
+                    errorList.Insert(0, incoming);
+                    errorList.Insert(0, bystander);
+                    NestedCommand.RemoveHopEraDuplicateError(this, incoming, null);
+                    break;
+
+                case "boundedMissingBaselineScansAll":
+                    errorList.Insert(0, incoming);
+                    errorList.Insert(0, bystander);
+                    NestedCommand.RemoveHopEraDuplicateError(this, incoming, new object());
+                    break;
+
+                case "boundedRemovesOnlyOne":
+                    object oneBoundary = new object();
+                    errorList.Insert(0, oneBoundary);
+                    errorList.Insert(0, incoming);
+                    errorList.Insert(0, new ErrorRecord(incoming.Exception, "duplicate", ErrorCategory.NotSpecified, null));
+                    NestedCommand.RemoveHopEraDuplicateError(this, incoming, oneBoundary);
+                    break;
+
+                case "indexZeroFormUnchanged":
+                    errorList.Insert(0, incoming);
+                    errorList.Insert(0, bystander);
                     NestedCommand.RemoveDuplicateError(this, incoming);
                     break;
             }
@@ -99,6 +148,32 @@ namespace Dataplat.Dbatools.Commands.Test
             return lines;
         }
 
+        private static List<string> StreamingLines(out int streamErrorCount, out int boundErrorCount)
+        {
+            InitialSessionState iss = InitialSessionState.CreateDefault2();
+            iss.Commands.Add(new SessionStateCmdletEntry("Test-DbaHopBookkeeping", typeof(TestDbaHopBookkeepingCommand), null));
+            using (System.Management.Automation.Runspaces.Runspace runspace = RunspaceFactory.CreateRunspace(iss))
+            {
+                runspace.Open();
+                using (PowerShell shell = PowerShell.Create())
+                {
+                    shell.Runspace = runspace;
+                    shell.AddCommand("Test-DbaHopBookkeeping")
+                        .AddParameter("Mode", "streamingReal")
+                        .AddParameter("ErrorVariable", "streamingErrors")
+                        .AddParameter("ErrorAction", ActionPreference.Continue);
+                    Collection<PSObject> output = shell.Invoke();
+                    streamErrorCount = shell.Streams.Error.Count;
+                    ArrayList boundErrors = runspace.SessionStateProxy.GetVariable("streamingErrors") as ArrayList;
+                    boundErrorCount = boundErrors == null ? 0 : boundErrors.Count;
+                    List<string> lines = new List<string>();
+                    foreach (PSObject item in output)
+                        lines.Add(item == null ? null : item.ToString());
+                    return lines;
+                }
+            }
+        }
+
         /// <summary>
         /// The regression this rule exists for. Message-text equality used to be the third match
         /// arm, so an unrelated record whose exception happened to read "Failure" was dequeued in
@@ -135,6 +210,51 @@ namespace Dataplat.Dbatools.Commands.Test
         public void AnEmptyErrorListIsLeftAlone()
         {
             CollectionAssert.Contains(Lines("empty"), "Count=0");
+        }
+
+        [TestMethod]
+        public void BoundedScanRemovesAnEarlierHopRecord()
+        {
+            CollectionAssert.Contains(Lines("boundedEarlierRecord"), "Count=2");
+        }
+
+        [TestMethod]
+        public void BoundedScanStopsBeforeThePreHopHead()
+        {
+            CollectionAssert.Contains(Lines("boundedStopsAtBoundary"), "Count=2");
+        }
+
+        [TestMethod]
+        public void NullBaselineScansTheWholeList()
+        {
+            CollectionAssert.Contains(Lines("boundedNullBaselineScansAll"), "Count=1");
+        }
+
+        [TestMethod]
+        public void MissingBaselineScansTheWholeList()
+        {
+            CollectionAssert.Contains(Lines("boundedMissingBaselineScansAll"), "Count=1");
+        }
+
+        [TestMethod]
+        public void BoundedScanRemovesOnlyOneDuplicate()
+        {
+            CollectionAssert.Contains(Lines("boundedRemovesOnlyOne"), "Count=2");
+        }
+
+        [TestMethod]
+        public void ExistingIndexZeroHelperRemainsIndexZeroOnly()
+        {
+            CollectionAssert.Contains(Lines("indexZeroFormUnchanged"), "Count=2");
+        }
+
+        [TestMethod]
+        public void RealStreamingDrainCharacterizesErrorBookkeeping()
+        {
+            List<string> lines = StreamingLines(out int streamErrorCount, out int boundErrorCount);
+            CollectionAssert.Contains(lines, "InnerErrorCount=3");
+            Assert.AreEqual(3, streamErrorCount);
+            Assert.AreEqual(3, boundErrorCount);
         }
 
         [TestMethod]
