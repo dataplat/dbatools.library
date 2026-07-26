@@ -108,9 +108,12 @@ internal static partial class NestedCommand
                 if (item?.BaseObject is WarningRecord warning)
                     host.WriteWarning(warning.Message);
                 else if (item?.BaseObject is ErrorRecord nonTerminating)
+                {
                     // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
                     // and caller-side preference handling see them, as the function world does.
+                    RemoveHopEraDuplicateError(host, nonTerminating, bridge.HopEraBaselineHead);
                     host.WriteError(nonTerminating);
+                }
                 else
                     output.Add(item!);
             }
@@ -162,9 +165,12 @@ internal static partial class NestedCommand
                 if (item?.BaseObject is WarningRecord warning)
                     host.WriteWarning(warning.Message);
                 else if (item?.BaseObject is ErrorRecord nonTerminating)
+                {
                     // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
                     // and caller-side preference handling see them, as the function world does.
+                    RemoveHopEraDuplicateError(host, nonTerminating, bridge.HopEraBaselineHead);
                     host.WriteError(nonTerminating);
+                }
                 else
                     output.Add(item!);
             }
@@ -407,10 +413,10 @@ internal static partial class NestedCommand
                 foreach (object? item in pipelineInput)
                 {
                     foreach (object output in pipeline.Process(item))
-                        ForwardStreamedItem(host, output);
+                        ForwardStreamedItem(host, output, bridge.HopEraBaselineHead);
                 }
                 foreach (object output in pipeline.End())
-                    ForwardStreamedItem(host, output);
+                    ForwardStreamedItem(host, output, bridge.HopEraBaselineHead);
             }
             catch
             {
@@ -433,14 +439,17 @@ internal static partial class NestedCommand
     /// </summary>
     /// <param name="host">The calling cmdlet.</param>
     /// <param name="item">The item produced by the pipeline.</param>
-    private static void ForwardStreamedItem(PSCmdlet host, object? item)
+    private static void ForwardStreamedItem(PSCmdlet host, object? item, object? hopEraBaselineHead)
     {
         object? unwrapped = item is PSObject psObject ? psObject.BaseObject : item;
         if (unwrapped is WarningRecord warning)
             host.WriteWarning(warning.Message);
         else if (unwrapped is ErrorRecord nonTerminating)
+        {
             // Same channel correction as the item-form branches above.
+            RemoveHopEraDuplicateError(host, nonTerminating, hopEraBaselineHead);
             host.WriteError(nonTerminating);
+        }
         else
             host.WriteObject(item);
     }

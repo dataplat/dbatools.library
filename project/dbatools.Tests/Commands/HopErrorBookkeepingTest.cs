@@ -32,6 +32,13 @@ namespace Dataplat.Dbatools.Commands.Test
 
             switch (Mode)
             {
+                case "bufferedReal":
+                    NestedCommand.InvokeScoped(
+                        this,
+                        "& { Write-Error 'BUFFER-A'; Write-Error 'BUFFER-B'; Write-Error 'BUFFER-C' } 2>&1");
+                    WriteObject("InnerErrorCount=" + errorList.Count);
+                    break;
+
                 case "streamingReal":
                     NestedCommand.InvokeScopedStreaming(
                         this,
@@ -150,6 +157,11 @@ namespace Dataplat.Dbatools.Commands.Test
 
         private static List<string> StreamingLines(out int streamErrorCount, out int boundErrorCount)
         {
+            return RealDrainLines("streamingReal", out streamErrorCount, out boundErrorCount);
+        }
+
+        private static List<string> RealDrainLines(string mode, out int streamErrorCount, out int boundErrorCount)
+        {
             InitialSessionState iss = InitialSessionState.CreateDefault2();
             iss.Commands.Add(new SessionStateCmdletEntry("Test-DbaHopBookkeeping", typeof(TestDbaHopBookkeepingCommand), null));
             using (System.Management.Automation.Runspaces.Runspace runspace = RunspaceFactory.CreateRunspace(iss))
@@ -159,12 +171,12 @@ namespace Dataplat.Dbatools.Commands.Test
                 {
                     shell.Runspace = runspace;
                     shell.AddCommand("Test-DbaHopBookkeeping")
-                        .AddParameter("Mode", "streamingReal")
-                        .AddParameter("ErrorVariable", "streamingErrors")
+                        .AddParameter("Mode", mode)
+                        .AddParameter("ErrorVariable", "drainErrors")
                         .AddParameter("ErrorAction", ActionPreference.Continue);
                     Collection<PSObject> output = shell.Invoke();
                     streamErrorCount = shell.Streams.Error.Count;
-                    ArrayList boundErrors = runspace.SessionStateProxy.GetVariable("streamingErrors") as ArrayList;
+                    ArrayList boundErrors = runspace.SessionStateProxy.GetVariable("drainErrors") as ArrayList;
                     boundErrorCount = boundErrors == null ? 0 : boundErrors.Count;
                     List<string> lines = new List<string>();
                     foreach (PSObject item in output)
@@ -255,6 +267,15 @@ namespace Dataplat.Dbatools.Commands.Test
             CollectionAssert.Contains(lines, "InnerErrorCount=3");
             Assert.AreEqual(3, streamErrorCount);
             Assert.AreEqual(3, boundErrorCount);
+        }
+
+        [TestMethod]
+        public void RealBufferedDrainDoesNotDoubleBookErrors()
+        {
+            List<string> lines = RealDrainLines("bufferedReal", out int streamErrorCount, out int boundErrorCount);
+            Assert.AreEqual(3, streamErrorCount);
+            Assert.AreEqual(3, boundErrorCount);
+            Assert.IsTrue(lines.Contains("InnerErrorCount=3"), "output=" + string.Join("|", lines));
         }
 
         [TestMethod]
