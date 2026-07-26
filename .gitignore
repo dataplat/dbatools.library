@@ -45,6 +45,7 @@ dbatools.library.zip
 !/.claude/
 !/.claude/hooks/
 !/.claude/commands/
+!/.claude/skills/
 !/.claude/settings.json
 !/.claude/hooks/stop-file-length.sh
 !/.claude/commands/*.md
