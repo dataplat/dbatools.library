@@ -154,6 +154,7 @@ public sealed class GetDbaNetworkEncryptionCommand : DbaBaseCmdlet
                 "param($__parameters) " +
                 "$__module = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; " +
                 "& $__module { param($p) Get-SqlServerTlsCertificate @p } $__parameters 3>&1");
+            NestedCommand.RequireDbatoolsScriptModule(this);
             Collection<PSObject> raw = InvokeCommand.InvokeScript(false, script, null, parameters);
             Collection<PSObject> output = new();
             foreach (PSObject item in raw)

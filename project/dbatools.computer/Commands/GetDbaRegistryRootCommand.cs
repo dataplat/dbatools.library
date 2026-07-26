@@ -61,6 +61,7 @@ public sealed class GetDbaRegistryRootCommand : DbaBaseCmdlet
                     { "ScriptText", " $wmi.Services " },
                     { "Credential", Credential }
                 };
+                NestedCommand.RequireDbatoolsScriptModule(this);
                 Collection<PSObject> services = InvokeModuleScoped(
                     "param($__p) " +
                     "$__module = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; " +

@@ -204,6 +204,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
         // returned empty FEATURES. ModuleBase is intrinsic to the module object and stays stable.
         // The nested InvokeScript unrolls the returned array, so the whole result Collection IS the
         // component list (each item a component object) - store it directly rather than taking [0].
+        NestedCommand.RequireDbatoolsScriptModule(this);
         Collection<PSObject> baseResult = InvokeCommand.InvokeScript(false, ScriptBlock.Create(
             "(Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1).ModuleBase"),
             null);
@@ -859,6 +860,7 @@ public sealed class InstallDbaInstanceCommand : DbaBaseCmdlet
             "param($__body, $__p) " +
             "$__m = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1; " +
             "& $__m ([ScriptBlock]::Create($__body)) $__p");
+        NestedCommand.RequireDbatoolsScriptModule(this);
         Collection<PSObject> raw = InvokeCommand.InvokeScript(false, script, null, scriptText, payload);
         Collection<PSObject> output = new();
         foreach (PSObject item in raw)

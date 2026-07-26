@@ -360,6 +360,7 @@ public sealed class TestDbaNetworkCertificateCommand : DbaBaseCmdlet
         // 3>&1 rides the helper's WarningRecords on the output stream so InvokeModuleScoped can
         // re-emit them through the outer cmdlet (WarningAction/WarningVariable parity with the PS
         // function's direct call); without it they hit the host and bypass both.
+        NestedCommand.RequireDbatoolsScriptModule(this);
         Collection<PSObject> res = InvokeModuleScoped(
             "param($__p) $__m = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; & $__m { param($p) Resolve-DbaComputerName -ComputerName $p.ComputerName -Credential $p.Credential } $__p 3>&1",
             splat);
@@ -370,6 +371,7 @@ public sealed class TestDbaNetworkCertificateCommand : DbaBaseCmdlet
     private void RequireElevation(string computerName)
     {
         Hashtable splat = new Hashtable { { "ComputerName", computerName } };
+        NestedCommand.RequireDbatoolsScriptModule(this);
         InvokeModuleScoped(
             "param($__p) $__m = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; $null = & $__m { param($p) Test-ElevationRequirement -ComputerName $p.ComputerName -EnableException $true } $__p",
             splat);

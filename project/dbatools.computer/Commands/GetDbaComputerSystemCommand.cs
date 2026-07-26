@@ -320,6 +320,7 @@ public sealed class GetDbaComputerSystemCommand : DbaBaseCmdlet
     // The private function lives inside the dbatools module scope; resolve it there.
     private string BuildProxiedTlsRestMethod()
     {
+        NestedCommand.RequireDbatoolsScriptModule(this);
         System.Collections.ObjectModel.Collection<PSObject> results = InvokeCommand.InvokeScript("& (Get-Module dbatools) { (Get-Item function:\\Invoke-TlsRestMethod).ScriptBlock }");
         string body = results.Count > 0 && results[0] is not null ? results[0].ToString() : string.Empty;
         return "function Invoke-TlsRestMethod {\n" + body + "\n}";

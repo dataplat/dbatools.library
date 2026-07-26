@@ -150,7 +150,7 @@ internal static partial class NestedCommand
             using InterruptBeacon interruptBeacon = new InterruptBeacon(host);
             string __seedToken = Guid.NewGuid().ToString("N");
             ScriptBlock script = ScriptBlock.Create(
-                "param($__nestedCommandArguments, $__nestedInterruptBeacon)\n" + ModuleRootSeedProlog(__seedToken) + InterruptBeaconSeedProlog(__seedToken) + "& {\n" + scriptText + "\n} @__nestedCommandArguments" + InterruptBeaconSeedEpilog(__seedToken) + ModuleRootSeedEpilog(__seedToken));
+                "param($__nestedCommandArguments, $__nestedInterruptBeacon)\n" + ModuleRootSeedProlog(host, scriptText, __seedToken) + InterruptBeaconSeedProlog(__seedToken) + "& {\n" + scriptText + "\n} @__nestedCommandArguments" + InterruptBeaconSeedEpilog(__seedToken) + ModuleRootSeedEpilog(__seedToken));
             Collection<PSObject> raw = host.InvokeCommand.InvokeScript(false, script, null, new object?[] { scriptArgs, interruptBeacon.State });
             Collection<PSObject> output = new Collection<PSObject>();
             foreach (PSObject item in raw)
@@ -258,7 +258,7 @@ internal static partial class NestedCommand
             using InterruptBeacon interruptBeacon = new InterruptBeacon(host);
             string __seedToken = Guid.NewGuid().ToString("N");
             string wrapper =
-                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker, $__nestedInterruptBeacon)\n" + ModuleRootSeedProlog(__seedToken) + InterruptBeaconSeedProlog(__seedToken) + "try { & {\n" + scriptText +
+                "param($__nestedCommandArguments, $__nestedTermination, $__nestedTerminationMarker, $__nestedInterruptBeacon)\n" + ModuleRootSeedProlog(host, scriptText, __seedToken) + InterruptBeaconSeedProlog(__seedToken) + "try { & {\n" + scriptText +
                 "\n} @__nestedCommandArguments 6>&1 5>&1 4>&1 3>&1 2>&1 } catch { " +
                 "$__nestedTermination.ErrorRecord = $PSItem; " +
                 "Write-Output $__nestedTerminationMarker }" + InterruptBeaconSeedEpilog(__seedToken) + ModuleRootSeedEpilog(__seedToken);

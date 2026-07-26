@@ -240,6 +240,7 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
                     { "ArgumentList", new object?[] { resolved.FullComputerName, hostEntry, computer.InstanceName } },
                     { "Credential", Credential }
                 };
+                NestedCommand.RequireDbatoolsScriptModule(this);
                 spns = InvokeModuleScoped(
                     "param($__p) " +
                     "$__module = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; " +
@@ -297,6 +298,7 @@ public sealed class TestDbaSpnCommand : DbaBaseCmdlet
                             { "Type", searchfor },
                             { "Credential", Credential }
                         };
+                        NestedCommand.RequireDbatoolsScriptModule(this);
                         _adLookupResult = ShapeForScript(InvokeModuleScoped(
                             "param($__p) " +
                             "$__module = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; " +

@@ -99,6 +99,7 @@ public sealed class JoinDbaPathCommand : DbaBaseCmdlet
     /// exactly like the function's unguarded call.</summary>
     private bool TestHostOSLinux()
     {
+        NestedCommand.RequireDbatoolsScriptModule(this);
         Hashtable probeParams = new();
         probeParams["SqlInstance"] = SqlInstance;
         ScriptBlock script = ScriptBlock.Create(

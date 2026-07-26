@@ -365,6 +365,7 @@ public sealed class InvokeDbaAdvancedUpdateCommand : DbaBaseCmdlet
             "param($__c, $__p) " +
             "$__m = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1; " +
             "& $__m ([ScriptBlock]::Create('param($c, $p) & $c @p')) $__c $__p");
+        NestedCommand.RequireDbatoolsScriptModule(this);
         Collection<PSObject> raw = InvokeCommand.InvokeScript(false, script, null, command, splat);
         Collection<PSObject> output = new();
         foreach (PSObject item in raw)

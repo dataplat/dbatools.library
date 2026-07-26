@@ -70,6 +70,7 @@ public sealed partial class InvokeDbaQueryCommand
     /// <summary>Runs a PRIVATE dbatools function in the module scope (W5-027 pattern).</summary>
     private Collection<PSObject> ModuleScopedInvoke(string commandName, Hashtable parameters)
     {
+        NestedCommand.RequireDbatoolsScriptModule(this);
         ScriptBlock script = ScriptBlock.Create(
             "param($__cmd, $__params) & (Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1) { param($c, $p) & $c @p } $__cmd $__params");
         return InvokeCommand.InvokeScript(true, script, null, commandName, parameters);

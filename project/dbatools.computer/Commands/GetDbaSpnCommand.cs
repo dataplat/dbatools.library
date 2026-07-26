@@ -135,6 +135,7 @@ public sealed class GetDbaSpnCommand : DbaBaseCmdlet
                 { "Credential", Credential },
                 { "EnableException", true }
             };
+            NestedCommand.RequireDbatoolsScriptModule(this);
             adResult = InvokeModuleScoped(
                 "param($__p) " +
                 "$__module = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; " +

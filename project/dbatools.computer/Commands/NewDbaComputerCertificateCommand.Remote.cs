@@ -30,6 +30,7 @@ public sealed partial class NewDbaComputerCertificateCommand
         {
             if (ShouldProcess("local", "Generating pfx and reading from disk"))
             {
+                NestedCommand.RequireDbatoolsScriptModule(this);
                 _certData = InvokeCertScript(
                     @"param($p)
                 $m = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1
@@ -42,6 +43,7 @@ public sealed partial class NewDbaComputerCertificateCommand
 
             if (ShouldProcess("local", "Removing cert from disk but keeping it in memory"))
             {
+                NestedCommand.RequireDbatoolsScriptModule(this);
                 InvokeCertScript(
                     @"param($p)
                 $m = Get-Module dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1
@@ -83,6 +85,7 @@ public sealed partial class NewDbaComputerCertificateCommand
             { "Folder", Folder },
             { "Flags", string.Join(",", Flag) }
         };
+        NestedCommand.RequireDbatoolsScriptModule(this);
         Collection<PSObject> imported = InvokeCommand.InvokeScript(
             false,
             ScriptBlock.Create(@"param($p)

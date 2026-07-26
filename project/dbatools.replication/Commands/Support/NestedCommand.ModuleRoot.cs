@@ -102,8 +102,26 @@ internal static partial class NestedCommand
     // dbatools cmdlet in the same frame) would overwrite fixed names and make the outer finally
     // restore the SEED instead of the caller's value (codex r3) - so every invocation gets
     // GUID-suffixed snapshot names, and the finally removes them to leave no scope litter.
-    private static string ModuleRootSeedProlog(string seedToken)
+    internal static void RequireDbatoolsScriptModule(PSCmdlet host)
     {
+        var modules = host.InvokeCommand.InvokeScript(
+            "Get-Module -Name dbatools | Where-Object ModuleType -eq 'Script' | Select-Object -First 1");
+        PSModuleInfo? scriptModule = modules.Count > 0 ? modules[0].BaseObject as PSModuleInfo : null;
+        if (scriptModule is not null && scriptModule.ModuleType == ModuleType.Script)
+            return;
+
+        string? commandName = host.MyInvocation?.MyCommand?.Name;
+        if (string.IsNullOrEmpty(commandName))
+            commandName = "this command";
+        throw new PSInvalidOperationException(
+            "The dbatools script module is not loaded; Import-Module dbatools before calling " + commandName + ".");
+    }
+
+    private static string ModuleRootSeedProlog(PSCmdlet host, string scriptText, string seedToken)
+    {
+        if (scriptText.IndexOf("$__dbatoolsModule", StringComparison.Ordinal) >= 0)
+            RequireDbatoolsScriptModule(host);
+
         string prior = "$__dbatoolsPriorModuleRoot_" + seedToken;
         string priorValue = "$__dbatoolsPriorModuleRootValue_" + seedToken;
         return

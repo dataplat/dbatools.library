@@ -66,6 +66,7 @@ public sealed class RemoveDbaSpnCommand : DbaBaseCmdlet
                 { "Type", searchfor },
                 { "Credential", Credential }
             };
+            NestedCommand.RequireDbatoolsScriptModule(this);
             _lookupResult = ShapeOutput(InvokeModuleScoped(
                 "param($__p) " +
                 "$__module = Get-Module dbatools | Where-Object ModuleType -eq \"Script\" | Select-Object -First 1; " +
