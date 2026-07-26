@@ -36,11 +36,10 @@ public sealed class SetDbaSpnCommand : DbaBaseCmdlet
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.
 
-    // PS: $Result and $adentry are FUNCTION-scope, so a throwing lookup (or GetUnderlyingObject)
-    // leaves the value from a PREVIOUS pipeline record in place and the stale object is then used
-    // for the current record (quirk preserved - same family as Test-DbaSpn's $result). Holds the
-    // pipeline-SHAPED value like the PS variable (a not-found lookup emits an explicit $null,
-    // which PS collapses to scalar null with Count 0).
+    // PS: $Result and $adentry are FUNCTION-scope. Keep the pipeline-shaped lookup value because
+    // the throwing-lookup path has not been behaviorally characterized. Clear the DirectoryEntry
+    // per record: reusing it after a later lookup cannot resolve an account would apply that
+    // record's SPN to an earlier account.
     private object? _lookupResult;
     private object? _adEntry;
 
@@ -50,6 +49,8 @@ public sealed class SetDbaSpnCommand : DbaBaseCmdlet
         {
             return;
         }
+
+        _adEntry = null;
 
         string serviceAccount = ServiceAccount ?? string.Empty;
         string spn = SPN ?? string.Empty;
