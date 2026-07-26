@@ -1,222 +1,153 @@
-# dbatools.library C# Style Guide for Claude Code
+# dbatools.library
 
-The .NET library that powers [dbatools](https://github.com/dataplat/dbatools), the community module for SQL Server professionals.
+The .NET library that powers [dbatools](https://github.com/dataplat/dbatools), the community
+module for SQL Server professionals.
 
-**Tech Stack**: C# (.NET Framework 4.7.2 + .NET 8.0), PowerShell module loader, MSTest.
+**Stack**: C# targeting both `net472` (Windows PowerShell 5.1) and `net8.0` (PowerShell 7+),
+PowerShell module loader, MSTest.
 
-## CRITICAL LANGUAGE VERSION RULES (scoped per project)
+## Two language regimes — which applies depends on the directory
 
-The repo has TWO language regimes. Which one applies depends on the project directory —
-normative source: `dbatools/migration/specs/architecture.md` section 11.
+Normative source: `dbatools/migration/specs/architecture.md` §11.
 
-### Shared runtime and CSV package: LangVersion 7.3 — NO C# 8+ FEATURES
+### `project/dbatools/` (shared runtime) and `project/Dataplat.Dbatools.Csv/` — LangVersion 7.3
 
-**Applies to:** `project/dbatools/` (shared runtime, builds `dbatools.dll`) and
-`project/Dataplat.Dbatools.Csv/`. NEVER use C# 8+ syntax there.
+No C# 8+ syntax, and **no string interpolation at all**:
 
 ```csharp
-// FORBIDDEN in project/dbatools/ and project/Dataplat.Dbatools.Csv/ — C# 8+ features
-var x = obj?.Property ?? "default";   // null-coalescing assignment ??= is C# 8
+// FORBIDDEN here
 string? nullable = null;              // nullable reference types (C# 8)
+x ??= "default";                      // null-coalescing assignment (C# 8)
 var range = array[1..^1];             // ranges/indices (C# 8)
-using var stream = new FileStream(); // using declarations (C# 8)
+using var stream = new FileStream();  // using declarations (C# 8)
 var result = obj switch { ... };      // switch expressions (C# 8)
-static int Add(int a, int b) => a+b; // static local functions (C# 8)
-
-// FORBIDDEN there — String interpolation (any version)
-var msg = $"Hello {name}";            // NO — not allowed in the shared runtime
-
-// CORRECT — Use String.Format
-var msg = String.Format("Hello {0}", name);
+static int Add(int a, int b) => a+b;  // static local functions (C# 8)
+var msg = $"Hello {name}";            // interpolation — use String.Format("Hello {0}", name)
 ```
 
-### Satellite cmdlet assemblies: modern C# 12 — deliberately NOT 7.3
+### `project/dbatools.<module>/` satellites — modern C# 12, deliberately not 7.3
 
-**Applies to:** every `project/dbatools.<module>/` satellite (agent, computer, core,
-database, hadr, maintenance, performance, replication, security, ssis, xevents). These
-intentionally set `<LangVersion>12</LangVersion>` + `TreatWarningsAsErrors` per the
-migration architecture spec — do NOT "fix" them back to 7.3, and do NOT flag modern
-syntax there as a style violation.
+Every satellite (agent, computer, core, database, hadr, maintenance, performance, replication,
+security, ssis, xevents) sets `<LangVersion>12</LangVersion>` + `TreatWarningsAsErrors` per the
+migration architecture spec. **Do not "fix" them back to 7.3**, and do not flag modern syntax
+there as a style violation.
 
-- **Allowed:** file-scoped namespaces, `#nullable enable` (mandatory first line of every
-  `Commands/` file), string interpolation, pattern matching, target-typed `new`,
-  `using` declarations, switch expressions.
-- **Still banned** (net472 + SMA 3.0.0.0 compatibility, see architecture.md §11):
-  `async`/`await`/`Task.Run`, `record`, `init`/`required` members, ranges/indices,
-  `ArgumentCompleterAttribute`, class-level `[Alias]` on cmdlets, `Console.*`/`Host.UI.*`,
-  static mutable state in cmdlet classes, LINQ in hot loops, `Assembly.LoadFile`.
+- **Allowed**: file-scoped namespaces, string interpolation, pattern matching, target-typed `new`,
+  `using` declarations, switch expressions. `#nullable enable` is the mandatory first line of
+  every `Commands/` file.
+- **Still banned** (net472 + SMA 3.0.0.0 compatibility, architecture.md §11): `async`/`await`/
+  `Task.Run`, `record`, `init`/`required` members, ranges/indices, `ArgumentCompleterAttribute`,
+  class-level `[Alias]` on cmdlets, `Console.*`/`Host.UI.*`, static mutable state in cmdlet
+  classes, LINQ in hot loops, `Assembly.LoadFile`.
 
-## CRITICAL CMDLET RULES
+## Cmdlet rules
 
-### Base Class Requirement
+- Cmdlets inherit `DbaBaseCmdlet` or `DbaInstanceCmdlet` — never `PSCmdlet` or `Cmdlet` directly.
+- Use `WriteMessage(MessageLevel.Verbose, "Processing {0}", serverName)`, not `WriteVerbose` /
+  `WriteWarning` / `WriteDebug`. Use `StopFunction(...)`, not `ThrowTerminatingError`.
+- `[Cmdlet]` classes need `/// <summary>` docs.
+- Never `Assembly.LoadFile()` — the module loads assemblies through its `Redirector` class and
+  binding redirects.
 
-**ABSOLUTE RULE**: All cmdlets MUST inherit from `DbaBaseCmdlet` or `DbaInstanceCmdlet`. NEVER inherit directly from `PSCmdlet` or `Cmdlet`.
+**Legacy exemptions** from the message/error rules: `WriteMessageCommand`,
+`SetDbatoolsConfigCommand`, `ImportCommand`, `ReadXEvent`, `SelectDbaObject`.
 
-```csharp
-// CORRECT
-[Cmdlet(VerbsCommon.Get, "DbaDatabase")]
-public class GetDbaDatabase : DbaInstanceCmdlet { }
+Shared cmdlet behavior belongs in the satellite's own `Commands/NestedCommand.*.cs` partial, not in
+`DbaBaseCmdlet` — that class is shared runtime and every satellite pays for a change to it.
 
-// WRONG — Will be rejected by hook
-[Cmdlet(VerbsCommon.Get, "DbaDatabase")]
-public class GetDbaDatabase : PSCmdlet { }
-```
+## Where things live in `project/dbatools/`
 
-### Message and Error Handling
+Only the folders whose names undersell or misdescribe them. The rest — `Csv/` (50 files, the
+biggest), `Computer/`, `Configuration/`, `Database/`, `Exceptions/`, `Runspace/`, `Maintenance/`,
+`TypeConversion/` — hold what you'd expect.
 
-**CRITICAL**: Do NOT call `WriteVerbose`, `WriteWarning`, or `WriteDebug` directly in cmdlets — use `WriteMessage` instead. Do NOT call `ThrowTerminatingError` — use `StopFunction` instead.
+| Folder | Holds | Why it's listed |
+|---|---|---|
+| `Commands/` | `DbaBaseCmdlet`, `DbaInstanceCmdlet`, and the five legacy-exempt cmdlets | The base classes every cmdlet inherits |
+| `Parameter/` | `DbaInstanceParameter`, `DbaCredentialParameter`, `DbaDatabaseParameter`, `DbaCmConnectionParameter` (18 files) | The input-coercion types, not `[Parameter]` attributes |
+| `dbaSystem/` | `DebugHost`, `DmfLibrary`, `ReplicationLibrary`, `DbaErrorRecord` | Lowercase, and nothing about the name suggests any of it — `DmfLibrary` is the PBM/Dmf resolution path |
+| `Message/` | `MessageLevel`, `DbatoolsException`, `LogEntry`, `CallStack` (16 files) | Where `WriteMessage`'s plumbing and the exception types live |
+| `Utility/` | `DbaDate`/`DbaDateTime`/`DbaTimeSpan`, `ByteHex`, `CollationSensitiveFilter` (24 files) | Junk-drawer name over real types — check here before writing a helper |
+| `Connection/` | `ConnectionHost`, Entra auth, CIM services (21 files) | Larger and broader than "connection" implies |
+| `Discovery/` | SQL Browser replies, instance scan/availability types | Network discovery, not object enumeration |
+| `TabExpansion/` | `TabExpansionHost`, `ScriptContainer` | This is TEPP |
+| `General/` | `ExecutionMode` — one file | Name conveys nothing |
+| `IO/` | `ProgressStream` — one file | Name conveys nothing |
+| `Validation/` | `LinkedServerResult` — one file | Not a validation framework |
 
-```csharp
-// CORRECT
-WriteMessage(MessageLevel.Verbose, "Processing {0}", serverName);
-StopFunction("Connection failed", exception);
+Satellite cmdlets live in `project/dbatools.<module>/Commands/` instead, one folder per module.
 
-// WRONG — Direct PS methods
-WriteVerbose("Processing " + serverName);
-ThrowTerminatingError(new ErrorRecord(...));
-```
-
-**Legacy exemptions** (DO NOT apply these rules to): `WriteMessageCommand`, `SetDbatoolsConfigCommand`, `ImportCommand`, `ReadXEvent`, `SelectDbaObject`.
-
-### XML Documentation Required
-
-All `[Cmdlet]` classes MUST have `/// <summary>` documentation.
-
-## ASSEMBLY LOADING
-
-**NEVER** use `Assembly.LoadFile()`. The module handles assembly loading via a custom `Redirector` class and binding redirects.
-
-## Dev Commands
+## Dev commands
 
 ```bash
-# Build the library
-dotnet build project/dbatools/dbatools.csproj
-
-# Run tests
-dotnet test project/dbatools.Tests/dbatools.Tests.csproj
-
-# Build the standalone CSV NuGet package
-dotnet build project/Dataplat.Dbatools.Csv/Dataplat.Dbatools.Csv.csproj
-
-# Build everything
-dotnet build project/dbatools.sln
+dotnet build project/dbatools.sln                              # everything
+dotnet build project/dbatools/dbatools.csproj                  # shared runtime only
+dotnet test  project/dbatools.Tests/dbatools.Tests.csproj      # MSTest (not xUnit, not NUnit)
 ```
 
-## Project Structure
+Always build `dbatools.sln` before finishing a C# change — there is no auto-build hook;
+enforcement is `TreatWarningsAsErrors` in the satellite csprojs plus the migration gate's build
+step.
 
-```
-dbatools.library/
-├── project/
-│   ├── dbatools/                  # Main C# library
-│   │   ├── Csv/                   # CSV reader/writer (also published as NuGet)
-│   │   ├── Computer/              # Disk/drive types
-│   │   ├── Configuration/         # Config system + ConfigurationHost
-│   │   ├── Connection/            # Connection management
-│   │   ├── Database/              # BackupHistory, Dependency
-│   │   ├── Discovery/             # SQL Server browser/discovery
-│   │   ├── Exceptions/            # Custom exceptions
-│   │   ├── General/               # ExecutionMode
-│   │   ├── IO/                    # ProgressStream
-│   │   ├── Maintenance/           # Background maintenance tasks
-│   │   ├── Message/               # Messaging system (LogHost, MessageHost)
-│   │   ├── Parameter/             # DbaInstanceParameter, DbaCredentialParameter, etc.
-│   │   ├── Runspace/              # RunspaceHost, RunspaceContainer
-│   │   ├── TabExpansion/          # Tab completion (TEPP)
-│   │   ├── TypeConversion/        # Type converters
-│   │   └── Utility/               # DbaDateTime, DbaTimeSpan, etc.
-│   ├── dbatools.<module>/         # Satellite cmdlet assemblies (C# 12): agent, computer,
-│   │                              #   core, database, hadr, maintenance, performance,
-│   │                              #   replication, security, ssis, xevents — ports of
-│   │                              #   dbatools PS commands per dbatools/migration/ specs
-│   ├── Dataplat.Dbatools.Csv/     # Standalone NuGet package (links to Csv/ source)
-│   └── dbatools.Tests/            # MSTest unit tests
-├── dbatools.library.psd1          # PowerShell module manifest
-├── dbatools.library.psm1          # Module loader (assembly loading, binding redirects)
-├── benchmarks/                    # BenchmarkDotNet CSV benchmarks
-└── artifacts/lib/                 # Build output
-```
+## Gotchas
 
-## Multi-Framework Targeting
+**Windows + net8.0 test failures are expected.** PowerShell SDK assembly conflicts in the test
+host — only `net472` results matter on Windows. CI runs net8.0 on Linux, where it is clean.
 
-The library targets **both** `net472` (Windows PowerShell 5.1) and `net8.0` (PowerShell 7+).
+**MSTest 3.11+ ships a `MessageLevel`** that collides with `Dataplat.Dbatools.Message.MessageLevel`
+— use a `using` alias in affected test files.
 
-- `net472` uses GAC reference for `System.Management.Automation` on Windows
-- `net472` uses `PowerShellStandard.Library` on non-Windows (CI)
-- `net8.0` uses `Microsoft.PowerShell.SDK 7.4.x`
-- Some packages differ by framework (e.g., `System.Threading.Tasks.Dataflow` versions)
-
-## Dependency Version Constraints
-
-**Read before upgrading any package**: Several packages have hard version ceilings due to runtime compatibility issues.
+**Package version ceilings** — read before upgrading anything:
 
 | Package | Ceiling | Why |
 |---------|---------|-----|
-| Microsoft.Data.SqlClient | 6.x only | DacFx/SMO compiled against 6.x; 7.x causes type-load failures |
-| Microsoft.PowerShell.SDK | 7.4.x only | 7.5+ requires net9.0 target change |
-| MSTest.* | 3.x only | 4.x drops `Assert.ThrowsException<T>()` on net472 |
-| Microsoft.NET.Test.Sdk | 17.x only | 18.x aligns with MSTest 4.x ecosystem |
+| Microsoft.Data.SqlClient | 6.x | DacFx/SMO compiled against 6.x; 7.x causes type-load failures |
+| Microsoft.PowerShell.SDK | 7.4.x | 7.5+ requires a net9.0 target change |
+| MSTest.* | 3.x | 4.x drops `Assert.ThrowsException<T>()` on net472 |
+| Microsoft.NET.Test.Sdk | 17.x | 18.x aligns with the MSTest 4.x ecosystem |
 
-For full details and current versions, see the [dependency constraints memory](file://memory/dependency_constraints.md).
+Some packages differ by framework (e.g. `System.Threading.Tasks.Dataflow`). On non-Windows,
+`net472` uses `PowerShellStandard.Library` instead of the GAC `System.Management.Automation`.
 
-## Architecture — Static Hubs
+**Cross-cutting state lives in singleton hosts**, not in cmdlets: `MessageHost`, `LogHost`,
+`ConfigurationHost`, `ConnectionHost`, `RunspaceHost`, `TabExpansionHost`.
 
-The library uses singleton "host" classes for cross-cutting concerns:
+**The CSV code has two homes.** `project/dbatools/Csv/` is compiled into the main assembly, and
+`project/Dataplat.Dbatools.Csv/` links the same source files to publish a standalone NuGet
+package. A change to one is a change to both; the package carries its own `README.md`,
+`CHANGELOG.md`, and `MIGRATING-FROM-LUMENWORKS.md`.
 
-- `MessageHost` — message configuration and event subscriptions
-- `LogHost` — log entry storage and configuration
-- `ConfigurationHost` — configuration values and handlers
-- `ConnectionHost` — connection management
-- `RunspaceHost` — runspace container registry
-- `TabExpansionHost` — tab completion registration
+## Hooks that will block you
 
-## CSV Library (Dataplat.Dbatools.Csv)
+Stop hooks, so they fire at the end of a turn — fix the violation, don't route around it.
 
-The CSV library is both:
-1. Part of the main `dbatools` assembly (under `project/dbatools/Csv/`)
-2. Published as a standalone NuGet package (via `project/Dataplat.Dbatools.Csv/` which links the same source files)
+- `enforce-cs-rules.sh` — the cmdlet and language rules above, including *new* string interpolation
+  in the 7.3 projects (pre-existing occurrences are grandfathered; satellites are C# 12 and
+  interpolation is fine there).
+- `enforce-psd1-rules.sh` — no wildcard exports in module manifests.
+- `stop-file-length.sh` — tracked text/source/docs/scripts/config files stay at or below 400
+  physical lines. Split structurally rather than growing a file.
 
-When modifying CSV code, changes apply to both. The standalone package has its own:
-- [README](project/Dataplat.Dbatools.Csv/README.md) — full API documentation
-- [CHANGELOG](project/Dataplat.Dbatools.Csv/CHANGELOG.md) — version history
-- [Migration guide](project/Dataplat.Dbatools.Csv/MIGRATING-FROM-LUMENWORKS.md) — for LumenWorks users
+All hooks use `set -eu` — not `pipefail`, which is unsupported on Windows `sh`.
 
-## Testing
+## Tone: warm and short
 
-- Framework: **MSTest** (not xUnit, not NUnit)
-- Test project references the main `dbatools.csproj`
-- Run with: `dotnet test project/dbatools.Tests/dbatools.Tests.csproj`
-- MSTest 3.11+ has a `MessageLevel` type that conflicts with `Dataplat.Dbatools.Message.MessageLevel` — use a using alias in affected test files
-- **Windows + net8.0 test failures**: Some tests fail under `net8.0` on Windows due to PowerShell SDK assembly conflicts in the test host. These are expected — only `net472` test results matter on Windows. CI runs the net8.0 tests on Linux where they pass cleanly.
+Talk like a friendly colleague who is busy — kind, plain, and finished in a few lines. The warmth
+is in the wording, not in extra words.
 
-## Hooks (Enforced Automatically)
+**Prose**: lead with the answer or the result, and add detail only when it changes what happens
+next. No preamble, no restating the request back, no closing paragraph that summarizes the opening
+one. Say "I'm not sure" once instead of hedging three times.
 
-Hooks enforce these rules — if a hook blocks you, fix the violation:
+**Comments**: explain *why*, never *what*. If the code already says it, delete the comment. No
+banners, no `// Step 1:` narration, no comment above a method that restates its signature. A
+version quirk, a non-obvious workaround, a constraint that cost real debugging — those earn a line.
+The mandatory `/// <summary>` docs on `[Cmdlet]` classes are not covered by this.
 
-- **C# rules** (`enforce-cs-rules.sh`, Stop hook): cmdlet base class, no `Assembly.LoadFile`, no direct `WriteVerbose`/`WriteWarning`/`WriteDebug`, no `ThrowTerminatingError`, XML docs on `[Cmdlet]` classes, satellite bans (async/await/`Task.Run`, `ArgumentCompleter`), and NEW string interpolation in the LangVersion 7.3 projects (pre-existing occurrences are grandfathered; satellites are C# 12 by design and interpolation is fine there)
-- **PSD1 rules** (`enforce-psd1-rules.sh`, Stop hook): No wildcard exports in module manifests
-- **Builds**: no auto-build hook — enforcement is `TreatWarningsAsErrors` in the satellite csproj files plus the migration gate's build step; always run `dotnet build project/dbatools.sln` before finishing a C# change
-- **File length check** (`stop-file-length.sh`, Stop hook): Tracked text/source/docs/scripts/config files must stay at or below 400 physical lines; split files structurally rather than growing them.
+## Companions
 
-All hooks use `set -eu` (not `pipefail` — unsupported on Windows sh).
-
-## Companion Repositories
-
-| Repo | Purpose | Location |
-|------|---------|----------|
-| [dbatools](https://github.com/dataplat/dbatools) | PowerShell module (consumes this library) | `c:\github\dbatools` |
-| dbatools.pro | Fleet management platform (uses dbatools) | `c:\github\dbatools.pro` |
-
-## VERIFICATION CHECKLIST
-
-**Before submitting any C# change:**
-- [ ] Shared runtime + Csv package only: no C# 8+ syntax (no `??=`, no nullable refs, no ranges, no `using` declarations, no switch expressions)
-- [ ] Shared runtime + Csv package only: no `$"..."` string interpolation — use `String.Format`
-- [ ] Satellites (`project/dbatools.<module>/`): modern C# 12 is correct; only the §11 banned list applies (no async, no `record`/`init`/`required`, no ranges/indices, no ArgumentCompleter)
-- [ ] Cmdlets inherit `DbaBaseCmdlet` or `DbaInstanceCmdlet`
-- [ ] No direct `WriteVerbose`/`WriteWarning`/`WriteDebug` — use `WriteMessage`
-- [ ] No `ThrowTerminatingError` — use `StopFunction`
-- [ ] `[Cmdlet]` classes have `/// <summary>` docs
-- [ ] No `Assembly.LoadFile()`
-- [ ] No tracked text/source/docs/scripts/config file exceeds 400 physical lines
-- [ ] Build succeeds: `dotnet build project/dbatools/dbatools.csproj`
-- [ ] Tests pass: `dotnet test project/dbatools.Tests/dbatools.Tests.csproj`
+This repo is one of three in the dbatools 3.0 migration; the campaign's coordination repo and
+issue queue is `c:\github\dbatools\migration` (read its `CLAUDE.md` before working a row).
+`c:\github\dbatools` is the PowerShell module that consumes this library. Both code repos are on
+branch `libmigration`. `c:\github\dbatools.pro` is a separate fleet-management platform that uses
+dbatools.
