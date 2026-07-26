@@ -189,8 +189,10 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $LocalFile = Join-Path -Path $temp -ChildPath $fileName
     }
 
+    $shouldInstall = $__realCmdlet.ShouldProcess("$LocalFile", "Install SqlPackage")
+
     # Download if needed
-    if (-not (Test-Path -Path $LocalFile) -or $Force) {
+    if ($shouldInstall -and (-not (Test-Path -Path $LocalFile) -or $Force)) {
         try {
             Write-Progress -Activity "Installing SqlPackage" -Status "Starting download from Microsoft..." -PercentComplete 20
             Write-Message -Level Verbose -Message "Downloading SqlPackage from $url" -FunctionName Install-DbaSqlPackage -ModuleName "dbatools"
@@ -213,7 +215,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     Write-Progress -Activity "Installing SqlPackage" -Status "Preparing installation..." -PercentComplete 50
 
     # Install SqlPackage
-    if ($__realCmdlet.ShouldProcess("$LocalFile", "Install SqlPackage")) {
+    if ($shouldInstall) {
         if (-not (Test-Path -Path $LocalFile)) {
             Write-Progress -Activity "Installing SqlPackage" -Completed
             Stop-Function -Message "LocalFile $LocalFile does not exist." -FunctionName Install-DbaSqlPackage
