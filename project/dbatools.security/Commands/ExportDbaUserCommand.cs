@@ -149,7 +149,7 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
     {
         // InputObject is bimodal: bound BY NAME (a fixed value the body accumulates ON TOP of via +=
         // across records) or bound from the PIPELINE (databases piped, rebinds each record). ContainsKey
-        // captured before any record distinguishes them - exactly as W2-245 does for its lone pipeline param.
+        // captured before pipeline binding distinguishes the fixed by-name value from per-record input.
         _inputObjectByName = MyInvocation.BoundParameters.ContainsKey("InputObject");
         _inputObjectState = InputObject;
         _appendState = Append.ToBool();
