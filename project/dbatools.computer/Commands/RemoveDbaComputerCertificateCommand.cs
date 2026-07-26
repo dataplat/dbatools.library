@@ -9,9 +9,7 @@ using Dataplat.Dbatools.Parameter;
 namespace Dataplat.Dbatools.Commands;
 
 /// <summary>
-/// Removes a computer certificate by thumbprint from a certificate store. Port of
-/// public/Remove-DbaComputerCertificate.ps1; surface pinned by
-/// migration/baselines/Remove-DbaComputerCertificate.json.
+/// Removes a computer certificate by thumbprint from a certificate store.
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "DbaComputerCertificate", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(PSObject))]
