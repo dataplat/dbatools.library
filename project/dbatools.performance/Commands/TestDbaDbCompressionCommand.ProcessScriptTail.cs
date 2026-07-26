@@ -240,7 +240,7 @@ IF OBJECT_ID('tempdb..##tmpEstimatePage', 'U') IS NOT NULL
         }
 
     [pscustomobject]@{
-        __dbatoolsW1126ProcessCarrier = $true
+        __dbatoolsTdcProcessCarrier = $true
         StaleDatabase = $(if ([bool](Get-Variable -Name db -Scope 0 -ErrorAction Ignore)) { $db } else { $null }); StaleDatabaseAssigned = [bool](Get-Variable -Name db -Scope 0 -ErrorAction Ignore)
     }
 } $SqlInstance $SqlCredential $Database $ExcludeDatabase $__excludeDatabaseBound $sqlSchemaWhere $sqlTableWhere $sqlRestrict $StaleDatabase $StaleDatabaseAssigned $EnableException @__commonParameters 3>&1 2>&1

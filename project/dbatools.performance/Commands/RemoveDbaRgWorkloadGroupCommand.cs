@@ -135,7 +135,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             this, BoundVerbose(), BoundDebug());
     }
 
-    private const string CarrierMarker = "__dbatoolsW1117Carrier";
+    private const string CarrierMarker = "__dbatoolsRrwgCarrier";
 
     private object? BoundDebug()
     {
@@ -161,12 +161,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     if (-not $InputObject -and -not $WorkloadGroup) {
         Stop-Function -Message "You must pipe in a workload group or specify a WorkloadGroup." -FunctionName Remove-DbaRgWorkloadGroup
-        [pscustomobject]@{ __dbatoolsW1117Carrier = $true; InputObject = $InputObject }
+        [pscustomobject]@{ __dbatoolsRrwgCarrier = $true; InputObject = $InputObject }
         return
     }
     if (-not $InputObject -and -not $SqlInstance) {
         Stop-Function -Message "You must pipe in a workload group or specify a SqlInstance." -FunctionName Remove-DbaRgWorkloadGroup
-        [pscustomobject]@{ __dbatoolsW1117Carrier = $true; InputObject = $InputObject }
+        [pscustomobject]@{ __dbatoolsRrwgCarrier = $true; InputObject = $InputObject }
         return
     }
 
@@ -186,7 +186,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $InputObject += $resPool.WorkloadGroups | Where-Object Name -in $WorkloadGroup
     }
 
-    [pscustomobject]@{ __dbatoolsW1117Carrier = $true; InputObject = $InputObject }
+    [pscustomobject]@{ __dbatoolsRrwgCarrier = $true; InputObject = $InputObject }
 } $SqlInstance $SqlCredential $WorkloadGroup $ResourcePool $ResourcePoolType $InputObject $EnableException $__boundVerbose $__boundDebug 3>&1 2>&1
 """;
 

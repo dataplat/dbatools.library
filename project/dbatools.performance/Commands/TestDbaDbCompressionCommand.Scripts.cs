@@ -6,8 +6,8 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class TestDbaDbCompressionCommand
 {
 
-    private const string BeginCarrierMarker = "__dbatoolsW1126BeginCarrier";
-    private const string ProcessCarrierMarker = "__dbatoolsW1126ProcessCarrier";
+    private const string BeginCarrierMarker = "__dbatoolsTdcBeginCarrier";
+    private const string ProcessCarrierMarker = "__dbatoolsTdcProcessCarrier";
 
     private const string BeginScript = """
 param($Schema, $Table, $ResultSize, $Rank, $FilterBy, $__boundParameterNames, $EnableException, $__boundVerbose, $__boundDebug)
@@ -110,7 +110,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
 
     [pscustomobject]@{
-        __dbatoolsW1126BeginCarrier = $true
+        __dbatoolsTdcBeginCarrier = $true
         SqlSchemaWhere = $sqlSchemaWhere
         SqlTableWhere = $sqlTableWhere
         SqlRestrict = $sqlRestrict

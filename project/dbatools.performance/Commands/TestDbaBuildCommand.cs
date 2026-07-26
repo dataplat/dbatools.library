@@ -127,8 +127,8 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
                LanguagePrimitives.IsTrue(item.Properties[marker].Value);
     }
 
-    private const string BeginCarrierMarker = "__dbatoolsW1124BeginCarrier";
-    private const string ProcessCarrierMarker = "__dbatoolsW1124ProcessCarrier";
+    private const string BeginCarrierMarker = "__dbatoolsTbBeginCarrier";
+    private const string ProcessCarrierMarker = "__dbatoolsTbProcessCarrier";
 
     private const string BeginScript = """
 param($MaxBehind, $MaxTimeBehind, $__minimumBuildBound, $__maxBehindBound, $__maxTimeBehindBound, $__latestBound, $EnableException, $__boundVerbose, $__boundDebug)
@@ -147,12 +147,12 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($__latestBound) { $ComplianceSpec += 'Latest' }
     if ($ComplianceSpec.Length -gt 1) {
         Stop-Function -Category InvalidArgument -Message "-MinimumBuild, -MaxBehind, -MaxTimeBehind and -Latest are mutually exclusive. Please choose only one. Quitting." -FunctionName Test-DbaBuild
-        [pscustomobject]@{ __dbatoolsW1124BeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $null; ParsedMaxTimeBehind = $null }
+        [pscustomobject]@{ __dbatoolsTbBeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $null; ParsedMaxTimeBehind = $null }
         return
     }
     if ($ComplianceSpec.Length -eq 0) {
         Stop-Function -Category InvalidArgument -Message "You need to choose one from -MinimumBuild, -MaxBehind, -MaxTimeBehind and -Latest. Quitting." -FunctionName Test-DbaBuild
-        [pscustomobject]@{ __dbatoolsW1124BeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $null; ParsedMaxTimeBehind = $null }
+        [pscustomobject]@{ __dbatoolsTbBeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $null; ParsedMaxTimeBehind = $null }
         return
     }
 
@@ -166,14 +166,14 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 $pieceMatch = $MaxBehindValidator.Match($piece)
                 if ($pieceMatch.Success -ne $true) {
                     Stop-Function -Message "MaxBehind has an invalid syntax ('$piece' could not be parsed correctly)" -ErrorRecord $_ -FunctionName Test-DbaBuild
-                    [pscustomobject]@{ __dbatoolsW1124BeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $null }
+                    [pscustomobject]@{ __dbatoolsTbBeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $null }
                     return
                 } else {
                     $howmany = [int]$pieceMatch.Groups['howmany'].Value
                     $what = $pieceMatch.Groups['what'].Value
                     if ($ParsedMaxBehind.ContainsKey($what)) {
                         Stop-Function -Message "The specifier $what has been already passed" -ErrorRecord $_ -FunctionName Test-DbaBuild
-                        [pscustomobject]@{ __dbatoolsW1124BeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $null }
+                        [pscustomobject]@{ __dbatoolsTbBeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $null }
                         return
                     } else {
                         $ParsedMaxBehind[$what] = $howmany
@@ -185,7 +185,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         } catch {
             Stop-Function -Message "Error parsing MaxBehind" -ErrorRecord $_ -FunctionName Test-DbaBuild
-            [pscustomobject]@{ __dbatoolsW1124BeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $null }
+            [pscustomobject]@{ __dbatoolsTbBeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $null }
             return
         }
     }
@@ -196,7 +196,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         $timePieceMatch = $MaxTimeBehindValidator.Match($MaxTimeBehind)
         if (-not $timePieceMatch.Success) {
             Stop-Function -Category InvalidArgument -Message "MaxTimeBehind has an invalid syntax ('$MaxTimeBehind' could not be parsed). Use formats like '6Mo' for months or '180D' for days." -FunctionName Test-DbaBuild
-            [pscustomobject]@{ __dbatoolsW1124BeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $null }
+            [pscustomobject]@{ __dbatoolsTbBeginCarrier = $true; SkipProcessing = $true; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $null }
             return
         }
         $ParsedMaxTimeBehind = @{
@@ -205,7 +205,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
 
-    [pscustomobject]@{ __dbatoolsW1124BeginCarrier = $true; SkipProcessing = $false; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $ParsedMaxTimeBehind }
+    [pscustomobject]@{ __dbatoolsTbBeginCarrier = $true; SkipProcessing = $false; ParsedMaxBehind = $ParsedMaxBehind; ParsedMaxTimeBehind = $ParsedMaxTimeBehind }
 } $MaxBehind $MaxTimeBehind $__minimumBuildBound $__maxBehindBound $__maxTimeBehindBound $__latestBound $EnableException @__commonParameters 3>&1 2>&1
 """;
 
@@ -228,7 +228,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     if (Test-FunctionInterrupt) {
-        [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
+        [pscustomobject]@{ __dbatoolsTbProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
         return
     }
     $hiddenProps = @()
@@ -253,7 +253,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $IdxRef = Get-DbaBuildReferenceIndex
         } catch {
             Stop-Function -Message "Error loading SQL build reference" -ErrorRecord $_ -FunctionName Test-DbaBuild
-            [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
+            [pscustomobject]@{ __dbatoolsTbProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
             return
         }
     }
@@ -363,7 +363,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             $BuildVersion | Select-Object * | Select-DefaultView -ExcludeProperty $hiddenProps
         }
     }
-    [pscustomobject]@{ __dbatoolsW1124ProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
+    [pscustomobject]@{ __dbatoolsTbProcessCarrier = $true; IndexReference = $IdxRef; BuildVersions = $BuildVersions }
 } $Build $MinimumBuild $MaxBehind $MaxTimeBehind $Latest $SqlInstance $SqlCredential $Update $Quiet $EnableException $ParsedMaxBehind $ParsedMaxTimeBehind $IdxRef $BuildVersions @__commonParameters 3>&1 2>&1
 """;
 }
