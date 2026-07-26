@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
 
@@ -163,23 +164,54 @@ public sealed partial class GetDbaDatabaseCommand : DbaBaseCmdlet
         if (Interrupted)
             return;
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
-            ExcludeUser, ExcludeSystem, EnableException,
-            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug")))
+        List<string> guardWarnings = new List<string>();
+        try
         {
-            if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__getDbaDatabaseBegin"))
+            foreach (PSObject? item in NestedCommand.InvokeScoped(this, BeginScript,
+                ExcludeUser, ExcludeSystem, EnableException,
+                NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"),
+                guardWarnings))
             {
-                if (sentinel["__getDbaDatabaseBegin"] is Hashtable state)
-                    _interrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
-                continue;
+                if (item?.BaseObject is Hashtable sentinel && sentinel.ContainsKey("__getDbaDatabaseBegin"))
+                {
+                    if (sentinel["__getDbaDatabaseBegin"] is Hashtable state)
+                        _interrupted = LanguagePrimitives.IsTrue(state["Interrupted"]);
+                    continue;
+                }
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    NestedCommand.RemoveDuplicateError(this, nestedError);
+                    WriteError(nestedError);
+                    continue;
+                }
+                WriteObject(item);
             }
-            if (item?.BaseObject is ErrorRecord nestedError)
+        }
+        finally
+        {
+            bool boundStop = MyInvocation.BoundParameters.TryGetValue("WarningAction", out object? warningAction) &&
+                warningAction is ActionPreference boundWarningPreference &&
+                boundWarningPreference == ActionPreference.Stop;
+            bool ambientStop = SessionState.PSVariable.GetValue("WarningPreference") is ActionPreference effectiveWarningPreference &&
+                effectiveWarningPreference == ActionPreference.Stop;
+            foreach (string guardWarning in guardWarnings)
             {
-                NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
-                continue;
+                if (boundStop || ambientStop)
+                {
+                    Host.UI.WriteWarningLine(guardWarning);
+                    if (MyInvocation.BoundParameters.TryGetValue("WarningVariable", out object? warningVariable) &&
+                        warningVariable is string warningVariableName)
+                    {
+                        warningVariableName = warningVariableName.TrimStart('+');
+                        if (SessionState.PSVariable.GetValue(warningVariableName) is IList warningRecords)
+                            warningRecords.Add(new WarningRecord(guardWarning));
+                    }
+                }
+                else
+                {
+                    WriteWarning(guardWarning);
+                }
             }
-            WriteObject(item);
         }
     }
 

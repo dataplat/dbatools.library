@@ -6,31 +6,39 @@ namespace Dataplat.Dbatools.Commands;
 public sealed partial class GetDbaDatabaseCommand
 {
 
-    // PS: the begin block VERBATIM, dot-sourced. Only edit is -FunctionName on the guard. The guard
-    // is Stop-Function -Continue (does not set the latch); the sentinel still carries the interrupt
-    // for uniformity. Begin holds no value state that process depends on.
+    // PS: the begin block, dot-sourced. Edits are -FunctionName on the guard and a live warning
+    // sink for the top-level -Continue path. The guard does not set the latch; the sentinel still
+    // carries the interrupt for uniformity. Begin holds no value state that process depends on.
     private const string BeginScript = """
-param($ExcludeUser, $ExcludeSystem, $EnableException, $__boundVerbose, $__boundDebug)
+param($ExcludeUser, $ExcludeSystem, $EnableException, $__boundVerbose, $__boundDebug, $__guardWarningSink)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param($ExcludeUser, $ExcludeSystem, $EnableException, $__boundVerbose, $__boundDebug)
+    param($ExcludeUser, $ExcludeSystem, $EnableException, $__boundVerbose, $__boundDebug, $__guardWarningSink)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     . {
 
         if ($ExcludeUser -and $ExcludeSystem) {
-            Stop-Function -Message "You cannot specify both ExcludeUser and ExcludeSystem." -Continue -EnableException $EnableException -FunctionName Get-DbaDatabase
+            $__guardWarningPreference = $WarningPreference
+            try {
+                if ($__guardWarningPreference -in @("SilentlyContinue", "Inquire")) {
+                    $WarningPreference = "Continue"
+                }
+                Stop-Function -Message "You cannot specify both ExcludeUser and ExcludeSystem." -Continue -EnableException $EnableException -FunctionName Get-DbaDatabase 3>&1 | ForEach-Object { if ($PSItem -is [System.Management.Automation.WarningRecord]) { $null = $__guardWarningSink.Add($PSItem.Message) } }
+            } finally {
+                $WarningPreference = $__guardWarningPreference
+            }
         }
 
     }
 
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
     @{ __getDbaDatabaseBegin = @{ Interrupted = [bool]($__iv -and $__iv.Value) } }
-} $ExcludeUser $ExcludeSystem $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $ExcludeUser $ExcludeSystem $EnableException $__boundVerbose $__boundDebug $__guardWarningSink @__commonParameters 3>&1 2>&1
 """;
     // PS: the process block VERBATIM, dot-sourced so the :252 early return exits only the body.
     // Edits: Test-Bound -Parameter 'Encrypted' becomes $__boundEncrypted, plus -FunctionName stamps.
