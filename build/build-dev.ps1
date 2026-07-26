@@ -59,17 +59,17 @@ foreach ($edition in $editions) {
 
 Push-Location -Path $projectRoot
 try {
-    # Refresh the shared runtime dbatools.dll per requested edition (incremental Debug build).
+    # Refresh the shared runtime dbatools.dll per requested edition (incremental Release build).
     foreach ($edition in $editions) {
-        Write-Host "Building runtime dbatools.dll ($($edition.Framework), Debug)..." -ForegroundColor Cyan
-        dotnet build dbatools/dbatools.csproj --configuration Debug --framework $edition.Framework --nologo | Out-String -OutVariable runtimeBuild
+        Write-Host "Building runtime dbatools.dll ($($edition.Framework), Release)..." -ForegroundColor Cyan
+        dotnet build dbatools/dbatools.csproj --configuration Release --framework $edition.Framework --nologo | Out-String -OutVariable runtimeBuild
         if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: runtime build ($($edition.Framework)) failed with exit code $LASTEXITCODE" -ForegroundColor Red
             exit $LASTEXITCODE
         }
-        # dbatools.csproj redirects Debug output to artifacts/lib/Debug/<tfm>/ (custom OutputPath),
+        # dbatools.csproj redirects Release output to artifacts/lib/Release/<tfm>/ (custom OutputPath),
         # NOT the default bin/ - so read the freshly built runtime dll from there.
-        $builtDll = Join-Path -Path $artifactsDir -ChildPath "lib/Debug/$($edition.Framework)/dbatools.dll"
+        $builtDll = Join-Path -Path $artifactsDir -ChildPath "lib/Release/$($edition.Framework)/dbatools.dll"
         if (-not (Test-Path -LiteralPath $builtDll)) {
             Write-Host "ERROR: expected build output not found: $builtDll" -ForegroundColor Red
             exit 1
@@ -91,13 +91,13 @@ try {
             $satelliteName = $satellite.Name
             $moduleStage = Join-Path -Path $artifactsDir -ChildPath "modules/$satelliteName"
             foreach ($edition in $editions) {
-                Write-Host "Building satellite $satelliteName ($($edition.Framework), Debug)..." -ForegroundColor Cyan
-                dotnet build "$satelliteName/$satelliteName.csproj" --configuration Debug --framework $edition.Framework --nologo | Out-String -OutVariable satelliteBuild
+                Write-Host "Building satellite $satelliteName ($($edition.Framework), Release)..." -ForegroundColor Cyan
+                dotnet build "$satelliteName/$satelliteName.csproj" --configuration Release --framework $edition.Framework --nologo | Out-String -OutVariable satelliteBuild
                 if ($LASTEXITCODE -ne 0) {
                     Write-Host "ERROR: satellite build ($satelliteName, $($edition.Framework)) failed with exit code $LASTEXITCODE" -ForegroundColor Red
                     exit $LASTEXITCODE
                 }
-                $builtSat = Join-Path -Path $projectRoot -ChildPath "$satelliteName/bin/Debug/$($edition.Framework)/$satelliteName.dll"
+                $builtSat = Join-Path -Path $projectRoot -ChildPath "$satelliteName/bin/Release/$($edition.Framework)/$satelliteName.dll"
                 if (-not (Test-Path -LiteralPath $builtSat)) {
                     Write-Host "ERROR: expected satellite output not found: $builtSat" -ForegroundColor Red
                     exit 1
@@ -109,7 +109,7 @@ try {
             # dll-Help.xml (MAML) is generated only from the net8.0 build (CmdletHelp.props) but
             # is target-framework independent, so the one file is staged beside the assembly in
             # every edition. Mirrors the same step in build/build.ps1.
-            $helpFile = Join-Path -Path $projectRoot -ChildPath "$satelliteName/bin/Debug/net8.0/$satelliteName.dll-Help.xml"
+            $helpFile = Join-Path -Path $projectRoot -ChildPath "$satelliteName/bin/Release/net8.0/$satelliteName.dll-Help.xml"
             if (Test-Path -LiteralPath $helpFile) {
                 foreach ($edition in $editions) {
                     Copy-Item -Path $helpFile -Destination (Join-Path -Path $moduleStage -ChildPath $edition.Name) -Force
