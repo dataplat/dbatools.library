@@ -127,7 +127,7 @@ public sealed class GetDbaXESessionTemplateCommand : DbaBaseCmdlet
     // "$Pattern = $Pattern.Replace(...)" line is reproduced in C# (_pattern). Runs once in BeginProcessing.
     // The source reads $script:PSModuleRoot; the module's script scope is NOT reliably visible inside the
     // nested hop under the gate harness (it resolved EMPTY there, making both the metadata path and the
-    // -Path default CWD-relative - the discriminator-proven class on the W2-252/W2-254 siblings), so the
+    // -Path default CWD-relative in sibling commands), so the
     // module root comes from the module OBJECT's ModuleBase instead. Same value, different resolution path.
     private const string BeginScript = """
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
