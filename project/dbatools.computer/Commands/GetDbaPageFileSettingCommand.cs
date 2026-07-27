@@ -149,7 +149,7 @@ public sealed class GetDbaPageFileSettingCommand : DbaBaseCmdlet
         CimService.CmObjectResult result = CimService.GetCmObject(request);
         foreach (ErrorRecord error in result.PassthroughErrors)
         {
-            WriteError(error);
+            WriteError(NestedCommand.PreserveErrorIdentity(error));
         }
         return result;
     }

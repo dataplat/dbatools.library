@@ -76,7 +76,7 @@ public sealed class CopyDbaAgentScheduleCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item?.BaseObject is SmoAgentJobSchedule schedule)
             {
@@ -124,7 +124,7 @@ public sealed class CopyDbaAgentScheduleCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else
             {

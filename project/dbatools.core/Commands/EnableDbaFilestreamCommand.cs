@@ -69,7 +69,7 @@ public sealed class EnableDbaFilestreamCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
                 return;
             }
             if (item?.Properties["__dbatoolsEfLevelCarrier"] is not null &&

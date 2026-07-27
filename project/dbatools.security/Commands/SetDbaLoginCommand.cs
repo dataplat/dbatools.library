@@ -205,7 +205,7 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__SetDbaLoginBeginComplete"]?.Value))
@@ -249,7 +249,7 @@ public sealed class SetDbaLoginCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__SetDbaLoginProcessComplete"]?.Value))

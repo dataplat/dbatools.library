@@ -291,7 +291,7 @@ $strSID.Value
                     RemoteExecutionService.RemoteCommandResult exportResult = RemoteExecutionService.InvokeCommand(exportRequest);
                     foreach (ErrorRecord error in exportResult.Errors)
                     {
-                        WriteError(error);
+                        WriteError(NestedCommand.PreserveErrorIdentity(error));
                     }
 
                     // PS: $SQLServiceAccounts = @(); $SQLPerServiceSIDs = @() then either the bound
@@ -355,7 +355,7 @@ $strSID.Value
                         RemoteExecutionService.RemoteCommandResult mainResult = RemoteExecutionService.InvokeCommand(mainRequest);
                         foreach (ErrorRecord error in mainResult.Errors)
                         {
-                            WriteError(error);
+                            WriteError(NestedCommand.PreserveErrorIdentity(error));
                         }
                         EmitForcedVerbose(mainResult.Verbose);
 
@@ -370,7 +370,7 @@ $strSID.Value
                         RemoteExecutionService.RemoteCommandResult cleanupResult = RemoteExecutionService.InvokeCommand(cleanupRequest);
                         foreach (ErrorRecord error in cleanupResult.Errors)
                         {
-                            WriteError(error);
+                            WriteError(NestedCommand.PreserveErrorIdentity(error));
                         }
                     }
                     else

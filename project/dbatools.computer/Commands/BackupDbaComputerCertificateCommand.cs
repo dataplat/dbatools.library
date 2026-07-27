@@ -133,7 +133,7 @@ public sealed class BackupDbaComputerCertificateCommand : DbaBaseCmdlet
                 Collection<PSObject> items = shell.Invoke();
                 foreach (ErrorRecord error in shell.Streams.Error)
                 {
-                    WriteError(error);
+                    WriteError(NestedCommand.PreserveErrorIdentity(error));
                 }
                 foreach (PSObject item in items)
                 {
@@ -146,7 +146,7 @@ public sealed class BackupDbaComputerCertificateCommand : DbaBaseCmdlet
             }
             catch (RuntimeException rex)
             {
-                WriteError(rex.ErrorRecord);
+                WriteError(NestedCommand.PreserveErrorIdentity(rex.ErrorRecord));
             }
         }
     }

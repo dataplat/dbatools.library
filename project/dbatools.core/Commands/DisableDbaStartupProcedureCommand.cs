@@ -56,7 +56,7 @@ public sealed class DisableDbaStartupProcedureCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
                 return;
             }
             // DEF-012: the trailer packet parks the source's cross-record variables. It is

@@ -106,7 +106,7 @@ internal static partial class NestedCommand
                     // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
                     // and caller-side preference handling see them, as the function world does.
                     RemoveHopEraDuplicateError(host, nonTerminating, bridge.HopEraBaselineHead);
-                    host.WriteError(nonTerminating);
+                    host.WriteError(PreserveErrorIdentity(nonTerminating));
                 }
                 else
                     output.Add(item!);
@@ -162,7 +162,7 @@ internal static partial class NestedCommand
                     // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
                     // and caller-side preference handling see them, as the function world does.
                     RemoveHopEraDuplicateError(host, nonTerminating, bridge.HopEraBaselineHead);
-                    host.WriteError(nonTerminating);
+                    host.WriteError(PreserveErrorIdentity(nonTerminating));
                 }
                 else
                     output.Add(item!);
@@ -234,7 +234,7 @@ internal static partial class NestedCommand
         {
             // Same channel correction as the item-form branches above.
             RemoveHopEraDuplicateError(host, nonTerminating, hopEraBaselineHead);
-            host.WriteError(nonTerminating);
+            host.WriteError(PreserveErrorIdentity(nonTerminating));
         }
         else
             host.WriteObject(item);
@@ -310,7 +310,7 @@ internal static partial class NestedCommand
                         // Same forwarding as the non-streaming path: merged nonterminating
                         // errors must ride the cmdlet's error channel, not the output pipeline,
                         // so -ErrorVariable and caller-side handling see them.
-                        host.WriteError(nonTerminating);
+                        host.WriteError(PreserveErrorIdentity(nonTerminating));
                     }
                     else
                     {

@@ -84,7 +84,7 @@ public sealed class GetDbaPermissionCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__GetDbaPermissionBeginComplete"]?.Value))
@@ -110,7 +110,7 @@ public sealed class GetDbaPermissionCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else
             {

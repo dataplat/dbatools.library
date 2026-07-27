@@ -58,7 +58,7 @@ public sealed class DisableDbaHideInstanceCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
                 return;
             }
             if (item?.Properties["__dbatoolsDhiNameCarrier"] is not null &&

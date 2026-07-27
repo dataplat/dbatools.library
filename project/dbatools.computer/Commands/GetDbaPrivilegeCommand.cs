@@ -231,7 +231,7 @@ public sealed class GetDbaPrivilegeCommand : DbaBaseCmdlet
                 RemoteExecutionService.RemoteCommandResult result = RemoteExecutionService.InvokeCommand(request);
                 foreach (ErrorRecord error in result.Errors)
                 {
-                    WriteError(error);
+                    WriteError(NestedCommand.PreserveErrorIdentity(error));
                 }
                 object? privData = ShapeOutput(result.Output);
 

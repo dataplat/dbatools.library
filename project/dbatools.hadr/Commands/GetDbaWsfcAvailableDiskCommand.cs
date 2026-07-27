@@ -60,7 +60,7 @@ public sealed class GetDbaWsfcAvailableDiskCommand : DbaBaseCmdlet
                 CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
                 foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 if (clusterResult.Instances.Count > 0)
                 {
@@ -96,7 +96,7 @@ public sealed class GetDbaWsfcAvailableDiskCommand : DbaBaseCmdlet
                 CimService.CmObjectResult diskResult = CimService.GetCmObject(diskRequest);
                 foreach (ErrorRecord passthrough in diskResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 disks = diskResult.Instances;
             }

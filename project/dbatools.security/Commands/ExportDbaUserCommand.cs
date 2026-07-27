@@ -165,7 +165,7 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__ExportDbaUserBeginComplete"]?.Value))
@@ -224,7 +224,7 @@ public sealed class ExportDbaUserCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__ExportDbaUserProcessComplete"]?.Value))

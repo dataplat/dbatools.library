@@ -85,7 +85,7 @@ public sealed class NewDbaDbMasterKeyCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && item.BaseObject is PSCustomObject && LanguagePrimitives.IsTrue(
                 item.Properties["__NewDbaDbMasterKeyBeginComplete"]?.Value))
@@ -112,7 +112,7 @@ public sealed class NewDbaDbMasterKeyCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             // Identified by SHAPE as well as by marker property: matching on the property alone would let
             // an Update-TypeData graft that name onto an SMO type and have a real payload silently

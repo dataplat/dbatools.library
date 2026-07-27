@@ -78,7 +78,7 @@ public sealed partial class TestDbaDbCompressionCommand : DbaInstanceCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (IsCarrier(item, BeginCarrierMarker))
             {
@@ -100,7 +100,7 @@ public sealed partial class TestDbaDbCompressionCommand : DbaInstanceCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (IsCarrier(item, ProcessCarrierMarker))
             {

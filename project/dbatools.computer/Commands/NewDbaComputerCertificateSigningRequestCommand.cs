@@ -275,7 +275,7 @@ public sealed class NewDbaComputerCertificateSigningRequestCommand : DbaBaseCmdl
         catch (RuntimeException) { yield break; }
         foreach (ErrorRecord error in shell.Streams.Error)
         {
-            WriteError(error);
+            WriteError(NestedCommand.PreserveErrorIdentity(error));
         }
         foreach (PSObject item in items)
         {

@@ -57,7 +57,7 @@ public sealed class TestDbaBackupEncryptedCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item?.Properties["__dbatoolsTbeResultsCarrier"] is not null &&
                      LanguagePrimitives.IsTrue(item.Properties["__dbatoolsTbeResultsCarrier"].Value))

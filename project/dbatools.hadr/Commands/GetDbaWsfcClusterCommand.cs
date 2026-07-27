@@ -61,7 +61,7 @@ public sealed class GetDbaWsfcClusterCommand : DbaBaseCmdlet
                 CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
                 foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 clusters = clusterResult.Instances;
             }

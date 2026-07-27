@@ -76,7 +76,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item?.Properties[CarrierMarker] is not null &&
                      LanguagePrimitives.IsTrue(item.Properties[CarrierMarker].Value))
@@ -124,7 +124,7 @@ public sealed class RemoveDbaRgWorkloadGroupCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else
             {

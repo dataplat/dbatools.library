@@ -60,7 +60,7 @@ public sealed class GetDbaWsfcResourceTypeCommand : DbaBaseCmdlet
                 CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
                 foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 if (clusterResult.Instances.Count > 0)
                 {
@@ -96,7 +96,7 @@ public sealed class GetDbaWsfcResourceTypeCommand : DbaBaseCmdlet
                 CimService.CmObjectResult resourceResult = CimService.GetCmObject(resourceRequest);
                 foreach (ErrorRecord passthrough in resourceResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 resources = resourceResult.Instances;
             }

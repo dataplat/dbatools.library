@@ -56,7 +56,7 @@ public sealed class InvokeDbaDbccDropCleanBufferCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__InvokeDbaDbccDropCleanBufferBeginComplete"]?.Value))
@@ -80,7 +80,7 @@ public sealed class InvokeDbaDbccDropCleanBufferCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && string.Equals(
                 item.Properties["__InvokeDbaDbccDropCleanBufferProcessComplete"]?.Value as string, _processToken, StringComparison.Ordinal))

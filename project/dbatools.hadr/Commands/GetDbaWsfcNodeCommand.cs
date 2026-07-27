@@ -61,7 +61,7 @@ public sealed class GetDbaWsfcNodeCommand : DbaBaseCmdlet
                 CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
                 foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 if (clusterResult.Instances.Count > 0)
                 {
@@ -97,7 +97,7 @@ public sealed class GetDbaWsfcNodeCommand : DbaBaseCmdlet
                 CimService.CmObjectResult nodeResult = CimService.GetCmObject(nodeRequest);
                 foreach (ErrorRecord passthrough in nodeResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 nodes = nodeResult.Instances;
             }

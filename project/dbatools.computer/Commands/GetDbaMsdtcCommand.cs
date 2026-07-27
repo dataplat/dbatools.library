@@ -273,7 +273,7 @@ public sealed class GetDbaMsdtcCommand : DbaBaseCmdlet
         catch (RuntimeException rex)
         {
             ReemitNestedStreams(shell);
-            WriteError(rex.ErrorRecord);
+            WriteError(NestedCommand.PreserveErrorIdentity(rex.ErrorRecord));
             return null;
         }
         ReemitNestedStreams(shell);
@@ -353,7 +353,7 @@ public sealed class GetDbaMsdtcCommand : DbaBaseCmdlet
         RemoteExecutionService.RemoteCommandResult result = RemoteExecutionService.InvokeCommand(request);
         foreach (ErrorRecord error in result.Errors)
         {
-            WriteError(error);
+            WriteError(NestedCommand.PreserveErrorIdentity(error));
         }
         return ShapeOutput(result.Output);
     }
@@ -407,7 +407,7 @@ public sealed class GetDbaMsdtcCommand : DbaBaseCmdlet
         }
         foreach (ErrorRecord record in shell.Streams.Error)
         {
-            WriteError(record);
+            WriteError(NestedCommand.PreserveErrorIdentity(record));
         }
         shell.Streams.ClearStreams();
     }

@@ -92,7 +92,7 @@ internal static partial class NestedCommand
                     // -ErrorVariable capture and caller-side preference handling, which the
                     // function world gets for free (measured: -ErrorVariable collected 3 records
                     // from the function and 0 from the hop before this forwarding existed).
-                    host.WriteError(nonTerminating);
+                    host.WriteError(PreserveErrorIdentity(nonTerminating));
                 else
                     yield return item!;
             }
@@ -165,7 +165,7 @@ internal static partial class NestedCommand
                         // Same forwarding as the non-streaming path: merged nonterminating
                         // errors must ride the cmdlet's error channel, not the output pipeline,
                         // so -ErrorVariable and caller-side handling see them.
-                        host.WriteError(nonTerminating);
+                        host.WriteError(PreserveErrorIdentity(nonTerminating));
                     }
                     else
                     {

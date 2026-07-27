@@ -81,7 +81,7 @@ public sealed class InstallDbaFirstResponderKitCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__InstallFrkBeginComplete"]?.Value))
@@ -112,7 +112,7 @@ public sealed class InstallDbaFirstResponderKitCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && string.Equals(
                 item.Properties["__InstallFrkProcessComplete"]?.Value as string, _processToken, StringComparison.Ordinal))

@@ -86,7 +86,7 @@ public sealed class GetDbaPowerPlanCommand : DbaBaseCmdlet
                 CimService.CmObjectResult planResult = CimService.GetCmObject(planRequest);
                 foreach (ErrorRecord passthrough in planResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 powerPlans = planResult.Instances;
             }

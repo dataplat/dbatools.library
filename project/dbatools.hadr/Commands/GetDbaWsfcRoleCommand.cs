@@ -60,7 +60,7 @@ public sealed class GetDbaWsfcRoleCommand : DbaBaseCmdlet
                 CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
                 foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 if (clusterResult.Instances.Count > 0)
                 {
@@ -96,7 +96,7 @@ public sealed class GetDbaWsfcRoleCommand : DbaBaseCmdlet
                 CimService.CmObjectResult roleResult = CimService.GetCmObject(roleRequest);
                 foreach (ErrorRecord passthrough in roleResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 roles = roleResult.Instances;
             }

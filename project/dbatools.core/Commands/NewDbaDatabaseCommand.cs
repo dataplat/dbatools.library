@@ -155,7 +155,7 @@ public sealed partial class NewDbaDatabaseCommand : DbaBaseCmdlet
                 if (item?.BaseObject is ErrorRecord nestedError)
                 {
                     NestedCommand.RemoveDuplicateError(this, nestedError);
-                    WriteError(nestedError);
+                    WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
                 }
                 else
                 {
@@ -190,7 +190,7 @@ public sealed partial class NewDbaDatabaseCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
                 return;
             }
             WriteObject(item);

@@ -117,7 +117,7 @@ public sealed class GetDbaDiskSpaceCommand : DbaBaseCmdlet
             }
             foreach (ErrorRecord error in disks.PassthroughErrors)
             {
-                WriteError(error);
+                WriteError(NestedCommand.PreserveErrorIdentity(error));
             }
 
             foreach (PSObject disk in disks.Instances)

@@ -114,7 +114,7 @@ public sealed class NewDbaDbAsymmetricKeyCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__NewDbaDbAsymmetricKeyBeginComplete"]?.Value))
@@ -141,7 +141,7 @@ public sealed class NewDbaDbAsymmetricKeyCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             // The sentinel is always a [pscustomobject]; a real payload never is. Without the
             // BaseObject check an Update-TypeData-grafted property on an emitted AsymmetricKey

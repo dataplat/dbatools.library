@@ -96,7 +96,7 @@ public sealed class RemoveDbaAgentJobStepCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
                 return;
             }
             if (item is not null)
@@ -123,7 +123,7 @@ public sealed class RemoveDbaAgentJobStepCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
                 continue;
             }
             if (item is not null)

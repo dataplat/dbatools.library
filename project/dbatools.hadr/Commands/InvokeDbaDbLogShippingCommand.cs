@@ -120,7 +120,7 @@ public sealed partial class InvokeDbaDbLogShippingCommand : DbaBaseCmdlet
         if (item?.BaseObject is ErrorRecord nestedError)
         {
             NestedCommand.RemoveDuplicateError(this, nestedError);
-            WriteError(nestedError);
+            WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             return true;
         }
         return false;

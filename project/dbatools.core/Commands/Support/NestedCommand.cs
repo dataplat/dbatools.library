@@ -105,7 +105,7 @@ internal static partial class NestedCommand
                     // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
                     // and caller-side preference handling see them, as the function world does.
                     RemoveHopEraDuplicateError(host, nonTerminating, bridge.HopEraBaselineHead);
-                    host.WriteError(nonTerminating);
+                    host.WriteError(PreserveErrorIdentity(nonTerminating));
                 }
                 else
                     output.Add(item!);
@@ -161,7 +161,7 @@ internal static partial class NestedCommand
                     // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
                     // and caller-side preference handling see them, as the function world does.
                     RemoveHopEraDuplicateError(host, nonTerminating, bridge.HopEraBaselineHead);
-                    host.WriteError(nonTerminating);
+                    host.WriteError(PreserveErrorIdentity(nonTerminating));
                 }
                 else
                     output.Add(item!);
@@ -203,7 +203,7 @@ internal static partial class NestedCommand
                     // Re-emit through the cmdlet's own error channel so -ErrorVariable capture
                     // and caller-side preference handling see them, as the function world does.
                     RemoveHopEraDuplicateError(host, nonTerminating, bridge.HopEraBaselineHead);
-                    host.WriteError(nonTerminating);
+                    host.WriteError(PreserveErrorIdentity(nonTerminating));
                 }
                 else
                     onOutput(item!);
@@ -274,7 +274,7 @@ internal static partial class NestedCommand
         {
             // Same channel correction as the item-form branches above.
             RemoveHopEraDuplicateError(host, nonTerminating, hopEraBaselineHead);
-            host.WriteError(nonTerminating);
+            host.WriteError(PreserveErrorIdentity(nonTerminating));
         }
         else
             host.WriteObject(item);
@@ -347,7 +347,7 @@ internal static partial class NestedCommand
                     else if (item?.BaseObject is ErrorRecord nonTerminating)
                     {
                         // Same channel correction as the item-form branches above.
-                        host.WriteError(nonTerminating);
+                        host.WriteError(PreserveErrorIdentity(nonTerminating));
                     }
                     else
                     {

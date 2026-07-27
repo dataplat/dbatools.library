@@ -60,7 +60,7 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
                 CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
                 foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 if (clusterResult.Instances.Count > 0)
                 {
@@ -98,7 +98,7 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
                 CimService.CmObjectResult resourceResult = CimService.GetCmObject(resourceRequest);
                 foreach (ErrorRecord passthrough in resourceResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 resources = resourceResult.Instances;
             }
@@ -173,7 +173,7 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
                     CimService.CmObjectResult diskResult = CimService.GetAssociatedCmObjects(diskAssocReq);
                     foreach (ErrorRecord passthrough in diskResult.PassthroughErrors)
                     {
-                        WriteError(passthrough);
+                        WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                     }
                     disks = diskResult.Instances;
                 }
@@ -204,7 +204,7 @@ public sealed class GetDbaWsfcDiskCommand : DbaBaseCmdlet
                         CimService.CmObjectResult partResult = CimService.GetAssociatedCmObjects(partAssocReq);
                         foreach (ErrorRecord passthrough in partResult.PassthroughErrors)
                         {
-                            WriteError(passthrough);
+                            WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                         }
                         partitions = partResult.Instances;
                     }

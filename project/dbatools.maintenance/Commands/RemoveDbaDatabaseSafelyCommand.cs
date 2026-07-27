@@ -125,7 +125,7 @@ public sealed class RemoveDbaDatabaseSafelyCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && LanguagePrimitives.IsTrue(
                 item.Properties["__RemoveDbaDatabaseSafelyBeginComplete"]?.Value))
@@ -163,7 +163,7 @@ public sealed class RemoveDbaDatabaseSafelyCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null && string.Equals(
                 item.Properties["__RemoveDbaDatabaseSafelyProcessComplete"]?.Value as string, _processToken, StringComparison.Ordinal))
@@ -195,7 +195,7 @@ public sealed class RemoveDbaDatabaseSafelyCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (item is not null)
             {

@@ -60,7 +60,7 @@ public sealed class GetDbaWsfcSharedVolumeCommand : DbaBaseCmdlet
                 CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
                 foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 if (clusterResult.Instances.Count > 0)
                 {
@@ -96,7 +96,7 @@ public sealed class GetDbaWsfcSharedVolumeCommand : DbaBaseCmdlet
                 CimService.CmObjectResult volumeResult = CimService.GetCmObject(volumeRequest);
                 foreach (ErrorRecord passthrough in volumeResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 volumes = volumeResult.Instances;
             }

@@ -312,7 +312,7 @@ public sealed class GetDbaComputerSystemCommand : DbaBaseCmdlet
     {
         foreach (ErrorRecord error in errors)
         {
-            WriteError(error);
+            WriteError(NestedCommand.PreserveErrorIdentity(error));
         }
     }
 

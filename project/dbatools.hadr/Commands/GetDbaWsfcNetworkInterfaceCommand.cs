@@ -61,7 +61,7 @@ public sealed class GetDbaWsfcNetworkInterfaceCommand : DbaBaseCmdlet
                 CimService.CmObjectResult clusterResult = CimService.GetCmObject(clusterRequest);
                 foreach (ErrorRecord passthrough in clusterResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 if (clusterResult.Instances.Count > 0)
                 {
@@ -97,7 +97,7 @@ public sealed class GetDbaWsfcNetworkInterfaceCommand : DbaBaseCmdlet
                 CimService.CmObjectResult interfaceResult = CimService.GetCmObject(interfaceRequest);
                 foreach (ErrorRecord passthrough in interfaceResult.PassthroughErrors)
                 {
-                    WriteError(passthrough);
+                    WriteError(NestedCommand.PreserveErrorIdentity(passthrough));
                 }
                 networkInterfaces = interfaceResult.Instances;
             }

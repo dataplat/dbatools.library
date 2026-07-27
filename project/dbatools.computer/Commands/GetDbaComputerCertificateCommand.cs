@@ -296,7 +296,7 @@ public sealed class GetDbaComputerCertificateCommand : DbaBaseCmdlet
         RemoteExecutionService.RemoteCommandResult result = RemoteExecutionService.InvokeCommand(request);
         foreach (ErrorRecord error in result.Errors)
         {
-            WriteError(error);
+            WriteError(NestedCommand.PreserveErrorIdentity(error));
         }
         List<string> values = new();
         foreach (PSObject item in result.Output)

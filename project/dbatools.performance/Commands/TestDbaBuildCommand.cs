@@ -74,7 +74,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (IsCarrier(item, BeginCarrierMarker))
             {
@@ -107,7 +107,7 @@ public sealed class TestDbaBuildCommand : DbaBaseCmdlet
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             else if (IsCarrier(item, ProcessCarrierMarker))
             {

@@ -180,7 +180,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
-                WriteError(nestedError);
+                WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
             }
             // The sentinel must be identified by SHAPE as well as by marker property. Matching on the
             // property alone lets any emitted object that happens to carry that name be swallowed as
