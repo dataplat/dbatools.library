@@ -19,6 +19,7 @@ public sealed class GetDbatoolsPathCommand : DbaBaseCmdlet
 {
     /// <summary>The name of the managed path to retrieve.</summary>
     [Parameter(Mandatory = true, Position = 0)]
+    [PsStringCast]
     public string? Name { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.

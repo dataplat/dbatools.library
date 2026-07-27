@@ -43,6 +43,7 @@ public sealed partial class ImportDbaCsvCommand : DbaInstanceCmdlet
 
     /// <summary>The target database for the CSV import.</summary>
     [Parameter(Mandatory = true, Position = 3)]
+    [PsStringCast]
     public string Database { get; set; } = null!;
 
     /// <summary>The destination table name; defaults to the CSV file name.</summary>

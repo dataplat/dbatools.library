@@ -214,6 +214,7 @@ public sealed partial class RestoreDbaDatabaseCommand : DbaBaseCmdlet
 
     /// <summary>Folder for the tail log backup that page restore requires.</summary>
     [Parameter(Mandatory = true, ParameterSetName = "RestorePage")]
+    [PsStringCast]
     public string? PageRestoreTailFolder { get; set; }
 
     /// <summary>Stop before StopMark or StopAtLsn instead of at it.</summary>

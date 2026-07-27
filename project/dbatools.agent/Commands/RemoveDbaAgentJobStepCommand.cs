@@ -68,6 +68,7 @@ public sealed class RemoveDbaAgentJobStepCommand : DbaBaseCmdlet
     /// <summary>The exact name of the job step to remove from the specified jobs.</summary>
     [Parameter(Mandatory = true, Position = 3)]
     [ValidateNotNullOrEmpty]
+    [PsStringCast]
     public string StepName { get; set; } = null!;
 
     // EnableException is inherited from DbaBaseCmdlet - the source declares it bare, which the

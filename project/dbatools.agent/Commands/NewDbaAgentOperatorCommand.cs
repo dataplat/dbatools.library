@@ -52,6 +52,7 @@ public sealed class NewDbaAgentOperatorCommand : DbaBaseCmdlet
 
     /// <summary>The name of the operator to create.</summary>
     [Parameter(Mandatory = true, Position = 2)]
+    [PsStringCast]
     public string Operator { get; set; } = null!;
 
     /// <summary>The email address for notifications.</summary>

@@ -39,6 +39,7 @@ public sealed class NewDbaClientAliasCommand : DbaBaseCmdlet
     public DbaInstanceParameter? ServerName { get; set; }
 
     [Parameter(Mandatory = true, Position = 3)]
+    [PsStringCast]
     public string Alias { get; set; } = null!;
 
     [Parameter(Position = 4)]

@@ -37,6 +37,7 @@ public sealed class NewDbaXESessionCommand : DbaBaseCmdlet
 
     /// <summary>The name for the new Extended Events session.</summary>
     [Parameter(Mandatory = true, Position = 2)]
+    [PsStringCast]
     public string? Name { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - the source declares it bare (every set), which the

@@ -29,6 +29,7 @@ public sealed class ImportDbatoolsConfigCommand : DbaBaseCmdlet
 
     /// <summary>The module whose persisted configuration settings are imported.</summary>
     [Parameter(ParameterSetName = "ModuleName", Mandatory = true)]
+    [PsStringCast]
     public string ModuleName { get; set; } = null!;
 
     /// <summary>The configuration version of the module-settings to load.</summary>

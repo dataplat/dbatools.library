@@ -36,6 +36,7 @@ public sealed class ResetDbatoolsConfigCommand : DbaBaseCmdlet
     public string[]? FullName { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "Module")]
+    [PsStringCast]
     public string? Module { get; set; }
 
     [Parameter(ParameterSetName = "Module")]

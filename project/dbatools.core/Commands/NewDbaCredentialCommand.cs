@@ -42,6 +42,7 @@ public sealed class NewDbaCredentialCommand : DbaBaseCmdlet
     /// <summary>The identity the credential maps to.</summary>
     [Parameter(Mandatory = true, Position = 3)]
     [Alias("CredentialIdentity")]
+    [PsStringCast]
     public string Identity { get; set; } = null!;
 
     /// <summary>The password as a SecureString; omitted creates a passwordless credential.</summary>

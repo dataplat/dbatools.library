@@ -44,6 +44,7 @@ public sealed class NewDbaDiagnosticAdsNotebookCommand : DbaBaseCmdlet
 
     /// <summary>The full file path where the notebook will be created.</summary>
     [Parameter(Mandatory = true, Position = 3)]
+    [PsStringCast]
     public string Path { get; set; } = null!;
 
     /// <summary>Include database-level diagnostic queries too.</summary>

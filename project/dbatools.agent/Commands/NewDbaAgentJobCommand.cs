@@ -63,6 +63,7 @@ public sealed class NewDbaAgentJobCommand : DbaBaseCmdlet
     /// <summary>The name of the job to create.</summary>
     [Parameter(Mandatory = true, Position = 2)]
     [ValidateNotNullOrEmpty]
+    [PsStringCast]
     public string Job { get; set; } = null!;
 
     /// <summary>One or more schedules to attach to the job.</summary>

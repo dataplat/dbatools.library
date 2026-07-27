@@ -46,6 +46,7 @@ public sealed class ConvertToDbaXESessionCommand : DbaBaseCmdlet
 
     /// <summary>The name for the new Extended Events session.</summary>
     [Parameter(Mandatory = true, Position = 1)]
+    [PsStringCast]
     public string Name { get; set; } = null!;
 
     /// <summary>Login to the target instance using alternative credentials.</summary>

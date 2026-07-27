@@ -58,6 +58,7 @@ public sealed class SetDbaAgentJobOutputFileCommand : DbaBaseCmdlet
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, HelpMessage = "The Full Output File Path")]
     [ValidateNotNull]
     [ValidateNotNullOrEmpty]
+    [PsStringCast]
     public string OutputFile { get; set; } = null!;
 
     // EnableException is inherited from DbaBaseCmdlet - the source declares it bare (every set), which the

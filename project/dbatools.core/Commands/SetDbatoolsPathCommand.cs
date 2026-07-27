@@ -22,9 +22,11 @@ public sealed class SetDbatoolsPathCommand : DbaBaseCmdlet
     // no such parameter (nothing here ever calls Stop-Function).
 
     [Parameter(Mandatory = true)]
+    [PsStringCast]
     public string Name { get; set; } = null!;
 
     [Parameter(Mandatory = true)]
+    [PsStringCast]
     public string Path { get; set; } = null!;
 
     [Parameter(ParameterSetName = "Register", Mandatory = true)]

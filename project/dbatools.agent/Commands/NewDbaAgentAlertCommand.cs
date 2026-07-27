@@ -37,6 +37,7 @@ public sealed class NewDbaAgentAlertCommand : DbaBaseCmdlet
     /// <summary>The name of the alert to create.</summary>
     [Parameter(Mandatory = true, Position = 2)]
     [ValidateNotNullOrEmpty]
+    [PsStringCast]
     public string Alert { get; set; } = null!;
 
     /// <summary>The alert category name.</summary>

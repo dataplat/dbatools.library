@@ -28,10 +28,12 @@ public sealed class ExportDbatoolsConfigCommand : DbaBaseCmdlet
 {
     /// <summary>The full name (module.name) of the setting(s) to export.</summary>
     [Parameter(ParameterSetName = "FullName", Mandatory = true)]
+    [PsStringCast]
     public string? FullName { get; set; }
 
     /// <summary>The module whose settings are exported.</summary>
     [Parameter(ParameterSetName = "Module", Mandatory = true)]
+    [PsStringCast]
     public string? Module { get; set; }
 
     /// <summary>The setting name filter within the module.</summary>
@@ -44,6 +46,7 @@ public sealed class ExportDbatoolsConfigCommand : DbaBaseCmdlet
 
     /// <summary>Exports the module cache for this module name.</summary>
     [Parameter(ParameterSetName = "ModuleName", Mandatory = true)]
+    [PsStringCast]
     public string? ModuleName { get; set; }
 
     /// <summary>The module cache version.</summary>
@@ -58,6 +61,7 @@ public sealed class ExportDbatoolsConfigCommand : DbaBaseCmdlet
     [Parameter(Position = 1, Mandatory = true, ParameterSetName = "Config")]
     [Parameter(Position = 1, Mandatory = true, ParameterSetName = "FullName")]
     [Parameter(Position = 2, Mandatory = true, ParameterSetName = "Module")]
+    [PsStringCast]
     public string? OutPath { get; set; }
 
     /// <summary>Skips settings that still carry their initial default value.</summary>

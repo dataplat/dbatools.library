@@ -66,6 +66,7 @@ public sealed class SetDbaAgentScheduleCommand : DbaBaseCmdlet
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 3)]
     [ValidateNotNullOrEmpty]
     [Alias("ScheduleName")]
+    [PsStringCast]
     public string? Schedule { get; set; }
 
     /// <summary>A new name for the schedule.</summary>

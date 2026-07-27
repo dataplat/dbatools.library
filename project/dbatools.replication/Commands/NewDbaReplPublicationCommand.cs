@@ -36,15 +36,18 @@ public sealed class NewDbaReplPublicationCommand : DbaBaseCmdlet
 
     /// <summary>The database where the publication will be created and which contains the objects to be replicated.</summary>
     [Parameter(Mandatory = true, Position = 2)]
+    [PsStringCast]
     public string Database { get; set; } = null!;
 
     /// <summary>The unique name for the publication within the database.</summary>
     [Parameter(Mandatory = true, Position = 3)]
+    [PsStringCast]
     public string Name { get; set; } = null!;
 
     /// <summary>The replication method used for distributing data to subscribers.</summary>
     [Parameter(Mandatory = true, Position = 4)]
     [ValidateSet("Snapshot", "Transactional", "Merge")]
+    [PsStringCast]
     public string Type { get; set; } = null!;
 
     /// <summary>The Windows account credentials for the Log Reader Agent (Transactional and Snapshot only).</summary>

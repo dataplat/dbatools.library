@@ -36,10 +36,12 @@ public sealed class RemoveDbaReplSubscriptionCommand : DbaBaseCmdlet
 
     /// <summary>The publisher database that contains the replication publication.</summary>
     [Parameter(Mandatory = true, Position = 2)]
+    [PsStringCast]
     public string Database { get; set; } = null!;
 
     /// <summary>The name of the replication publication to remove the subscription from.</summary>
     [Parameter(Mandatory = true, Position = 3)]
+    [PsStringCast]
     public string PublicationName { get; set; } = null!;
 
     /// <summary>The subscriber SQL Server instance that receives replicated data.</summary>
@@ -52,6 +54,7 @@ public sealed class RemoveDbaReplSubscriptionCommand : DbaBaseCmdlet
 
     /// <summary>The database on the subscriber that receives the replicated data.</summary>
     [Parameter(Mandatory = true, Position = 6)]
+    [PsStringCast]
     public string SubscriptionDatabase { get; set; } = null!;
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.

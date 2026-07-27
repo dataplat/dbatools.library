@@ -35,10 +35,12 @@ public sealed class AddDbaReplArticleCommand : DbaBaseCmdlet
 
     /// <summary>The database containing both the publication and the object to add as an article.</summary>
     [Parameter(Mandatory = true, Position = 2)]
+    [PsStringCast]
     public string Database { get; set; } = null!;
 
     /// <summary>The name of the existing replication publication to add the article to.</summary>
     [Parameter(Mandatory = true, Position = 3)]
+    [PsStringCast]
     public string Publication { get; set; } = null!;
 
     /// <summary>The schema name of the object to add as an article. Defaults to dbo.</summary>
@@ -47,6 +49,7 @@ public sealed class AddDbaReplArticleCommand : DbaBaseCmdlet
 
     /// <summary>The name of the database object (typically a table) to add as an article.</summary>
     [Parameter(Mandatory = true, Position = 5)]
+    [PsStringCast]
     public string Name { get; set; } = null!;
 
     /// <summary>A WHERE clause condition to horizontally filter which rows get replicated. Do not include the word WHERE.</summary>

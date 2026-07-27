@@ -37,6 +37,7 @@ public sealed class GetDbaWaitResourceCommand : DbaBaseCmdlet
 
     /// <summary>The wait resource string (PAGE: d:f:p or KEY: d:h (lockres)).</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 2)]
+    [PsStringCast]
     public string WaitResource { get; set; } = null!;
 
     /// <summary>Also fetches the locked row for KEY resources.</summary>

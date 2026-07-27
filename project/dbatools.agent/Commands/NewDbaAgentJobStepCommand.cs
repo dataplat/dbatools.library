@@ -66,6 +66,7 @@ public sealed class NewDbaAgentJobStepCommand : DbaBaseCmdlet
     /// <summary>The name of the job step.</summary>
     [Parameter(Mandatory = true, Position = 4)]
     [ValidateNotNullOrEmpty]
+    [PsStringCast]
     public string StepName { get; set; } = null!;
 
     /// <summary>The subsystem used by the job step.</summary>

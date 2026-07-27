@@ -43,6 +43,7 @@ public sealed partial class InvokeDbaQueryCommand : DbaInstanceCmdlet
 
     /// <summary>The T-SQL statement(s) to run.</summary>
     [Parameter(Mandatory = true, ParameterSetName = "Query")]
+    [PsStringCast]
     public string? Query { get; set; }
 
     /// <summary>Number of seconds before the queries time out.</summary>

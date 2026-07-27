@@ -23,6 +23,7 @@ public sealed class JoinDbaPathCommand : DbaBaseCmdlet
 {
     /// <summary>The base path to build on.</summary>
     [Parameter(Mandatory = true, Position = 0)]
+    [PsStringCast]
     public string Path { get; set; } = null!;
 
     /// <summary>Optional -- tests to see if destination SQL Server is Linux or Windows.</summary>

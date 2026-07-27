@@ -61,6 +61,7 @@ public sealed class SetDbaDbSchemaCommand : DbaBaseCmdlet
 
     /// <summary>The login that will own the schema.</summary>
     [Parameter(Mandatory = true, Position = 4)]
+    [PsStringCast]
     public string? SchemaOwner { get; set; }
 
     /// <summary>SMO database object(s), typically from Get-DbaDatabase.</summary>

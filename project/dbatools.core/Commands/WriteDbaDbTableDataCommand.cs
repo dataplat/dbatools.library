@@ -64,6 +64,7 @@ public sealed partial class WriteDbaDbTableDataCommand : DbaBaseCmdlet
 
     [Parameter(Position = 3, Mandatory = true)]
     [ValidateNotNullOrEmpty]
+    [PsStringCast]
     public string Table { get; set; } = null!;
 
     [Parameter(Position = 4)]

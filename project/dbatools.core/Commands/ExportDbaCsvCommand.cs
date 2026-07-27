@@ -54,6 +54,7 @@ public sealed class ExportDbaCsvCommand : DbaInstanceCmdlet
 
     /// <summary>The output CSV file path.</summary>
     [Parameter(Position = 6, Mandatory = true)]
+    [PsStringCast]
     public string Path { get; set; } = null!;
 
     /// <summary>The field delimiter (default comma).</summary>

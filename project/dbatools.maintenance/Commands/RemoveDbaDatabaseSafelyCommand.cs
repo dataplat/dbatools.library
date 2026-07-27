@@ -45,6 +45,7 @@ public sealed class RemoveDbaDatabaseSafelyCommand : DbaBaseCmdlet
 
     /// <summary>Directory where the final database backups are stored before deletion.</summary>
     [Parameter(Mandatory = true, Position = 5, ParameterSetName = "Default")]
+    [PsStringCast]
     public string BackupFolder { get; set; } = null!;
 
     /// <summary>SQL Agent job category for the restore jobs. Defaults to 'Rationalisation'.</summary>

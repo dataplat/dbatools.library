@@ -19,11 +19,13 @@ public sealed class RemoveDbaSpnCommand : DbaBaseCmdlet
     /// <summary>The Service Principal Name to remove from Active Directory.</summary>
     [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true, Position = 0)]
     [Alias("RequiredSPN")]
+    [PsStringCast]
     public string? SPN { get; set; }
 
     /// <summary>The Active Directory account the SPN is registered to.</summary>
     [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true, Position = 1)]
     [Alias("InstanceServiceAccount", "AccountName")]
+    [PsStringCast]
     public string? ServiceAccount { get; set; }
 
     /// <summary>The credential to use to connect to Active Directory to make the changes.</summary>

@@ -54,6 +54,7 @@ public sealed class NewDbaDbMailAccountCommand : DbaBaseCmdlet
     /// <summary>The unique name for the Database Mail account being created.</summary>
     [Parameter(Mandatory = true, Position = 2)]
     [Alias("Name")]
+    [PsStringCast]
     public string Account { get; set; } = null!;
 
     /// <summary>The friendly name that appears in the 'From' field of outgoing emails (defaults to Account).</summary>
@@ -66,6 +67,7 @@ public sealed class NewDbaDbMailAccountCommand : DbaBaseCmdlet
 
     /// <summary>The sender email address for outgoing messages.</summary>
     [Parameter(Mandatory = true, Position = 5)]
+    [PsStringCast]
     public string EmailAddress { get; set; } = null!;
 
     /// <summary>An alternate reply-to email address.</summary>

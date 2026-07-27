@@ -49,6 +49,7 @@ public sealed class NewDbaDbMailProfileCommand : DbaBaseCmdlet
     /// <summary>The name for the new Database Mail profile.</summary>
     [Parameter(Mandatory = true, Position = 2)]
     [Alias("Name")]
+    [PsStringCast]
     public string Profile { get; set; } = null!;
 
     /// <summary>A description explaining the purpose of the Database Mail profile.</summary>

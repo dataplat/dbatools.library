@@ -34,6 +34,7 @@ public sealed class RegisterDbatoolsConfigCommand : DbaBaseCmdlet
     public string[]? FullName { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "Name", Position = 0)]
+    [PsStringCast]
     public string? Module { get; set; }
 
     [Parameter(ParameterSetName = "Name", Position = 1)]

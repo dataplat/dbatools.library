@@ -51,6 +51,7 @@ public sealed class NewDbaReplSubscriptionCommand : DbaBaseCmdlet
 
     /// <summary>The name of the existing publication on the publisher database to subscribe to.</summary>
     [Parameter(Mandatory = true, Position = 6)]
+    [PsStringCast]
     public string PublicationName { get; set; } = null!;
 
     /// <summary>SQL Server credentials used by the replication agents to connect to the subscriber.</summary>
@@ -60,6 +61,7 @@ public sealed class NewDbaReplSubscriptionCommand : DbaBaseCmdlet
     /// <summary>Specifies whether to create a Push or Pull subscription for data synchronization.</summary>
     [Parameter(Mandatory = true, Position = 8)]
     [ValidateSet("Push", "Pull")]
+    [PsStringCast]
     public string Type { get; set; } = null!;
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.

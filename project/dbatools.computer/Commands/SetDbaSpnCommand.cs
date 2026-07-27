@@ -19,11 +19,13 @@ public sealed class SetDbaSpnCommand : DbaBaseCmdlet
     /// <summary>The Service Principal Name to register in Active Directory.</summary>
     [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true, Position = 0)]
     [Alias("RequiredSPN")]
+    [PsStringCast]
     public string? SPN { get; set; }
 
     /// <summary>The Active Directory account that runs the SQL Server service and will own the SPN.</summary>
     [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true, Position = 1)]
     [Alias("InstanceServiceAccount", "AccountName")]
+    [PsStringCast]
     public string? ServiceAccount { get; set; }
 
     /// <summary>The credential to use to connect to Active Directory to make the changes.</summary>

@@ -57,6 +57,7 @@ public sealed class TestDbaDbDataGeneratorConfigCommand : DbaBaseCmdlet
     // cmdlet infers no position, so omitting this would reject the documented
     // "Test-DbaDbDataGeneratorConfig C:\temp\db1.json" call the .EXAMPLE shows.
     [Parameter(Mandatory = true, Position = 0)]
+    [PsStringCast]
     public string? FilePath { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.

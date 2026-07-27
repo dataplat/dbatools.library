@@ -41,10 +41,12 @@ public sealed class RenameDbaLoginCommand : DbaBaseCmdlet
 
     /// <summary>The current login name to rename.</summary>
     [Parameter(Mandatory = true, Position = 2)]
+    [PsStringCast]
     public string? Login { get; set; }
 
     /// <summary>The new login name.</summary>
     [Parameter(Mandatory = true, Position = 3)]
+    [PsStringCast]
     public string? NewLogin { get; set; }
 
     /// <summary>Also renames the mapped database users, rolling back the login rename if any user rename fails.</summary>

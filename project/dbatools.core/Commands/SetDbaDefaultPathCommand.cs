@@ -39,6 +39,7 @@ public sealed class SetDbaDefaultPathCommand : DbaInstanceCmdlet
     public string[]? Type { get; set; }
 
     [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true, Position = 3)]
+    [PsStringCast]
     public string Path { get; set; } = null!;
 
     protected override void ProcessRecord()

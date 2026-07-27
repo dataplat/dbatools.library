@@ -41,6 +41,7 @@ public sealed class SetDbaExtendedPropertyCommand : DbaBaseCmdlet
 
     /// <summary>The new value for the extended property.</summary>
     [Parameter(Mandatory = true, Position = 1)]
+    [PsStringCast]
     public string? Value { get; set; }
 
     // EnableException is inherited from DbaBaseCmdlet - never redeclared.

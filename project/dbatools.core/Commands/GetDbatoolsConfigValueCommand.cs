@@ -24,6 +24,7 @@ public sealed class GetDbatoolsConfigValueCommand : DbaBaseCmdlet
     /// <summary>The full name (module.name) of the configured value.</summary>
     [Alias("Name")]
     [Parameter(Mandatory = true, Position = 0)]
+    [PsStringCast]
     public string? FullName { get; set; }
 
     /// <summary>A fallback value returned when the setting holds no value.</summary>

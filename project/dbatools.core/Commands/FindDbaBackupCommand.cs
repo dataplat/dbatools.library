@@ -28,14 +28,17 @@ public sealed class FindDbaBackupCommand : DbaBaseCmdlet
     /// <summary>Full path to the root level backup folder.</summary>
     [Parameter(Mandatory = true, Position = 0, HelpMessage = "Full path to the root level backup folder (ex. 'C:\\SQL\\Backups'")]
     [Alias("BackupFolder")]
+    [PsStringCast]
     public string? Path { get; set; }
 
     /// <summary>Backup file extension to find (ex. bak, trn, dif).</summary>
     [Parameter(Mandatory = true, Position = 1, HelpMessage = "Backup File extension to remove (ex. bak, trn, dif)")]
+    [PsStringCast]
     public string? BackupFileExtension { get; set; }
 
     /// <summary>Backup retention period (ex. 24h, 7d, 4w, 6m).</summary>
     [Parameter(Mandatory = true, Position = 2, HelpMessage = "Backup retention period. (ex. 24h, 7d, 4w, 6m)")]
+    [PsStringCast]
     public string? RetentionPeriod { get; set; }
 
     /// <summary>Only includes files whose Archive bit is clear (already backed up elsewhere).</summary>
