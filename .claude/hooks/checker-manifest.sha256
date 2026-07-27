@@ -5,7 +5,7 @@
 # stop-checker-integrity.sh, so silently re-baselining a weakened checker
 # does not go unrecorded - which is the whole point of the file.
 #
-# Generated from HEAD f1271eb
+# Generated from HEAD ae7f668b
 ffb9446c4aacdc02c1d7410b88d419ca3d95d16513ee9aea96f186a3a425eba7  .claude/hooks/enforce-cs-rules.sh
 b3f3249f8fa6c01d87d90fe21ba8ed73f47e6a50c77f764f62a8b9694d832529  .claude/hooks/enforce-psd1-rules.sh
 ad537fa028f5943e731a2a14618ce743da6171f862683cfc16975f2c997d44c0  .claude/hooks/jscpd-baseline.sh
@@ -16,16 +16,17 @@ af5b3902d5dfad03c0114cf7bd9538bd6ecf6ed623a4375f057e5cc922183fc4  .claude/hooks/
 98384422cbdb975856dfbed02416f36f295b07b8b6be2ef19e2a2fc4eb59870f  .claude/hooks/lib-hook-common.sh
 c991d699cddc90b94381894d2cfff213b0dc93e2d16c7217b4abda7de7936d45  .claude/hooks/lib-protected-surface.sh
 f155da722c6f311b89dc794fdd038085ff98cd68651661256f88956ce317d250  .claude/hooks/lib-stop-guard.sh
-756a5c16e0b34be7914e1e24dbc0c3f2cbaca98f69a4de94f8249d44598ed092  .claude/hooks/post-write-track-session-files.sh
+fd82217e88022010c8e0f55a050af2804856159694f6b526c98218579f8253e0  .claude/hooks/post-write-track-session-files.sh
 f0c2c5fdc35d3e1b07aa3556fcb1e58ce8f1ac541cbb77affaf8c152e64feb27  .claude/hooks/pretooluse-bash-tamper-guard.sh
 97499dc681c3c6d1bb3b5b5b5b0693c47ff2af6bce2e671251331f9ae6ba3058  .claude/hooks/pretooluse-checker-removal-guard.sh
 99311b70c19c5d1f64998ab8184ce1aa5ccac37c8ee64a3c48a5c63e92cfedb2  .claude/hooks/session-context.sh
 e005c196beff7e6bf8b230094de8902cfd9619fc59cbeed5d4ac685ad730c4c3  .claude/hooks/stop-checker-integrity.sh
-5b332dd9c6f68992a8335fb15ef5df1d439e05922fb03c65d6550cb9b496ea88  .claude/hooks/stop-codex-review.sh
+3f53c05a473c02633fe2447f39b1a527f79fa5041a6a1a152f435e6d6467549b  .claude/hooks/stop-codex-review.sh
 ea413c0217a298f5fbecd4f425b5c5b829b14af3335e23f0cc6a04bd1d6e9b9b  .claude/hooks/stop-file-length.sh
 da4e4ec2265076ac4f16333073d8522950d4614bf38d54f71d7d131ee66b1555  .claude/hooks/stop-jscpd-ratchet.sh
 274c047f1bb917123e08c3826bd4225e45503a673d61f669142bfbcf3924cb95  .claude/hooks/stop-no-deflection.sh
 0adf545889429df1b17e7b15e1efeac560ca944368d4420d6604990dd3e286ea  .claude/hooks/stop-verify.sh
+5e3f67d34d9fe01c9e461105711fa35f386e3370d53a6996969e7dd5f1794cd1  .claude/hooks/test-stop-codex-review.sh
 010ca5e3d5b90f51660d6ffb7aa0d9d4c88404e790b3f863f6f3e9782a2ea172  .claude/hooks/verify-checker-integrity.sh
 745a792457425f01f782eef497fa6ce870d28fa749890fec8ec87b738480abd1  .claude/settings.json
 03ccd71e9261cde26a1c676c796cf27f28e77f6858a13e70fdebee29fc82c12c  .claude/skills/reviewme/SKILL.md
