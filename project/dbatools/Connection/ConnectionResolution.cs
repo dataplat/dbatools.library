@@ -30,6 +30,13 @@ namespace Dataplat.Dbatools.Connection
         /// <summary>Whether the target matched the AzureDomain check for this instance.</summary>
         public bool IsAzure;
 
+        /// <summary>
+        /// Whether this connection authenticates through an explicit Windows credential
+        /// SspiContextProvider. Such connections cannot be copied or stored in the legacy
+        /// connection-string-only registry without losing their credential identity.
+        /// </summary>
+        public bool UsesCredentialSspiProvider;
+
         /// <summary>The instance that was resolved (after any service-principal rewrite).</summary>
         public DbaInstanceParameter Instance;
     }

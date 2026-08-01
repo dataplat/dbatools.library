@@ -101,7 +101,7 @@ host — only `net472` results matter on Windows. CI runs net8.0 on Linux, where
 
 | Package | Ceiling | Why |
 |---------|---------|-----|
-| Microsoft.Data.SqlClient | 6.x | DacFx/SMO compiled against 6.x; 7.x causes type-load failures |
+| Microsoft.Data.SqlClient | 7.x | 7.0.1 is validated with the pinned SMO and DacFx packages; revalidate their loaders before upgrading |
 | Microsoft.PowerShell.SDK | 7.4.x | 7.5+ requires a net9.0 target change |
 | MSTest.* | 3.x | 4.x drops `Assert.ThrowsException<T>()` on net472 |
 | Microsoft.NET.Test.Sdk | 17.x | 18.x aligns with the MSTest 4.x ecosystem |
