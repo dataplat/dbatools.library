@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
 using Dataplat.Dbatools.Message;
@@ -136,8 +135,7 @@ namespace Dataplat.Dbatools.Connection
 
             if (request.SqlConnectionOnly)
             {
-                if (!state.UsesCredentialSspiProvider)
-                    RegisterConnection(server.ConnectionContext.ConnectionString, server.ConnectionContext.SqlConnectionObject, request.MessageCallback);
+                RegisterConnection(server.ConnectionContext.ConnectionString, server.ConnectionContext.SqlConnectionObject, request.MessageCallback);
                 Msg(request, MessageLevel.Debug, "We return only SqlConnection in server.ConnectionContext.SqlConnectionObject");
                 resolution.SqlConnection = server.ConnectionContext.SqlConnectionObject;
                 return resolution;
@@ -254,8 +252,7 @@ namespace Dataplat.Dbatools.Connection
                     RegisterInstanceForTepp(resolution.Instance, resolution.Server);
                 ApplyDefaultInitFields(resolution.Server, resolution.IsAzure, request.MessageCallback);
             }
-            if (!resolution.UsesCredentialSspiProvider)
-                RegisterConnection(resolution.Server.ConnectionContext.ConnectionString, resolution.Server, request.MessageCallback);
+            RegisterConnection(resolution.Server.ConnectionContext.ConnectionString, resolution.Server, request.MessageCallback);
         }
 
         /// <summary>
@@ -302,154 +299,5 @@ namespace Dataplat.Dbatools.Connection
             }
         }
 
-        #region SetDefaultInitFields priming
-        //'PrimaryFilePath' seems the culprit for slow SMO on databases
-        private static readonly string[] Fields2000_Db = new string[] { "Collation", "CompatibilityLevel", "CreateDate", "ID", "IsAccessible", "IsFullTextEnabled", "IsSystemObject", "IsUpdateable", "LastBackupDate", "LastDifferentialBackupDate", "LastLogBackupDate", "Name", "Owner", "ReadOnly", "RecoveryModel", "ReplicationOptions", "Status", "Version" };
-        private static readonly string[] Fields200x_Db = new string[] { "Collation", "CompatibilityLevel", "CreateDate", "ID", "IsAccessible", "IsFullTextEnabled", "IsSystemObject", "IsUpdateable", "LastBackupDate", "LastDifferentialBackupDate", "LastLogBackupDate", "Name", "Owner", "ReadOnly", "RecoveryModel", "ReplicationOptions", "Status", "Version", "BrokerEnabled", "DatabaseSnapshotBaseName", "IsMirroringEnabled", "Trustworthy" };
-        private static readonly string[] Fields201x_Db = new string[] { "Collation", "CompatibilityLevel", "CreateDate", "ID", "IsAccessible", "IsFullTextEnabled", "IsSystemObject", "IsUpdateable", "LastBackupDate", "LastDifferentialBackupDate", "LastLogBackupDate", "Name", "Owner", "ReadOnly", "RecoveryModel", "ReplicationOptions", "Status", "Version", "BrokerEnabled", "DatabaseSnapshotBaseName", "IsMirroringEnabled", "Trustworthy", "ActiveConnections", "AvailabilityDatabaseSynchronizationState", "AvailabilityGroupName", "ContainmentType", "EncryptionEnabled" };
-
-        private static readonly string[] Fields2000_Login = new string[] { "CreateDate", "DateLastModified", "DefaultDatabase", "DenyWindowsLogin", "IsSystemObject", "Language", "LanguageAlias", "LoginType", "Name", "Sid", "WindowsLoginAccessType" };
-        private static readonly string[] Fields200x_Login = new string[] { "CreateDate", "DateLastModified", "DefaultDatabase", "DenyWindowsLogin", "IsSystemObject", "Language", "LanguageAlias", "LoginType", "Name", "Sid", "WindowsLoginAccessType", "AsymmetricKey", "Certificate", "Credential", "ID", "IsDisabled", "IsLocked", "IsPasswordExpired", "MustChangePassword", "PasswordExpirationEnabled", "PasswordPolicyEnforced" };
-        private static readonly string[] Fields201x_Login = new string[] { "CreateDate", "DateLastModified", "DefaultDatabase", "DenyWindowsLogin", "IsSystemObject", "Language", "LanguageAlias", "LoginType", "Name", "Sid", "WindowsLoginAccessType", "AsymmetricKey", "Certificate", "Credential", "ID", "IsDisabled", "IsLocked", "IsPasswordExpired", "MustChangePassword", "PasswordExpirationEnabled", "PasswordPolicyEnforced", "PasswordHashAlgorithm" };
-
-        //see #7753
-        private static readonly string[] Fields_Job = new string[] { "LastRunOutcome", "CurrentRunStatus", "CurrentRunStep", "CurrentRunRetryAttempt", "NextRunScheduleID", "NextRunDate", "LastRunDate", "JobType", "HasStep", "HasServer", "CurrentRunRetryAttempt", "HasSchedule", "Category", "CategoryID", "CategoryType", "OperatorToEmail", "OperatorToNetSend", "OperatorToPage" };
-
-        private static int _loadedSmoMajorVersion = -1;
-
-        private static int GetLoadedSmoMajorVersion()
-        {
-            // PS begin block: $loadedSmoVersion from the loaded Microsoft.SqlServer.SMO
-            // assembly's location/ProductVersion, later compared -ge 11. The compiled port
-            // links the vendored SMO directly (file version 18.x for SqlManagementObjects
-            // 181.x), so this resolves once and stays.
-            if (_loadedSmoMajorVersion < 0)
-            {
-                try
-                {
-                    string location = typeof(Server).Assembly.Location;
-                    System.Diagnostics.FileVersionInfo info = System.Diagnostics.FileVersionInfo.GetVersionInfo(location);
-                    _loadedSmoMajorVersion = info.ProductMajorPart;
-                }
-                catch
-                {
-                    // Single-file or reflection-restricted hosts: the linked SMO is modern.
-                    _loadedSmoMajorVersion = 18;
-                }
-            }
-            return _loadedSmoMajorVersion;
-        }
-
-        /// <summary>
-        /// The SetDefaultInitFields priming of Connect-DbaInstance.ps1, with the exact
-        /// per-version field lists (BP-201/BP-202).
-        /// </summary>
-        /// <param name="server">The connected server</param>
-        /// <param name="isAzure">Whether the target is Azure (skips priming)</param>
-        /// <param name="messageCallback">Optional verbatim-message sink</param>
-        public static void ApplyDefaultInitFields(Server server, bool isAzure, Action<MessageLevel, string> messageCallback)
-        {
-            // By default, SMO initializes several properties. We push it to the limit and gather a bit more
-            // this slows down the connect a smidge but drastically improves overall performance
-            // especially when dealing with a multitude of servers
-            if (GetLoadedSmoMajorVersion() >= 11 && !isAzure)
-            {
-                try
-                {
-                    if (messageCallback != null)
-                        messageCallback(MessageLevel.Debug, "SetDefaultInitFields will be used");
-                    StringCollection initFieldsDb = new StringCollection();
-                    StringCollection initFieldsLogin = new StringCollection();
-                    StringCollection initFieldsJob = new StringCollection();
-                    if (server.VersionMajor == 8)
-                    {
-                        // 2000
-                        initFieldsDb.AddRange(Fields2000_Db);
-                        initFieldsLogin.AddRange(Fields2000_Login);
-                    }
-                    else if (server.VersionMajor == 9 || server.VersionMajor == 10)
-                    {
-                        // 2005 and 2008
-                        initFieldsDb.AddRange(Fields200x_Db);
-                        initFieldsLogin.AddRange(Fields200x_Login);
-                    }
-                    else if (server.VersionMajor >= 16)
-                    {
-                        // 2022 and above - exclude ActiveConnections due to performance issue #9282
-                        foreach (string field in Fields201x_Db)
-                        {
-                            if (!String.Equals(field, "ActiveConnections", StringComparison.Ordinal))
-                                initFieldsDb.Add(field);
-                        }
-                        initFieldsLogin.AddRange(Fields201x_Login);
-                    }
-                    else
-                    {
-                        // 2012 to 2019
-                        initFieldsDb.AddRange(Fields201x_Db);
-                        initFieldsLogin.AddRange(Fields201x_Login);
-                    }
-                    server.SetDefaultInitFields(typeof(Microsoft.SqlServer.Management.Smo.Database), initFieldsDb);
-                    server.SetDefaultInitFields(typeof(Microsoft.SqlServer.Management.Smo.Login), initFieldsLogin);
-                    //see 7753
-                    initFieldsJob.AddRange(Fields_Job);
-                    server.SetDefaultInitFields(typeof(Microsoft.SqlServer.Management.Smo.Agent.Job), initFieldsJob);
-                }
-                catch (Exception ex)
-                {
-                    if (messageCallback != null)
-                        messageCallback(MessageLevel.Debug, String.Format("SetDefaultInitFields failed with {0}", ex.Message));
-                    // perhaps a DLL issue, continue going
-                }
-            }
-        }
-        #endregion SetDefaultInitFields priming
-
-        /// <summary>
-        /// private/functions/Add-ConnectionHashValue.ps1 parity over
-        /// ConnectionHost.ActiveConnections: non-pooled connections append to the entry's
-        /// list, pooled connections replace it.
-        /// </summary>
-        /// <param name="key">The connection string key</param>
-        /// <param name="value">The Server or SqlConnection to register</param>
-        /// <param name="messageCallback">Optional verbatim-message sink</param>
-        public static void RegisterConnection(string key, object value, Action<MessageLevel, string> messageCallback)
-        {
-            if (messageCallback != null)
-                messageCallback(MessageLevel.Debug, "Adding to connection hash");
-            if (String.IsNullOrEmpty(key) || value == null)
-                return;
-
-            // PS: if ($Value.ConnectionContext.NonPooledConnection -or $Value.NonPooledConnection)
-            // A Server exposes it through ConnectionContext; a bare SqlConnection has neither,
-            // which lands in the pooled/replace branch exactly like the PS member miss did.
-            bool nonPooled = false;
-            Server serverValue = value as Server;
-            if (serverValue != null)
-            {
-                try { nonPooled = serverValue.ConnectionContext.NonPooledConnection; }
-                catch { /* unreadable on some connection shapes; treat as pooled like the PS member miss */ }
-            }
-
-            lock (ConnectionHost.ActiveConnections)
-            {
-                if (nonPooled)
-                {
-                    List<object> entries;
-                    if (!ConnectionHost.ActiveConnections.TryGetValue(key, out entries) || entries == null)
-                    {
-                        entries = new List<object>();
-                        ConnectionHost.ActiveConnections[key] = entries;
-                    }
-                    entries.Add(value);
-                }
-                else
-                {
-                    List<object> single = new List<object>();
-                    single.Add(value);
-                    ConnectionHost.ActiveConnections[key] = single;
-                }
-            }
-        }
     }
 }
