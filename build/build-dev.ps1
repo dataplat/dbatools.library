@@ -21,9 +21,16 @@ param(
 # alone. Use it when you touched a satellite and NOT dbatools/ - the common case for a port
 # iteration. It exists because the base drop cannot be re-staged at all while any live session has
 # it loaded (see the holder check below), and that blocked satellite-only work that never needed
-# the base refreshed (#849). Skew is still caught downstream: the gate's base-library parity guard
-# compares the guest base dbatools.dll against the host build, so a -SkipRuntime run that DID
-# change dbatools/ source reds there rather than shipping quietly.
+# the base refreshed (#849).
+#
+# It does NOT rely on anything downstream to catch skew, and an earlier version of this comment was
+# wrong to say it did: every satellite csproj carries <ProjectReference Include="..\dbatools\
+# dbatools.csproj" />, so building a satellite recompiles the runtime into artifacts/lib/Release/
+# whether or not -SkipRuntime was passed - it is only the STAGING that is skipped. The gate's
+# base-library parity guard hashes the two STAGED copies (guest vs host,
+# migration/tools/Test-GateBaseLibraryPrecondition.ps1), and staging is exactly the step that did
+# not run, so both sides read the same stale file and the guard passes on skewed bits (#854). The
+# post-build check at the bottom of this script is therefore the only thing that sees it.
 #
 # ACCEPTANCE (P0-004): after `build-dev.ps1 -IncludeDesktop`, Use-LocalDbatoolsLibrary -Validate is
 # green (both editions import warning-clean) because the dependency tree is reused untouched and
@@ -92,9 +99,10 @@ function Get-StagedDllHolder {
         [string]$Path
     )
     foreach ($proc in (Get-Process -ErrorAction SilentlyContinue)) {
-        if ($proc.Id -eq $PID) {
-            continue
-        }
+        # Do NOT skip $PID. Running this script from a shell that already imported the core drop out
+        # of artifacts is the COMMON way to lock it, and skipping self reported zero holders, which
+        # the caller then printed as "likely held under another user account" - the one diagnosis
+        # that sends the reader looking at the wrong machine.
         # Both .Modules and .StartTime are unreadable for a process this session cannot open, or one
         # that exits mid-enumeration - both happen here, and one died mid-probe during the #849
         # investigation. PowerShell does NOT throw on a failing property getter: verified on pwsh 7
@@ -123,6 +131,7 @@ function Get-StagedDllHolder {
             Id      = $proc.Id
             Name    = $proc.ProcessName
             Started = $started
+            IsSelf  = ($proc.Id -eq $PID)
         }
     }
 }
@@ -145,7 +154,11 @@ if (-not $SkipRuntime) {
             Write-Host "  no holder could be attributed - it is likely held under another user account." -ForegroundColor Red
         }
         foreach ($holder in $holders) {
-            Write-Host "  $($holder.Name) pid=$($holder.Id) started=$($holder.Started)" -ForegroundColor Red
+            $selfNote = ""
+            if ($holder.IsSelf) {
+                $selfNote = "  <-- THIS shell: it imported the core drop out of artifacts; start a fresh shell to build"
+            }
+            Write-Host "  $($holder.Name) pid=$($holder.Id) started=$($holder.Started)$selfNote" -ForegroundColor Red
         }
         Write-Host "  This is NOT the library edit lease. Do not kill these - a peer gate or regate run may be live." -ForegroundColor Yellow
         Write-Host "  If you did not change dbatools/ source, re-run with -SkipRuntime to refresh satellites only." -ForegroundColor Yellow
@@ -220,6 +233,41 @@ try {
     }
 } finally {
     Pop-Location
+}
+
+# ABI-skew check for -SkipRuntime, per the note at the top. The satellites just compiled against
+# whatever the ProjectReference produced; if that is NEWER than the staged base, the two disagree and
+# nothing downstream will say so. Timestamps rather than hashes on purpose: an incremental build
+# leaves the runtime untouched when dbatools/ source did not change (the case -SkipRuntime is FOR),
+# so this is quiet then - while a hash compare would red every run, because .NET stamps a fresh MVID
+# into each compile and no two builds of identical source are byte-equal.
+if ($SkipRuntime -and -not $SkipSatellites) {
+    $skewed = @()
+    foreach ($edition in $editions) {
+        $builtDll = Join-Path -Path $artifactsDir -ChildPath "lib/Release/$($edition.Framework)/dbatools.dll"
+        $stagedDll = Join-Path -Path $moduleDir -ChildPath "$($edition.Name)/lib/dbatools.dll"
+        if (-not (Test-Path -LiteralPath $builtDll)) {
+            # Every satellite references dbatools.csproj, so this file must exist after a satellite
+            # build. Missing means the comparison could not be made - never treat that as agreement.
+            Write-Host "ERROR: cannot check base skew for $($edition.Name) - expected $builtDll after the satellite build, and it is not there." -ForegroundColor Red
+            exit 1
+        }
+        $builtAt = (Get-Item -LiteralPath $builtDll).LastWriteTimeUtc
+        $stagedAt = (Get-Item -LiteralPath $stagedDll).LastWriteTimeUtc
+        if ($builtAt -gt $stagedAt) {
+            $skewed += [PSCustomObject]@{ Edition = $edition.Name; Built = $builtAt; Staged = $stagedAt }
+        }
+    }
+    if ($skewed.Count -gt 0) {
+        Write-Host "ERROR: -SkipRuntime staged satellites built against a NEWER runtime than the staged base dbatools.dll:" -ForegroundColor Red
+        foreach ($skew in $skewed) {
+            Write-Host "  $($skew.Edition): built $($skew.Built)Z, staged $($skew.Staged)Z" -ForegroundColor Red
+        }
+        Write-Host "  You changed dbatools/ source, so -SkipRuntime is not safe here - the satellites and the base disagree." -ForegroundColor Yellow
+        Write-Host "  The gate will NOT catch this: its parity guard hashes the two staged copies, and staging is what was skipped (#854)." -ForegroundColor Yellow
+        Write-Host "  Free the holder named above and re-run without -SkipRuntime." -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 $stopwatch.Stop()

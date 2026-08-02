@@ -282,6 +282,40 @@ public class FakeHolderProcess {
     Write-Leg -Ok ($injected.Count -eq 1 -and $injected[0].Started -eq "unknown") -Message "its start time reads `"unknown`" rather than printing blank"
     Write-Leg -Ok ($injected.Count -eq 1 -and $injected[0].Id -eq -1 -and $injected[0].Name -eq "fake-holder") -Message "the pid and name - the whole point of the diagnostic - survive"
 
+    # SELF-HOLDER. Running build-dev from a shell that already imported the core drop is the ordinary
+    # way to lock it, and the sweep used to skip $PID - so it found nothing and the caller printed
+    # "likely held under another user account", pointing the reader at a different machine.
+    function Get-Process {
+        param(
+            [Parameter(ValueFromRemainingArguments)]
+            $Rest
+        )
+        $self = New-Object -TypeName FakeHolderProcess
+        $self.Id = $PID
+        $self.ProcessName = "pwsh"
+        $self.Modules = @([PSCustomObject]@{ FileName = $stagedCore })
+        , @($self)
+    }
+    $selfHeld = @(Get-StagedDllHolder -Path $stagedCore)
+    Write-Leg -Ok ($selfHeld.Count -eq 1) -Message "the invoking process is reported when it is itself the holder (got $($selfHeld.Count))"
+    Write-Leg -Ok ($selfHeld.Count -eq 1 -and $selfHeld[0].IsSelf) -Message "it is flagged IsSelf, so the caller can say which shell to restart"
+
+    # Control: the pre-fix shape skipped $PID outright. It must report ZERO here - otherwise the leg
+    # above passes with or without the fix.
+    $holderSource = ($ast.FindAll({
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq "Get-StagedDllHolder"
+            }, $true))[0].Extent.Text
+    $selfSkipping = $holderSource -replace "function Get-StagedDllHolder", "function Get-StagedDllHolderSkipSelf"
+    $selfSkipping = $selfSkipping -replace "(?ms)(foreach \(\`$proc in \(Get-Process[^\r\n]*\r?\n)", "`$1        if (`$proc.Id -eq `$PID) { continue }`r`n"
+    if ($selfSkipping -notmatch "Get-StagedDllHolderSkipSelf" -or $selfSkipping -notmatch "\-eq \`$PID") {
+        Write-Leg -Ok $false -Message "self control: could not reconstruct the pre-fix skip - THE CONTROL IS VOID, do not trust the two legs above"
+    } else {
+        . ([scriptblock]::Create($selfSkipping))
+        $skipped = @(Get-StagedDllHolderSkipSelf -Path $stagedCore)
+        Write-Leg -Ok ($skipped.Count -eq 0) -Message "self control: the pre-fix sweep reports $($skipped.Count) holders - the legs above detect the regression"
+    }
+
     # And the control: the same injection against the pre-fix shape, which assigned StartTime
     # unconditionally. It must yield a BLANK start time - if it still says "unknown", the fallback is
     # not what produces that and the leg above cannot fail.
@@ -337,6 +371,29 @@ public class FakeHolderProcess {
     Write-Leg -Ok ($skipLocked.Output -match "Staged satellite: dbatools.fake") -Message "satellites still built and staged - -SkipRuntime is not a no-op"
     Write-Leg -Ok (Test-Path -LiteralPath $stagedSatellite) -Message "the satellite assembly really landed in the module stage"
     Write-Leg -Ok ($baseBefore -eq $baseAfter) -Message "the locked staged base is byte-identical after the run"
+    Write-Leg -Ok ($skipLocked.Output -notmatch "NEWER runtime") -Message "and it does NOT cry skew when dbatools/ source was untouched - the case -SkipRuntime is for"
+
+    # 5b. ABI SKEW. Every satellite csproj ProjectReferences dbatools.csproj, so a satellite build
+    #     recompiles the runtime even under -SkipRuntime; only the staging is skipped. The gate cannot
+    #     see the result - its parity guard hashes the two STAGED copies and staging is what did not
+    #     run (#854) - so this script has to. Newer built runtime = the satellites and the staged base
+    #     disagree.
+    #
+    #     The leg immediately above is this one's positive control: the same run, same sandbox, with
+    #     only the timestamp moved. Without it "exits 1 on skew" would also hold for a check that
+    #     fires unconditionally, which would make -SkipRuntime unusable.
+    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = (Get-Item -LiteralPath $stagedCore).LastWriteTimeUtc.AddMinutes(5)
+    $splatSkew = @{
+        Script   = $sandboxScript
+        Switches = @("-SkipRuntime")
+        WorkDir  = $runDir
+    }
+    $skew = Invoke-BuildDev @splatSkew
+    Write-Leg -Ok ($skew.ExitCode -eq 1) -Message "a runtime newer than the staged base fails the -SkipRuntime run (exit $($skew.ExitCode))"
+    Write-Leg -Ok ($skew.Output -match "NEWER runtime than the staged base") -Message "the failure names the skew rather than dying obscurely"
+    Write-Leg -Ok ($skew.Output -match "#854") -Message "it says the gate will not catch this, and cites the issue"
+    Write-Leg -Ok ($skew.Output -match "Staged satellite: dbatools.fake") -Message "the check runs AFTER the satellites build - it is a verdict, not a second preflight"
+    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = (Get-Item -LiteralPath $stagedCore).LastWriteTimeUtc.AddMinutes(-5)
 
     # 6. NEGATIVE CONTROL. Everything above is unfalsifiable until a script WITHOUT the guard turns a
     #    leg red. Two earlier control shapes were void, both guarded against here: the pre-change
