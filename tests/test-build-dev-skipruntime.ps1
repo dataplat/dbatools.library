@@ -113,6 +113,7 @@ $scriptText = Get-Content -Path $resolved -Raw
 # and delete each other's files.
 $runDir = Join-Path ([System.IO.Path]::GetTempPath()) ("build-dev-test-" + [System.IO.Path]::GetRandomFileName())
 $null = New-Item -ItemType Directory -Path $runDir -Force
+$originalPath = $env:PATH
 
 try {
     # The sandbox only has to satisfy what the script inspects before it would build: a script
@@ -128,6 +129,36 @@ try {
     }
     $sandboxScript = Join-Path -Path $sandboxBuild -ChildPath "build-dev.ps1"
     Copy-Item -Path $resolved -Destination $sandboxScript -Force
+
+    # A fake dotnet on PATH plus a minimal project tree. Without them the script cannot get past
+    # Push-Location, so a -SkipRuntime leg could only assert "no lock error" - which passes just as
+    # readily when the run dies one line later for an unrelated reason. With them the run completes
+    # and the leg asserts what actually matters: satellites built, runtime not.
+    $fakeBin = Join-Path -Path $runDir -ChildPath "fakebin"
+    $null = New-Item -ItemType Directory -Path $fakeBin -Force
+    Set-Content -Path (Join-Path -Path $fakeBin -ChildPath "dotnet.cmd") -Value "@echo off`r`necho   fake dotnet %*`r`nexit /b 0" -Encoding Ascii
+    if (-not $IsWindows) {
+        $shim = Join-Path -Path $fakeBin -ChildPath "dotnet"
+        Set-Content -Path $shim -Value "#!/bin/sh`necho `"  fake dotnet `$@`"`nexit 0" -Encoding Ascii
+        chmod +x $shim
+    }
+    $env:PATH = $fakeBin + [System.IO.Path]::PathSeparator + $env:PATH
+
+    $sandboxProject = Join-Path -Path $runDir -ChildPath "project"
+    foreach ($proj in @("dbatools", "dbatools.fake")) {
+        $projDir = Join-Path -Path $sandboxProject -ChildPath $proj
+        $null = New-Item -ItemType Directory -Path $projDir -Force
+        Set-Content -Path (Join-Path -Path $projDir -ChildPath "$proj.csproj") -Value "<Project />" -Encoding Ascii
+    }
+    # The script verifies each build's output exists before staging it, so a fake compiler that
+    # writes nothing needs these seeded in the exact locations the real projects emit to.
+    $builtRuntime = Join-Path -Path $runDir -ChildPath "artifacts/lib/Release/net8.0/dbatools.dll"
+    $builtSatellite = Join-Path -Path $sandboxProject -ChildPath "dbatools.fake/bin/Release/net8.0/dbatools.fake.dll"
+    foreach ($built in @($builtRuntime, $builtSatellite)) {
+        $null = New-Item -ItemType Directory -Path (Split-Path -Path $built) -Force
+        Set-Content -Path $built -Value "built by the fake dotnet" -Encoding Ascii
+    }
+    $stagedSatellite = Join-Path -Path $runDir -ChildPath "artifacts/modules/dbatools.fake/core/dbatools.fake.dll"
 
     # 1. Mutual exclusion. This path exits before any dotnet invocation, so it stays hermetic.
     #    The exit code alone proves nothing - the guard, a binding failure against a script with no
@@ -161,8 +192,10 @@ try {
         $lock.Close()
     }
 
-    # 3. The other direction, at the same level: unlocked, the preflight must NOT block. Without
-    #    this the preflight could be a blanket refusal and every leg above would still be green.
+    # 3. The other direction, at the same level: unlocked, the preflight must NOT block - and the run
+    #    must reach BOTH build paths. That second half is what gives the -SkipRuntime leg below any
+    #    meaning: in a sandbox that could never build a runtime, "no runtime build ran" proves
+    #    nothing at all.
     $splatFree = @{
         Script   = $sandboxScript
         Switches = @()
@@ -170,6 +203,9 @@ try {
     }
     $free = Invoke-BuildDev @splatFree
     Write-Leg -Ok ($free.Output -notmatch "cannot stage") -Message "with the DLL released the preflight lets the run proceed - not a blanket refusal"
+    Write-Leg -Ok ($free.ExitCode -eq 0) -Message "a full default run completes in the sandbox (exit $($free.ExitCode))"
+    Write-Leg -Ok ($free.Output -match "Building runtime dbatools.dll") -Message "the default run DOES build the runtime - the positive control for -SkipRuntime"
+    Write-Leg -Ok ($free.Output -match "Staged satellite: dbatools.fake") -Message "the default run also builds and stages satellites"
 
     # 4. The lock helpers themselves, lifted from the shipped script - never re-implemented here, so
     #    deleting or weakening them there makes this stop finding them.
@@ -205,16 +241,68 @@ try {
     }
     Write-Leg -Ok (Test-StagedDllWritable -Path $probe) -Message "the same file reads writable again once released - not a latched NO"
 
-    # Holder enumeration must survive a full sweep of live processes, including ones that exit
-    # mid-scan or cannot be opened. It used to read StartTime outside the guard, which aborted the
-    # whole diagnostic exactly while it was naming holders.
-    $sweepOk = $true
-    try {
-        $null = @(Get-StagedDllHolder -Path $stagedCore)
-    } catch {
-        $sweepOk = $false
+    # Holder enumeration must still name a process whose StartTime is unreadable - one that exited
+    # mid-scan, or that this session cannot open. That is the case the diagnostic exists for, so
+    # losing the row (or printing a blank time) defeats it.
+    #
+    # Injected, never observed: sweeping the real process table only exercises this if a holder
+    # happens to be dying at that instant, so it would pass whether or not the bug was present -
+    # which is the same as not testing it. A local function outranks a cmdlet in PowerShell's
+    # command precedence, so this is what the dot-sourced Get-StagedDllHolder resolves.
+    # A compiled type whose StartTime getter throws. PowerShell swallows a failing property getter
+    # and hands back $null - verified on pwsh 7 and 5.1, even under $ErrorActionPreference = "Stop"
+    # - so this reproduces an inaccessible real process exactly: the sweep sees $null, not an
+    # exception. That $null is what the fallback has to convert into a usable "unknown".
+    if (-not ("FakeHolderProcess" -as [type])) {
+        Add-Type -TypeDefinition @"
+public class FakeHolderProcess {
+    public int Id { get; set; }
+    public string ProcessName { get; set; }
+    public object[] Modules { get; set; }
+    public System.DateTime StartTime {
+        get { throw new System.ComponentModel.Win32Exception(5, "Access is denied"); }
     }
-    Write-Leg -Ok $sweepOk -Message "the holder sweep completes over all live processes without throwing"
+}
+"@
+    }
+    function Get-Process {
+        param(
+            [Parameter(ValueFromRemainingArguments)]
+            $Rest
+        )
+        $fake = New-Object -TypeName FakeHolderProcess
+        $fake.Id = -1
+        $fake.ProcessName = "fake-holder"
+        $fake.Modules = @([PSCustomObject]@{ FileName = $stagedCore })
+        , @($fake)
+    }
+
+    $injected = @(Get-StagedDllHolder -Path $stagedCore)
+    Write-Leg -Ok ($injected.Count -eq 1) -Message "a holder with an unreadable StartTime is still reported, not dropped (got $($injected.Count))"
+    Write-Leg -Ok ($injected.Count -eq 1 -and $injected[0].Started -eq "unknown") -Message "its start time reads `"unknown`" rather than printing blank"
+    Write-Leg -Ok ($injected.Count -eq 1 -and $injected[0].Id -eq -1 -and $injected[0].Name -eq "fake-holder") -Message "the pid and name - the whole point of the diagnostic - survive"
+
+    # And the control: the same injection against the pre-fix shape, which assigned StartTime
+    # unconditionally. It must yield a BLANK start time - if it still says "unknown", the fallback is
+    # not what produces that and the leg above cannot fail.
+    $holderText = ($ast.FindAll({
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq "Get-StagedDllHolder"
+            }, $true))[0].Extent.Text
+    $unguarded = $holderText -replace "(?ms)if \(\`$proc\.StartTime\) \{\r?\n\s*(\`$started = \`$proc\.StartTime)\r?\n\s*\}", '$1'
+    $unguarded = $unguarded -replace "function Get-StagedDllHolder", "function Get-StagedDllHolderUnguarded"
+    if ($unguarded -eq $holderText -or $unguarded -notmatch "Get-StagedDllHolderUnguarded") {
+        Write-Leg -Ok $false -Message "control: could not reconstruct the pre-fix holder sweep - THE CONTROL IS VOID, do not trust the legs above"
+    } else {
+        . ([scriptblock]::Create($unguarded))
+        $controlHolders = @(Get-StagedDllHolderUnguarded -Path $stagedCore)
+        if ($controlHolders.Count -ne 1) {
+            Write-Leg -Ok $false -Message "control: reported $($controlHolders.Count) holders, so it failed before reaching StartTime - THE CONTROL IS VOID"
+        } else {
+            Write-Leg -Ok ([string]::IsNullOrEmpty([string]$controlHolders[0].Started)) -Message "control: without the fallback the start time comes back blank - the leg above detects the regression"
+        }
+    }
+    Remove-Item -Path Function:\Get-Process -ErrorAction SilentlyContinue
 
     # 5. -SkipRuntime must skip both the staging loop and the preflight.
     $runtimeSkip = $ast.FindAll({
@@ -225,8 +313,11 @@ try {
         }, $true)
     Write-Leg -Ok ([bool]$runtimeSkip) -Message "-SkipRuntime short-circuits the runtime staging loop"
 
-    # Behavioural, not structural: with the DLL locked, -SkipRuntime must still get past the
-    # preflight - that is the combination #849 was actually blocked on.
+    # Behavioural, not structural: with the DLL locked, -SkipRuntime must get past the preflight AND
+    # go on to do the work it exists for. "No lock error" on its own is not that assertion - it also
+    # holds when the run dies immediately afterwards, which is how this leg first passed.
+    Remove-Item -Path $stagedSatellite -Force -ErrorAction SilentlyContinue
+    $baseBefore = (Get-FileHash -Path $stagedCore -Algorithm SHA256).Hash
     $lock2 = [System.IO.File]::Open($stagedCore, "Open", "ReadWrite", "None")
     try {
         $splatSkip = @{
@@ -235,10 +326,17 @@ try {
             WorkDir  = $runDir
         }
         $skipLocked = Invoke-BuildDev @splatSkip
-        Write-Leg -Ok ($skipLocked.Output -notmatch "cannot stage") -Message "-SkipRuntime proceeds even with the staged DLL locked - the #849 unblock"
     } finally {
         $lock2.Close()
     }
+    $baseAfter = (Get-FileHash -Path $stagedCore -Algorithm SHA256).Hash
+    Write-Leg -Ok ($skipLocked.Output -notmatch "cannot stage") -Message "-SkipRuntime proceeds even with the staged DLL locked - the #849 unblock"
+    Write-Leg -Ok ($skipLocked.ExitCode -eq 0) -Message "-SkipRuntime runs to completion with the base DLL locked (exit $($skipLocked.ExitCode))"
+    Write-Leg -Ok ($skipLocked.Output -match "Skipping runtime dbatools.dll") -Message "it says it skipped the runtime rather than skipping silently"
+    Write-Leg -Ok ($skipLocked.Output -notmatch "Building runtime dbatools.dll") -Message "no runtime build ran - and leg 3 proved this sandbox CAN run one"
+    Write-Leg -Ok ($skipLocked.Output -match "Staged satellite: dbatools.fake") -Message "satellites still built and staged - -SkipRuntime is not a no-op"
+    Write-Leg -Ok (Test-Path -LiteralPath $stagedSatellite) -Message "the satellite assembly really landed in the module stage"
+    Write-Leg -Ok ($baseBefore -eq $baseAfter) -Message "the locked staged base is byte-identical after the run"
 
     # 6. NEGATIVE CONTROL. Everything above is unfalsifiable until a script WITHOUT the guard turns a
     #    leg red. Two earlier control shapes were void, both guarded against here: the pre-change
@@ -289,6 +387,7 @@ try {
         Write-Host "skip end-to-end -SkipRuntime build (pass -IncludeBuild, holding the library edit lease)"
     }
 } finally {
+    $env:PATH = $originalPath
     Remove-Item -Path $runDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 

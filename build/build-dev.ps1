@@ -95,11 +95,12 @@ function Get-StagedDllHolder {
         if ($proc.Id -eq $PID) {
             continue
         }
-        # StartTime has to be read inside the guard too, not just .Modules: it throws for a process
-        # that exits mid-enumeration or that this session cannot open, and under
-        # $ErrorActionPreference = "Stop" that would abort the whole holder sweep - losing the
-        # diagnostic precisely while it is naming holders. Holders really do churn here; one died
-        # mid-probe during the #849 investigation. An unknown start time is still a useful holder.
+        # Both .Modules and .StartTime are unreadable for a process this session cannot open, or one
+        # that exits mid-enumeration - both happen here, and one died mid-probe during the #849
+        # investigation. PowerShell does NOT throw on a failing property getter: verified on pwsh 7
+        # and 5.1, it returns $null silently even under $ErrorActionPreference = "Stop". So $null is
+        # the case that has to be handled and the try blocks are only insurance. An unknown start
+        # time is still a useful holder, so never drop the row over it.
         try {
             $loaded = @($proc.Modules | Where-Object { $_.FileName -eq $Path })
             if ($loaded.Count -eq 0) {
@@ -107,13 +108,15 @@ function Get-StagedDllHolder {
             }
             $started = "unknown"
             try {
-                $started = $proc.StartTime
+                if ($proc.StartTime) {
+                    $started = $proc.StartTime
+                }
             } catch {
                 # keep "unknown"
             }
         } catch {
-            # .Modules throws for processes this session cannot open. Not attributable, not a
-            # reason to call the file free - Test-StagedDllWritable already decided that.
+            # Not attributable, and not a reason to call the file free - Test-StagedDllWritable
+            # already decided that.
             continue
         }
         [PSCustomObject]@{
