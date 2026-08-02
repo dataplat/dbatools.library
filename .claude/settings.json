@@ -1,13 +1,105 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pretooluse-checker-removal-guard.sh",
+            "timeout": 10,
+            "statusMessage": "Checking this edit does not weaken a verification step..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pretooluse-bash-tamper-guard.sh",
+            "timeout": 10,
+            "statusMessage": "Checking this command does not tamper with a checker..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-write-track-session-files.sh",
+            "timeout": 10,
+            "statusMessage": "Tracking session writes for codex review..."
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-checker-integrity.sh",
+            "timeout": 30,
+            "statusMessage": "Verifying the checker surface still matches the approved baseline..."
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/enforce-cs-rules.sh",
+            "timeout": 30,
+            "statusMessage": "Checking C# rules (per-project language regimes, cmdlet rules)..."
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/enforce-psd1-rules.sh",
+            "timeout": 15,
+            "statusMessage": "Checking module manifests (no wildcard exports)..."
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-file-length.sh",
             "timeout": 15,
             "statusMessage": "Checking file lengths (400-line limit)..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-no-deflection.sh",
+            "timeout": 30,
+            "statusMessage": "Checking for deflected bug ownership..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-verify.sh",
+            "timeout": 30,
+            "statusMessage": "Quality gate: parity traps, both TFMs, cross-record legs..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-jscpd-ratchet.sh",
+            "timeout": 180,
+            "statusMessage": "Checking duplication ratchet (jscpd)..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/stop-codex-review.sh",
+            "timeout": 900,
+            "statusMessage": "Codex cross-model review of changed C#..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|compact|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-context.sh",
+            "timeout": 10,
+            "statusMessage": "Re-injecting migration project rules..."
           }
         ]
       }

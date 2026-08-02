@@ -118,6 +118,19 @@ namespace Dataplat.Dbatools.Csv.Tests
                     {
                         // Expected when disposed during read
                     }
+                    catch (CsvParseException cpe) when (cpe.ParseError != null && cpe.ParseError.Exception is ObjectDisposedException)
+                    {
+                        // Same dispose race, wrapped: the parse-error handler
+                        // (CsvDataReader.Conversion.cs) re-wraps the mid-parse
+                        // ObjectDisposedException via the (message, CsvParseError) ctor,
+                        // which carries it only in ParseError.Exception. Genuine parse
+                        // errors still fall through to the errors bag below.
+                    }
+                    // The former wrapped-NRE tolerance is deliberately GONE (codex: a test that
+                    // accepts the defect cannot verify its fix). Since the active-read-count
+                    // dispose contract, the ONLY legal outcomes of a dispose race are clean
+                    // completion, ObjectDisposedException, or the wrapped-ODE shape above -
+                    // any NRE (raw or wrapped) now lands in the errors bag and fails the test.
                     catch (Exception ex)
                     {
                         errors.Add(ex);
@@ -138,7 +151,13 @@ namespace Dataplat.Dbatools.Csv.Tests
                 }
             }
 
-            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join("; ", errors.Select(e => e.Message))));
+            // Full ToString + the CsvParseException's carried ParseError.Exception (which
+            // the (message, CsvParseError) ctor does NOT surface as InnerException) so a
+            // failure names the actual racy shape instead of the bare "CSV parse error".
+            Assert.AreEqual(0, errors.Count, String.Format("Errors: {0}", string.Join(" ||| ", errors.Select(e =>
+                e is CsvParseException cpeDetail && cpeDetail.ParseError != null && cpeDetail.ParseError.Exception != null
+                    ? e.ToString() + " [ParseError.Exception: " + cpeDetail.ParseError.Exception.ToString() + "]"
+                    : e.ToString()))));
         }
 
 

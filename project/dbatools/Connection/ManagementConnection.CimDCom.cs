@@ -192,6 +192,42 @@ namespace Dataplat.Dbatools.Connection
 
 
         /// <summary>
+        /// Enumerate instances associated with the source CIM instance using DCOM.
+        /// Mirrors Get-CimAssociatedInstance -ResultClassName on the CimDCOM rung.
+        /// </summary>
+        /// <param name="Credential">The credentials to use for the connection.</param>
+        /// <param name="source">The source CIM instance to traverse from.</param>
+        /// <param name="resultClassName">The result class name filter (equivalent to -ResultClassName).</param>
+        /// <param name="Namespace">The namespace to look in (defaults to root\cimv2).</param>
+        /// <returns>The associated CIM instances as an enumerable.</returns>
+        public object GetCimDComAssociatedInstances(PSCredential Credential, CimInstance source, string resultClassName, string Namespace)
+        {
+            CimSession tempSession = GetCimDComSession(Credential);
+            // Parameter order is (namespaceName, sourceInstance, associationClassName, resultClassName,
+            // sourceRole, resultRole): the result class filter rides in the FOURTH slot. Passing it as
+            // the association class returns zero instances (cross-model review 2026-07-07 finding 1).
+            IEnumerable<CimInstance> result = tempSession.EnumerateAssociatedInstances(Namespace, source, null, resultClassName, null, null);
+
+            if (DisableCimPersistence)
+            {
+                try
+                {
+                    tempSession.Close();
+                }
+                catch
+                {
+                }
+                cimDComSession = null;
+            }
+            else
+            {
+                if (cimDComSession != tempSession)
+                    cimDComSession = tempSession;
+            }
+            return result;
+        }
+
+        /// <summary>
         /// Generates a CIM session to the target computer.
         /// For use with other commands that expect a CIM session.
         /// </summary>

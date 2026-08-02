@@ -1,0 +1,90 @@
+#nullable enable
+
+using System.Collections;
+using System.Management.Automation;
+using Dataplat.Dbatools.Parameter;
+
+namespace Dataplat.Dbatools.Commands;
+
+/// <summary>
+/// Returns the HADR (Availability Group) enablement status of SQL Server instances.
+/// Port of public/Get-DbaAgHadr.ps1; surface pinned by
+/// migration/baselines/Get-DbaAgHadr.json.
+/// </summary>
+[Cmdlet(VerbsCommon.Get, "DbaAgHadr")]
+public sealed class GetDbaAgHadrCommand : DbaBaseCmdlet
+{
+    /// <summary>The target SQL Server instance or instances.</summary>
+    [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
+    public DbaInstanceParameter[]? SqlInstance { get; set; }
+
+    /// <summary>Login to the target instances using alternative credentials.</summary>
+    [Parameter(Position = 1)]
+    public PSCredential? SqlCredential { get; set; }
+
+    // EnableException is inherited from DbaBaseCmdlet - never redeclared.
+
+    protected override void ProcessRecord()
+    {
+        if (Interrupted)
+        {
+            return;
+        }
+
+        if (SqlInstance is null)
+        {
+            return;
+        }
+
+        foreach (DbaInstanceParameter instance in SqlInstance)
+        {
+            // [DEF-001] closed via InvokeScopedStreaming (ab7492c). Streaming changes -WhatIf transcript
+            // capture (documented observability change, not behaviour); the parity runner strips the
+            // transcript gate-message. Fleet-confirmed non-blocker (C's streamed ShouldProcess wave, MSTest 487/487).
+            NestedCommand.InvokeScopedStreaming(this, item =>
+            {
+                if (item?.BaseObject is ErrorRecord nestedError)
+                {
+                    NestedCommand.RemoveDuplicateError(this, nestedError);
+                    WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
+                    return;
+                }
+                WriteObject(item);
+            }, ProcessScript,
+                new DbaInstanceParameter[] { instance }, SqlCredential,
+                EnableException.ToBool(),
+                NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
+        }
+    }
+
+    // PS: the source process foreach VERBATIM, one element per hop invocation (the
+    // source loop line doubles as the guard loop for the Stop-Function -Continue
+    // site). No begin block. Substitutions: one -FunctionName append only - no
+    // gates, no Test-Bound.
+    private const string ProcessScript = """
+param($SqlInstance, $SqlCredential, $EnableException, $__boundVerbose, $__boundDebug)
+$__commonParameters = @{}
+if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
+if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__commonParameters.Debug = [bool]$__boundDebug }
+$__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
+& $__dbatoolsModule {
+    [CmdletBinding()]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [PSCredential]$SqlCredential, $EnableException, $__boundVerbose, $__boundDebug)
+    if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
+
+        foreach ($instance in $SqlInstance) {
+            try {
+                $server = Connect-DbaInstance -SqlInstance $instance -SqlCredential $SqlCredential
+            } catch {
+                Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue -FunctionName Get-DbaAgHadr
+            }
+
+            Add-Member -Force -InputObject $server -MemberType NoteProperty -Name ComputerName -value $server.ComputerName
+            Add-Member -Force -InputObject $server -MemberType NoteProperty -Name InstanceName -value $server.ServiceName
+            Add-Member -Force -InputObject $server -MemberType NoteProperty -Name SqlInstance -value $server.DomainInstanceName
+
+            Select-DefaultView -InputObject $server -Property 'ComputerName', 'InstanceName', 'SqlInstance', 'IsHadrEnabled'
+        }
+} $SqlInstance $SqlCredential $EnableException $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+""";
+}

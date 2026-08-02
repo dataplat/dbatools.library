@@ -142,6 +142,45 @@ if (Test-Path $coreRuntimesPath) {
     }
 }
 
+# Build and stage satellite cmdlet assemblies (migration/specs/modules.md section 5.2):
+# one dll per module, both editions, into artifacts/modules/dbatools.<module>/{desktop,core}/.
+# These dlls ship INSIDE each satellite's package; the shared dbatools.dll and its SMO/SqlClient
+# dependency tree continue to ship only in dbatools.library.
+# NOTE: -Filter "dbatools.*" ALSO matches the extensionless "dbatools" runtime directory
+# (FindFirstFile-compatible wildcard semantics), so the runtime project must be excluded by
+# name - it publishes through artifacts/lib, never as a satellite. Uncaught until 2026-07-06:
+# stale project/dbatools/bin copies masked the mis-staging until a solution restore cleaned
+# them and the loop died on the copy.
+$satelliteProjects = Get-ChildItem -Path . -Directory -Filter "dbatools.*" | Where-Object {
+    $_.Name -ne "dbatools" -and $_.Name -ne "dbatools.Tests" -and (Test-Path (Join-Path $_.FullName "$($_.Name).csproj"))
+}
+foreach ($satellite in $satelliteProjects) {
+    $satelliteName = $satellite.Name
+    Write-Host "Building satellite cmdlet assembly: $satelliteName"
+    dotnet build "$satelliteName/$satelliteName.csproj" --configuration release --nologo | Out-String -OutVariable satelliteBuild
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: satellite build ($satelliteName) failed with exit code $LASTEXITCODE" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    $moduleStage = Join-Path $artifactsDir "modules/$satelliteName"
+    $null = New-Item -ItemType Directory -Path (Join-Path $moduleStage "desktop") -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $moduleStage "core") -Force
+    Copy-Item "$satelliteName/bin/release/net472/$satelliteName.dll" -Destination (Join-Path $moduleStage "desktop") -Force
+    Copy-Item "$satelliteName/bin/release/net8.0/$satelliteName.dll" -Destination (Join-Path $moduleStage "core") -Force
+    # dll-Help.xml (MAML) is generated only from the net8.0 build (CmdletHelp.props) but is
+    # target-framework independent - the same cmdlets carry the same help on both editions - so
+    # the one file is staged beside the assembly in BOTH desktop and core.
+    $helpFile = "$satelliteName/bin/release/net8.0/$satelliteName.dll-Help.xml"
+    if (Test-Path $helpFile) {
+        Copy-Item $helpFile -Destination (Join-Path $moduleStage "desktop") -Force
+        Copy-Item $helpFile -Destination (Join-Path $moduleStage "core") -Force
+        Write-Host "Staged satellite: $satelliteName (desktop + core + help)" -ForegroundColor Green
+    } else {
+        Write-Host "WARNING: no dll-Help.xml generated for $satelliteName" -ForegroundColor Yellow
+        Write-Host "Staged satellite: $satelliteName (desktop + core)" -ForegroundColor Green
+    }
+}
+
 if ($CoreOnly) {
     Write-Host "CoreOnly specified - returning after core build"
     return
@@ -177,40 +216,69 @@ Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Bogus -OutFile (Join
 $ProgressPreference = "Continue"
 
 # Extract all packages
-7z x (Join-Path $tempPath "bogus.zip") "-o$(Join-Path $tempPath "bogus")" -y
+# A NuGet package is an ordinary zip archive, so extracting it needs no external tool. Shelling out
+# to 7z made the build depend on a program that is absent from a clean machine, and it failed late
+# and quietly: the run aborted here yet still reported a success exit code, leaving a drop with no
+# module manifest in it.
+#
+# This unpacks via the .NET API rather than Expand-Archive deliberately. The "*:Confirm" entry in
+# $PSDefaultParameterValues at the top of this script is injected into the cmdlets Expand-Archive
+# calls internally, which makes it throw "Object reference not set to an instance of an object" and
+# extract nothing. A .NET call cannot be reached by parameter defaults, so it is stable no matter
+# what this script sets. Do not "simplify" this back to Expand-Archive without removing that default.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$bogusArchive = Join-Path $tempPath "bogus.zip"
+$bogusStage = Join-Path $tempPath "bogus"
+# Both steps must fail the build loudly. A .NET method that throws while the error preference is
+# "Continue" writes an error record and then carries straight on to the next statement, so an
+# unguarded failure here yields a drop that is missing Bogus and still reports success - the exact
+# silent-partial-output problem that replacing the external extractor was meant to end.
+try {
+    # ExtractToDirectory refuses to overwrite an existing file, so start from a clean directory.
+    if (Test-Path -LiteralPath $bogusStage) {
+        Remove-Item -LiteralPath $bogusStage -Recurse -Force -ErrorAction Stop
+    }
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($bogusArchive, $bogusStage)
+} catch {
+    throw "Failed to extract $bogusArchive to $bogusStage. $($_.Exception.Message)"
+}
 
 
 # Copy Bogus files for both frameworks
 Write-Host "Copying Bogus.dll..." -ForegroundColor Green
 
 # Copy Bogus.dll for .NET Framework (handle case sensitivity)
+# A missing Bogus here is fatal, not a warning: this code only runs on a full build (-CoreOnly
+# returns earlier), so the package is always expected to carry it. Warning and carrying on produced
+# a drop with no Bogus.dll in it and still exited 0, which reads as a successful build.
 if (Test-Path (Join-Path $tempPath "bogus/lib/net40/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net40/bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/net40/bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/net40/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net40/Bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/net40/Bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
 } else {
-    Write-Warning "Bogus.dll for .NET Framework (net40) not found at expected location"
+    throw "Bogus.dll for .NET Framework (net40) not found under $(Join-Path $tempPath "bogus/lib/net40"). The extracted package layout is not what this build expects."
 }
 
 # Copy Bogus.dll for .NET Core (handle case sensitivity)
 $bogusCoreCopied = $false
 # Try net6.0 first (both lowercase and uppercase)
 if (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force
+    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
     $bogusCoreCopied = $true
 }
 
+# Fatal for the same reason as the .NET Framework copy above.
 if (-not $bogusCoreCopied) {
-    Write-Warning "Bogus.dll for .NET Core not found in expected locations"
+    throw "Bogus.dll for .NET Core not found under $(Join-Path $tempPath "bogus/lib") in any of the expected framework folders. The extracted package layout is not what this build expects."
 }
 
 # Core files are already in place from dotnet publish
