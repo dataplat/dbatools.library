@@ -76,10 +76,10 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
 
                             // PS: registry lookup, removal, and the masked output each read
                             // $server.ConnectionContext.ConnectionString AGAIN.
-                            if (RegistryEntryIsTruthy(ToPsString(PsProperty.Get(PsProperty.Get(server, "ConnectionContext"), "ConnectionString"))))
+                            if (RegistryEntryIsTruthy(RegistryKeyFor(server, ToPsString(PsProperty.Get(PsProperty.Get(server, "ConnectionContext"), "ConnectionString")))))
                             {
                                 WriteMessage(MessageLevel.Verbose, "removing from connection hash");
-                                RemoveRegistryEntry(ToPsString(PsProperty.Get(PsProperty.Get(server, "ConnectionContext"), "ConnectionString")));
+                                RemoveRegistryEntry(RegistryKeyFor(server, ToPsString(PsProperty.Get(PsProperty.Get(server, "ConnectionContext"), "ConnectionString"))));
                             }
 
                             PSObject result = new PSObject();
@@ -107,10 +107,10 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
                                 InvokePsMethod(server, "Close");
                             }
 
-                            if (RegistryEntryIsTruthy(ToPsString(PsProperty.Get(server, "ConnectionString"))))
+                            if (RegistryEntryIsTruthy(RegistryKeyFor(server, ToPsString(PsProperty.Get(server, "ConnectionString")))))
                             {
                                 WriteMessage(MessageLevel.Verbose, "removing from connection hash");
-                                RemoveRegistryEntry(ToPsString(PsProperty.Get(server, "ConnectionString")));
+                                RemoveRegistryEntry(RegistryKeyFor(server, ToPsString(PsProperty.Get(server, "ConnectionString"))));
                             }
 
                             PSObject result = new PSObject();
@@ -162,6 +162,26 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
             return null;
         }
         return (string)LanguagePrimitives.ConvertTo(value, typeof(string), CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// The key ConnectionHost.ActiveConnections was actually registered under for this
+    /// connection object — see ConnectionService.GetRegistryKey. An explicit-Windows-credential
+    /// connection is keyed by connection string plus Windows principal (not the raw connection
+    /// string alone), since the credential lives out-of-band on SspiContextProvider.
+    /// </summary>
+    private static string? RegistryKeyFor(object? server, string? connectionString)
+    {
+        if (connectionString is null)
+        {
+            return null;
+        }
+        if (server is null)
+        {
+            return connectionString;
+        }
+        object baseServer = server is PSObject wrapped ? wrapped.BaseObject : server;
+        return ConnectionService.GetRegistryKey(connectionString, baseServer);
     }
 
     /// <summary>

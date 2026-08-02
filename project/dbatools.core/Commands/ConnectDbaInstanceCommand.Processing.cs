@@ -139,7 +139,13 @@ public sealed partial class ConnectDbaInstanceCommand
 
             if (resolution.IsNewConnection && !DedicatedAdminConnection)
             {
-                ConnectionService.RegisterInstanceForTepp(resolution.Instance, resolution.Server);
+                // RegisterInstanceForTepp copies ConnectionContext for the TEPP cache, which
+                // would silently drop an explicit-Windows-credential SspiContextProvider and
+                // reintroduce the identity-loss bug this connection type exists to avoid.
+                if (!resolution.UsesCredentialSspiProvider)
+                {
+                    ConnectionService.RegisterInstanceForTepp(resolution.Instance, resolution.Server);
+                }
 
                 // Update lots of registered stuff
                 // Default for [Dataplat.Dbatools.TabExpansion.TabExpansionHost]::TeppSyncDisabled is $true, so will not run by default

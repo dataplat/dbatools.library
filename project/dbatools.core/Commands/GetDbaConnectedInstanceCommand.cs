@@ -245,14 +245,25 @@ public sealed class GetDbaConnectedInstanceCommand : DbaBaseCmdlet
     // present, or the fixed failure string when the key does not parse as a connection string.
     private static string HideConnectionString(string connectionString)
     {
+        // Explicit-Windows-credential entries carry a "|sspi:<principal>" suffix appended by
+        // ConnectionService.GetRegistryKey to keep ActiveConnections keys collision-free; the
+        // principal isn't secret, so it's preserved rather than parsed as part of the DSN.
+        string dsn = connectionString;
+        string suffix = string.Empty;
+        int sspiIndex = connectionString.IndexOf("|sspi:", StringComparison.Ordinal);
+        if (sspiIndex >= 0)
+        {
+            dsn = connectionString.Substring(0, sspiIndex);
+            suffix = connectionString.Substring(sspiIndex);
+        }
         try
         {
-            Microsoft.Data.SqlClient.SqlConnectionStringBuilder builder = new(connectionString);
+            Microsoft.Data.SqlClient.SqlConnectionStringBuilder builder = new(dsn);
             if (!string.IsNullOrEmpty(builder.Password))
             {
                 builder.Password = "********";
             }
-            return builder.ConnectionString;
+            return builder.ConnectionString + suffix;
         }
         catch
         {
