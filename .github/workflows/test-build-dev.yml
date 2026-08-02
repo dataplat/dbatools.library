@@ -5,12 +5,14 @@ on:
     paths:
       - 'build/build-dev.ps1'
       - 'tests/test-build-dev-skipruntime.ps1'
+      - 'tests/BuildDevTestSupport.ps1'
       - '.github/workflows/test-build-dev.yml'
   pull_request:
     branches: [main, libmigration]
     paths:
       - 'build/build-dev.ps1'
       - 'tests/test-build-dev-skipruntime.ps1'
+      - 'tests/BuildDevTestSupport.ps1'
       - '.github/workflows/test-build-dev.yml'
   workflow_dispatch:
 defaults:

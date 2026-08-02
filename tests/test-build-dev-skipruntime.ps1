@@ -9,12 +9,11 @@
     artifacts. That failure used to surface as a bare Copy-Item error AFTER a multi-minute build and
     was misread as a library-edit-lease conflict, which it never was.
 
-    Everything runs against a disposable SANDBOX: a minimal tree holding a copy of the script and a
-    dummy staged dbatools.dll. That is what makes the important leg possible - the real script is
-    invoked with the staged DLL genuinely locked, and asserted to abort before any dotnet
-    invocation - without locking the shared artifacts drop or compiling anything. The sandbox is a
-    uniquely named directory removed in a finally, so concurrent runs on this shared box cannot
-    collide or delete each other's files.
+    Everything runs against a disposable SANDBOX built by BuildDevTestSupport.ps1 (split out only to
+    stay under the 400-line limit; it holds no assertions). That is what makes the important leg
+    possible - the real script invoked with the staged DLL genuinely locked, asserted to abort before
+    any dotnet invocation - without locking the shared artifacts drop or compiling anything. The
+    sandbox is uniquely named and removed in a finally, so concurrent runs cannot collide.
 
     Every lock assertion checks BOTH directions. A check that can only answer "locked" is as broken
     as one that can only answer "free".
@@ -50,55 +49,7 @@ $ErrorActionPreference = "Stop"
 $pass = 0
 $fail = 0
 
-function Write-Leg {
-    param(
-        [Parameter(Mandatory)]
-        [bool]$Ok,
-        [Parameter(Mandatory)]
-        [string]$Message
-    )
-    if ($Ok) {
-        Write-Host "ok   $Message"
-        $script:pass++
-    } else {
-        Write-Host "FAIL $Message"
-        $script:fail++
-    }
-}
-
-# Run the sandboxed script and return exit code plus BOTH streams merged. Both matter: the guard
-# messages go to stdout, while binding failures and terminating errors go to stderr, and a
-# stdout-only read would let legs pass against a script that never had the parameter at all.
-function Invoke-BuildDev {
-    param(
-        [Parameter(Mandatory)]
-        [string]$Script,
-        [Parameter(Mandatory)]
-        [AllowEmptyCollection()]
-        [string[]]$Switches,
-        [Parameter(Mandatory)]
-        [string]$WorkDir
-    )
-    $outPath = Join-Path -Path $WorkDir -ChildPath "run.out"
-    $errPath = Join-Path -Path $WorkDir -ChildPath "run.err"
-    $splatRun = @{
-        FilePath               = "pwsh"
-        ArgumentList           = @("-NoProfile", "-File", $Script) + $Switches
-        Wait                   = $true
-        PassThru               = $true
-        NoNewWindow            = $true
-        RedirectStandardOutput = $outPath
-        RedirectStandardError  = $errPath
-    }
-    $proc = Start-Process @splatRun
-    $text = (Get-Content -Path $outPath -Raw -ErrorAction SilentlyContinue) +
-        (Get-Content -Path $errPath -Raw -ErrorAction SilentlyContinue)
-    Remove-Item -Path $outPath, $errPath -ErrorAction SilentlyContinue
-    [PSCustomObject]@{
-        ExitCode = $proc.ExitCode
-        Output   = [string]$text
-    }
-}
+. (Join-Path -Path $PSScriptRoot -ChildPath "BuildDevTestSupport.ps1")
 
 $resolved = (Resolve-Path -Path $ScriptPath).Path
 $errors = $null
@@ -116,49 +67,12 @@ $null = New-Item -ItemType Directory -Path $runDir -Force
 $originalPath = $env:PATH
 
 try {
-    # The sandbox only has to satisfy what the script inspects before it would build: a script
-    # directory whose parent holds artifacts/dbatools.library/<edition>/lib/dbatools.dll. The DLL is
-    # a dummy - the preflight opens the file, it never loads it as an assembly.
-    $sandboxBuild = Join-Path -Path $runDir -ChildPath "build"
-    $null = New-Item -ItemType Directory -Path $sandboxBuild -Force
-    $stagedCore = Join-Path -Path $runDir -ChildPath "artifacts/dbatools.library/core/lib/dbatools.dll"
-    $stagedDesktop = Join-Path -Path $runDir -ChildPath "artifacts/dbatools.library/desktop/lib/dbatools.dll"
-    foreach ($staged in @($stagedCore, $stagedDesktop)) {
-        $null = New-Item -ItemType Directory -Path (Split-Path -Path $staged) -Force
-        Set-Content -Path $staged -Value "not a real assembly" -Encoding Ascii
-    }
-    $sandboxScript = Join-Path -Path $sandboxBuild -ChildPath "build-dev.ps1"
-    Copy-Item -Path $resolved -Destination $sandboxScript -Force
-
-    # A fake dotnet on PATH plus a minimal project tree. Without them the script cannot get past
-    # Push-Location, so a -SkipRuntime leg could only assert "no lock error" - which passes just as
-    # readily when the run dies one line later for an unrelated reason. With them the run completes
-    # and the leg asserts what actually matters: satellites built, runtime not.
-    $fakeBin = Join-Path -Path $runDir -ChildPath "fakebin"
-    $null = New-Item -ItemType Directory -Path $fakeBin -Force
-    Set-Content -Path (Join-Path -Path $fakeBin -ChildPath "dotnet.cmd") -Value "@echo off`r`necho   fake dotnet %*`r`nexit /b 0" -Encoding Ascii
-    if (-not $IsWindows) {
-        $shim = Join-Path -Path $fakeBin -ChildPath "dotnet"
-        Set-Content -Path $shim -Value "#!/bin/sh`necho `"  fake dotnet `$@`"`nexit 0" -Encoding Ascii
-        chmod +x $shim
-    }
-    $env:PATH = $fakeBin + [System.IO.Path]::PathSeparator + $env:PATH
-
-    $sandboxProject = Join-Path -Path $runDir -ChildPath "project"
-    foreach ($proj in @("dbatools", "dbatools.fake")) {
-        $projDir = Join-Path -Path $sandboxProject -ChildPath $proj
-        $null = New-Item -ItemType Directory -Path $projDir -Force
-        Set-Content -Path (Join-Path -Path $projDir -ChildPath "$proj.csproj") -Value "<Project />" -Encoding Ascii
-    }
-    # The script verifies each build's output exists before staging it, so a fake compiler that
-    # writes nothing needs these seeded in the exact locations the real projects emit to.
-    $builtRuntime = Join-Path -Path $runDir -ChildPath "artifacts/lib/Release/net8.0/dbatools.dll"
-    $builtSatellite = Join-Path -Path $sandboxProject -ChildPath "dbatools.fake/bin/Release/net8.0/dbatools.fake.dll"
-    foreach ($built in @($builtRuntime, $builtSatellite)) {
-        $null = New-Item -ItemType Directory -Path (Split-Path -Path $built) -Force
-        Set-Content -Path $built -Value "built by the fake dotnet" -Encoding Ascii
-    }
-    $stagedSatellite = Join-Path -Path $runDir -ChildPath "artifacts/modules/dbatools.fake/core/dbatools.fake.dll"
+    $sandbox = New-BuildDevSandbox -RunDir $runDir -ScriptSource $resolved
+    $sandboxBuild = $sandbox.Build
+    $sandboxScript = $sandbox.Script
+    $stagedCore = $sandbox.StagedCore
+    $builtRuntime = $sandbox.BuiltRuntime
+    $stagedSatellite = $sandbox.StagedSatellite
 
     # 1. Mutual exclusion. This path exits before any dotnet invocation, so it stays hermetic.
     #    The exit code alone proves nothing - the guard, a binding failure against a script with no
@@ -248,23 +162,10 @@ try {
     # Injected, never observed: sweeping the real process table only exercises this if a holder
     # happens to be dying at that instant, so it would pass whether or not the bug was present -
     # which is the same as not testing it. A local function outranks a cmdlet in PowerShell's
-    # command precedence, so this is what the dot-sourced Get-StagedDllHolder resolves.
-    # A compiled type whose StartTime getter throws. PowerShell swallows a failing property getter
-    # and hands back $null - verified on pwsh 7 and 5.1, even under $ErrorActionPreference = "Stop"
-    # - so this reproduces an inaccessible real process exactly: the sweep sees $null, not an
-    # exception. That $null is what the fallback has to convert into a usable "unknown".
-    if (-not ("FakeHolderProcess" -as [type])) {
-        Add-Type -TypeDefinition @"
-public class FakeHolderProcess {
-    public int Id { get; set; }
-    public string ProcessName { get; set; }
-    public object[] Modules { get; set; }
-    public System.DateTime StartTime {
-        get { throw new System.ComponentModel.Win32Exception(5, "Access is denied"); }
-    }
-}
-"@
-    }
+    # command precedence, so this is what the dot-sourced Get-StagedDllHolder resolves. The stand-in's
+    # StartTime getter throws and PowerShell hands back $null - see Initialize-FakeHolderType - and
+    # that $null is what the fallback has to convert into a usable "unknown".
+    Initialize-FakeHolderType
     function Get-Process {
         param(
             [Parameter(ValueFromRemainingArguments)]
@@ -352,7 +253,12 @@ public class FakeHolderProcess {
     # holds when the run dies immediately afterwards, which is how this leg first passed.
     Remove-Item -Path $stagedSatellite -Force -ErrorAction SilentlyContinue
     $baseBefore = (Get-FileHash -Path $stagedCore -Algorithm SHA256).Hash
-    $lock2 = [System.IO.File]::Open($stagedCore, "Open", "ReadWrite", "None")
+    # FileShare.Read, because that is how a live process actually holds this file: a loaded .NET
+    # assembly is mapped shared-read, so staging is refused (the preflight opens ReadWrite/None and
+    # is denied) while reads still succeed. An exclusive lock here would model a holder that does not
+    # occur in the #849 scenario, and it hid a real defect: the skew check hashes the staged copy, and
+    # under an exclusive lock it died instead of comparing. The unreadable case has its own leg below.
+    $lock2 = [System.IO.File]::Open($stagedCore, "Open", "Read", "Read")
     try {
         $splatSkip = @{
             Script   = $sandboxScript
@@ -376,24 +282,59 @@ public class FakeHolderProcess {
     # 5b. ABI SKEW. Every satellite csproj ProjectReferences dbatools.csproj, so a satellite build
     #     recompiles the runtime even under -SkipRuntime; only the staging is skipped. The gate cannot
     #     see the result - its parity guard hashes the two STAGED copies and staging is what did not
-    #     run (#854) - so this script has to. Newer built runtime = the satellites and the staged base
-    #     disagree.
+    #     run (#854) - so this script has to.
     #
-    #     The leg immediately above is this one's positive control: the same run, same sandbox, with
-    #     only the timestamp moved. Without it "exits 1 on skew" would also hold for a check that
-    #     fires unconditionally, which would make -SkipRuntime unusable.
-    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = (Get-Item -LiteralPath $stagedCore).LastWriteTimeUtc.AddMinutes(5)
+    #     Skew is a CONTENT difference, so every leg here writes genuinely different bytes. An earlier
+    #     version moved the timestamp on byte-identical files, which only ever proved that the check
+    #     read the instrument it was written against - it would have passed just as well against a
+    #     wrong instrument. The two timestamp legs below exist because that wrong instrument, an mtime
+    #     compare, is silent on both of them.
+    $builtItem = Get-Item -LiteralPath $builtRuntime
+    $stagedItem = Get-Item -LiteralPath $stagedCore
+    $pristineBuilt = Get-Content -Path $builtRuntime -Raw
     $splatSkew = @{
         Script   = $sandboxScript
         Switches = @("-SkipRuntime")
         WorkDir  = $runDir
     }
+
+    Set-Content -Path $builtRuntime -Value "rebuilt from CHANGED dbatools/ source" -Encoding Ascii -NoNewline
+    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = $stagedItem.LastWriteTimeUtc.AddMinutes(5)
     $skew = Invoke-BuildDev @splatSkew
-    Write-Leg -Ok ($skew.ExitCode -eq 1) -Message "a runtime newer than the staged base fails the -SkipRuntime run (exit $($skew.ExitCode))"
-    Write-Leg -Ok ($skew.Output -match "NEWER runtime than the staged base") -Message "the failure names the skew rather than dying obscurely"
+    Write-Leg -Ok ($skew.ExitCode -eq 1) -Message "a runtime whose bytes differ from the staged base fails the -SkipRuntime run (exit $($skew.ExitCode))"
+    Write-Leg -Ok ($skew.Output -match "DIFFERS from the staged base") -Message "the failure names the skew rather than dying obscurely"
     Write-Leg -Ok ($skew.Output -match "#854") -Message "it says the gate will not catch this, and cites the issue"
     Write-Leg -Ok ($skew.Output -match "Staged satellite: dbatools.fake") -Message "the check runs AFTER the satellites build - it is a verdict, not a second preflight"
-    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = (Get-Item -LiteralPath $stagedCore).LastWriteTimeUtc.AddMinutes(-5)
+
+    # Differing bytes, SAME mtime - and then differing bytes, OLDER mtime. Both are real skew (a
+    # staged copy that came from some other build), and an mtime compare passes both.
+    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = $stagedItem.LastWriteTimeUtc
+    $skewSame = Invoke-BuildDev @splatSkew
+    Write-Leg -Ok ($skewSame.ExitCode -eq 1 -and $skewSame.Output -match "DIFFERS from the staged base") -Message "differing bytes with an EQUAL mtime still fail - an mtime compare would pass this"
+
+    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = $stagedItem.LastWriteTimeUtc.AddMinutes(-5)
+    $skewOlder = Invoke-BuildDev @splatSkew
+    Write-Leg -Ok ($skewOlder.ExitCode -eq 1 -and $skewOlder.Output -match "DIFFERS from the staged base") -Message "differing bytes with an OLDER mtime still fail - an mtime compare would pass this too"
+
+    # The other direction: identical bytes with a NEWER mtime is NOT skew, and must stay quiet. An
+    # mtime compare reds here, which would break the very case -SkipRuntime exists for.
+    Set-Content -Path $builtRuntime -Value $pristineBuilt -Encoding Ascii -NoNewline
+    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = $stagedItem.LastWriteTimeUtc.AddMinutes(5)
+    $noSkew = Invoke-BuildDev @splatSkew
+    Write-Leg -Ok ($noSkew.ExitCode -eq 0 -and $noSkew.Output -notmatch "DIFFERS from the staged base") -Message "identical bytes with a NEWER mtime stay quiet (exit $($noSkew.ExitCode)) - an mtime compare would red this"
+    (Get-Item -LiteralPath $builtRuntime).LastWriteTimeUtc = $builtItem.LastWriteTimeUtc
+
+    # A holder that denies reads leaves the comparison unmade. That is UNKNOWN skew, and reporting it
+    # as absent is the failure mode this whole check exists to prevent - so it must exit non-zero and
+    # say the comparison did not happen, not fall through quietly.
+    $deny = [System.IO.File]::Open($stagedCore, "Open", "ReadWrite", "None")
+    try {
+        $unreadable = Invoke-BuildDev @splatSkew
+    } finally {
+        $deny.Close()
+    }
+    Write-Leg -Ok ($unreadable.ExitCode -eq 1) -Message "an unreadable staged base fails the run rather than passing on an unmade comparison (exit $($unreadable.ExitCode))"
+    Write-Leg -Ok ($unreadable.Output -match "Skew is UNKNOWN, not absent") -Message "and it says the comparison could not be made, not that the bits agree"
 
     # 6. NEGATIVE CONTROL. Everything above is unfalsifiable until a script WITHOUT the guard turns a
     #    leg red. Two earlier control shapes were void, both guarded against here: the pre-change

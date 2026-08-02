@@ -30,7 +30,7 @@ param(
 # base-library parity guard hashes the two STAGED copies (guest vs host,
 # migration/tools/Test-GateBaseLibraryPrecondition.ps1), and staging is exactly the step that did
 # not run, so both sides read the same stale file and the guard passes on skewed bits (#854). The
-# post-build check at the bottom of this script is therefore the only thing that sees it.
+# post-build content check at the bottom of this script is therefore the only thing that sees it.
 #
 # ACCEPTANCE (P0-004): after `build-dev.ps1 -IncludeDesktop`, Use-LocalDbatoolsLibrary -Validate is
 # green (both editions import warning-clean) because the dependency tree is reused untouched and
@@ -236,11 +236,14 @@ try {
 }
 
 # ABI-skew check for -SkipRuntime, per the note at the top. The satellites just compiled against
-# whatever the ProjectReference produced; if that is NEWER than the staged base, the two disagree and
-# nothing downstream will say so. Timestamps rather than hashes on purpose: an incremental build
-# leaves the runtime untouched when dbatools/ source did not change (the case -SkipRuntime is FOR),
-# so this is quiet then - while a hash compare would red every run, because .NET stamps a fresh MVID
-# into each compile and no two builds of identical source are byte-equal.
+# whatever the ProjectReference produced, and the staged base is a byte copy of that same file from
+# some earlier run - so CONTENT equality is the question, and a timestamp is the wrong instrument in
+# both directions: a rebuild that reproduces identical bytes reds on a newer mtime, and a staged copy
+# that came from a different build passes on an older one.
+#
+# This does not fire on the case -SkipRuntime exists for, and not because the compiler is
+# deterministic: when dbatools/ source is unchanged, dotnet's up-to-date check does not rewrite the
+# runtime AT ALL, so the file still hashes to the copy that was staged from it.
 if ($SkipRuntime -and -not $SkipSatellites) {
     $skewed = @()
     foreach ($edition in $editions) {
@@ -252,16 +255,25 @@ if ($SkipRuntime -and -not $SkipSatellites) {
             Write-Host "ERROR: cannot check base skew for $($edition.Name) - expected $builtDll after the satellite build, and it is not there." -ForegroundColor Red
             exit 1
         }
-        $builtAt = (Get-Item -LiteralPath $builtDll).LastWriteTimeUtc
-        $stagedAt = (Get-Item -LiteralPath $stagedDll).LastWriteTimeUtc
-        if ($builtAt -gt $stagedAt) {
-            $skewed += [PSCustomObject]@{ Edition = $edition.Name; Built = $builtAt; Staged = $stagedAt }
+        # The staged base is normally held by a live process - that is the whole reason -SkipRuntime
+        # exists - but a loaded .NET assembly is mapped FileShare.Read, so hashing it works. A holder
+        # that denies reads too leaves the comparison unmade, and an unmade comparison is not a pass.
+        try {
+            $builtHash = (Get-FileHash -LiteralPath $builtDll -Algorithm SHA256).Hash
+            $stagedHash = (Get-FileHash -LiteralPath $stagedDll -Algorithm SHA256).Hash
+        } catch {
+            Write-Host "ERROR: cannot verify base skew for $($edition.Name) - $stagedDll could not be read: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  Something is holding it without sharing reads. Skew is UNKNOWN, not absent - find the holder before trusting this build." -ForegroundColor Yellow
+            exit 1
+        }
+        if ($builtHash -ne $stagedHash) {
+            $skewed += [PSCustomObject]@{ Edition = $edition.Name; Built = $builtHash; Staged = $stagedHash }
         }
     }
     if ($skewed.Count -gt 0) {
-        Write-Host "ERROR: -SkipRuntime staged satellites built against a NEWER runtime than the staged base dbatools.dll:" -ForegroundColor Red
+        Write-Host "ERROR: -SkipRuntime staged satellites built against a runtime that DIFFERS from the staged base dbatools.dll:" -ForegroundColor Red
         foreach ($skew in $skewed) {
-            Write-Host "  $($skew.Edition): built $($skew.Built)Z, staged $($skew.Staged)Z" -ForegroundColor Red
+            Write-Host "  $($skew.Edition): built $($skew.Built.Substring(0, 16))..., staged $($skew.Staged.Substring(0, 16))..." -ForegroundColor Red
         }
         Write-Host "  You changed dbatools/ source, so -SkipRuntime is not safe here - the satellites and the base disagree." -ForegroundColor Yellow
         Write-Host "  The gate will NOT catch this: its parity guard hashes the two staged copies, and staging is what was skipped (#854)." -ForegroundColor Yellow
