@@ -89,6 +89,13 @@ Always build `dbatools.sln` before finishing a C# change — there is no auto-bu
 enforcement is `TreatWarningsAsErrors` in the satellite csprojs plus the migration gate's build
 step.
 
+**Bump the version whenever you change runtime behavior** — package upgrades, connection/auth
+logic, cmdlet behavior, anything beyond docs or tests — in the same PR. This package is consumed
+by the dbatools PowerShell module as a pinned dependency; a merged behavior change with no version
+bump is invisible to consumers until an unrelated release drags it along. Use the `bump` skill,
+which updates the module manifest version, the main assembly version, and the CSV package version
+together.
+
 ## Gotchas
 
 **Windows + net8.0 test failures are expected.** PowerShell SDK assembly conflicts in the test
