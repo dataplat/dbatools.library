@@ -22,6 +22,15 @@ namespace Dataplat.Dbatools.Connection
         private bool disposed;
 
         /// <summary>
+        /// The case-insensitive Windows principal ("domain\user" or "user") this provider
+        /// authenticates as. Password-free, safe to use as part of a registry/cache key.
+        /// </summary>
+        public string Principal
+        {
+            get { return principal; }
+        }
+
+        /// <summary>
         /// Creates a provider that authenticates with the supplied Windows credential.
         /// </summary>
         /// <param name="credential">The Windows credential used for Negotiate authentication.</param>

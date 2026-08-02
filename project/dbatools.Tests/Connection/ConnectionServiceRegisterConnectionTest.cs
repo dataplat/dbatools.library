@@ -5,6 +5,9 @@ using Dataplat.Dbatools.Message;
 using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.Management.Smo;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+#if NET8_0_OR_GREATER
+using System.Net;
+#endif
 using DbaMessageLevel = Dataplat.Dbatools.Message.MessageLevel;
 
 namespace Dataplat.Dbatools.Connection.Test
@@ -257,5 +260,59 @@ namespace Dataplat.Dbatools.Connection.Test
                 }
             }
         }
+
+        [TestMethod]
+        public void GetRegistryKey_WithoutSspiProvider_ReturnsConnectionStringUnchanged()
+        {
+            string key = UniqueKey();
+            Assert.AreEqual(key, ConnectionService.GetRegistryKey(key, new SqlConnection()));
+        }
+
+#if NET8_0_OR_GREATER
+        [TestMethod]
+        public void GetRegistryKey_WithSspiProvider_AppendsPrincipal()
+        {
+            string key = UniqueKey();
+            using (SqlConnection connection = new SqlConnection())
+            using (NetworkCredentialSspiContextProvider provider = new NetworkCredentialSspiContextProvider(
+                new NetworkCredential("user", "password", "domain")))
+            {
+                connection.SspiContextProvider = provider;
+                Assert.AreEqual(key + "|sspi:domain\\user", ConnectionService.GetRegistryKey(key, connection));
+            }
+        }
+
+        [TestMethod]
+        public void RegisterConnection_DifferentSspiIdentitiesDoNotCollide()
+        {
+            // Root-cause regression test for the Get-DbaConnectedInstance visibility gap:
+            // an explicit Windows credential lives out-of-band on SspiContextProvider, not in
+            // the connection string, so two different identities against the same connection
+            // string must land in two separate ActiveConnections entries instead of one
+            // silently clobbering the other.
+            string key = UniqueKey();
+            using (SqlConnection first = new SqlConnection())
+            using (SqlConnection second = new SqlConnection())
+            using (NetworkCredentialSspiContextProvider firstProvider = new NetworkCredentialSspiContextProvider(
+                new NetworkCredential("first-user", "password", "domain")))
+            using (NetworkCredentialSspiContextProvider secondProvider = new NetworkCredentialSspiContextProvider(
+                new NetworkCredential("second-user", "password", "domain")))
+            {
+                first.SspiContextProvider = firstProvider;
+                second.SspiContextProvider = secondProvider;
+
+                ConnectionService.RegisterConnection(key, first, null);
+                ConnectionService.RegisterConnection(key, second, null);
+
+                string firstKey = ConnectionService.GetRegistryKey(key, first);
+                string secondKey = ConnectionService.GetRegistryKey(key, second);
+
+                Assert.AreNotEqual(firstKey, secondKey);
+                Assert.AreSame(first, ConnectionHost.ActiveConnections[firstKey][0]);
+                Assert.AreSame(second, ConnectionHost.ActiveConnections[secondKey][0]);
+                Assert.IsFalse(ConnectionHost.ActiveConnections.ContainsKey(key));
+            }
+        }
+#endif
     }
 }
