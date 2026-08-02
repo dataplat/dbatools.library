@@ -278,7 +278,11 @@ if ($SkipRuntime -and -not $SkipSatellites) {
             exit 1
         }
         if ($builtHash -ne $stagedHash) {
-            $skewed += [PSCustomObject]@{ Edition = $edition.Name; Built = $builtHash; Staged = $stagedHash }
+            $skewed += [PSCustomObject]@{
+                Edition = $edition.Name
+                Built   = $builtHash
+                Staged  = $stagedHash
+            }
         }
     }
     if ($skewed.Count -gt 0) {

@@ -63,11 +63,9 @@ $sandbox = New-BuildDevSandbox -ScriptSource $resolved
 $runDir = $sandbox.RunDir
 
 try {
-    $sandboxBuild = $sandbox.Build
     $sandboxScript = $sandbox.Script
     $stagedCore = $sandbox.StagedCore
     $builtRuntime = $sandbox.BuiltRuntime
-    $builtSatellite = $sandbox.BuiltSatellite
     $stagedSatellite = $sandbox.StagedSatellite
 
     # 1. Mutual exclusion. This path exits before any dotnet invocation, so it stays hermetic.
@@ -295,7 +293,7 @@ try {
     # The build output has to differ from what is staged, or "staged copy unchanged" is true whether
     # or not the copy ran and the leg proves nothing. This is also what really happens: the satellite
     # recompiles against the changed runtime, which is the whole reason its bits must not be staged.
-    Set-Content -Path $builtSatellite -Value "recompiled against the CHANGED runtime" -Encoding Ascii -NoNewline
+    Set-Content -Path $sandbox.BuiltSatellite -Value "recompiled against the CHANGED runtime" -Encoding Ascii -NoNewline
     $splatSkew = @{
         Script   = $sandboxScript
         Switches = @("-SkipRuntime")
@@ -349,7 +347,7 @@ try {
     #    paths resolve it runs a real multi-minute dotnet build. So the control is the CURRENT
     #    script with only the mutual-exclusion block removed, inside the sandbox. With the guard
     #    gone both switches are accepted and both loops skip, so nothing is compiled.
-    $controlPath = Join-Path -Path $sandboxBuild -ChildPath "build-dev-control.ps1"
+    $controlPath = Join-Path -Path $sandbox.Build -ChildPath "build-dev-control.ps1"
     $controlText = $scriptText -replace "(?ms)if \(\`$SkipRuntime -and \`$SkipSatellites\) \{.*?\r?\n\}\r?\n", ""
     if ($controlText -eq $scriptText) {
         Write-Leg -Ok $false -Message "control: could not strip the mutual-exclusion block - THE CONTROL IS VOID, do not trust the legs above"
@@ -372,19 +370,21 @@ try {
 
     # 7. End-to-end, opt-in: a -SkipRuntime run leaves the REAL staged base byte-identical.
     if ($IncludeBuild) {
+        # Drop the sandbox PATH first: the child inherits it, and its fake dotnet compiles nothing, so
+        # the "real" build would pass without a compiler ever running. The leg below re-checks that.
+        $env:PATH = $originalPath
         $root = Split-Path -Path (Split-Path -Path $resolved)
         $realStaged = Join-Path -Path $root -ChildPath "artifacts/dbatools.library/core/lib/dbatools.dll"
         $before = (Get-FileHash -Path $realStaged -Algorithm SHA256).Hash
         $splatBuild = @{
-            FilePath     = "pwsh"
-            ArgumentList = @("-NoProfile", "-File", $resolved, "-SkipRuntime")
-            Wait         = $true
-            PassThru     = $true
-            NoNewWindow  = $true
+            Script   = $resolved
+            Switches = @("-SkipRuntime")
+            WorkDir  = $runDir
         }
-        $build = Start-Process @splatBuild
+        $build = Invoke-BuildDev @splatBuild
         $after = (Get-FileHash -Path $realStaged -Algorithm SHA256).Hash
         Write-Leg -Ok ($build.ExitCode -eq 0) -Message "-SkipRuntime completes against the real tree (exit $($build.ExitCode))"
+        Write-Leg -Ok ($build.Output -notmatch "fake dotnet") -Message "a REAL compiler ran - the sandbox's fake dotnet did not leak in and make this leg vacuous"
         Write-Leg -Ok ($before -eq $after) -Message "the staged base dbatools.dll is untouched by a -SkipRuntime run"
     } else {
         Write-Host "skip end-to-end -SkipRuntime build (pass -IncludeBuild, holding the library edit lease)"
