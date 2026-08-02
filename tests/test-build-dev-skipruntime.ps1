@@ -289,7 +289,7 @@ public class FakeHolderProcess {
                 param($node)
                 $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq "Get-StagedDllHolder"
             }, $true))[0].Extent.Text
-    $unguarded = $holderText -replace "(?ms)if \(\`$proc\.StartTime\) \{\r?\n\s*(\`$started = \`$proc\.StartTime)\r?\n\s*\}", '$1'
+    $unguarded = $holderText -replace "(?ms)if \(\`$proc\.StartTime\) \{\r?\n\s*(\`$started = \`$proc\.StartTime)\r?\n\s*\}", "`$1"
     $unguarded = $unguarded -replace "function Get-StagedDllHolder", "function Get-StagedDllHolderUnguarded"
     if ($unguarded -eq $holderText -or $unguarded -notmatch "Get-StagedDllHolderUnguarded") {
         Write-Leg -Ok $false -Message "control: could not reconstruct the pre-fix holder sweep - THE CONTROL IS VOID, do not trust the legs above"
