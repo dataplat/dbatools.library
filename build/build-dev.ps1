@@ -95,19 +95,31 @@ function Get-StagedDllHolder {
         if ($proc.Id -eq $PID) {
             continue
         }
+        # StartTime has to be read inside the guard too, not just .Modules: it throws for a process
+        # that exits mid-enumeration or that this session cannot open, and under
+        # $ErrorActionPreference = "Stop" that would abort the whole holder sweep - losing the
+        # diagnostic precisely while it is naming holders. Holders really do churn here; one died
+        # mid-probe during the #849 investigation. An unknown start time is still a useful holder.
         try {
             $loaded = @($proc.Modules | Where-Object { $_.FileName -eq $Path })
+            if ($loaded.Count -eq 0) {
+                continue
+            }
+            $started = "unknown"
+            try {
+                $started = $proc.StartTime
+            } catch {
+                # keep "unknown"
+            }
         } catch {
             # .Modules throws for processes this session cannot open. Not attributable, not a
             # reason to call the file free - Test-StagedDllWritable already decided that.
             continue
         }
-        if ($loaded.Count -gt 0) {
-            [PSCustomObject]@{
-                Id      = $proc.Id
-                Name    = $proc.ProcessName
-                Started = $proc.StartTime
-            }
+        [PSCustomObject]@{
+            Id      = $proc.Id
+            Name    = $proc.ProcessName
+            Started = $started
         }
     }
 }
