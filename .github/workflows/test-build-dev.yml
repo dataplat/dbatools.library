@@ -1,0 +1,29 @@
+name: Test build-dev SkipRuntime and DLL-lock preflight
+on:
+  push:
+    branches: [main, libmigration]
+    paths:
+      - 'build/build-dev.ps1'
+      - 'tests/test-build-dev-skipruntime.ps1'
+      - '.github/workflows/test-build-dev.yml'
+  pull_request:
+    branches: [main, libmigration]
+    paths:
+      - 'build/build-dev.ps1'
+      - 'tests/test-build-dev-skipruntime.ps1'
+      - '.github/workflows/test-build-dev.yml'
+  workflow_dispatch:
+defaults:
+  run:
+    shell: pwsh
+jobs:
+  # No build job on purpose. The test runs against a disposable sandbox holding a copy of the
+  # script and a dummy staged dbatools.dll, so it needs no artifacts and compiles nothing - which
+  # is also what lets it lock the staged DLL and assert the preflight aborts before dotnet.
+  test-preflight:
+    name: PowerShell Core - build-dev preflight
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the build-dev preflight tests
+        run: ./tests/test-build-dev-skipruntime.ps1
