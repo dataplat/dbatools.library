@@ -9,19 +9,17 @@
     artifacts. That failure used to surface as a bare Copy-Item error AFTER a multi-minute build and
     was misread as a library-edit-lease conflict, which it never was.
 
-    Everything runs against a disposable SANDBOX built by BuildDevTestSupport.ps1 (split out only to
-    stay under the 400-line limit; it holds no assertions). That is what makes the important leg
-    possible - the real script invoked with the staged DLL genuinely locked, asserted to abort before
-    any dotnet invocation - without locking the shared artifacts drop or compiling anything. The
-    sandbox is uniquely named and removed in a finally, so concurrent runs cannot collide.
+    Everything runs against a disposable sandbox built by BuildDevTestSupport.ps1 (scaffolding only,
+    no assertions). That is what makes the important leg possible - the real script invoked with the
+    staged DLL genuinely locked, asserted to abort before any dotnet invocation - without touching
+    the shared artifacts drop.
 
     Every lock assertion checks BOTH directions. A check that can only answer "locked" is as broken
     as one that can only answer "free".
 
-    -IncludeBuild adds the end-to-end leg that runs -SkipRuntime against the REAL tree and proves
-    the staged base DLL is untouched. It is opt-in because it compiles every satellite and writes
-    into artifacts: TAKE THE LIBRARY EDIT LEASE FIRST, or it races a gate and both results become
-    meaningless.
+    -IncludeBuild adds the end-to-end leg against the REAL tree. It compiles every satellite and
+    writes into artifacts: TAKE THE LIBRARY EDIT LEASE FIRST, or it races a gate and both results
+    become meaningless.
 
 .EXAMPLE
     PS C:\> pwsh -NoProfile -File tests/test-build-dev-skipruntime.ps1
@@ -60,18 +58,16 @@ if ($errors) {
 }
 $scriptText = Get-Content -Path $resolved -Raw
 
-# Unique per run - this box is shared by many windows and fixed names let concurrent runs overwrite
-# and delete each other's files.
-$runDir = Join-Path ([System.IO.Path]::GetTempPath()) ("build-dev-test-" + [System.IO.Path]::GetRandomFileName())
-$null = New-Item -ItemType Directory -Path $runDir -Force
 $originalPath = $env:PATH
+$sandbox = New-BuildDevSandbox -ScriptSource $resolved
+$runDir = $sandbox.RunDir
 
 try {
-    $sandbox = New-BuildDevSandbox -RunDir $runDir -ScriptSource $resolved
     $sandboxBuild = $sandbox.Build
     $sandboxScript = $sandbox.Script
     $stagedCore = $sandbox.StagedCore
     $builtRuntime = $sandbox.BuiltRuntime
+    $builtSatellite = $sandbox.BuiltSatellite
     $stagedSatellite = $sandbox.StagedSatellite
 
     # 1. Mutual exclusion. This path exits before any dotnet invocation, so it stays hermetic.
@@ -292,6 +288,14 @@ try {
     $builtItem = Get-Item -LiteralPath $builtRuntime
     $stagedItem = Get-Item -LiteralPath $stagedCore
     $pristineBuilt = Get-Content -Path $builtRuntime -Raw
+    # The staged satellite from the clean run above. A rejected run must leave it exactly here:
+    # Ship-Satellite.ps1 reads this tree and not the exit code, so a satellite staged against the new
+    # runtime beside the old base would ship on the next gate with nothing left to report it.
+    $satBefore = (Get-FileHash -Path $stagedSatellite -Algorithm SHA256).Hash
+    # The build output has to differ from what is staged, or "staged copy unchanged" is true whether
+    # or not the copy ran and the leg proves nothing. This is also what really happens: the satellite
+    # recompiles against the changed runtime, which is the whole reason its bits must not be staged.
+    Set-Content -Path $builtSatellite -Value "recompiled against the CHANGED runtime" -Encoding Ascii -NoNewline
     $splatSkew = @{
         Script   = $sandboxScript
         Switches = @("-SkipRuntime")
@@ -304,7 +308,9 @@ try {
     Write-Leg -Ok ($skew.ExitCode -eq 1) -Message "a runtime whose bytes differ from the staged base fails the -SkipRuntime run (exit $($skew.ExitCode))"
     Write-Leg -Ok ($skew.Output -match "DIFFERS from the staged base") -Message "the failure names the skew rather than dying obscurely"
     Write-Leg -Ok ($skew.Output -match "#854") -Message "it says the gate will not catch this, and cites the issue"
-    Write-Leg -Ok ($skew.Output -match "Staged satellite: dbatools.fake") -Message "the check runs AFTER the satellites build - it is a verdict, not a second preflight"
+    Write-Leg -Ok ($skew.Output -match "Building satellite dbatools.fake") -Message "the check runs AFTER the satellites build - it is a verdict, not a second preflight"
+    Write-Leg -Ok ($skew.Output -notmatch "Staged satellite: dbatools.fake") -Message "but nothing was staged - a rejected build must not leave new satellites beside the old base"
+    Write-Leg -Ok ((Get-FileHash -Path $stagedSatellite -Algorithm SHA256).Hash -eq $satBefore) -Message "and the previously staged satellite is byte-identical, so Ship-Satellite has nothing mismatched to push"
 
     # Differing bytes, SAME mtime - and then differing bytes, OLDER mtime. Both are real skew (a
     # staged copy that came from some other build), and an mtime compare passes both.
@@ -364,8 +370,7 @@ try {
         }
     }
 
-    # 7. End-to-end against the REAL tree, opt-in. Proves a -SkipRuntime run leaves the staged base
-    #    byte-identical.
+    # 7. End-to-end, opt-in: a -SkipRuntime run leaves the REAL staged base byte-identical.
     if ($IncludeBuild) {
         $root = Split-Path -Path (Split-Path -Path $resolved)
         $realStaged = Join-Path -Path $root -ChildPath "artifacts/dbatools.library/core/lib/dbatools.dll"

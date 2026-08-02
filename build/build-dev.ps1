@@ -166,6 +166,7 @@ if (-not $SkipRuntime) {
     }
 }
 
+$pendingStage = @()
 Push-Location -Path $projectRoot
 try {
     # Refresh the shared runtime dbatools.dll per requested edition (incremental Release build).
@@ -196,6 +197,11 @@ try {
     # artifacts/modules/dbatools.<module>/{core,desktop}/ exactly as build/build.ps1 does, so
     # Ship-Satellite.ps1 pushes the freshly built cmdlet dll on the next gate. Branch 30's
     # build-dev staged dbatools.dll ONLY, which left a runtime with no commands - this closes that.
+    #
+    # BUILD here, STAGE after the skew check below. Copying on the way through would leave satellites
+    # built against a new runtime sitting beside the old staged base every time that check rejects,
+    # and exit 1 does not undo it: Ship-Satellite.ps1 reads the staged tree, not this script's exit
+    # code, so the mismatch ships on the next gate with the one thing that noticed it long gone.
     if (-not $SkipSatellites) {
         $satelliteProjects = Get-ChildItem -Path $projectRoot -Directory -Filter "dbatools.*" | Where-Object {
             $_.Name -ne "dbatools" -and $_.Name -ne "dbatools.Tests" -and (Test-Path (Join-Path $_.FullName "$($_.Name).csproj"))
@@ -215,9 +221,11 @@ try {
                     Write-Host "ERROR: expected satellite output not found: $builtSat" -ForegroundColor Red
                     exit 1
                 }
-                $editionStage = Join-Path -Path $moduleStage -ChildPath $edition.Name
-                $null = New-Item -ItemType Directory -Path $editionStage -Force
-                Copy-Item -Path $builtSat -Destination $editionStage -Force
+                $pendingStage += [PSCustomObject]@{
+                    Satellite   = $satelliteName
+                    Source      = $builtSat
+                    Destination = Join-Path -Path $moduleStage -ChildPath $edition.Name
+                }
             }
             # dll-Help.xml (MAML) is generated only from the net8.0 build (CmdletHelp.props) but
             # is target-framework independent, so the one file is staged beside the assembly in
@@ -225,10 +233,13 @@ try {
             $helpFile = Join-Path -Path $projectRoot -ChildPath "$satelliteName/bin/Release/net8.0/$satelliteName.dll-Help.xml"
             if (Test-Path -LiteralPath $helpFile) {
                 foreach ($edition in $editions) {
-                    Copy-Item -Path $helpFile -Destination (Join-Path -Path $moduleStage -ChildPath $edition.Name) -Force
+                    $pendingStage += [PSCustomObject]@{
+                        Satellite   = $satelliteName
+                        Source      = $helpFile
+                        Destination = Join-Path -Path $moduleStage -ChildPath $edition.Name
+                    }
                 }
             }
-            Write-Host "Staged satellite: $satelliteName" -ForegroundColor Green
         }
     }
 } finally {
@@ -278,8 +289,21 @@ if ($SkipRuntime -and -not $SkipSatellites) {
         Write-Host "  You changed dbatools/ source, so -SkipRuntime is not safe here - the satellites and the base disagree." -ForegroundColor Yellow
         Write-Host "  The gate will NOT catch this: its parity guard hashes the two staged copies, and staging is what was skipped (#854)." -ForegroundColor Yellow
         Write-Host "  Free the holder named above and re-run without -SkipRuntime." -ForegroundColor Yellow
+        Write-Host "  Nothing was staged - the satellites built above are still only in project/*/bin/." -ForegroundColor Yellow
         exit 1
     }
+}
+
+$stagedNames = @()
+foreach ($item in $pendingStage) {
+    $null = New-Item -ItemType Directory -Path $item.Destination -Force
+    Copy-Item -Path $item.Source -Destination $item.Destination -Force
+    if ($stagedNames -notcontains $item.Satellite) {
+        $stagedNames += $item.Satellite
+    }
+}
+foreach ($name in $stagedNames) {
+    Write-Host "Staged satellite: $name" -ForegroundColor Green
 }
 
 $stopwatch.Stop()

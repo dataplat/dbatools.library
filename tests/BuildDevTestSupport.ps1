@@ -88,14 +88,16 @@ public class FakeHolderProcess {
 }
 
 # Build the disposable tree the legs run against, and hand back every path they assert on. Prepends a
-# fake dotnet to $env:PATH as a side effect - the caller restores it.
+# fake dotnet to $env:PATH as a side effect - the caller restores it, and removes RunDir in a finally.
 function New-BuildDevSandbox {
     param(
         [Parameter(Mandatory)]
-        [string]$RunDir,
-        [Parameter(Mandatory)]
         [string]$ScriptSource
     )
+    # Unique per run - this box is shared by many windows, and a fixed name lets concurrent runs
+    # overwrite and delete each other's files.
+    $RunDir = Join-Path ([System.IO.Path]::GetTempPath()) ("build-dev-test-" + [System.IO.Path]::GetRandomFileName())
+    $null = New-Item -ItemType Directory -Path $RunDir -Force
     # The sandbox only has to satisfy what the script inspects before it would build: a script
     # directory whose parent holds artifacts/dbatools.library/<edition>/lib/dbatools.dll. The DLL is
     # a dummy - the preflight opens the file, it never loads it as an assembly.
@@ -140,10 +142,12 @@ function New-BuildDevSandbox {
     }
 
     [PSCustomObject]@{
+        RunDir          = $RunDir
         Build           = $sandboxBuild
         Script          = $sandboxScript
         StagedCore      = $stagedCore
         BuiltRuntime    = $builtRuntime
+        BuiltSatellite  = $builtSatellite
         StagedSatellite = Join-Path -Path $RunDir -ChildPath "artifacts/modules/dbatools.fake/core/dbatools.fake.dll"
     }
 }
