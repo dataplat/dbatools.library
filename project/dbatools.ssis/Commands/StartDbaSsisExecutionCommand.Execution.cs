@@ -3,6 +3,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Management.Automation;
 using Dataplat.Dbatools.Parameter;
 using Dataplat.Dbatools.Utility;
@@ -285,6 +286,29 @@ public sealed partial class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
         catch (Exception)
         {
             return string.Empty;
+        }
+    }
+    /// <summary>
+    /// Whether a column exists on one of the catalog's own views. The catalog ships as objects
+    /// inside SSISDB, so what it exposes is a property of the database in front of you rather than
+    /// of the engine hosting it - a restored catalog is older than its server, and the emit SELECT
+    /// has to be built from what is actually there.
+    /// </summary>
+    private bool CatalogViewHasColumn(Server server, string viewName, string columnName)
+    {
+        using SqlCommand command = new("SELECT COUNT(*) FROM [SSISDB].sys.columns catalogColumns JOIN [SSISDB].sys.objects catalogObjects ON catalogObjects.object_id = catalogColumns.object_id JOIN [SSISDB].sys.schemas catalogSchemas ON catalogSchemas.schema_id = catalogObjects.schema_id WHERE catalogSchemas.name = 'catalog' AND catalogObjects.name = @viewName AND catalogColumns.name = @columnName", server.ConnectionContext.SqlConnectionObject);
+        command.Parameters.AddWithValue("@viewName", viewName);
+        command.Parameters.AddWithValue("@columnName", columnName);
+
+        SetActiveCommand(command);
+        try
+        {
+            object? result = command.ExecuteScalar();
+            return result is not null and not DBNull && Convert.ToInt32(result, CultureInfo.InvariantCulture) > 0;
+        }
+        finally
+        {
+            SetActiveCommand(null);
         }
     }
 }

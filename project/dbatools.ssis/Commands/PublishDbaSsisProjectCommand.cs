@@ -162,7 +162,14 @@ public sealed partial class PublishDbaSsisProjectCommand : DbaInstanceCmdlet
                     // operation identifier N" and keeps the actual reason - wrong project name,
                     // unreadable stream, failed validation - in that view. Reporting the raised
                     // text alone would hand the caller a lookup instead of an answer.
-                    StopDeployment(instance, ReadOperationMessagesSince(server, priorOperationId), ex);
+                    //
+                    // That refusal names the operation, so the read is scoped to it. The id must
+                    // postdate the watermark to be this call's; anything else means the number came
+                    // from somewhere other than the substitution and is not an id to read by.
+                    string reason = TryReadFailedOperationId(ex, out long failedOperationId) && failedOperationId > priorOperationId
+                        ? ReadOperationMessages(server, failedOperationId)
+                        : ReadOperationMessagesSince(server, priorOperationId);
+                    StopDeployment(instance, reason, ex);
                     continue;
                 }
 
@@ -228,75 +235,6 @@ public sealed partial class PublishDbaSsisProjectCommand : DbaInstanceCmdlet
         }
 
         StopFunction($"Failure deploying SSIS project {Project} to folder {Folder} on {instance}: {reason}", target: instance, exception: ex, continueLoop: true, overrideExceptionMessage: true);
-    }
-
-    /// <summary>
-    /// Reads the log of one known operation. Anything wider would be a guess: two windows
-    /// deploying the same project name to one catalog produce operations that differ only by id,
-    /// so a name-and-range match can hand back the other deployment's errors as this one's.
-    /// </summary>
-    private string ReadOperationMessages(Server server, long operationId)
-    {
-        using SqlCommand command = new("SELECT TOP 10 messages.message FROM [SSISDB].[catalog].[operation_messages] messages WHERE messages.operation_id = @operationId ORDER BY messages.operation_message_id", server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@operationId", operationId);
-        return CollectMessages(command);
-    }
-
-    /// <summary>
-    /// The fallback for the one case with no id to scope to: the proc raised, so the OUTPUT
-    /// parameter was never assigned, and the failed operation can only be found by project name
-    /// among the operations logged since this call started. Returns an empty string when nothing
-    /// matches - and, being a guess, it is not used anywhere the id is known.
-    /// </summary>
-    private string ReadOperationMessagesSince(Server server, long priorOperationId)
-    {
-        using SqlCommand command = new("SELECT TOP 10 messages.message FROM [SSISDB].[catalog].[operation_messages] messages JOIN [SSISDB].[catalog].[operations] operations ON operations.operation_id = messages.operation_id WHERE operations.operation_id > @priorOperationId AND operations.operation_type = @operationType AND operations.object_name = @projectName ORDER BY messages.operation_message_id", server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@priorOperationId", priorOperationId);
-        command.Parameters.AddWithValue("@operationType", DeployOperationType);
-        command.Parameters.AddWithValue("@projectName", Project);
-        return CollectMessages(command);
-    }
-
-    private string CollectMessages(SqlCommand command)
-    {
-        StringBuilder detail = new();
-        try
-        {
-            SetActiveCommand(command);
-            try
-            {
-                using SqlDataReader reader = command.ExecuteReader();
-                while (reader.Read())
-                {
-                    object raw = reader["message"];
-                    if (raw is DBNull)
-                    {
-                        continue;
-                    }
-                    if (detail.Length > 0)
-                    {
-                        detail.Append(" | ");
-                    }
-                    detail.Append(Convert.ToString(raw, CultureInfo.InvariantCulture));
-                }
-            }
-            finally
-            {
-                SetActiveCommand(null);
-            }
-        }
-        catch (PipelineStoppedException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            // The deployment failure is the news; losing the explanation must not replace it with
-            // a failure to read the explanation.
-            return string.Empty;
-        }
-
-        return detail.ToString();
     }
 
     /// <summary>

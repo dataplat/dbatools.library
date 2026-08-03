@@ -234,11 +234,13 @@ public sealed partial class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
     /// </summary>
     private void EmitExecution(Server server, long executionId)
     {
-        // worker_agent_id arrived with Scale Out in SQL 2017, and the catalog schema this command
-        // accepts goes back to 2012 - naming the column on an older catalog fails the whole SELECT,
-        // so a 2012 run could not emit the execution it had just started. The property stays in the
-        // output either way so the shape does not change with the server version.
-        string workerAgentColumn = server.VersionMajor >= 14
+        // worker_agent_id arrived with Scale Out in SQL 2017, and naming it on an older catalog
+        // fails the whole SELECT - which would leave the execution started and unreportable. The
+        // engine version does not answer whether the column is there: catalog.executions is a view
+        // inside SSISDB, so a catalog restored from an older instance keeps the older view on a
+        // newer engine. Ask the catalog. The property stays in the output either way, so the shape
+        // does not change with the server.
+        string workerAgentColumn = CatalogViewHasColumn(server, "executions", "worker_agent_id")
             ? "e.worker_agent_id"
             : "CAST(NULL AS uniqueidentifier)";
 
