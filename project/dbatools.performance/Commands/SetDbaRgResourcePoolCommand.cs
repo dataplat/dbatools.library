@@ -212,7 +212,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             }
         }
 
-        # Execute
+        #Execute
         try {
             if ($__realCmdlet.ShouldProcess($server, "Altering resource pool $resPool")) {
                 $resPool.Alter()
@@ -221,7 +221,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
             Stop-Function -Message "Failure" -ErrorRecord $_ -Target $resPool -Continue -FunctionName Set-DbaRgResourcePool
         }
 
-        # Reconfigure Resource Governor
+        #Reconfigure Resource Governor
         try {
             if ($SkipReconfigure) {
                 Write-Message -Level Warning -Message "Resource pool changes will not take effect in Resource Governor until it is reconfigured." -FunctionName Set-DbaRgResourcePool -ModuleName "dbatools"
