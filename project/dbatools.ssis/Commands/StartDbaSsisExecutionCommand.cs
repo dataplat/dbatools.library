@@ -32,7 +32,7 @@ namespace Dataplat.Dbatools.Commands;
 /// </example>
 [Cmdlet(VerbsLifecycle.Start, "DbaSsisExecution", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [OutputType(typeof(PSObject))]
-public sealed class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
+public sealed partial class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
 {
     // set_execution_parameter_value discriminates the scope on one smallint, so the two hashtables
     // and the logging level are the caller's way of saying which one a name belongs to. Guessing
@@ -42,11 +42,18 @@ public sealed class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
     private const short PackageParameterScope = 30;
     private const short SystemParameterScope = 50;
 
-    // catalog.executions.status; the rest (Created, Running, Pending, Stopping) mean still going.
-    private static readonly HashSet<int> TerminalStatuses = new() { 3, 4, 6, 7, 9 };
-    private static readonly HashSet<int> FailedStatuses = new() { 3, 4, 6 };
-
     private const int PollIntervalSeconds = 3;
+
+    // catalog.executions.status; the rest (Created, Running, Pending, Stopping) mean still going.
+    private static bool IsTerminalStatus(int status)
+    {
+        return status is 3 or 4 or 6 or 7 or 9;
+    }
+
+    private static bool IsFailedStatus(int status)
+    {
+        return status is 3 or 4 or 6;
+    }
 
     /// <summary>The target SQL Server instance or instances.</summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
@@ -110,6 +117,15 @@ public sealed class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
         if (TestBound(nameof(Timeout)) && !Synchronous.ToBool())
         {
             StopFunction("-Timeout applies only with -Synchronous: without it the command returns as soon as the run has started and never waits", category: ErrorCategory.InvalidArgument);
+            return;
+        }
+
+        // Zero or negative reads as "do not wait", but the wait it would produce is one poll of a
+        // package that has had no time to finish - so every run would report a timeout it never
+        // really had. There is no non-waiting -Synchronous; -Timeout 0 is a caller mistake.
+        if (TestBound(nameof(Timeout)) && Timeout <= 0)
+        {
+            StopFunction($"-Timeout must be greater than zero seconds, not {Timeout}: omit it to wait for the run without a bound", category: ErrorCategory.InvalidArgument);
         }
     }
 
@@ -202,275 +218,21 @@ public sealed class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
     }
 
     /// <summary>
-    /// Presence is asked of the instance rather than of SMO's Databases collection: enumerating
-    /// every database to answer a one-name question drags in whatever state the other databases
-    /// are in, and a single-user database is enough to poison the shared connection.
-    /// </summary>
-    private bool CatalogExists(Server server)
-    {
-        using SqlCommand presence = new("SELECT DB_ID('SSISDB')", server.ConnectionContext.SqlConnectionObject);
-        SetActiveCommand(presence);
-        try
-        {
-            object? result = presence.ExecuteScalar();
-            return result != null && result is not DBNull;
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-    }
-
-    /// <summary>
-    /// An execution binds to a reference, not to an environment: a project has to reference an
-    /// environment before it can run against it, and the same environment name can be referenced
-    /// out of two folders, which is what -EnvironmentFolder disambiguates.
-    /// </summary>
-    private long? ReadReferenceId(Server server)
-    {
-        string sql = "SELECT TOP 1 references_.reference_id FROM [SSISDB].[catalog].[environment_references] references_ JOIN [SSISDB].[catalog].[projects] projects ON projects.project_id = references_.project_id JOIN [SSISDB].[catalog].[folders] folders ON folders.folder_id = projects.folder_id WHERE folders.name = @folderName AND projects.name = @projectName AND references_.environment_name = @environmentName";
-        if (TestBound(nameof(EnvironmentFolder)))
-        {
-            sql += " AND references_.environment_folder_name = @environmentFolderName";
-        }
-
-        using SqlCommand command = new(sql, server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@folderName", Folder);
-        command.Parameters.AddWithValue("@projectName", Project);
-        command.Parameters.AddWithValue("@environmentName", Environment);
-        if (TestBound(nameof(EnvironmentFolder)))
-        {
-            command.Parameters.AddWithValue("@environmentFolderName", EnvironmentFolder);
-        }
-
-        SetActiveCommand(command);
-        try
-        {
-            object? result = command.ExecuteScalar();
-            return result == null || result is DBNull ? null : Convert.ToInt64(result);
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-    }
-
-    private long CreateExecution(Server server, long? referenceId)
-    {
-        using SqlCommand command = new("EXEC [SSISDB].[catalog].[create_execution] @folder_name = @folderName, @project_name = @projectName, @package_name = @packageName, @reference_id = @referenceId, @use32bitruntime = @use32BitRuntime, @execution_id = @executionId OUTPUT", server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@folderName", Folder);
-        command.Parameters.AddWithValue("@projectName", Project);
-        command.Parameters.AddWithValue("@packageName", Package);
-        command.Parameters.AddWithValue("@referenceId", (object?)referenceId ?? DBNull.Value);
-        command.Parameters.AddWithValue("@use32BitRuntime", Use32BitRuntime.ToBool());
-        SqlParameter executionIdParameter = command.Parameters.Add("@executionId", System.Data.SqlDbType.BigInt);
-        executionIdParameter.Direction = System.Data.ParameterDirection.Output;
-
-        SetActiveCommand(command);
-        try
-        {
-            command.ExecuteNonQuery();
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-
-        return Convert.ToInt64(executionIdParameter.Value);
-    }
-
-    private void SetParameterValues(Server server, long executionId)
-    {
-        if (Parameter != null)
-        {
-            foreach (DictionaryEntry entry in Parameter)
-            {
-                SetParameterValue(server, executionId, PackageParameterScope, Convert.ToString(entry.Key)!, entry.Value);
-            }
-        }
-
-        if (ProjectParameter != null)
-        {
-            foreach (DictionaryEntry entry in ProjectParameter)
-            {
-                SetParameterValue(server, executionId, ProjectParameterScope, Convert.ToString(entry.Key)!, entry.Value);
-            }
-        }
-
-        if (TestBound(nameof(LoggingLevel)))
-        {
-            SetParameterValue(server, executionId, SystemParameterScope, "LOGGING_LEVEL", LoggingLevel);
-        }
-    }
-
-    private void SetParameterValue(Server server, long executionId, short scope, string parameterName, object? parameterValue)
-    {
-        using SqlCommand command = new("EXEC [SSISDB].[catalog].[set_execution_parameter_value] @execution_id = @executionId, @object_type = @objectType, @parameter_name = @parameterName, @parameter_value = @parameterValue", server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@executionId", executionId);
-        command.Parameters.AddWithValue("@objectType", scope);
-        command.Parameters.AddWithValue("@parameterName", parameterName);
-        command.Parameters.AddWithValue("@parameterValue", Unwrap(parameterValue) ?? DBNull.Value);
-
-        SetActiveCommand(command);
-        try
-        {
-            command.ExecuteNonQuery();
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-    }
-
-    private void StartExecution(Server server, long executionId)
-    {
-        using SqlCommand command = new("EXEC [SSISDB].[catalog].[start_execution] @execution_id = @executionId", server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@executionId", executionId);
-
-        SetActiveCommand(command);
-        try
-        {
-            command.ExecuteNonQuery();
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-    }
-
-    /// <summary>
-    /// Polls rather than setting the SYNCHRONIZED system parameter, which would make
-    /// start_execution itself block for the whole package run with no client-side way to give up -
-    /// and no way to implement -Timeout at all.
-    /// </summary>
-    /// <returns>False when the caller should not be handed an execution: the wait expired, or the
-    /// package ended in a failing state, both of which are reported here.</returns>
-    private bool WaitForCompletion(Server server, DbaInstanceParameter instance, long executionId)
-    {
-        DateTime deadline = TestBound(nameof(Timeout)) ? DateTime.UtcNow.AddSeconds(Timeout) : DateTime.MaxValue;
-
-        while (true)
-        {
-            int status = ReadStatus(server, executionId);
-            if (TerminalStatuses.Contains(status))
-            {
-                if (!FailedStatuses.Contains(status))
-                {
-                    return true;
-                }
-
-                // The status alone names no cause, and the catalog's own log is where the cause
-                // is. A caller told only "Failed" has to go and find this view themselves.
-                string reason = ReadOperationMessages(server, executionId);
-                string detail = reason.Length == 0 ? string.Empty : $": {reason}";
-                StopFunction($"SSIS package {Package} from project {Project} in folder {Folder} on {instance} finished as {StatusName(status)} (execution {executionId}){detail}", target: instance, continueLoop: true);
-                return false;
-            }
-
-            if (DateTime.UtcNow >= deadline)
-            {
-                // Stopping the run would be a destructive act the caller did not ask for; that is
-                // Stop-DbaSsisExecution's job. The execution id is in the message so they can.
-                StopFunction($"Timed out after {Timeout} seconds waiting for SSIS package {Package} from project {Project} in folder {Folder} on {instance}; execution {executionId} is still {StatusName(ReadStatus(server, executionId))} and has NOT been stopped", target: instance, continueLoop: true);
-                return false;
-            }
-
-            // Sleeping through the cmdlet's own cancellation check keeps Ctrl-C responsive during
-            // a long wait; a bare Thread.Sleep would swallow it for the whole interval.
-            for (int elapsed = 0; elapsed < PollIntervalSeconds; elapsed++)
-            {
-                if (Stopping)
-                {
-                    throw new PipelineStoppedException();
-                }
-                System.Threading.Thread.Sleep(1000);
-            }
-        }
-    }
-
-    private int ReadStatus(Server server, long executionId)
-    {
-        using SqlCommand command = new("SELECT status FROM [SSISDB].[catalog].[executions] WHERE execution_id = @executionId", server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@executionId", executionId);
-
-        SetActiveCommand(command);
-        try
-        {
-            object? result = command.ExecuteScalar();
-            return result == null || result is DBNull ? 0 : Convert.ToInt32(result);
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-    }
-
-    private static string StatusName(int status)
-    {
-        return status switch
-        {
-            1 => "Created",
-            2 => "Running",
-            3 => "Cancelled",
-            4 => "Failed",
-            5 => "Pending",
-            6 => "Halted",
-            7 => "Succeeded",
-            8 => "Stopping",
-            9 => "Completed",
-            _ => "Unknown"
-        };
-    }
-
-    /// <summary>
-    /// The failure is the news; losing the explanation must not replace it with a failure to read
-    /// the explanation, so a read that goes wrong here reports nothing rather than throwing.
-    /// </summary>
-    private string ReadOperationMessages(Server server, long executionId)
-    {
-        try
-        {
-            using SqlCommand command = new("SELECT TOP 10 message FROM [SSISDB].[catalog].[operation_messages] WHERE operation_id = @executionId AND message_type = 120 ORDER BY operation_message_id", server.ConnectionContext.SqlConnectionObject);
-            command.Parameters.AddWithValue("@executionId", executionId);
-
-            List<string> messages = new();
-            SetActiveCommand(command);
-            try
-            {
-                using SqlDataReader reader = command.ExecuteReader();
-                while (reader.Read())
-                {
-                    if (reader["message"] is string message)
-                    {
-                        messages.Add(message);
-                    }
-                }
-            }
-            finally
-            {
-                SetActiveCommand(null);
-            }
-
-            return string.Join(" | ", messages);
-        }
-        catch (PipelineStoppedException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            return string.Empty;
-        }
-    }
-
-    /// <summary>
     /// The started execution is re-emitted in Get-DbaSsisExecution's shape and decorated
     /// identically, so Start -&gt; Get pipelines compose and the status names are the same words in
     /// both commands.
     /// </summary>
     private void EmitExecution(Server server, long executionId)
     {
-        const string sql = @"
+        // worker_agent_id arrived with Scale Out in SQL 2017, and the catalog schema this command
+        // accepts goes back to 2012 - naming the column on an older catalog fails the whole SELECT,
+        // so a 2012 run could not emit the execution it had just started. The property stays in the
+        // output either way so the shape does not change with the server version.
+        string workerAgentColumn = server.VersionMajor >= 14
+            ? "e.worker_agent_id"
+            : "CAST(NULL AS uniqueidentifier)";
+
+        string sql = $@"
         WITH
             cteLoglevel AS (
                 SELECT
@@ -527,7 +289,7 @@ public sealed class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
                     , e.dump_id AS DumpId
                     , e.server_name AS ServerName
                     , e.machine_name AS MachineName
-                    , e.worker_agent_id AS WorkerAgentId
+                    , {workerAgentColumn} AS WorkerAgentId
                     , e.total_physical_memory_kb AS TotalPhysicalMemoryKb
                     , e.available_physical_memory_kb AS AvailablePhysicalMemoryKb
                     , e.total_page_file_kb AS TotalPageFileKb

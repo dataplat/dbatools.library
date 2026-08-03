@@ -32,7 +32,7 @@ namespace Dataplat.Dbatools.Commands;
 /// </example>
 [Cmdlet(VerbsData.Publish, "DbaSsisProject", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [OutputType(typeof(PSObject))]
-public sealed class PublishDbaSsisProjectCommand : DbaInstanceCmdlet
+public sealed partial class PublishDbaSsisProjectCommand : DbaInstanceCmdlet
 {
     // catalog.operations.operation_type for a project deployment, and the status it reports when
     // one succeeded. Both are read back after the call because the proc returning without an
@@ -162,7 +162,7 @@ public sealed class PublishDbaSsisProjectCommand : DbaInstanceCmdlet
                     // operation identifier N" and keeps the actual reason - wrong project name,
                     // unreadable stream, failed validation - in that view. Reporting the raised
                     // text alone would hand the caller a lookup instead of an answer.
-                    StopDeployment(instance, ReadOperationMessages(server, priorOperationId), ex);
+                    StopDeployment(instance, ReadOperationMessagesSince(server, priorOperationId), ex);
                     continue;
                 }
 
@@ -171,7 +171,9 @@ public sealed class PublishDbaSsisProjectCommand : DbaInstanceCmdlet
                 int status = ReadOperationStatus(server, operationId);
                 if (status != OperationStatusSucceeded)
                 {
-                    string reason = ReadOperationMessages(server, priorOperationId);
+                    // The id is known here, so the messages are this operation's. The ranged read
+                    // is for the throw path alone, where no id ever came back.
+                    string reason = ReadOperationMessages(server, operationId);
                     StopFunction($"Deployment of SSIS project {Project} to folder {Folder} on {instance} finished with operation status {status}: {reason}", target: instance, continueLoop: true);
                     continue;
                 }
@@ -210,70 +212,6 @@ public sealed class PublishDbaSsisProjectCommand : DbaInstanceCmdlet
     }
 
     /// <summary>
-    /// The project file goes in as a varbinary parameter. Formatting megabytes of build output as
-    /// a hex literal in the statement text would be an injection-policy violation and would not
-    /// survive real project sizes anyway.
-    /// </summary>
-    private long Deploy(Server server)
-    {
-        using SqlCommand command = new("EXEC [SSISDB].[catalog].[deploy_project] @folder_name = @folderName, @project_name = @projectName, @project_stream = @projectStream, @operation_id = @operationId OUTPUT", server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@folderName", Folder);
-        command.Parameters.AddWithValue("@projectName", Project);
-        SqlParameter streamParameter = command.Parameters.Add("@projectStream", System.Data.SqlDbType.VarBinary, -1);
-        streamParameter.Value = projectStream;
-        SqlParameter operationIdParameter = command.Parameters.Add("@operationId", System.Data.SqlDbType.BigInt);
-        operationIdParameter.Direction = System.Data.ParameterDirection.Output;
-        // A deployment validates every package it carries, which routinely outlives SqlCommand's
-        // 30 second default; the connection's own budget is the one the caller configured.
-        command.CommandTimeout = server.ConnectionContext.StatementTimeout;
-
-        SetActiveCommand(command);
-        try
-        {
-            command.ExecuteNonQuery();
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-
-        return operationIdParameter.Value is DBNull or null
-            ? 0
-            : Convert.ToInt64(operationIdParameter.Value, CultureInfo.InvariantCulture);
-    }
-
-    private long ReadLastOperationId(Server server)
-    {
-        using SqlCommand command = new("SELECT ISNULL(MAX(operation_id), 0) FROM [SSISDB].[catalog].[operations]", server.ConnectionContext.SqlConnectionObject);
-        SetActiveCommand(command);
-        try
-        {
-            object? result = command.ExecuteScalar();
-            return result is null or DBNull ? 0 : Convert.ToInt64(result, CultureInfo.InvariantCulture);
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-    }
-
-    private int ReadOperationStatus(Server server, long operationId)
-    {
-        using SqlCommand command = new("SELECT status FROM [SSISDB].[catalog].[operations] WHERE operation_id = @operationId", server.ConnectionContext.SqlConnectionObject);
-        command.Parameters.AddWithValue("@operationId", operationId);
-        SetActiveCommand(command);
-        try
-        {
-            object? result = command.ExecuteScalar();
-            return result is null or DBNull ? 0 : Convert.ToInt32(result, CultureInfo.InvariantCulture);
-        }
-        finally
-        {
-            SetActiveCommand(null);
-        }
-    }
-
-    /// <summary>
     /// Reports a refused deployment with the catalog's own explanation, falling back to the raised
     /// text when the catalog logged no operation to explain it - a folder that does not exist, for
     /// instance, is refused before an operation is ever opened, and there the raised text is the
@@ -293,20 +231,37 @@ public sealed class PublishDbaSsisProjectCommand : DbaInstanceCmdlet
     }
 
     /// <summary>
-    /// The failed operation is found by project name among the operations logged since this call
-    /// started, because the OUTPUT id is never assigned when the proc raises. Returns an empty
-    /// string when nothing matches.
+    /// Reads the log of one known operation. Anything wider would be a guess: two windows
+    /// deploying the same project name to one catalog produce operations that differ only by id,
+    /// so a name-and-range match can hand back the other deployment's errors as this one's.
     /// </summary>
-    private string ReadOperationMessages(Server server, long priorOperationId)
+    private string ReadOperationMessages(Server server, long operationId)
+    {
+        using SqlCommand command = new("SELECT TOP 10 messages.message FROM [SSISDB].[catalog].[operation_messages] messages WHERE messages.operation_id = @operationId ORDER BY messages.operation_message_id", server.ConnectionContext.SqlConnectionObject);
+        command.Parameters.AddWithValue("@operationId", operationId);
+        return CollectMessages(command);
+    }
+
+    /// <summary>
+    /// The fallback for the one case with no id to scope to: the proc raised, so the OUTPUT
+    /// parameter was never assigned, and the failed operation can only be found by project name
+    /// among the operations logged since this call started. Returns an empty string when nothing
+    /// matches - and, being a guess, it is not used anywhere the id is known.
+    /// </summary>
+    private string ReadOperationMessagesSince(Server server, long priorOperationId)
+    {
+        using SqlCommand command = new("SELECT TOP 10 messages.message FROM [SSISDB].[catalog].[operation_messages] messages JOIN [SSISDB].[catalog].[operations] operations ON operations.operation_id = messages.operation_id WHERE operations.operation_id > @priorOperationId AND operations.operation_type = @operationType AND operations.object_name = @projectName ORDER BY messages.operation_message_id", server.ConnectionContext.SqlConnectionObject);
+        command.Parameters.AddWithValue("@priorOperationId", priorOperationId);
+        command.Parameters.AddWithValue("@operationType", DeployOperationType);
+        command.Parameters.AddWithValue("@projectName", Project);
+        return CollectMessages(command);
+    }
+
+    private string CollectMessages(SqlCommand command)
     {
         StringBuilder detail = new();
         try
         {
-            using SqlCommand command = new("SELECT TOP 10 messages.message FROM [SSISDB].[catalog].[operation_messages] messages JOIN [SSISDB].[catalog].[operations] operations ON operations.operation_id = messages.operation_id WHERE operations.operation_id > @priorOperationId AND operations.operation_type = @operationType AND operations.object_name = @projectName ORDER BY messages.operation_message_id", server.ConnectionContext.SqlConnectionObject);
-            command.Parameters.AddWithValue("@priorOperationId", priorOperationId);
-            command.Parameters.AddWithValue("@operationType", DeployOperationType);
-            command.Parameters.AddWithValue("@projectName", Project);
-
             SetActiveCommand(command);
             try
             {

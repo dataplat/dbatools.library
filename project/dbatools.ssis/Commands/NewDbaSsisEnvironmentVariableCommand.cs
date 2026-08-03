@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.Management.Automation;
 using System.Runtime.InteropServices;
 using System.Security;
@@ -17,7 +16,7 @@ namespace Dataplat.Dbatools.Commands;
 /// <para type="description">Creates one or more variables in an environment of the SSIS catalog (SSISDB). Environment variables are the values a project execution binds its parameters to, which is what lets one deployed project run against development, test and production settings.</para>
 /// <para type="description">Calls catalog.create_environment_variable with parameterized T-SQL rather than the Integration Services object model, so it works on both PowerShell editions and on Linux. Each variable is created, emitted and errored independently.</para>
 /// <para type="description">A sensitive value is supplied through -SecureValue as a SecureString and is never accepted as plain text: a password passed as an ordinary value would survive in the caller's command history and in any transcript. Sensitivity is decided at creation and is effectively one-way - the catalog can promote a variable to sensitive later but refuses to take a stored sensitive value back out of encryption - so it is worth getting right here.</para>
-/// <para type="description">-DataType is the SSIS type name the catalog validates against, not a guess made from the value: Boolean, Byte, DateTime, Decimal, Double, Int16, Int32, Int64, SByte, Single, String, UInt32 or UInt64. Omit it for an ordinary value and it is derived from the .NET type - Boolean, Byte, DateTime, Decimal, Double, Int16 (Int16), Int32 (Int32), Int64 (Int64), Single and String map across directly. It is required alongside -Sensitive, because a SecureString carries no type information at all.</para>
+/// <para type="description">-DataType is the SSIS type name the catalog validates against, not a guess made from the value: Boolean, Byte, DateTime, Decimal, Double, Int16, Int32, Int64, SByte, Single, String, UInt32 or UInt64. Omit it for an ordinary value and it is derived from the .NET type - Boolean, Byte, DateTime, Decimal, Double, Int16 (Int16), Int32 (Int32), Int64 (Int64), Single and String map across directly. A null value has no type to derive from, so it needs -DataType named. It is required alongside -Sensitive, because a SecureString carries no type information at all, and there it has to be String: the secret is bound as text and the catalog refuses text carrying any other declared type.</para>
 /// </summary>
 /// <example>
 ///   <code>PS C:\&gt; New-DbaSsisEnvironmentVariable -SqlInstance sql2019 -Folder Finance -Environment Production -Variable BatchSize -Value 500</code>
@@ -35,24 +34,6 @@ namespace Dataplat.Dbatools.Commands;
 [OutputType(typeof(PSObject))]
 public sealed class NewDbaSsisEnvironmentVariableCommand : DbaInstanceCmdlet
 {
-    // internal.data_type_mapping is what the proc validates @data_type against, and it maps each
-    // SSIS type name to the sql_variant base types allowed to carry it. Only the .NET types
-    // SqlClient can bind to one of those base types are derivable; SByte, UInt32 and UInt64 have
-    // no SqlClient binding of their own and have to be named explicitly.
-    private static readonly Dictionary<Type, string> DerivableDataTypes = new()
-    {
-        { typeof(bool), "Boolean" },
-        { typeof(byte), "Byte" },
-        { typeof(DateTime), "DateTime" },
-        { typeof(decimal), "Decimal" },
-        { typeof(double), "Double" },
-        { typeof(short), "Int16" },
-        { typeof(int), "Int32" },
-        { typeof(long), "Int64" },
-        { typeof(float), "Single" },
-        { typeof(string), "String" }
-    };
-
     /// <summary>The target SQL Server instance or instances.</summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
     public override DbaInstanceParameter[] SqlInstance { get; set; } = null!;
@@ -134,9 +115,25 @@ public sealed class NewDbaSsisEnvironmentVariableCommand : DbaInstanceCmdlet
             return;
         }
 
-        if (!TestBound(nameof(DataType)) && Value != null && !DerivableDataTypes.ContainsKey(GetValueType(Value)))
+        // A SecureString is text, and the only way to bind it without materialising the secret as
+        // a managed string is as nvarchar. The catalog checks the sql_variant's base type against
+        // the declared one, so naming any other type here reaches the server and comes back as
+        // "The data type of the input value is not compatible with the data type of the 'Int32'" -
+        // measured on SQL 2019. Refusing here says which parameter is wrong.
+        if (Sensitive.ToBool() && TestBound(nameof(DataType)) && !string.Equals(DataType, "String", StringComparison.OrdinalIgnoreCase))
         {
-            StopFunction($"Cannot derive an SSIS data type from {GetValueType(Value).FullName}; supply -DataType", category: ErrorCategory.InvalidArgument);
+            StopFunction($"-Sensitive requires -DataType String, not {DataType}: a sensitive value is supplied as a SecureString and the catalog stores it as text", category: ErrorCategory.InvalidArgument);
+            return;
+        }
+
+        if (!TestBound(nameof(DataType)) && !TryDeriveDataType(GetValueType(Value), out _))
+        {
+            // A bound null is the case worth naming separately: there is no type to derive from at
+            // all, and the generic message would have to describe the absence of a type.
+            string described = Value == null
+                ? "a null -Value"
+                : $"{GetValueType(Value)!.FullName}";
+            StopFunction($"Cannot derive an SSIS data type from {described}; supply -DataType", category: ErrorCategory.InvalidArgument);
         }
     }
 
@@ -296,14 +293,44 @@ public sealed class NewDbaSsisEnvironmentVariableCommand : DbaInstanceCmdlet
             return DataType!;
         }
 
-        return DerivableDataTypes[GetValueType(Value!)];
+        // BeginProcessing has already refused anything this cannot answer.
+        TryDeriveDataType(GetValueType(Value), out string derived);
+        return derived;
     }
 
-    private static Type GetValueType(object value)
+    /// <summary>
+    /// internal.data_type_mapping is what the proc validates @data_type against, and it maps each
+    /// SSIS type name to the sql_variant base types allowed to carry it. Only the .NET types
+    /// SqlClient can bind to one of those base types are derivable; SByte, UInt32 and UInt64 have
+    /// no SqlClient binding of their own and have to be named explicitly.
+    /// </summary>
+    private static bool TryDeriveDataType(Type? valueType, out string dataType)
+    {
+        dataType = valueType switch
+        {
+            null => "",
+            _ when valueType == typeof(bool) => "Boolean",
+            _ when valueType == typeof(byte) => "Byte",
+            _ when valueType == typeof(DateTime) => "DateTime",
+            _ when valueType == typeof(decimal) => "Decimal",
+            _ when valueType == typeof(double) => "Double",
+            _ when valueType == typeof(short) => "Int16",
+            _ when valueType == typeof(int) => "Int32",
+            _ when valueType == typeof(long) => "Int64",
+            _ when valueType == typeof(float) => "Single",
+            _ when valueType == typeof(string) => "String",
+            _ => ""
+        };
+
+        return dataType.Length > 0;
+    }
+
+    private static Type? GetValueType(object? value)
     {
         // PowerShell hands an argument bound to an [object] parameter over as a PSObject often
         // enough that unwrapping it is not optional; the CLR type underneath is what decides.
-        return value is PSObject wrapper ? wrapper.BaseObject.GetType() : value.GetType();
+        object? bare = value is PSObject wrapper ? wrapper.BaseObject : value;
+        return bare?.GetType();
     }
 
     /// <summary>
