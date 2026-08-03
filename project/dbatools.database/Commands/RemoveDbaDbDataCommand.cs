@@ -26,15 +26,25 @@ namespace Dataplat.Dbatools.Commands;
 /// Test-FunctionInterrupt through its sentinel into _beginInterrupted, and ProcessRecord refuses to
 /// run when it is set.
 ///
-/// MEASURED CORRECTION, and it matters because this text is safety-critical: I first wrote here that
-/// a port without this carry "destroys data the source refuses to touch when -Path is bad". THE
+/// MEASURED CORRECTION, and it matters because this text is safety-critical: this comment first said
+/// that a port without this carry "destroys data the source refuses to touch when -Path is bad". THE
 /// SOURCE DOES NOT REFUSE. Probed with -Path pointing at a file (the input that actually makes
 /// Test-ExportDirectory call Stop-Function), the legacy function truncated exactly as the port did -
-/// before=3 after=0 with one warning in BOTH worlds - because Stop-Function only sets the interrupt
-/// variable in its -EnableException branch, so in default mode the source's own guard never fires.
-/// The latch carry still belongs (the standing order requires it, and it IS reachable on
-/// -EnableException paths) but its honest status is CORRECT-BY-CONSTRUCTION and
-/// UNVERIFIED-BY-MEASUREMENT: no input has yet been found that exercises it on this command.
+/// before=3 after=0 with one warning in BOTH worlds.
+///
+/// The reason given for that was wrong, and the correct one is narrower. Stop-Function does NOT set
+/// the interrupt variable only under -EnableException: its non-EnableException, non-Continue branch
+/// sets the same variable at -Scope 1 and then returns. What makes the BEGIN half's guard unreachable
+/// is where that scope points - the stop is raised inside Test-ExportDirectory, so -Scope 1 writes
+/// into Test-ExportDirectory's caller frame, which is the helper's, not this command's, and the
+/// command's own Test-FunctionInterrupt never sees it. The distinction matters because the wrong
+/// reason implied the PROCESS half was unreachable too, and it is not: the direct Stop-Function calls
+/// in the process body carry no -Continue, so each one does set this command's own interrupt flag.
+///
+/// The process half is therefore MEASURED, not merely constructed. Piping a non-database first and a
+/// real database second stops on record 1 and the source refuses record 2; a port whose latch did not
+/// carry would truncate it. Live A/B on both editions: 1 warning and the second database keeping all
+/// its rows on BOTH sides, against a two-good-record control on the same trace that truncates both.
 ///
 /// THE PROCESS HALF is the ordinary cross-record latch: an in-hop Stop-Function cannot set
 /// DbaBaseCmdlet.Interrupted (private setter), so without a carry each record would start fresh and
