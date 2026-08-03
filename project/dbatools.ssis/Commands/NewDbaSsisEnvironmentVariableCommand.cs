@@ -191,7 +191,25 @@ public sealed class NewDbaSsisEnvironmentVariableCommand : DbaInstanceCmdlet
                         continue;
                     }
 
-                    EmitVariable(server, variableName);
+                    // The read-back reaches further than the create did - it reads the catalog
+                    // views directly, where create_environment_variable is a proc - so a caller who
+                    // may create variables but not select from those views fails here and nowhere
+                    // else. Outside its own catch that failure escaped to the per-instance handler
+                    // and dropped every variable after this one. The variable exists either way,
+                    // which is why this does not report a creation failure.
+                    try
+                    {
+                        EmitVariable(server, variableName);
+                    }
+                    catch (PipelineStoppedException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        StopFunction($"SSIS environment variable {variableName} was created in {Folder}\\{Environment} on {instance} but could not be read back", target: instance, exception: ex, continueLoop: true);
+                        continue;
+                    }
                 }
             }
             catch (PipelineStoppedException)

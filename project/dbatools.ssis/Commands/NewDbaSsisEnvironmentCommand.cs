@@ -103,7 +103,25 @@ public sealed class NewDbaSsisEnvironmentCommand : DbaInstanceCmdlet
                         continue;
                     }
 
-                    EmitEnvironment(server, environmentName);
+                    // Reading back has its own catch, and its own words. Outside one, a read-back
+                    // failure - a revoked SELECT on the catalog views is enough - escaped to the
+                    // per-instance handler and took every name after this one with it, which is the
+                    // opposite of the independence the loop is built for. And it is not a creation
+                    // failure: the environment is there, so saying so would send the caller looking
+                    // for something that does not need creating.
+                    try
+                    {
+                        EmitEnvironment(server, environmentName);
+                    }
+                    catch (PipelineStoppedException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        StopFunction($"SSIS environment {environmentName} was created in folder {Folder} on {instance} but could not be read back", target: instance, exception: ex, continueLoop: true);
+                        continue;
+                    }
                 }
             }
             catch (PipelineStoppedException)

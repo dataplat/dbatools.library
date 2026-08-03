@@ -302,6 +302,10 @@ public sealed class SetDbaSsisCatalogCommand : DbaInstanceCmdlet
     private void ConfigureCatalog(Server server, string propertyName, string propertyValue)
     {
         using SqlCommand command = new("EXEC [SSISDB].[catalog].[configure_catalog] @property_name = @propertyName, @property_value = @propertyValue", server.ConnectionContext.SqlConnectionObject);
+        // Setting ENCRYPTION_ALGORITHM re-encrypts every sensitive value in the catalog, which on a
+        // catalog of any size outlasts SqlCommand's own 30-second default. The connection's
+        // statement timeout is what the caller configured, so it is what this honours.
+        command.CommandTimeout = server.ConnectionContext.StatementTimeout;
         command.Parameters.AddWithValue("@propertyName", propertyName);
         command.Parameters.AddWithValue("@propertyValue", propertyValue);
 

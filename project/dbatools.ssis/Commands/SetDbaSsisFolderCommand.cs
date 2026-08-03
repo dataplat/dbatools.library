@@ -72,6 +72,7 @@ public sealed partial class SetDbaSsisFolderCommand : DbaInstanceCmdlet
     }
 
     private readonly List<FolderTarget> _renameTargets = new();
+    private bool _explicitTargetsExpanded;
 
     protected override void BeginProcessing()
     {
@@ -100,8 +101,13 @@ public sealed partial class SetDbaSsisFolderCommand : DbaInstanceCmdlet
 
         List<FolderTarget> targets = new();
 
-        if (TestBound(nameof(SqlInstance)))
+        // -SqlInstance is not pipeline-bound, so it is supplied once however many records arrive.
+        // Expanding it on every record instead updated the named folders once per piped object and
+        // emitted each of them that many times - and under -NewName it filled the rename list with
+        // repeats of one folder, which the "more than one" guard then refused.
+        if (TestBound(nameof(SqlInstance)) && !_explicitTargetsExpanded)
         {
+            _explicitTargetsExpanded = true;
             // -Folder selects the folders on the -SqlInstance path. Without it the selection is
             // every folder in the catalog, which is not what anyone means by "set a description".
             if (!TestBound(nameof(Folder)))
