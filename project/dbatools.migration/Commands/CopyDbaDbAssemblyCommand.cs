@@ -104,7 +104,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         }
     }
 
-    if ($Force) { $ConfirmPreference = 'none' }
+    if ($Force) { $ConfirmPreference = "none" }
 
     if (Test-FunctionInterrupt) { return }
     foreach ($destinstance in $Destination) {
@@ -214,7 +214,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 try {
                     Write-Message -Level Verbose -Message "Copying assembly $assemblyName from database." -FunctionName Copy-DbaDbAssembly -ModuleName "dbatools"
                     $sql = $currentAssembly.Script()
-                    Write-Message -Level Debug -Message ($sql -join ' ') -FunctionName Copy-DbaDbAssembly -ModuleName "dbatools"
+                    Write-Message -Level Debug -Message ($sql -join " ") -FunctionName Copy-DbaDbAssembly -ModuleName "dbatools"
                     $destDb.Query($sql, $dbName)
 
                     $copyDbAssemblyStatus.Status = "Successful"

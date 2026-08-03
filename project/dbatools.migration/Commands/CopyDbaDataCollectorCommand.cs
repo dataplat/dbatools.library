@@ -97,7 +97,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     $configDb = $sourceStore.ScriptAlter().GetScript() | Out-String
     $configDb = $configDb -replace [Regex]::Escape("'$source'"), "'$destReplace'"
 
-    if ($Force) { $ConfirmPreference = 'none' }
+    if ($Force) { $ConfirmPreference = "none" }
 
     if (Test-FunctionInterrupt) { return }
     foreach ($destinstance in $Destination) {
