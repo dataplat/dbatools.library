@@ -229,6 +229,7 @@ public sealed class CopyDbaDatabaseCommand : DbaBaseCmdlet
         }, BeginScript,
             InputObject, Source, BackupRestore.ToBool(), SharedPath, UseLastBackup.ToBool(),
             DetachAttach.ToBool(), Reattach.ToBool(), Destination, Continue.ToBool(),
+            EnableException.ToBool(),
             NestedCommand.BoundCommonParameter(this, "Verbose"),
             NestedCommand.BoundCommonParameter(this, "Debug"));
     }
@@ -329,17 +330,22 @@ if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
+    # The flag parameters are deliberately untyped. This block is called with positional
+    # arguments, and PowerShell excludes [switch] parameters from positional binding - a single
+    # [switch] in the list shifts every argument after it, so -Destination was receiving the
+    # shared path. They arrive as real booleans from the cmdlet, which reads the same in every
+    # test and pass-through the body performs.
     param([DbaInstanceParameter]$Source, [PSCredential]$SourceSqlCredential,
         [DbaInstanceParameter[]]$Destination, [PSCredential]$DestinationSqlCredential,
-        [object[]]$Database, [object[]]$ExcludeDatabase, [switch]$AllDatabases,
-        [switch]$BackupRestore, [hashtable]$AdvancedBackupParams, [string]$SharedPath,
-        [string]$AzureCredential, [switch]$WithReplace, [switch]$NoRecovery,
-        [switch]$NoBackupCleanup, [int]$NumberFiles, [switch]$DetachAttach, [switch]$Reattach,
-        [switch]$SetSourceReadOnly, [switch]$SetSourceOffline, [switch]$ReuseSourceFolderStructure,
-        [switch]$IncludeSupportDbs, [switch]$UseLastBackup, [switch]$Continue,
-        [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [switch]$NoCopyOnly,
-        [switch]$KeepCDC, [switch]$KeepReplication, [string]$NewName, [string]$Prefix,
-        [switch]$Force, $EnableException, $__boundNewName, $__boundPrefix, $backupCollection,
+        [object[]]$Database, [object[]]$ExcludeDatabase, $AllDatabases,
+        $BackupRestore, [hashtable]$AdvancedBackupParams, [string]$SharedPath,
+        [string]$AzureCredential, $WithReplace, $NoRecovery,
+        $NoBackupCleanup, [int]$NumberFiles, $DetachAttach, $Reattach,
+        $SetSourceReadOnly, $SetSourceOffline, $ReuseSourceFolderStructure,
+        $IncludeSupportDbs, $UseLastBackup, $Continue,
+        [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, $NoCopyOnly,
+        $KeepCDC, $KeepReplication, [string]$NewName, [string]$Prefix,
+        $Force, $EnableException, $__boundNewName, $__boundPrefix, $backupCollection,
         $fsWarning, $replaceInFile, $sourceServer, $elapsed, $started, $sourceDbOwnerChaining,
         $sourceDbTrustworthy, $sourceDbBrokerEnabled, $__realCmdlet)
 
@@ -1577,14 +1583,18 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // suppression and the five internal helper declarations are begin-block setup rather than
     // validation, so they live at the top of the process hop where the body can see them.
     private const string BeginScript = """
-param($InputObject, $Source, $BackupRestore, $SharedPath, $UseLastBackup, $DetachAttach, $Reattach, $Destination, $Continue, $__boundVerbose, $__boundDebug)
+param($InputObject, $Source, $BackupRestore, $SharedPath, $UseLastBackup, $DetachAttach, $Reattach, $Destination, $Continue, $EnableException, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding()]
-    param([Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [switch]$BackupRestore, [string]$SharedPath, [switch]$UseLastBackup, [switch]$DetachAttach, [switch]$Reattach, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, [switch]$Continue)
+    # Untyped flags for the same positional-binding reason as the process block above.
+    # $EnableException is unused here yet must be in scope: Stop-Function defaults its own
+    # [bool]$EnableException from the caller's variable, so an undefined one binds $null and
+    # the validation dies on a cast error instead of warning.
+    param([Microsoft.SqlServer.Management.Smo.Database[]]$InputObject, [Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, $BackupRestore, [string]$SharedPath, $UseLastBackup, $DetachAttach, $Reattach, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, $Continue, $EnableException)
 
     if (-not $InputObject -and -not $Source) {
         Stop-Function -Message "With no piped input a -Source must be specified." -FunctionName Copy-DbaDatabase
@@ -1610,7 +1620,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
         Stop-Function -Message "-Continue cannot be used without -UseLastBackup" -FunctionName Copy-DbaDatabase
         return
     }
-} $InputObject $Source $BackupRestore $SharedPath $UseLastBackup $DetachAttach $Reattach $Destination $Continue @__commonParameters 3>&1 2>&1
+} $InputObject $Source $BackupRestore $SharedPath $UseLastBackup $DetachAttach $Reattach $Destination $Continue $EnableException @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the end block, verbatim apart from the -FunctionName/-ModuleName attribution. Every
