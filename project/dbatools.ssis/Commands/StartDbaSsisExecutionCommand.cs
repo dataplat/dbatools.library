@@ -79,7 +79,7 @@ public sealed partial class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
     [Parameter(Position = 5)]
     public string? Environment { get; set; }
 
-    /// <summary>The folder the environment lives in, when it is not the project's own folder.</summary>
+    /// <summary>The folder the environment lives in, when it is not the project's own folder. Omit it and -Environment is looked for beside the project, so a reference to a same-named environment elsewhere is not picked up by accident. Requires -Environment.</summary>
     [Parameter(Position = 6)]
     public string? EnvironmentFolder { get; set; }
 
@@ -126,6 +126,16 @@ public sealed partial class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
         if (TestBound(nameof(Timeout)) && Timeout <= 0)
         {
             StopFunction($"-Timeout must be greater than zero seconds, not {Timeout}: omit it to wait for the run without a bound", category: ErrorCategory.InvalidArgument);
+            return;
+        }
+
+        // -EnvironmentFolder only ever disambiguates -Environment. On its own it looks like the
+        // run was bound to an environment, and the package would quietly run on its design-time
+        // values instead - the failure mode is a successful execution with the wrong settings,
+        // which nothing downstream reports.
+        if (TestBound(nameof(EnvironmentFolder)) && !TestBound(nameof(Environment)))
+        {
+            StopFunction("-EnvironmentFolder names the folder to look for -Environment in and does nothing on its own: add -Environment, or drop -EnvironmentFolder to run on the package's design-time values", category: ErrorCategory.InvalidArgument);
         }
     }
 

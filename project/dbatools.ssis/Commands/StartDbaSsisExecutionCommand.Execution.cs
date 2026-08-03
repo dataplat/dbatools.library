@@ -41,22 +41,26 @@ public sealed partial class StartDbaSsisExecutionCommand : DbaInstanceCmdlet
     /// environment before it can run against it, and the same environment name can be referenced
     /// out of two folders, which is what -EnvironmentFolder disambiguates.
     /// </summary>
+    /// <remarks>
+    /// A relative reference stores environment_folder_name NULL and resolves in the project's own
+    /// folder - catalog.create_environment_reference sets the lookup folder to @folder_name for
+    /// reference_type 'R' and refuses a folder name outright, and it stores the given folder for
+    /// 'A'. So the reference's effective folder is ISNULL(environment_folder_name, folders.name),
+    /// and matching on the stored column alone let a project holding both a relative reference to
+    /// Production and an absolute one to another folder's Production satisfy the predicate twice.
+    /// TOP 1 then picked whichever row the plan reached first.
+    /// </remarks>
     private long? ReadReferenceId(Server server)
     {
-        string sql = "SELECT TOP 1 references_.reference_id FROM [SSISDB].[catalog].[environment_references] references_ JOIN [SSISDB].[catalog].[projects] projects ON projects.project_id = references_.project_id JOIN [SSISDB].[catalog].[folders] folders ON folders.folder_id = projects.folder_id WHERE folders.name = @folderName AND projects.name = @projectName AND references_.environment_name = @environmentName";
-        if (TestBound(nameof(EnvironmentFolder)))
-        {
-            sql += " AND references_.environment_folder_name = @environmentFolderName";
-        }
+        // Unqualified means the environment beside the project, which is the one folder a caller
+        // can name without ambiguity; anything else has to be asked for by folder.
+        string sql = "SELECT TOP 1 references_.reference_id FROM [SSISDB].[catalog].[environment_references] references_ JOIN [SSISDB].[catalog].[projects] projects ON projects.project_id = references_.project_id JOIN [SSISDB].[catalog].[folders] folders ON folders.folder_id = projects.folder_id WHERE folders.name = @folderName AND projects.name = @projectName AND references_.environment_name = @environmentName AND ISNULL(references_.environment_folder_name, folders.name) = @environmentFolderName ORDER BY references_.reference_id";
 
         using SqlCommand command = new(sql, server.ConnectionContext.SqlConnectionObject);
         command.Parameters.AddWithValue("@folderName", Folder);
         command.Parameters.AddWithValue("@projectName", Project);
         command.Parameters.AddWithValue("@environmentName", Environment);
-        if (TestBound(nameof(EnvironmentFolder)))
-        {
-            command.Parameters.AddWithValue("@environmentFolderName", EnvironmentFolder);
-        }
+        command.Parameters.AddWithValue("@environmentFolderName", TestBound(nameof(EnvironmentFolder)) ? EnvironmentFolder : Folder);
 
         SetActiveCommand(command);
         try
