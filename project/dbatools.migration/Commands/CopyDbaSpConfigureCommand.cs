@@ -143,7 +143,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                         $copySpConfigStatus.Status = "Successful"
                         $copySpConfigStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                     } catch {
-                        if ($_.Exception -match 'the same as the') {
+                        if ($_.Exception -match "the same as the") {
                             $copySpConfigStatus.Status = "Successful"
                             $copySpConfigStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                         } else {
