@@ -39,6 +39,15 @@ namespace Dataplat.Dbatools.Commands;
 /// leaking the DAC. And a test that shadows Test-FunctionInterrupt sees its shadow called, exactly
 /// as the function world does.
 ///
+/// -WhatIf AND -Confirm ARE CARRIED INTO THE PROCESS HOP, not just routed through $__realCmdlet.
+/// Only the SysDbUserObjects step consults $PSCmdlet.ShouldProcess directly; every other step is a
+/// bare call to a Copy-Dba* command that declares its own SupportsShouldProcess and, in the function
+/// world, inherited $WhatIfPreference from the caller's scope. A hop scope does not inherit it, so
+/// without this carry "Start-DbaMigration -WhatIf" performed a real migration - measured, not
+/// inferred: the suite's -WhatIf leg passed against the script function and failed against the
+/// cmdlet by finding the database actually copied to the destination. Splatting the bound values
+/// into the hop's [CmdletBinding(SupportsShouldProcess)] block reproduces the inheritance.
+///
 /// $ConfirmPreference IS SET IN BOTH HOPS. begin's "if ($Force) { $ConfirmPreference = 'none' }"
 /// suppresses a prompt raised by the ShouldProcess call in the PROCESS block, which in the function
 /// world shares begin's scope. The hop scopes do not, so the assignment is repeated in the process
@@ -231,6 +240,7 @@ public sealed class StartDbaMigrationCommand : DbaBaseCmdlet
             UseLastBackup.ToBool(), KeepCDC.ToBool(), KeepReplication.ToBool(), Continue.ToBool(),
             ExcludePassword.ToBool(), Force.ToBool(), AzureCredential, MasterKeyPassword,
             EnableException.ToBool(), _beginState, this,
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
             NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
@@ -311,14 +321,16 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // Start-DbaMigration (plus -ModuleName "dbatools" on Write-Message) on every direct call, and
     // $Pscmdlet -> $__realCmdlet so the gate reaches the compiled cmdlet's own ShouldProcess.
     private const string ProcessScript = """
-param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $Credential, $DetachAttach, $Reattach, $BackupRestore, $SharedPath, $WithReplace, $NoRecovery, $SetSourceReadOnly, $SetSourceOffline, $ReuseSourceFolderStructure, $IncludeSupportDbs, $Exclude, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeSaRename, $UseLastBackup, $KeepCDC, $KeepReplication, $Continue, $ExcludePassword, $Force, $AzureCredential, $MasterKeyPassword, $EnableException, $__beginState, $__realCmdlet, $__boundVerbose, $__boundDebug)
+param($Source, $SourceSqlCredential, $Destination, $DestinationSqlCredential, $Credential, $DetachAttach, $Reattach, $BackupRestore, $SharedPath, $WithReplace, $NoRecovery, $SetSourceReadOnly, $SetSourceOffline, $ReuseSourceFolderStructure, $IncludeSupportDbs, $Exclude, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeSaRename, $UseLastBackup, $KeepCDC, $KeepReplication, $Continue, $ExcludePassword, $Force, $AzureCredential, $MasterKeyPassword, $EnableException, $__beginState, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
+if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
+if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
 if ($null -ne $__boundVerbose) { $__commonParameters.Verbose = [bool]$__boundVerbose }
 if ($null -ne $__boundDebug) { $__commonParameters.Debug = [bool]$__boundDebug }
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
-    [CmdletBinding()]
-    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [PSCredential]$SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, [PSCredential]$DestinationSqlCredential, [PSCredential]$Credential, $DetachAttach, $Reattach, $BackupRestore, [string]$SharedPath, $WithReplace, $NoRecovery, $SetSourceReadOnly, $SetSourceOffline, $ReuseSourceFolderStructure, $IncludeSupportDbs, [string[]]$Exclude, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeSaRename, $UseLastBackup, $KeepCDC, $KeepReplication, $Continue, $ExcludePassword, $Force, [string]$AzureCredential, [Security.SecureString]$MasterKeyPassword, $EnableException, $__beginState, $__realCmdlet, $__boundVerbose, $__boundDebug)
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter]$Source, [PSCredential]$SourceSqlCredential, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$Destination, [PSCredential]$DestinationSqlCredential, [PSCredential]$Credential, $DetachAttach, $Reattach, $BackupRestore, [string]$SharedPath, $WithReplace, $NoRecovery, $SetSourceReadOnly, $SetSourceOffline, $ReuseSourceFolderStructure, $IncludeSupportDbs, [string[]]$Exclude, $DisableJobsOnDestination, $DisableJobsOnSource, $ExcludeSaRename, $UseLastBackup, $KeepCDC, $KeepReplication, $Continue, $ExcludePassword, $Force, [string]$AzureCredential, [Security.SecureString]$MasterKeyPassword, $EnableException, $__beginState, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 
     # begin's once-computed state
     $elapsed = $__beginState.Elapsed
@@ -641,7 +653,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
 
     $__iv = Get-Variable -Name __dbatools_interrupt_function_78Q9VPrM6999g6zo24Qn83m09XF56InEn4hFrA8Fwhu5xJrs6r -Scope 0 -ErrorAction Ignore
     @{ __startDbaMigrationProcess = @{ Interrupted = [bool]($__iv -and $__iv.Value); DacOpened = $dacOpened; SourceServerDac = $sourceServerDac } }
-} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $Credential $DetachAttach $Reattach $BackupRestore $SharedPath $WithReplace $NoRecovery $SetSourceReadOnly $SetSourceOffline $ReuseSourceFolderStructure $IncludeSupportDbs $Exclude $DisableJobsOnDestination $DisableJobsOnSource $ExcludeSaRename $UseLastBackup $KeepCDC $KeepReplication $Continue $ExcludePassword $Force $AzureCredential $MasterKeyPassword $EnableException $__beginState $__realCmdlet $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $Source $SourceSqlCredential $Destination $DestinationSqlCredential $Credential $DetachAttach $Reattach $BackupRestore $SharedPath $WithReplace $NoRecovery $SetSourceReadOnly $SetSourceOffline $ReuseSourceFolderStructure $IncludeSupportDbs $Exclude $DisableJobsOnDestination $DisableJobsOnSource $ExcludeSaRename $UseLastBackup $KeepCDC $KeepReplication $Continue $ExcludePassword $Force $AzureCredential $MasterKeyPassword $EnableException $__beginState $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
     // PS: the end block VERBATIM, with begin's stopwatch and start timestamp, process's DAC state
