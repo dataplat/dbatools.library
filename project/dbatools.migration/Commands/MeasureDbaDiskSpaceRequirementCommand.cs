@@ -117,11 +117,12 @@ public sealed class MeasureDbaDiskSpaceRequirementCommand : DbaBaseCmdlet
 
     protected override void ProcessRecord()
     {
-        if (Interrupted)
-        {
-            return;
-        }
-
+        // NO Interrupted PROLOGUE, and its absence is load-bearing. The nested hop reports a
+        // Stop-Function back to the host, which latches Interrupted for the rest of the pipeline;
+        // the source's process block reads Test-FunctionInterrupt nowhere, so a record whose source
+        // instance will not connect must not silence the records behind it. Guarding here does
+        // silence them - measured red on a sibling row's "should still process the record after the
+        // failure" leg, against a pre-flip run of the same suite that was green.
         foreach (string name in MyInvocation.BoundParameters.Keys)
         {
             _boundNames.Add(name);
