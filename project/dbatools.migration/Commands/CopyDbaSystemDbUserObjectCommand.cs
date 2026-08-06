@@ -18,8 +18,15 @@ namespace Dataplat.Dbatools.Commands;
 [Cmdlet(VerbsCommon.Copy, "DbaSystemDbUserObject", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed partial class CopyDbaSystemDbUserObjectCommand : DbaBaseCmdlet
 {
+    // ValidateNotNullOrEmpty is load-bearing even under Mandatory, which already rejects null and
+    // an empty array on its own: it changes WHICH rejection happens. Without it the binder raises
+    // ParameterArgumentValidationErrorEmptyArrayNotAllowed / ...NullNotAllowed, with it the
+    // FullyQualifiedErrorId is plain ParameterArgumentValidationError. The baseline JSON records
+    // no validation attributes, so surfaceDiff cannot see this - the binder leg in the test file is
+    // what holds it.
     /// <summary>The source SQL Server instance holding the user objects. Requires sysadmin.</summary>
     [Parameter(Mandatory = true, Position = 0)]
+    [ValidateNotNullOrEmpty]
     public DbaInstanceParameter Source { get; set; } = null!;
 
     /// <summary>Alternative credential for the source instance.</summary>
@@ -28,6 +35,7 @@ public sealed partial class CopyDbaSystemDbUserObjectCommand : DbaBaseCmdlet
 
     /// <summary>The destination SQL Server instances. Requires sysadmin on each.</summary>
     [Parameter(Mandatory = true, Position = 2)]
+    [ValidateNotNullOrEmpty]
     public DbaInstanceParameter[] Destination { get; set; } = null!;
 
     /// <summary>Alternative credential for the destination instances.</summary>
