@@ -237,7 +237,11 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
                 }
             }
         }
-    $__masterkeyAssigned = [bool](Get-Variable -Name masterkey -Scope 0 -ErrorAction SilentlyContinue)
+    # Ignore, not SilentlyContinue. SilentlyContinue silences the STREAM and still appends the
+    # record to $Error, so every record that never assigned $masterkey left a VariableNotFound in
+    # the caller's $Error that the script implementation does not produce -- measured as six extra
+    # entries in $Error and in -ErrorVariable across one run. Ignore writes nothing anywhere.
+    $__masterkeyAssigned = [bool](Get-Variable -Name masterkey -Scope 0 -ErrorAction Ignore)
 
     [pscustomobject]@{ __NewDbaDbMasterKeyProcessComplete = $true; MasterKey = $(if ($__masterkeyAssigned) { $masterkey } else { $null }); MasterKeyAssigned = $__masterkeyAssigned }
 } $SqlInstance $SqlCredential $Database $SecurePassword $InputObject $EnableException $__realCmdlet $__masterKeyCarry $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
