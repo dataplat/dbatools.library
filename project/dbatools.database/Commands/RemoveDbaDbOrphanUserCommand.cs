@@ -71,24 +71,27 @@ namespace Dataplat.Dbatools.Commands;
 /// but an earlier revision of this comment claimed emitted objects "record completed repairs", and
 /// that overstated it.
 ///
-/// TWO KNOWN SHARED-RUNTIME GAPS, held for the consolidated fix rather than worked around here.
+/// The termination BOUNDARY is the thing to get right on this command, and it is now the shared
+/// runtime's job rather than this file's. The source applies -WarningAction / -ErrorAction Stop
+/// inside its own try blocks, so a Stop is converted in the body and caught there; a hop that let
+/// the streaming callback re-emit the record instead would terminate OUTSIDE that catch, which on a
+/// command that re-owns schemas and drops users changes which side effects have already landed.
+/// NestedCommand.PropagateActionPreferences sets the preference variables for the invocation window,
+/// so the conversion happens in the body again. Measured 2026-08-09 against sql01 with two databases
+/// and one orphan user apiece, the user in the first owning a populated schema: under
+/// -WarningAction Stop the skip warning terminates while the first database is still being
+/// processed, and the SECOND database's user is still there afterwards. -ErrorAction Stop is not
+/// observable here at all - the body raises no non-terminating error, so binding it is
+/// indistinguishable from a plain run (measured on the same fixture).
 ///
-/// First, warnings raised by NESTED calls are lost: the function emits a Connect-DbaInstance
-/// connection warning and its own Stop-Function warning, and this port emits only the second, in both
-/// warning modes. The mechanism I originally proposed - "compiled nested cmdlets bypass the 3>&1
-/// merge" - is NOT well supported and should not be repeated as fact. PSCmdlet.WriteWarning produces
-/// an ordinary stream-3 WarningRecord, which the redirection and the demultiplexer both handle, so
-/// "the child is compiled" cannot by itself be the cause; a real bypass would need direct host/UI
-/// writes, a separate pipeline or runspace, or a different code path in the child. The MEASUREMENT
-/// stands and the diagnosis does not.
-///
-/// Second - and this is the sharper form of the -WarningAction gap - preference values of Stop are
-/// not propagated INTO the hop at all. The source applies -WarningAction / -ErrorAction Stop inside
-/// its own try blocks, where a Stop is caught and handled. In the port the records are merged and
-/// re-emitted from the streaming callback, so a Stop fires OUTSIDE the original catch boundary. That
-/// is not merely a lost warning: it changes where termination happens and therefore which side
-/// effects have already been applied when it does. This command re-owns schemas and drops users, so
-/// the distinction is a real one for a caller.
+/// ONE KNOWN SHARED-RUNTIME GAP REMAINS. Warnings raised by NESTED calls are lost: the function
+/// emits a Connect-DbaInstance connection warning and its own Stop-Function warning, and this port
+/// emits only the second, in both warning modes. The mechanism originally proposed - "compiled
+/// nested cmdlets bypass the 3>&1 merge" - is NOT well supported and should not be repeated as fact.
+/// PSCmdlet.WriteWarning produces an ordinary stream-3 WarningRecord, which the redirection and the
+/// demultiplexer both handle, so "the child is compiled" cannot by itself be the cause; a real
+/// bypass would need direct host/UI writes, a separate pipeline or runspace, or a different code
+/// path in the child. The MEASUREMENT stands and the diagnosis does not.
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "DbaDbOrphanUser", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [OutputType(typeof(PSObject))]
