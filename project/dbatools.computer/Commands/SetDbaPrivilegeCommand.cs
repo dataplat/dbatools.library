@@ -51,7 +51,10 @@ $strSID = $objUser.Translate([System.Security.Principal.SecurityIdentifier])
 $strSID.Value
 }";
 
-    // The three Invoke-Command2 -Raw scriptblocks, verbatim from the PS source (comments included).
+    // The three Invoke-Command2 -Raw scriptblocks, verbatim from the PS source (comments
+    // included), except MainScript's /db path and CleanupScript's extra Remove-Item - see the
+    // secedit.sdb/.jfm fix note on CleanupScript below. The retired PS source (dbatools/private/
+    // retired/Set-DbaPrivilege.ps1) still carries the original bug; it is dead code, not shipping.
     private const string ExportScript = @"
                             $temp = ([System.IO.Path]::GetTempPath()).TrimEnd(""""); secedit /export /cfg $temp\secpolByDbatools.cfg > $NULL;
                         ";
@@ -198,10 +201,14 @@ $strSID.Value
                                         }
                                     }
                                 }
-                                $null = secedit /configure /cfg $tempfile /db secedit.sdb /areas USER_RIGHTS /overwrite /quiet
+                                $null = secedit /configure /cfg $tempfile /db $temp\secedit.sdb /areas USER_RIGHTS /overwrite /quiet
                             ";
 
-    private const string CleanupScript = @" $temp = ([System.IO.Path]::GetTempPath()).TrimEnd(""""); Remove-Item $temp\secpolByDbatools.cfg -Force > $NULL ";
+    // secedit /configure /db resolves a bare filename against the process's current directory,
+    // not $temp - a relative "secedit.sdb" left secedit.sdb/.jfm wherever the caller's shell
+    // happened to be running. Point /db at $temp and clean up the database and its journal file
+    // alongside the exported cfg.
+    private const string CleanupScript = @" $temp = ([System.IO.Path]::GetTempPath()).TrimEnd(""""); Remove-Item $temp\secpolByDbatools.cfg -Force > $NULL; Remove-Item $temp\secedit.sdb, $temp\secedit.jfm -Force -ErrorAction SilentlyContinue > $NULL ";
 
     // PS begin block: $ComputerName = $ComputerName.ComputerName | Select-Object -Unique. The
     // variable keeps its [DbaInstanceParameter[]] type constraint, so the unique ComputerName
