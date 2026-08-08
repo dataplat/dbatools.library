@@ -14,7 +14,8 @@ namespace Dataplat.Dbatools.Commands;
 /// Register-DbatoolsConfig dispatch, -notcontains coercion, += array growth (including the
 /// stale-$lower statement-fault path for null elements), TEPP cache mutation, and
 /// @($current) + @($toAdd) array-addition semantics are all decided by the engine exactly
-/// as the function decided them. Surface pinned by migration/baselines/Add-DbaInstanceList.json
+/// as the function decided them. EnableException is deliberately hidden because the source
+/// declares no such parameter. Surface pinned by migration/baselines/Add-DbaInstanceList.json
 /// (SqlInstance mandatory pos0 VFP+VFPBPN; Scope pos1 default UserDefault; Register switch).
 /// </summary>
 [Cmdlet(VerbsCommon.Add, "DbaInstanceList")]
@@ -33,7 +34,9 @@ public sealed class AddDbaInstanceListCommand : DbaBaseCmdlet
     [Parameter(Position = 1)]
     public ConfigScope Scope { get; set; } = ConfigScope.UserDefault;
 
-    // EnableException is inherited from DbaBaseCmdlet - never redeclared.
+    /// <summary>Not a parameter: the source does not expose EnableException, so this
+    /// attribute-less override keeps the inherited helper off the command surface.</summary>
+    public override SwitchParameter EnableException { get; set; }
 
     // begin/process/end share $current and $toAdd through this bag BY REFERENCE, exactly
     // like the function's shared function-scope locals (W1-106 lifecycle pattern).
