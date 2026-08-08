@@ -34,14 +34,15 @@ namespace Dataplat.Dbatools.Commands;
 /// one that was actually dropped, so a buffered invocation would discard the audit trail of
 /// completed drops if a later synonym threw under -EnableException.
 ///
-/// The termination BOUNDARY matters here for the same reason: the try encloses the DROP and the
-/// object built after it, so -WarningAction Stop has to convert in the body, where the catch can see
-/// it, rather than at the host after the loop has finished dropping. NestedCommand.PropagateAction-
-/// Preferences does that. Measured 2026-08-09 against sql01 by feeding one parameter-bound array
-/// holding the same synonym twice followed by a second one - the repeat DROP fails inside the try,
-/// which is this body's only reachable mid-loop failure, and under -WarningAction Stop the third
-/// element is never reached, so that synonym survives. -ErrorAction Stop is not observable here: the
-/// body raises no non-terminating error, so binding it matches a plain run (same fixture).
+/// The termination BOUNDARY matters here. A failed DROP is caught by the body's own catch, which
+/// reports it through Stop-Function - so under -WarningAction Stop the conversion happens on THAT
+/// warning, inside the catch, and unwinds the loop from there. It has to convert in the body rather
+/// than at the host after the loop has finished dropping, and NestedCommand.PropagateActionPreferences
+/// is what makes it. Measured 2026-08-09 against sql01 by feeding one parameter-bound array holding
+/// the same synonym twice followed by a second one - the repeat DROP fails, which is this body's only
+/// reachable mid-loop failure, and the third element is then never reached, so that synonym survives
+/// while the first one stays dropped. -ErrorAction Stop is not observable here: the body raises no
+/// non-terminating error, so binding it matches a plain run (same fixture).
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "DbaDbSynonym", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(PSObject))]
