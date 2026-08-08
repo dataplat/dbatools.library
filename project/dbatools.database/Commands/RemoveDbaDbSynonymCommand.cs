@@ -38,16 +38,17 @@ namespace Dataplat.Dbatools.Commands;
 /// reports it through Stop-Function - so under -WarningAction Stop the conversion happens on THAT
 /// warning, inside the catch, and unwinds the loop from there. It has to convert in the body rather
 /// than at the host after the loop has finished dropping, and NestedCommand.PropagateActionPreferences
-/// is what should make it.
+/// is what makes it.
 ///
-/// That last clause is UNVERIFIED on this cmdlet and must not be read as measured. The integration
-/// leg feeds one parameter-bound array holding the same synonym twice followed by a second one - the
-/// repeat DROP fails, which is this body's only reachable mid-loop failure - and asserts only that
-/// the third element is never reached, so that synonym survives while the first drop stands. That
-/// outcome does not separate an in-body conversion from one at the caller; the distinguishing
-/// assertion is the terminating error's own identity, and capturing it needs this cmdlet actually
-/// exported from the shipped satellite, which it is not yet. -ErrorAction Stop is not observable
-/// here: the body raises no non-terminating error, so binding it matches a plain run.
+/// The integration leg feeds one parameter-bound array holding the same synonym twice followed by a
+/// second one - the repeat DROP fails, which is this body's only reachable mid-loop failure. The
+/// third element then going unreached shows only that the run stopped early, since a caller-side
+/// conversion would leave it undropped too. What separates them is the terminating error's identity:
+/// converting in the body raises from Write-Message, the cmdlet Stop-Function reports through, so
+/// the error carries activity Write-Message and id ActionPreferenceStop,...WriteMessageCommand.
+/// Measured in the function world. It is still UNRUN against this cmdlet - the shipped satellite
+/// does not export it yet - so the assertion first bites at flip. -ErrorAction Stop is not
+/// observable here: the body raises no non-terminating error, so binding it matches a plain run.
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "DbaDbSynonym", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(PSObject))]
