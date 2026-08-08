@@ -38,11 +38,16 @@ namespace Dataplat.Dbatools.Commands;
 /// reports it through Stop-Function - so under -WarningAction Stop the conversion happens on THAT
 /// warning, inside the catch, and unwinds the loop from there. It has to convert in the body rather
 /// than at the host after the loop has finished dropping, and NestedCommand.PropagateActionPreferences
-/// is what makes it. Measured 2026-08-09 against sql01 by feeding one parameter-bound array holding
-/// the same synonym twice followed by a second one - the repeat DROP fails, which is this body's only
-/// reachable mid-loop failure, and the third element is then never reached, so that synonym survives
-/// while the first one stays dropped. -ErrorAction Stop is not observable here: the body raises no
-/// non-terminating error, so binding it matches a plain run (same fixture).
+/// is what should make it.
+///
+/// That last clause is UNVERIFIED on this cmdlet and must not be read as measured. The integration
+/// leg feeds one parameter-bound array holding the same synonym twice followed by a second one - the
+/// repeat DROP fails, which is this body's only reachable mid-loop failure - and asserts only that
+/// the third element is never reached, so that synonym survives while the first drop stands. That
+/// outcome does not separate an in-body conversion from one at the caller; the distinguishing
+/// assertion is the terminating error's own identity, and capturing it needs this cmdlet actually
+/// exported from the shipped satellite, which it is not yet. -ErrorAction Stop is not observable
+/// here: the body raises no non-terminating error, so binding it matches a plain run.
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "DbaDbSynonym", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(PSObject))]

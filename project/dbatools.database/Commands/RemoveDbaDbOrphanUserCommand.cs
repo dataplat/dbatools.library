@@ -77,12 +77,17 @@ namespace Dataplat.Dbatools.Commands;
 /// the streaming callback re-emit the record instead would terminate OUTSIDE that catch, which on a
 /// command that re-owns schemas and drops users changes which side effects have already landed.
 /// NestedCommand.PropagateActionPreferences sets the preference variables for the invocation window,
-/// so the conversion happens in the body again. Measured 2026-08-09 against sql01 with two databases
-/// and one orphan user apiece, the user in the first owning a populated schema: under
-/// -WarningAction Stop the skip warning terminates while the first database is still being
-/// processed, and the SECOND database's user is still there afterwards. -ErrorAction Stop is not
-/// observable here at all - the body raises no non-terminating error, so binding it is
-/// indistinguishable from a plain run (measured on the same fixture).
+/// which is what should put the conversion back in the body.
+///
+/// That last sentence is UNVERIFIED on this cmdlet and must not be read as measured. The integration
+/// leg covering it asserts only the observable mutation boundary - two databases with one orphan
+/// user apiece, the first user owning a populated schema, and under -WarningAction Stop the second
+/// database's user still present afterwards. That outcome does not separate an in-body conversion
+/// from one at the caller, because the streaming re-emit would halt before the second database
+/// either way; the distinguishing assertion is the terminating error's own identity, and capturing
+/// it needs this cmdlet actually exported from the shipped satellite, which it is not yet.
+/// -ErrorAction Stop is not observable here at all - the body raises no non-terminating error, so
+/// binding it is indistinguishable from a plain run.
 ///
 /// ONE KNOWN SHARED-RUNTIME GAP REMAINS. Warnings raised by NESTED calls are lost: the function
 /// emits a Connect-DbaInstance connection warning and its own Stop-Function warning, and this port
