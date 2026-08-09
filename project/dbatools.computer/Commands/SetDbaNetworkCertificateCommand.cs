@@ -74,21 +74,28 @@ public sealed class SetDbaNetworkCertificateCommand : DbaBaseCmdlet
             return;
         }
 
-        foreach (PSObject? item in NestedCommand.InvokeScoped(this, ProcessScript,
-            SqlInstance, Credential, Certificate, Thumbprint,
-            UnsetCertificate.ToBool(), RestartService.ToBool(), EnableException.ToBool(),
-            this,
-            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
-            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug")))
+        // InvokeScopedStreaming, not the buffered InvokeScoped: this command emits one object per
+        // instance inside the loop, and a later instance's Stop-Function -Continue throws under
+        // -EnableException. Buffered would discard the output already produced for earlier instances
+        // (DEF-001); streaming emits each as produced, matching the function world, and preserves a
+        // top-level validation guard's warning through the flow-control unwind.
+        NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
             {
                 NestedCommand.RemoveDuplicateError(this, nestedError);
                 WriteError(NestedCommand.PreserveErrorIdentity(nestedError));
-                continue;
             }
-            WriteObject(item);
-        }
+            else
+            {
+                WriteObject(item);
+            }
+        }, ProcessScript,
+            SqlInstance, Credential, Certificate, Thumbprint,
+            UnsetCertificate.ToBool(), RestartService.ToBool(), EnableException.ToBool(),
+            this,
+            NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
+            NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug"));
     }
 
     private static DbaInstanceParameter[]? DefaultSqlInstance()
