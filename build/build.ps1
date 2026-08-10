@@ -43,6 +43,13 @@ $null = New-Item -ItemType Directory -Path $dbatoolsLibraryDir -Force
 $null = New-Item -ItemType Directory -Path $tempPath -Force
 $null = New-Item -ItemType Directory -Path $publishDir -Force
 
+# Keep the module root diagnosable if a later build step fails.
+Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $dbatoolsLibraryDir -Force
+Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $dbatoolsLibraryDir -Force
+Copy-Item -Path (Join-Path $root "dbatools.library.CoreRedirector.cs") -Destination $dbatoolsLibraryDir -Force
+Copy-Item -Path (Join-Path $root "LICENSE") -Destination $dbatoolsLibraryDir -Force -ErrorAction SilentlyContinue
+Write-Host "Copied module files to artifacts/dbatools.library" -ForegroundColor Green
+
 Write-Host "Created centralized build directory at: $artifactsDir" -ForegroundColor Cyan
 Write-Host "All build artifacts will be placed in this directory to keep the root clean." -ForegroundColor Yellow
 Push-Location "$root\project"
@@ -317,13 +324,6 @@ if ($v6Unsafe) {
 } else {
     Write-Warning "Could not find System.Runtime.CompilerServices.Unsafe v6.0.0.0 in NuGet cache"
 }
-
-# Copy root module files
-Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $dbatoolsLibraryDir -Force
-Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $dbatoolsLibraryDir -Force
-Copy-Item -Path (Join-Path $root "dbatools.library.CoreRedirector.cs") -Destination $dbatoolsLibraryDir -Force
-Copy-Item -Path (Join-Path $root "LICENSE") -Destination $dbatoolsLibraryDir -Force -ErrorAction SilentlyContinue
-Write-Host "Copied module files to artifacts/dbatools.library" -ForegroundColor Green
 
 # Copy third-party-licenses
 $licensePath = Join-Path $dbatoolsLibraryDir "third-party-licenses"
