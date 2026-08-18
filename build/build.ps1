@@ -32,8 +32,70 @@ $tempPath = Join-Path $artifactsDir "temp"
 $publishDir = Join-Path $artifactsDir "publish"
 $licensePath = Join-Path $dbatoolsLibraryDir "third-party-licenses"
 
+function Test-StagedDllWritable {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+    try {
+        $stream = [System.IO.File]::Open($Path, "Open", "ReadWrite", "None")
+        $stream.Close()
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Get-StagedDllHolder {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+    foreach ($proc in (Get-Process -ErrorAction SilentlyContinue)) {
+        try {
+            $loaded = @($proc.Modules | Where-Object { $_.FileName -eq $Path })
+            if ($loaded.Count -eq 0) {
+                continue
+            }
+            $started = "unknown"
+            try {
+                if ($proc.StartTime) {
+                    $started = $proc.StartTime
+                }
+            } catch {
+                # Keep the holder when its start time cannot be read.
+            }
+        } catch {
+            # The lock check already proved that this file is unavailable; attribution is best effort.
+            continue
+        }
+        [PSCustomObject]@{
+            Id      = $proc.Id
+            Name    = $proc.ProcessName
+            Started = $started
+        }
+    }
+}
+
 # Clean up previous build artifacts
 if (Test-Path $artifactsDir) {
+    $lockedDlls = @(Get-ChildItem -Path $dbatoolsLibraryDir -Filter "*.dll" -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { -not (Test-StagedDllWritable -Path $_.FullName) })
+    if ($lockedDlls.Count -gt 0) {
+        Write-Host "ERROR: refusing to clean retained artifacts because DLLs are held by live processes:" -ForegroundColor Red
+        foreach ($lockedDll in $lockedDlls) {
+            Write-Host "  $($lockedDll.FullName)" -ForegroundColor Red
+            $holders = @(Get-StagedDllHolder -Path $lockedDll.FullName)
+            if ($holders.Count -eq 0) {
+                Write-Host "    no holder could be attributed - it is likely held under another user account." -ForegroundColor Red
+                continue
+            }
+            foreach ($holder in $holders) {
+                Write-Host "    $($holder.Name) pid=$($holder.Id) started=$($holder.Started)" -ForegroundColor Red
+            }
+        }
+        exit 1
+    }
     Remove-Item -Path $artifactsDir -Recurse -ErrorAction SilentlyContinue
 }
 
