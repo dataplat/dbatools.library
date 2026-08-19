@@ -575,6 +575,261 @@ else
     fail "leg L: campaign-root file no longer resolves (scope regression)"
 fi
 
+# ---- leg W: one AUTOMATIC round per session, and the free block still BLOCKS -
+# The value of step 4a is that it moved the SPEND without moving the GATE, so
+# both halves get asserted separately: a leg that only checked "no second codex
+# call" would pass just as well if the hook had started allowing the turn, which
+# is the bypass this campaign keeps re-learning.
+printf 'function Get-Thing { 4 } # SENTINEL_W1\n' > "$REPO/thing.ps1"
+printf '%s\n' "$REPO/thing.ps1" > "$STATE/legW.txt"
+printf '%s\t%s\t%s\n' "$BASE" "$ORIGIN_URL" "$REPO" > "$STATE/legW.repos"
+export CODEX_STUB_VERDICT=CHANGES_REQUESTED
+
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW1.txt"
+run_hook legW
+if [[ "$OUT" == *'"decision":"block"'* && -e "$WORK/promptW1.txt" ]]; then
+    pass "leg W: round 1 spends the automatic codex call and blocks"
+else
+    fail "leg W: round 1 did not review-and-block -- the rest of this leg proves nothing"
+fi
+
+# Round 2, same diff: the gate must hold, and it must hold for free.
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW2.txt"
+run_hook legW
+if [[ "$OUT" == *'"decision":"block"'* ]]; then
+    pass "leg W: round 2 still BLOCKS -- moving the spend did not reopen the bypass"
+else
+    fail "leg W: round 2 allowed the turn to end with no CLEAN verdict -- this is the removed per-diff bypass, back again"
+fi
+if [[ -e "$WORK/promptW2.txt" ]]; then
+    fail "leg W: round 2 called codex anyway -- the automatic-round budget does nothing"
+else
+    pass "leg W: round 2 called no codex -- the block is free"
+fi
+RECHECK_PATH=$(printf '%s' "$OUT" | grep -o '[^ "\\]*_codex-review\.recheck' | head -1)
+if [[ -n "$RECHECK_PATH" ]]; then
+    pass "leg W: the block names the recheck marker to touch"
+else
+    fail "leg W: the block did not name a recheck path -- there is no way out of it"
+fi
+
+# Perturbation control for the assertion above. "No codex call" is also what the
+# clean cache and every early exit produce, so the silence has to be shown to
+# come from the budget marker specifically: remove it, replay the SAME round,
+# and codex must run again. Without this, leg W would pass unchanged against a
+# build with step 4a deleted.
+AUTOSPENT_PATH="${RECHECK_PATH%.recheck}.autospent"
+if [[ -f "$AUTOSPENT_PATH" ]]; then
+    mv "$AUTOSPENT_PATH" "$AUTOSPENT_PATH.parked"
+    export CODEX_STUB_PROMPT_FILE="$WORK/promptW2c.txt"
+    run_hook legW
+    if [[ -e "$WORK/promptW2c.txt" ]]; then
+        pass "leg W control: with the budget marker gone the same round reviews again -- the silence above was the budget, not a cache"
+    else
+        fail "leg W control: the round stayed silent with no budget marker, so leg W is measuring something else entirely and cannot fail"
+    fi
+    rm -f "$AUTOSPENT_PATH.parked"
+else
+    fail "leg W control: no budget marker was written, so the free block is UNEXPLAINED and its assertion is unverified"
+fi
+
+# A NEW diff must not buy a fresh automatic round: "runs once" is per session,
+# and the cumulative payload means every turn's diff is a new one.
+printf 'function Get-Thing { 5 } # SENTINEL_W3\n' > "$REPO/thing.ps1"
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW3.txt"
+run_hook legW
+if [[ "$OUT" == *'"decision":"block"'* && ! -e "$WORK/promptW3.txt" ]]; then
+    pass "leg W: a changed diff does not buy another automatic round"
+else
+    fail "leg W: a changed diff bought a fresh codex call -- the budget is per-diff, so it caps nothing"
+fi
+
+# The recheck marker is the way out, and it must be consumed by the round it buys.
+if [[ -n "$RECHECK_PATH" ]]; then
+    : > "$RECHECK_PATH"
+    export CODEX_STUB_PROMPT_FILE="$WORK/promptW4.txt"
+    export CODEX_STUB_VERDICT=CLEAN
+    run_hook legW
+    if [[ -e "$WORK/promptW4.txt" ]]; then
+        pass "leg W: touching the recheck marker runs a full review"
+    else
+        fail "leg W: the recheck marker did not trigger a review -- the block is inescapable"
+    fi
+    if [[ "$OUT" != *'"decision":"block"'* ]]; then
+        pass "leg W: a CLEAN recheck releases the turn"
+    else
+        fail "leg W: a CLEAN recheck still blocked"
+    fi
+    if [[ ! -e "$RECHECK_PATH" ]]; then
+        pass "leg W: the marker is consumed, so one touch buys one round"
+    else
+        fail "leg W: the marker survived its round -- one touch re-enables automatic reviews for the rest of the session"
+    fi
+else
+    fail "leg W: no recheck path to exercise, so the escape hatch is UNVERIFIED on this run"
+fi
+git -C "$REPO" checkout -q -- thing.ps1
+unset CODEX_STUB_VERDICT CODEX_STUB_PROMPT_FILE
+
+# ---- leg W2: a planted symlink .autospent must not become a write-through ----
+# Same class leg P covers for .fail markers. The path is predictable and lives
+# under a world-writable temp root, so a plain redirect would follow the link and
+# overwrite whatever it names. Two halves, because either alone passes on a build
+# that got the other wrong: nothing may be written THROUGH the link, and the link
+# must not read as a spent budget (which would buy a free block with no review).
+printf 'function Get-Thing { 6 } # SENTINEL_W2A\n' > "$REPO/thing.ps1"
+printf '%s\n' "$REPO/thing.ps1" > "$STATE/legW2.txt"
+printf '%s\t%s\t%s\n' "$BASE" "$ORIGIN_URL" "$REPO" > "$STATE/legW2.repos"
+export CODEX_STUB_VERDICT=CHANGES_REQUESTED
+
+# Round 1 spends the budget honestly, so the marker path is the live one. Round 2
+# is what NAMES it: round 1's block is the ordinary findings block, and only the
+# already-spent block prints the recheck path.
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW2a.txt"
+run_hook legW2
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW2a2.txt"
+run_hook legW2
+W2_RECHECK=$(printf '%s' "$OUT" | grep -o '[^ "\\]*_codex-review\.recheck' | head -1)
+W2_AUTOSPENT="${W2_RECHECK%.recheck}.autospent"
+if [[ -n "$W2_RECHECK" && -f "$W2_AUTOSPENT" ]]; then
+    pass "leg W2 setup: round 1 spent the budget and wrote a real marker"
+else
+    fail "leg W2 setup: no budget marker was written, so the symlink legs below prove nothing"
+fi
+
+# Replace the real marker with a symlink at an absent target and force a write.
+rm -f "$W2_AUTOSPENT"
+ln -s "$WORK/evil-autospent-target" "$W2_AUTOSPENT"
+: > "$W2_RECHECK"
+printf 'function Get-Thing { 7 } # SENTINEL_W2B\n' > "$REPO/thing.ps1"
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW2b.txt"
+run_hook legW2
+if [[ ! -e "$WORK/evil-autospent-target" ]]; then
+    pass "leg W2: mark_autospent refused to write through the planted symlink"
+else
+    fail "leg W2: mark_autospent wrote through a symlinked marker -- arbitrary file overwrite"
+fi
+if [[ "$OUT" == *'"decision":"block"'* ]]; then
+    pass "leg W2: the turn still BLOCKS with an untrustworthy budget marker"
+else
+    fail "leg W2: a hostile marker released the turn"
+fi
+
+# The link must not read as a spent budget. With it in place and no recheck
+# marker, the round must still REVIEW rather than take the free-block branch.
+rm -f "$W2_RECHECK"
+rm -f "$W2_AUTOSPENT"
+ln -s "$WORK/evil-autospent-target2" "$W2_AUTOSPENT"
+printf 'function Get-Thing { 8 } # SENTINEL_W2C\n' > "$REPO/thing.ps1"
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW2c2.txt"
+run_hook legW2
+if [[ -e "$WORK/promptW2c2.txt" ]]; then
+    pass "leg W2: a symlinked marker does not read as a spent budget -- the review still runs"
+else
+    fail "leg W2: a planted symlink bought a free block with no review -- the check was made unable to run"
+fi
+rm -f "$W2_AUTOSPENT"
+git -C "$REPO" checkout -q -- thing.ps1
+unset CODEX_STUB_VERDICT CODEX_STUB_PROMPT_FILE
+
+# ---- leg W3: a DIRECTORY at the marker path must be refused, not filled ------
+# `mv -f file dir` moves the file INSIDE dir rather than failing, so a rename-
+# based marker write leaves the marker unwritten AND litters the path. The
+# emptiness assertion is the load-bearing one: the other two pass just as well on
+# a build that quietly deposited a file in there, which is how this shipped once.
+printf 'function Get-Thing { 9 } # SENTINEL_W3A\n' > "$REPO/thing.ps1"
+printf '%s\n' "$REPO/thing.ps1" > "$STATE/legW3.txt"
+printf '%s\t%s\t%s\n' "$BASE" "$ORIGIN_URL" "$REPO" > "$STATE/legW3.repos"
+export CODEX_STUB_VERDICT=CHANGES_REQUESTED
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW3a.txt"
+run_hook legW3
+export CODEX_STUB_PROMPT_FILE="$WORK/promptW3a2.txt"
+run_hook legW3
+W3_RECHECK=$(printf '%s' "$OUT" | grep -o '[^ "\\]*_codex-review\.recheck' | head -1)
+W3_AUTOSPENT="${W3_RECHECK%.recheck}.autospent"
+if [[ -n "$W3_RECHECK" ]]; then
+    rm -f "$W3_AUTOSPENT"
+    mkdir -p "$W3_AUTOSPENT"          # a directory: -f is false, writing to it fails
+    printf 'function Get-Thing { 10 } # SENTINEL_W3B\n' > "$REPO/thing.ps1"
+    export CODEX_STUB_PROMPT_FILE="$WORK/promptW3b.txt"
+    run_hook legW3
+    if [[ -e "$WORK/promptW3b.txt" ]]; then
+        pass "leg W3: an unwritable marker does not suppress the review itself"
+    else
+        fail "leg W3: no review ran, so this leg is measuring the wrong thing"
+    fi
+    if [[ "$OUT" == *'CANNOT BOUND ITS ROUNDS'* && "$OUT" == *'"decision":"block"'* ]]; then
+        pass "leg W3: the block says the round could not be recorded, and still blocks"
+    else
+        fail "leg W3: the marker write failed silently -- the next turn spends another review with no warning"
+    fi
+    if rmdir "$W3_AUTOSPENT" 2>/dev/null; then
+        pass "leg W3: the directory was left EMPTY -- nothing was moved inside it"
+    else
+        fail "leg W3: the marker write deposited a file INSIDE the directory -- unwritten marker plus a littered path"
+    fi
+else
+    fail "leg W3: no marker path resolved, so directory-marker handling is UNVERIFIED on this run"
+fi
+git -C "$REPO" checkout -q -- thing.ps1
+unset CODEX_STUB_VERDICT CODEX_STUB_PROMPT_FILE
+
+# ---- leg W4: the marker rename must never dereference a symlink -------------
+# The -L pre-check cannot close a swap that lands AFTER it; no pre-check can.
+# What makes that window harmless is that the rename itself cannot follow a link,
+# so THAT is what gets asserted here.
+#
+# The race is not reproducible in a fixture - there is no way to land a swap
+# between two adjacent shell commands on demand - and this leg does not pretend
+# otherwise. It proves the property the window depends on, on this box.
+MVDIR="$WORK/mvT"
+rm -rf "$MVDIR"; mkdir -p "$MVDIR/victim"
+printf 'payload' > "$MVDIR/src"
+ln -s "$MVDIR/victim" "$MVDIR/link"
+if mv -fT "$MVDIR/src" "$MVDIR/link" 2>/dev/null &&
+   [[ -z "$(ls -A "$MVDIR/victim" 2>/dev/null)" && ! -L "$MVDIR/link" && -f "$MVDIR/link" ]]; then
+    pass "leg W4: the rename replaces a symlink-to-directory instead of writing into it"
+else
+    fail "leg W4: the rename dereferenced a symlinked directory on this box -- the marker write has no safe form here"
+fi
+
+# Negative control. Without it the assertion above would pass just as well on a
+# box where NOTHING dereferences, proving nothing about why -T is there.
+rm -rf "$MVDIR"; mkdir -p "$MVDIR/victim"
+printf 'payload' > "$MVDIR/src"
+ln -s "$MVDIR/victim" "$MVDIR/link"
+mv -f "$MVDIR/src" "$MVDIR/link" 2>/dev/null
+if [[ -e "$MVDIR/victim/src" ]]; then
+    pass "leg W4 control: the same rename WITHOUT -T does write through the symlink"
+else
+    fail "leg W4 control: plain mv did not dereference either, so leg W4 is not measuring the flag at all"
+fi
+
+# Function level: mark_autospent driven directly at a symlinked marker path.
+rm -rf "$MVDIR"; mkdir -p "$MVDIR/victim"
+eval "$(awk '/^mark_autospent\(\) \{/,/^\}$/' "$HOOK_DIR/stop-codex-review.sh")"
+if declare -f mark_autospent >/dev/null 2>&1; then
+    AUTOSPENT_FILE="$MVDIR/marker"
+    PAYLOAD_HASH="deadbeefdeadbeef"
+    AUTOSPENT_WARN=""
+    ln -s "$MVDIR/victim" "$AUTOSPENT_FILE"
+    mark_autospent
+    if [[ -z "$(ls -A "$MVDIR/victim" 2>/dev/null)" ]]; then
+        pass "leg W4: mark_autospent put nothing inside the directory a symlinked marker pointed at"
+    else
+        fail "leg W4: mark_autospent wrote into the directory behind a symlinked marker"
+    fi
+    if [[ "$AUTOSPENT_WARN" == *'CANNOT BOUND ITS ROUNDS'* ]]; then
+        pass "leg W4: and it said out loud that the round could not be recorded"
+    else
+        fail "leg W4: the marker write failed silently at a symlinked path"
+    fi
+    unset AUTOSPENT_FILE PAYLOAD_HASH AUTOSPENT_WARN
+else
+    fail "leg W4: mark_autospent could not be extracted, so the function-level half did not run"
+fi
+rm -rf "$MVDIR"
+
 # ---- leg R: a lock cleared during the FINAL wait must read as cleared -------
 # Function-level: wait_for_index_locks is extracted verbatim; the lock is
 # removed ~12s in, inside the third 5s wait, so only a rescan AFTER that wait
