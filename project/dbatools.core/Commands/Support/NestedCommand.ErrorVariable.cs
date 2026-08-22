@@ -9,6 +9,14 @@ namespace Dataplat.Dbatools.Commands;
 internal static partial class NestedCommand
 {
     /// <summary>
+    /// Opens the existing error-variable reconciliation around a native cmdlet invocation.
+    /// </summary>
+    internal static IDisposable CreateErrorVariableBridge(PSCmdlet host)
+    {
+        return new ErrorVariableBridge(host);
+    }
+
+    /// <summary>
     /// DEF-013 residual: Stop-Function's non-EnableException path emits its error records as
     /// `$null = Write-Error ... 2&gt;&amp;1` — bookkeeping-only by design (the dbatools source
     /// comment says the point is that "the error is stored in the $error variable"). Such a

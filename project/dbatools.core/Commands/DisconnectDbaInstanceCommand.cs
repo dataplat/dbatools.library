@@ -48,6 +48,7 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
 
     protected override void EndProcessing()
     {
+        using IDisposable errorVariableBridge = NestedCommand.CreateErrorVariableBridge(this);
         foreach (object? inputItem in _objects)
         {
             // PS: if ($object.ConnectionObject) { $servers = $object.ConnectionObject } else { $servers = $object }
@@ -128,7 +129,6 @@ public sealed class DisconnectDbaInstanceCommand : DbaBaseCmdlet
                 {
                     // PS: Stop-Function -Message "Failed to disconnect $object" -ErrorRecord $PSItem -Continue
                     StopFunction($"Failed to disconnect {PsInterpolate(inputItem)}",
-                        target: inputItem,
                         errorRecord: new ErrorRecord(ex, "Disconnect-DbaInstance", ErrorCategory.NotSpecified, inputItem),
                         continueLoop: true);
                     continue;
