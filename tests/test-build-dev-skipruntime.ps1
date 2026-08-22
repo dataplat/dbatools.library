@@ -283,6 +283,9 @@ try {
     #     read the instrument it was written against - it would have passed just as well against a
     #     wrong instrument. The two timestamp legs below exist because that wrong instrument, an mtime
     #     compare, is silent on both of them.
+    # The marker may only waive a byte mismatch while the base source remains exactly the committed
+    # tree it records. Make this sandbox source dirty before exercising real changed-source skew.
+    Set-Content -Path $sandbox.SourceFile -Value "// changed source" -Encoding Ascii
     $builtItem = Get-Item -LiteralPath $builtRuntime
     $stagedItem = Get-Item -LiteralPath $stagedCore
     $pristineBuilt = Get-Content -Path $builtRuntime -Raw

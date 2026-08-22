@@ -111,6 +111,7 @@ function New-BuildDevSandbox {
     }
     $sandboxScript = Join-Path -Path $sandboxBuild -ChildPath "build-dev.ps1"
     Copy-Item -Path $ScriptSource -Destination $sandboxScript -Force
+    Copy-Item -Path (Join-Path (Split-Path $ScriptSource) "BuildDevSourceIdentity.ps1") -Destination $sandboxBuild -Force
 
     # A fake dotnet on PATH plus a minimal project tree. Without them the script cannot get past
     # Push-Location, so a -SkipRuntime leg could only assert "no lock error" - which passes just as
@@ -132,6 +133,18 @@ function New-BuildDevSandbox {
         $null = New-Item -ItemType Directory -Path $projDir -Force
         Set-Content -Path (Join-Path -Path $projDir -ChildPath "$proj.csproj") -Value "<Project />" -Encoding Ascii
     }
+    $sourceFile = Join-Path -Path $sandboxProject -ChildPath "dbatools/source.cs"
+    Set-Content -Path $sourceFile -Value "// committed sandbox source" -Encoding Ascii
+    & git -C $RunDir init --quiet
+    & git -C $RunDir config user.email "build-dev-test@example.invalid"
+    & git -C $RunDir config user.name "build-dev test"
+    & git -C $RunDir add project/dbatools
+    & git -C $RunDir commit --quiet -m "sandbox source"
+    if ($LASTEXITCODE -ne 0) { throw "Could not initialize disposable Git repository." }
+    $tree = (& git -C $RunDir rev-parse "HEAD:project/dbatools").Trim()
+    foreach ($staged in @($stagedCore, $stagedDesktop)) {
+        @{ Version = 1; Tree = $tree } | ConvertTo-Json -Compress | Set-Content -LiteralPath "$staged.source-identity.json" -Encoding UTF8
+    }
     # The script verifies each build's output exists before staging it, so a fake compiler that
     # writes nothing needs these seeded in the exact locations the real projects emit to.
     $builtRuntime = Join-Path -Path $RunDir -ChildPath "artifacts/lib/Release/net8.0/dbatools.dll"
@@ -149,5 +162,6 @@ function New-BuildDevSandbox {
         BuiltRuntime    = $builtRuntime
         BuiltSatellite  = $builtSatellite
         StagedSatellite = Join-Path -Path $RunDir -ChildPath "artifacts/modules/dbatools.fake/core/dbatools.fake.dll"
+        SourceFile      = $sourceFile
     }
 }

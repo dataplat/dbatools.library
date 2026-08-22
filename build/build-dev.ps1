@@ -49,6 +49,7 @@ if (-not $scriptroot) {
     $scriptroot = Split-Path -Path $MyInvocation.MyCommand.Path
 }
 $root = Split-Path -Path $scriptroot
+. (Join-Path -Path $scriptroot -ChildPath "BuildDevSourceIdentity.ps1")
 $projectRoot = Join-Path -Path $root -ChildPath "project"
 $artifactsDir = Join-Path -Path $root -ChildPath "artifacts"
 $moduleDir = Join-Path -Path $artifactsDir -ChildPath "dbatools.library"
@@ -190,6 +191,12 @@ try {
         }
         $targetDll = Join-Path -Path $moduleDir -ChildPath "$($edition.Name)/lib/dbatools.dll"
         Copy-Item -Path $builtDll -Destination $targetDll -Force
+        $identity = Get-BuildDevSourceIdentity -Root $root
+        if ($null -eq $identity) {
+            Write-Host "ERROR: cannot record source identity for $($edition.Name) runtime staging." -ForegroundColor Red
+            exit 1
+        }
+        Write-BuildDevSourceIdentity -StagedDll $targetDll -Identity $identity
         Write-Host "Staged runtime: $($edition.Name)/lib/dbatools.dll" -ForegroundColor Green
     }
 
@@ -286,6 +293,11 @@ if ($SkipRuntime -and -not $SkipSatellites) {
         }
     }
     if ($skewed.Count -gt 0) {
+        $identity = Get-BuildDevSourceIdentity -Root $root
+        $verified = @($skewed | Where-Object { Test-BuildDevSourceIdentity -StagedDll (Join-Path -Path $moduleDir -ChildPath "$($_.Edition)/lib/dbatools.dll") -CurrentIdentity $identity })
+        if ($verified.Count -eq $skewed.Count) {
+            Write-Host "-SkipRuntime accepts byte-different runtime output: staged bases match the current clean source identity." -ForegroundColor Green
+        } else {
         Write-Host "ERROR: -SkipRuntime staged satellites built against a runtime that DIFFERS from the staged base dbatools.dll:" -ForegroundColor Red
         foreach ($skew in $skewed) {
             Write-Host "  $($skew.Edition): built $($skew.Built.Substring(0, 16))..., staged $($skew.Staged.Substring(0, 16))..." -ForegroundColor Red
@@ -295,6 +307,7 @@ if ($SkipRuntime -and -not $SkipSatellites) {
         Write-Host "  Free the holder named above and re-run without -SkipRuntime." -ForegroundColor Yellow
         Write-Host "  Nothing was staged - the satellites built above are still only in project/*/bin/." -ForegroundColor Yellow
         exit 1
+        }
     }
 }
 
