@@ -7,6 +7,7 @@ $PSDefaultParameterValues["*:Confirm"] = $false
 $ProgressPreference = "SilentlyContinue"
 # Import MSI waiting functions
 . "$PSScriptRoot\Wait-MsiInstall.ps1"
+. "$PSScriptRoot\Copy-LockedArtifact.ps1"
 
 # Get script root and project root
 $scriptroot = $PSScriptRoot
@@ -106,10 +107,10 @@ $null = New-Item -ItemType Directory -Path $tempPath -Force
 $null = New-Item -ItemType Directory -Path $publishDir -Force
 
 # Keep the module root diagnosable if a later build step fails.
-Copy-Item -Path (Join-Path $root "dbatools.library.psd1") -Destination $dbatoolsLibraryDir -Force
-Copy-Item -Path (Join-Path $root "dbatools.library.psm1") -Destination $dbatoolsLibraryDir -Force
-Copy-Item -Path (Join-Path $root "dbatools.library.CoreRedirector.cs") -Destination $dbatoolsLibraryDir -Force
-Copy-Item -Path (Join-Path $root "LICENSE") -Destination $dbatoolsLibraryDir -Force -ErrorAction SilentlyContinue
+Copy-LockedArtifact -Source (Join-Path $root "dbatools.library.psd1") -Destination (Join-Path $dbatoolsLibraryDir "dbatools.library.psd1")
+Copy-LockedArtifact -Source (Join-Path $root "dbatools.library.psm1") -Destination (Join-Path $dbatoolsLibraryDir "dbatools.library.psm1")
+Copy-LockedArtifact -Source (Join-Path $root "dbatools.library.CoreRedirector.cs") -Destination (Join-Path $dbatoolsLibraryDir "dbatools.library.CoreRedirector.cs")
+Copy-LockedArtifact -Source (Join-Path $root "LICENSE") -Destination (Join-Path $dbatoolsLibraryDir "LICENSE") -IgnoreMissingSource
 Write-Host "Copied module files to artifacts/dbatools.library" -ForegroundColor Green
 
 Write-Host "Created centralized build directory at: $artifactsDir" -ForegroundColor Cyan
@@ -137,7 +138,7 @@ if ($LASTEXITCODE -ne 0) {
 # Copy desktop publish output preserving structure
 Write-Host "Copying .NET Framework output with preserved structure..."
 $null = New-Item -ItemType Directory -Path (Join-Path $libPath "desktop/lib") -Force
-Copy-Item -Path "$tempDesktopPublish\*" -Destination (Join-Path $libPath "desktop/lib") -Recurse -Force
+Copy-LockedArtifactTree -Source $tempDesktopPublish -Destination (Join-Path $libPath "desktop/lib")
 
 
 # Verify and patch desktop publish output
@@ -154,7 +155,7 @@ if ($LASTEXITCODE -ne 0) {
 # Copy core publish output preserving structure
 Write-Host "Copying .NET 8 output with preserved structure..."
 $null = New-Item -ItemType Directory -Path (Join-Path $libPath "core/lib") -Force
-Copy-Item -Path "$tempCorePublish\*" -Destination (Join-Path $libPath "core/lib") -Recurse -Force
+Copy-LockedArtifactTree -Source $tempCorePublish -Destination (Join-Path $libPath "core/lib")
 
 # Verify and organize runtime dependencies
 Write-Host "Verifying .NET 8 runtime dependencies..."
@@ -184,7 +185,7 @@ if (Test-Path $coreRuntimesPath) {
                 $sourcePath = $_.FullName
                 $destPath = Join-Path $desktopArchPath $_.Name
 
-                Copy-Item $sourcePath -Destination $destPath -Force
+                Copy-LockedArtifact -Source $sourcePath -Destination $destPath
                 Write-Host "  Copied: $($_.Name)" -ForegroundColor Green
             }
 
@@ -234,15 +235,15 @@ foreach ($satellite in $satelliteProjects) {
     $moduleStage = Join-Path $artifactsDir "modules/$satelliteName"
     $null = New-Item -ItemType Directory -Path (Join-Path $moduleStage "desktop") -Force
     $null = New-Item -ItemType Directory -Path (Join-Path $moduleStage "core") -Force
-    Copy-Item "$satelliteName/bin/release/net472/$satelliteName.dll" -Destination (Join-Path $moduleStage "desktop") -Force
-    Copy-Item "$satelliteName/bin/release/net8.0/$satelliteName.dll" -Destination (Join-Path $moduleStage "core") -Force
+    Copy-LockedArtifact -Source "$satelliteName/bin/release/net472/$satelliteName.dll" -Destination (Join-Path $moduleStage "desktop/$satelliteName.dll")
+    Copy-LockedArtifact -Source "$satelliteName/bin/release/net8.0/$satelliteName.dll" -Destination (Join-Path $moduleStage "core/$satelliteName.dll")
     # dll-Help.xml (MAML) is generated only from the net8.0 build (CmdletHelp.props) but is
     # target-framework independent - the same cmdlets carry the same help on both editions - so
     # the one file is staged beside the assembly in BOTH desktop and core.
     $helpFile = "$satelliteName/bin/release/net8.0/$satelliteName.dll-Help.xml"
     if (Test-Path $helpFile) {
-        Copy-Item $helpFile -Destination (Join-Path $moduleStage "desktop") -Force
-        Copy-Item $helpFile -Destination (Join-Path $moduleStage "core") -Force
+        Copy-LockedArtifact -Source $helpFile -Destination (Join-Path $moduleStage "desktop/$satelliteName.dll-Help.xml")
+        Copy-LockedArtifact -Source $helpFile -Destination (Join-Path $moduleStage "core/$satelliteName.dll-Help.xml")
         Write-Host "Staged satellite: $satelliteName (desktop + core + help)" -ForegroundColor Green
     } else {
         Write-Host "WARNING: no dll-Help.xml generated for $satelliteName" -ForegroundColor Yellow
@@ -321,9 +322,9 @@ Write-Host "Copying Bogus.dll..." -ForegroundColor Green
 # returns earlier), so the package is always expected to carry it. Warning and carrying on produced
 # a drop with no Bogus.dll in it and still exited 0, which reads as a successful build.
 if (Test-Path (Join-Path $tempPath "bogus/lib/net40/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net40/bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
+    Copy-LockedArtifact -Source (Join-Path $tempPath "bogus/lib/net40/bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll")
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/net40/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net40/Bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
+    Copy-LockedArtifact -Source (Join-Path $tempPath "bogus/lib/net40/Bogus.dll") -Destination (Join-Path $libPath "desktop/third-party/bogus/Bogus.dll")
 } else {
     throw "Bogus.dll for .NET Framework (net40) not found under $(Join-Path $tempPath "bogus/lib/net40"). The extracted package layout is not what this build expects."
 }
@@ -332,16 +333,16 @@ if (Test-Path (Join-Path $tempPath "bogus/lib/net40/bogus.dll")) {
 $bogusCoreCopied = $false
 # Try net6.0 first (both lowercase and uppercase)
 if (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
+    Copy-LockedArtifact -Source (Join-Path $tempPath "bogus/lib/net6.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll")
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
+    Copy-LockedArtifact -Source (Join-Path $tempPath "bogus/lib/net6.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll")
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
+    Copy-LockedArtifact -Source (Join-Path $tempPath "bogus/lib/netstandard2.0/bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll")
     $bogusCoreCopied = $true
 } elseif (Test-Path (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll")) {
-    Copy-Item (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll") -Force -ErrorAction Stop
+    Copy-LockedArtifact -Source (Join-Path $tempPath "bogus/lib/netstandard2.0/Bogus.dll") -Destination (Join-Path $libPath "core/third-party/bogus/Bogus.dll")
     $bogusCoreCopied = $true
 }
 
@@ -356,12 +357,12 @@ if (-not $bogusCoreCopied) {
 Write-Host "Copying additional assemblies from var/misc..."
 # Copy files that go to both core and desktop
 Get-ChildItem "./var/misc/both" -Filter "*.dll" | ForEach-Object {
-    Copy-Item $_.FullName -Destination (Join-Path $libPath "core/lib/") -Force
-    Copy-Item $_.FullName -Destination (Join-Path $libPath "desktop/lib/") -Force
+    Copy-LockedArtifact -Source $_.FullName -Destination (Join-Path $libPath "core/lib/$($_.Name)")
+    Copy-LockedArtifact -Source $_.FullName -Destination (Join-Path $libPath "desktop/lib/$($_.Name)")
 }
 
 # Copy desktop-specific files
-Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | Copy-Item -Destination (Join-Path $libPath "desktop/lib/") -Force
+Get-ChildItem "./var/misc/desktop" -Filter "*.dll" | ForEach-Object { Copy-LockedArtifact -Source $_.FullName -Destination (Join-Path $libPath "desktop/lib/$($_.Name)") }
 
 # Cleanup temporary files and artifacts
 Write-Host "Cleaning up temporary files..."
@@ -374,15 +375,15 @@ $null = New-Item -ItemType Directory -Path (Join-Path $libPath "desktop/lib/v6")
 
 # Copy v4.0.4.1 version from var/misc/desktop to desktop/v4
 Write-Host "Copying System.Runtime.CompilerServices.Unsafe v4.0.4.1 for SMO..."
-Copy-Item -Path "./var/misc/desktop/System.Runtime.CompilerServices.Unsafe.dll" -Destination (Join-Path $libPath "desktop/v4/") -Force
+Copy-LockedArtifact -Source "./var/misc/desktop/System.Runtime.CompilerServices.Unsafe.dll" -Destination (Join-Path $libPath "desktop/v4/System.Runtime.CompilerServices.Unsafe.dll")
 
 # Copy v6.0.0.0 version from NuGet cache to desktop/lib/v6 and core/lib
 Write-Host "Copying System.Runtime.CompilerServices.Unsafe v6.0.0.0 for SSAS..."
 $nugetCache = "$env:USERPROFILE\.nuget\packages";
 $v6Unsafe = Get-ChildItem -Path "$nugetCache\system.runtime.compilerservices.unsafe\*\lib\net6.0\System.Runtime.CompilerServices.Unsafe.dll" -Recurse | Select-Object -Last 1
 if ($v6Unsafe) {
-    Copy-Item -Path $v6Unsafe.FullName -Destination (Join-Path $libPath "core/lib/") -Force
-    Copy-Item -Path $v6Unsafe.FullName -Destination (Join-Path $libPath "desktop/lib/v6/") -Force
+    Copy-LockedArtifact -Source $v6Unsafe.FullName -Destination (Join-Path $libPath "core/lib/System.Runtime.CompilerServices.Unsafe.dll")
+    Copy-LockedArtifact -Source $v6Unsafe.FullName -Destination (Join-Path $libPath "desktop/lib/v6/System.Runtime.CompilerServices.Unsafe.dll")
 } else {
     Write-Warning "Could not find System.Runtime.CompilerServices.Unsafe v6.0.0.0 in NuGet cache"
 }
@@ -392,10 +393,10 @@ $licensePath = Join-Path $dbatoolsLibraryDir "third-party-licenses"
 $null = New-Item -ItemType Directory -Path $licensePath -Force
 
 if (Test-Path (Join-Path $root "var/third-party-licenses")) {
-    Copy-Item -Path (Join-Path $root "var/third-party-licenses/*") -Destination $licensePath -Recurse -Force
+    Copy-LockedArtifactTree -Source (Join-Path $root "var/third-party-licenses") -Destination $licensePath
     Write-Host "Included third-party-licenses in artifacts/dbatools.library" -ForegroundColor Green
 } elseif (Test-Path (Join-Path $artifactsDir "third-party-licenses")) {
-    Copy-Item -Path (Join-Path $artifactsDir "third-party-licenses/*") -Destination $licensePath -Recurse -Force
+    Copy-LockedArtifactTree -Source (Join-Path $artifactsDir "third-party-licenses") -Destination $licensePath
     Write-Host "Included third-party-licenses from artifacts in artifacts/dbatools.library" -ForegroundColor Green
 }
 
