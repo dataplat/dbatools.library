@@ -139,8 +139,8 @@ public sealed class RestartDbaServiceCommand : DbaBaseCmdlet
             return;
 
         foreach (PSObject? item in NestedCommand.InvokeScoped(this, EndScript,
-            InstanceName, Type, Timeout, Credential, Force.ToBool(),
-            EnableException.ToBool(), _state, this,
+            ComputerName, InstanceName, SqlInstance, Type, Timeout, Credential, Force.ToBool(),
+            EnableException.ToBool(), ParameterSetName, _state, this,
             NestedCommand.BoundCommonParameter(this, "WhatIf"), NestedCommand.BoundCommonParameter(this, "Confirm"),
             NestedCommand.BoundCommonParameter(this, "Verbose"), NestedCommand.BoundCommonParameter(this, "Debug")))
         {
@@ -169,17 +169,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     $processArray = @()
-    $InputObject = $null
-    if ($__parameterSetName -eq "Server") {
-        $serviceParams = @{ ComputerName = $ComputerName }
-        if ($InstanceName) { $serviceParams.InstanceName = $InstanceName }
-        if ($SqlInstance) { $serviceParams.SqlInstance = $SqlInstance }
-        if ($Type) { $serviceParams.Type = $Type }
-        if ($Credential) { $serviceParams.Credential = $Credential }
-        if ($EnableException) { $serviceParams.EnableException = $EnableException }
-        $InputObject = Get-DbaService @serviceParams
-    }
-    @{ __w3084State = @{ processArray = $processArray; beginInputObject = $InputObject } }
+    @{ __w3084State = @{ processArray = $processArray; beginInputObject = $null } }
 } $ComputerName $InstanceName $SqlInstance $Type $Credential $EnableException $__parameterSetName $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 
@@ -210,7 +200,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     // The private Update-ServiceStatus, the "$ProcessArray" gate-target interpolation,
     // and the explicit -EnableException $EnableException Stop-Function ride as-is.
     private const string EndScript = """
-param($InstanceName, $Type, $Timeout, $Credential, $Force, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+param($ComputerName, $InstanceName, $SqlInstance, $Type, $Timeout, $Credential, $Force, $EnableException, $__parameterSetName, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
 $__commonParameters = @{}
 if ($null -ne $__boundWhatIf) { $__commonParameters.WhatIf = [bool]$__boundWhatIf }
 if ($null -ne $__boundConfirm) { $__commonParameters.Confirm = [bool]$__boundConfirm }
@@ -219,7 +209,7 @@ if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -lt 7) { $__com
 $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Script" | Select-Object -First 1
 & $__dbatoolsModule {
     [CmdletBinding(SupportsShouldProcess)]
-    param([string[]]$InstanceName, [string[]]$Type, [int]$Timeout, [PSCredential]$Credential, $Force, $EnableException, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
+    param([Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$ComputerName, [string[]]$InstanceName, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, [string[]]$Type, [int]$Timeout, [PSCredential]$Credential, $Force, $EnableException, $__parameterSetName, $__state, $__realCmdlet, $__boundWhatIf, $__boundConfirm, $__boundVerbose, $__boundDebug)
     if ($null -ne $__boundDebug -and $PSVersionTable.PSVersion.Major -ge 7) { $DebugPreference = $(if ($__boundDebug) { "Continue" } else { "SilentlyContinue" }) }
 
     # ATTRIBUTION SHIM (B batch [P2], the Get-PSCallStack class): Update-ServiceStatus
@@ -255,6 +245,15 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     }
 
     $processArray = $__state.processArray
+    if ($__parameterSetName -eq "Server") {
+        $serviceParams = @{ ComputerName = $ComputerName }
+        if ($InstanceName) { $serviceParams.InstanceName = $InstanceName }
+        if ($SqlInstance) { $serviceParams.SqlInstance = $SqlInstance }
+        if ($Type) { $serviceParams.Type = $Type }
+        if ($Credential) { $serviceParams.Credential = $Credential }
+        if ($EnableException) { $serviceParams.EnableException = $EnableException }
+        $processArray = @(Get-DbaService @serviceParams)
+    }
 
     $processArray = [array]($processArray | Where-Object { (!$InstanceName -or $_.InstanceName -in $InstanceName) -and (!$Type -or $_.ServiceType -in $Type) })
     foreach ($service in $processArray) {
@@ -304,6 +303,6 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     } else {
         Stop-Function -EnableException $EnableException -Message "No SQL Server services found with current parameters." -FunctionName Restart-DbaService
     }
-} $InstanceName $Type $Timeout $Credential $Force $EnableException $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
+} $ComputerName $InstanceName $SqlInstance $Type $Timeout $Credential $Force $EnableException $__parameterSetName $__state $__realCmdlet $__boundWhatIf $__boundConfirm $__boundVerbose $__boundDebug @__commonParameters 3>&1 2>&1
 """;
 }
