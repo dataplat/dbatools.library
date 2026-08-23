@@ -160,7 +160,7 @@ $__dbatoolsModule = Get-Module -Name dbatools | Where-Object ModuleType -eq "Scr
     param($StringBuilder, [Dataplat.Dbatools.Parameter.DbaInstanceParameter[]]$SqlInstance, $SqlCredential, [string[]]$Database, [string[]]$Object, [int]$BatchSize, $EnableException, $results, $__realCmdlet, $__processToken, $__boundObject, $__boundBatchSize)
 
     if (-not $__boundObject) {
-        Stop-Function -Message "You must specify a table or indexed view to execute against using -Object" -FunctionName Invoke-DbaDbDbccCleanTable -ModuleName "dbatools"
+        Stop-Function -Message "You must specify a table or indexed view to execute against using -Object" -FunctionName Invoke-DbaDbDbccCleanTable
         return
     }
     foreach ($instance in $SqlInstance) {
