@@ -7,7 +7,9 @@ function Get-BuildDevSourceIdentity {
     try {
         $tree = (& git -C $Root rev-parse "HEAD:project/dbatools" 2>$null).Trim()
         if ($LASTEXITCODE -ne 0 -or $tree -notmatch '^[0-9a-f]{40}$') { return $null }
-        $changes = @(& git -C $Root status --porcelain --ignored -- project/dbatools 2>$null)
+        # Not --ignored: the runtime build itself leaves project/dbatools/obj/ behind, and counting
+        # that as a source change made the identity unrecordable on every box that had ever built.
+        $changes = @(& git -C $Root status --porcelain -- project/dbatools 2>$null)
         if ($LASTEXITCODE -ne 0 -or $changes.Count -ne 0) { return $null }
         return [PSCustomObject]@{ Version = 1; Tree = $tree }
     } catch {

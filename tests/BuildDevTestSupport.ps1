@@ -135,10 +135,17 @@ function New-BuildDevSandbox {
     }
     $sourceFile = Join-Path -Path $sandboxProject -ChildPath "dbatools/source.cs"
     Set-Content -Path $sourceFile -Value "// committed sandbox source" -Encoding Ascii
+    # Ignored build output under the runtime project, exactly as a real dotnet build leaves it. The
+    # source identity must still be recordable with it present, or no box that has ever built can
+    # stage the runtime.
+    $objDir = Join-Path -Path $sandboxProject -ChildPath "dbatools/obj"
+    $null = New-Item -ItemType Directory -Path $objDir -Force
+    Set-Content -Path (Join-Path -Path $objDir -ChildPath "project.assets.json") -Value "{}" -Encoding Ascii
+    Set-Content -Path (Join-Path -Path $RunDir -ChildPath ".gitignore") -Value "obj/" -Encoding Ascii
     & git -C $RunDir init --quiet
     & git -C $RunDir config user.email "build-dev-test@example.invalid"
     & git -C $RunDir config user.name "build-dev test"
-    & git -C $RunDir add project/dbatools
+    & git -C $RunDir add .gitignore project/dbatools
     & git -C $RunDir commit --quiet -m "sandbox source"
     if ($LASTEXITCODE -ne 0) { throw "Could not initialize disposable Git repository." }
     $tree = (& git -C $RunDir rev-parse "HEAD:project/dbatools").Trim()
