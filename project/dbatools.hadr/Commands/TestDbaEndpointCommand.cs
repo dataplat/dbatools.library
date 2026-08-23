@@ -40,20 +40,9 @@ public sealed class TestDbaEndpointCommand : DbaBaseCmdlet
             return;
         }
 
-        // WHOLE-RECORD hop, the simplest kind: read-only ([CmdletBinding()], NO ShouldProcess),
-        // NO Test-Bound (no bound flags), NO cross-record state. The only process-block parameter
-        // mutation is `$InputObject +=` at :102, targeting the ValueFromPipeline parameter, which
-        // the binder RE-BINDS every record. Both detectors clean; and per the W4-067 DEF-012
-        // lesson I checked the conditionally-assigned locals: $connect/$sslconnect are assigned on
-        // EVERY try/catch path before their read at the output object, and $tcp/$ssl are safe not
-        // by lexical scope (they are process-scoped like the rest) but because every reachable read
-        // is assignment-dominated - a New-Object/assignment precedes it or the failure transfers to
-        // the catch (codex precision) - so no cross-record leak to carry. $EnableException is passed
-        // for consistency though the body has no Stop-Function that reads it.
-        //
-        // T8/DEF-002 on Endpoint [string[]] CLOSED via [PsStringArrayCast]. DEF-001 (weak here -
-        // read-only, TcpClient failures caught locally) closed via InvokeScopedStreaming (ab7492c);
-        // read-only so no WhatIf interaction.
+        // This is a read-only whole-record hop. InputObject is rebound by the pipeline binder for
+        // each record; the process script may append SqlInstance lookups to that record-local input.
+        // The connection locals are assigned on every reachable path before they are emitted.
         NestedCommand.InvokeScopedStreaming(this, item =>
         {
             if (item?.BaseObject is ErrorRecord nestedError)
