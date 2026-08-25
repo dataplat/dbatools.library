@@ -187,7 +187,10 @@ public sealed class FormatDbaBackupInformationCommand : DbaBaseCmdlet
             string originalDb = RestoreUtility.PsStringify(PsProperty.Get(history, "OriginalDatabase"));
             string newDb = RestoreUtility.PsStringify(PsProperty.Get(history, "Database"));
 
-            if (PsProperty.Get(history, "FileList") is IEnumerable fileList and not string)
+            object? fileListValue = PsProperty.Get(history, "FileList");
+            IEnumerable fileList = fileListValue is IEnumerable enumerable and not string
+                ? enumerable
+                : new object?[] { fileListValue };
             {
                 foreach (object? fileRaw in fileList)
                 {
