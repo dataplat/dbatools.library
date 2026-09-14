@@ -118,76 +118,17 @@ Import-Module dbatools.library -ArgumentList @{AvoidConflicts = $true}  # This w
 Import-Module dbatools.library -ArgumentList $true  # This works correctly
 ```
 
-### ⚠️ Important: PowerShell Core + Credentials Issue
+### PowerShell Core + explicit Windows credentials
 
-**If you plan to use SQL Server credentials with PowerShell Core (pwsh), you MUST install to AllUsers scope or grant appropriate permissions.**
+On Windows and .NET 8 or later, dbatools.library uses Microsoft.Data.SqlClient 7's pluggable
+SSPI provider for `Connect-DbaInstance -SqlCredential` Windows authentication. The provider
+negotiates with the supplied Windows credential without SMO's thread-impersonation path. This
+supports non-domain workstations and untrusted-domain scenarios and avoids loading native SNI
+under an impersonated file-system identity.
 
-#### The Issue
-
-When using `-SqlCredential` with PowerShell Core, you may encounter this error:
-
-```
-unable to load DLL 'Microsoft.Data.SqlClient.SNI.dll'
-```
-
-#### Root Cause
-
-This is a **PowerShell Core + Microsoft.Data.SqlClient architectural limitation**, not a bug in dbatools.library:
-
-1. **Credential Impersonation**: When credentials are passed to SQL Server connections, the .NET runtime performs thread-level impersonation using those credentials.
-
-2. **DLL Access Under Impersonation**: During impersonation, `Microsoft.Data.SqlClient` tries to load its native dependency `Microsoft.Data.SqlClient.SNI.dll`, but file system access occurs under the **impersonated credential's security context**, not your current user's context.
-
-3. **Permission Denied**: The impersonated account often lacks read permissions to the module files in your local profile directory (e.g., `C:\Users\<user>\Documents\PowerShell\Modules\`), causing the DLL load to fail.
-
-#### Why Windows PowerShell 5.1 Works
-
-- Uses `System.Data.SqlClient` which is available in the Global Assembly Cache (GAC)
-- Different assembly loading behavior that doesn't trigger the same impersonation/access pattern
-- The native SNI.dll is already loaded system-wide
-
-#### Solutions
-
-**Option 1: Install to AllUsers Scope (Recommended)**
-
-```powershell
-# Uninstall any existing CurrentUser installation first
-Uninstall-Module dbatools.library -Force
-Uninstall-Module dbatools -Force
-
-# Install to AllUsers scope (requires admin on Windows, sudo on Linux/macOS)
-Install-Module dbatools.library -Scope AllUsers
-Install-Module dbatools -Scope AllUsers
-```
-
-This places the module in `C:\Program Files\PowerShell\Modules\` (Windows) or `/usr/local/share/powershell/Modules` (Linux/macOS), which typically has broader read permissions.
-
-**Option 2: Grant Permissions (Windows)**
-
-If you cannot use AllUsers scope, grant the credential account read access to your PowerShell modules folder:
-
-```powershell
-$modulePath = "$env:USERPROFILE\Documents\PowerShell\Modules"
-icacls $modulePath /grant "DOMAIN\User:(OI)(CI)R" /T
-```
-
-**Option 3: Use Windows PowerShell 5.1**
-
-If neither option above works for your environment, use Windows PowerShell instead of PowerShell Core for credential-based connections:
-
-```powershell
-# From Windows PowerShell 5.1
-Import-Module dbatools
-Connect-DbaInstance -SqlInstance server -SqlCredential $cred
-```
-
-#### Additional Notes
-
-- Commands like `Get-DbaDiskSpace -Credential` work fine because they use WinRM/PowerShell Remoting, not SQL Server authentication
-- This issue affects any PowerShell Core module using Microsoft.Data.SqlClient with credentials
-- Related to [PowerShell Issue #11616](https://github.com/PowerShell/PowerShell/issues/11616)
-
-For more details, see [Issue #28](https://github.com/dataplat/dbatools.library/issues/28).
+This path is Windows-only. On Linux and macOS, obtain a Kerberos ticket with `kinit` and use
+integrated authentication instead. Older dbatools.library releases still use SMO
+`ConnectAsUser`; update both dbatools and dbatools.library together to use the SSPI provider.
 
 ## Development
 
@@ -262,10 +203,10 @@ This library includes several major SQL Server components:
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| Microsoft.Data.SqlClient | 6.0.2 | SQL Server connectivity |
-| Microsoft.SqlServer.SqlManagementObjects | 172.76.0 | SQL Server Management Objects (SMO) |
-| Microsoft.SqlServer.DacFx | 170.0.94 | Data-tier Application Framework |
-| Microsoft.AnalysisServices | 19.101.1 | Analysis Services management |
+| Microsoft.Data.SqlClient | 7.0.1 | SQL Server connectivity and pluggable SSPI authentication |
+| Microsoft.SqlServer.SqlManagementObjects | 181.19.0 | SQL Server Management Objects (SMO) |
+| Microsoft.SqlServer.DacFx | 170.3.93 | Data-tier Application Framework |
+| Microsoft.AnalysisServices | 19.113.7 | Analysis Services management |
 | Microsoft.SqlServer.XEvent.XELite | 2024.2.5.1 | Extended Events processing |
 
 ### Standalone Packages

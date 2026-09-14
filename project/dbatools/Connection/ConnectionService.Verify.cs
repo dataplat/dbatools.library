@@ -132,10 +132,12 @@ namespace Dataplat.Dbatools.Connection
             resolution.Instance = instance;
             resolution.IsNewConnection = state.IsNewConnection;
             resolution.IsAzure = state.IsAzure;
+            resolution.UsesCredentialSspiProvider = state.UsesCredentialSspiProvider;
 
             if (request.SqlConnectionOnly)
             {
-                RegisterConnection(server.ConnectionContext.ConnectionString, server.ConnectionContext.SqlConnectionObject, request.MessageCallback);
+                if (!state.UsesCredentialSspiProvider)
+                    RegisterConnection(server.ConnectionContext.ConnectionString, server.ConnectionContext.SqlConnectionObject, request.MessageCallback);
                 Msg(request, MessageLevel.Debug, "We return only SqlConnection in server.ConnectionContext.SqlConnectionObject");
                 resolution.SqlConnection = server.ConnectionContext.SqlConnectionObject;
                 return resolution;
@@ -248,10 +250,12 @@ namespace Dataplat.Dbatools.Connection
                 return;
             if (resolution.IsNewConnection && !request.DedicatedAdminConnection)
             {
-                RegisterInstanceForTepp(resolution.Instance, resolution.Server);
+                if (!resolution.UsesCredentialSspiProvider)
+                    RegisterInstanceForTepp(resolution.Instance, resolution.Server);
                 ApplyDefaultInitFields(resolution.Server, resolution.IsAzure, request.MessageCallback);
             }
-            RegisterConnection(resolution.Server.ConnectionContext.ConnectionString, resolution.Server, request.MessageCallback);
+            if (!resolution.UsesCredentialSspiProvider)
+                RegisterConnection(resolution.Server.ConnectionContext.ConnectionString, resolution.Server, request.MessageCallback);
         }
 
         /// <summary>

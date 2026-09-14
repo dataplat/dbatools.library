@@ -35,6 +35,7 @@ namespace Dataplat.Dbatools.Connection
             public string ServerName;
             public string ConnectionString;
             public bool IsAzure;
+            public bool UsesCredentialSspiProvider = false;
             public Server Server;
         }
 
@@ -720,6 +721,13 @@ namespace Dataplat.Dbatools.Connection
             }
 
             ServerConnection serverConnection;
+            if (authType == "local ad" && String.IsNullOrEmpty(request.AuthenticationType) && Environment.OSVersion.Platform != PlatformID.Win32NT)
+            {
+                // PS: Stop-Function (no -Continue) followed by return - the cmdlet stops
+                // processing the remaining instances, exactly like the PS source did.
+                throw new ConnectionResolutionException(ConnectionResolutionFailure.WindowsCredentialOnUnix,
+                    "Cannot use Windows credentials to connect when host is Linux or OS X. Use kinit instead. See https://github.com/dataplat/dbatools/issues/7602 for more info.", null);
+            }
             // If we have an AccessToken, we will build a SqlConnection
             // PS: if ($AccessToken) - truthiness (finding 3)
             if (LanguagePrimitives.IsTrue(request.AccessToken))
@@ -737,6 +745,17 @@ namespace Dataplat.Dbatools.Connection
                 serverConnection = new ServerConnection(sqlConnection);
                 Msg(request, MessageLevel.Debug, "ServerConnection was built");
             }
+#if NET8_0_OR_GREATER
+            else if (authType == "local ad" && String.IsNullOrEmpty(request.AuthenticationType))
+            {
+                Msg(request, MessageLevel.Debug, "Building SqlConnection with explicit Windows credential SSPI provider");
+                SqlConnection sqlConnection = new SqlConnection(sqlConnectionInfo.ConnectionString);
+                sqlConnection.SspiContextProvider = new NetworkCredentialSspiContextProvider(request.SqlCredential.GetNetworkCredential());
+                serverConnection = new ServerConnection(sqlConnection);
+                state.UsesCredentialSspiProvider = true;
+                Msg(request, MessageLevel.Debug, "ServerConnection was built with explicit Windows credential SSPI provider");
+            }
+#endif
             else
             {
                 Msg(request, MessageLevel.Debug, "Building ServerConnection from SqlConnectionInfo");
@@ -744,15 +763,8 @@ namespace Dataplat.Dbatools.Connection
                 Msg(request, MessageLevel.Debug, "ServerConnection was built");
             }
 
-            if (authType == "local ad" && String.IsNullOrEmpty(request.AuthenticationType))
+            if (authType == "local ad" && String.IsNullOrEmpty(request.AuthenticationType) && !state.UsesCredentialSspiProvider)
             {
-                if (Environment.OSVersion.Platform != PlatformID.Win32NT)
-                {
-                    // PS: Stop-Function (no -Continue) followed by return - the cmdlet stops
-                    // processing the remaining instances, exactly like the PS source did.
-                    throw new ConnectionResolutionException(ConnectionResolutionFailure.WindowsCredentialOnUnix,
-                        "Cannot use Windows credentials to connect when host is Linux or OS X. Use kinit instead. See https://github.com/dataplat/dbatools/issues/7602 for more info.", null);
-                }
                 Msg(request, MessageLevel.Debug, String.Format("ConnectAsUser will be set to '{0}'", true));
                 serverConnection.ConnectAsUser = true;
 

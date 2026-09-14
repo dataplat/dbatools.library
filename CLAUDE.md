@@ -89,6 +89,13 @@ Always build `dbatools.sln` before finishing a C# change — there is no auto-bu
 enforcement is `TreatWarningsAsErrors` in the satellite csprojs plus the migration gate's build
 step.
 
+**Bump the version whenever you change runtime behavior** — package upgrades, connection/auth
+logic, cmdlet behavior, anything beyond docs or tests — in the same PR. This package is consumed
+by the dbatools PowerShell module as a pinned dependency; a merged behavior change with no version
+bump is invisible to consumers until an unrelated release drags it along. Use the `bump` skill,
+which updates the module manifest version, the main assembly version, and the CSV package version
+together.
+
 ## Gotchas
 
 **Windows + net8.0 test failures are expected.** PowerShell SDK assembly conflicts in the test
@@ -101,7 +108,7 @@ host — only `net472` results matter on Windows. CI runs net8.0 on Linux, where
 
 | Package | Ceiling | Why |
 |---------|---------|-----|
-| Microsoft.Data.SqlClient | 6.x | DacFx/SMO compiled against 6.x; 7.x causes type-load failures |
+| Microsoft.Data.SqlClient | 7.x | 7.0.1 is validated with the pinned SMO and DacFx packages; revalidate their loaders before upgrading |
 | Microsoft.PowerShell.SDK | 7.4.x | 7.5+ requires a net9.0 target change |
 | MSTest.* | 3.x | 4.x drops `Assert.ThrowsException<T>()` on net472 |
 | Microsoft.NET.Test.Sdk | 17.x | 18.x aligns with the MSTest 4.x ecosystem |
