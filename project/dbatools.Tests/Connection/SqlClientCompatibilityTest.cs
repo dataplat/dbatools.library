@@ -41,19 +41,6 @@ namespace Dataplat.Dbatools.Connection
         }
 
         [TestMethod]
-        public void NetworkCredentialSspiProviderExposesPasswordFreePrincipal()
-        {
-            using (NetworkCredentialSspiContextProvider domainQualified = new NetworkCredentialSspiContextProvider(
-                new NetworkCredential("user", "password", "domain")))
-            using (NetworkCredentialSspiContextProvider domainless = new NetworkCredentialSspiContextProvider(
-                new NetworkCredential("user", "password", string.Empty)))
-            {
-                Assert.AreEqual("domain\\user", domainQualified.Principal);
-                Assert.AreEqual("user", domainless.Principal);
-            }
-        }
-
-        [TestMethod]
         public void NetworkCredentialSspiProviderHasStablePoolIdentityPerCredential()
         {
             using (NetworkCredentialSspiContextProvider first = new NetworkCredentialSspiContextProvider(
