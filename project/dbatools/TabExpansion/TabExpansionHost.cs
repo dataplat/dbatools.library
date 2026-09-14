@@ -40,11 +40,9 @@ namespace Dataplat.Dbatools.TabExpansion
         public static List<ScriptBlock> TeppGatherScriptsSlow = new List<ScriptBlock>();
 
         /// <summary>
-        /// A list of all commands imported into dbatools. Typed as CommandInfo, not FunctionInfo,
-        /// so binary cmdlets participate: dbatools now ships flipped commands as compiled cmdlets,
-        /// and a FunctionInfo-only list silently excluded every one of them from tab completion.
+        /// A list of all commands imported into dbatools
         /// </summary>
-        public static List<CommandInfo> DbatoolsCommands = new List<CommandInfo>();
+        public static List<FunctionInfo> DbatoolsCommands = new List<FunctionInfo>();
 
         /// <summary>
         /// List of completion sets that should be processed into Tepp Assignments. Only populate this list on first import.
@@ -137,7 +135,7 @@ namespace Dataplat.Dbatools.TabExpansion
         /// </summary>
         public static void CalculateTabExpansion()
         {
-            foreach (CommandInfo info in DbatoolsCommands)
+            foreach (FunctionInfo info in DbatoolsCommands)
             {
                 try
                 {
