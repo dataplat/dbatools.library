@@ -5,6 +5,8 @@ on:
     paths:
       - 'dbatools.library.psm1'
       - 'dbatools.library.psd1'
+      - 'project/dbatools/dbatools.csproj'
+      - 'tests/test-az-compatibility.ps1'
       - 'tests/test-avoidconflicts.ps1'
       - '.github/workflows/test-avoidconflicts.yml'
   pull_request:
@@ -12,6 +14,8 @@ on:
     paths:
       - 'dbatools.library.psm1'
       - 'dbatools.library.psd1'
+      - 'project/dbatools/dbatools.csproj'
+      - 'tests/test-az-compatibility.ps1'
       - 'tests/test-avoidconflicts.ps1'
       - '.github/workflows/test-avoidconflicts.yml'
   workflow_dispatch:
@@ -300,10 +304,11 @@ jobs:
         with:
           name: dbatools-library
           path: artifacts/dbatools.library/
-      - name: Install SqlServer module (PowerShell Core)
+      - name: Install compatibility test modules
         run: |
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module SqlServer -Force -AllowClobber -Scope CurrentUser
+          Install-Module Az.Accounts -RequiredVersion 5.5.1 -Force -AllowClobber -Scope CurrentUser
       - name: Run test-avoidconflicts.ps1 test suite
         run: |
           Write-Host "Running comprehensive test suite..." -ForegroundColor Cyan
@@ -311,6 +316,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
               Write-Host "Test suite failed!" -ForegroundColor Red
               exit 1
+          }
+      - name: Test Az.Accounts compatibility
+        run: |
+          ./tests/test-az-compatibility.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Az compatibility test failed!" -ForegroundColor Red
+            exit 1
           }
   summary:
     name: Test Summary
@@ -342,6 +354,7 @@ jobs:
           echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
           echo "- Default module import (no conflicts)" >> $GITHUB_STEP_SUMMARY
           echo "- SqlServer + dbatools.library with AvoidConflicts" >> $GITHUB_STEP_SUMMARY
+          echo "- Az.Accounts 5.5.1 compatibility in both import orders" >> $GITHUB_STEP_SUMMARY
           echo "- Assembly version mismatch resolution" >> $GITHUB_STEP_SUMMARY
           echo "- ArgumentList syntax validation" >> $GITHUB_STEP_SUMMARY
           echo "- Both PowerShell Core and Windows PowerShell 5.1" >> $GITHUB_STEP_SUMMARY
